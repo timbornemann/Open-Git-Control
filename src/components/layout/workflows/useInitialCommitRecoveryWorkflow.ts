@@ -31,6 +31,15 @@ export const useInitialCommitRecoveryWorkflow = ({
       if (!gitClient.isAvailable()) return false;
       const repoPath = options.expectedRepoPath || getActiveRepo();
       if (!repoPath || getActiveRepo() !== repoPath) return false;
+      try {
+        if (!(await gitClient.ensureCommitIdentity(repoPath)) || getActiveRepo() !== repoPath) return false;
+      } catch (error: unknown) {
+        setGitActionToast({
+          msg: error instanceof Error ? error.message : tr('Git-Identität konnte nicht geprüft werden.', 'Could not check Git identity.'),
+          isError: true,
+        });
+        return false;
+      }
 
       const commitMessage = t('generated.components.layout.workflows.useinitialcommitrecoveryworkflow.initial_commit_de27cf34');
       const isIdentityMissingError = (message: string) =>
@@ -113,7 +122,7 @@ export const useInitialCommitRecoveryWorkflow = ({
       });
       return false;
     },
-    [getActiveRepo, recoverBareRepoForPush, setActiveTab, setGitActionToast, t],
+    [getActiveRepo, recoverBareRepoForPush, setActiveTab, setGitActionToast, t, tr],
   );
 
   const requestInitialCommitConfirmationIfNeeded = useCallback(

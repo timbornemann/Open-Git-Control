@@ -3,6 +3,18 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { createElectronApi } from '../createElectronApi';
 
 describe('createElectronApi', () => {
+  it('exposes checked Git identity reads and writes in both namespaces', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+    const read = { repoPath: 'C:/repo', scope: 'repository' as const };
+    const save = { ...read, name: 'Name', email: 'name@example.invalid', expectedRevision: 'revision' };
+    await api.git.getGitIdentity(read);
+    await api.saveGitIdentity(save);
+    expect(invoke.mock.calls).toEqual([
+      [IpcChannel.GitGetIdentity, read],
+      [IpcChannel.GitSaveIdentity, save],
+    ]);
+  });
   it('exposes repository-bound LFS inspection and checked conversion through both API namespaces', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

@@ -1,4 +1,4 @@
-import { createContext, useContext, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import type { AppStateSlicesValue, RepositoryContextValue, SettingsContextValue, UIContextValue, WorkflowContextValue } from './app-state/types';
@@ -125,6 +125,12 @@ export const useRepositoryContext = () => useGitStore((state) => state);
 export const useOptionalRepositoryContext = () => {
   const store = useContext(AppStateStoreContext);
   return store?.getState().repository ?? null;
+};
+const subscribeToNothing = () => () => {};
+/** Settings can edit global Git identity even with no repository selected. */
+export const useOptionalActiveRepository = () => {
+  const store = useContext(AppStateStoreContext);
+  return useSyncExternalStore(store?.subscribe || subscribeToNothing, () => store?.getState().repository.activeRepo || null);
 };
 export const useWorkflowContext = () => useWorkflowStore((state) => state);
 export const useUIContext = () => useUIStore((state) => state);

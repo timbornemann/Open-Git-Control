@@ -1,6 +1,7 @@
 import type { ElectronRepositorySecretScanAllowlistAPI } from './repositorySecretScanAllowlist';
 import type { ReadRequest } from '../../cache/resource';
 import type { GitLfsApi } from '../gitLfs';
+import type { GitIdentityApi } from '../gitIdentity';
 import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from '../../../types/git';
 import type {
   CommitLogPageDto,
@@ -229,7 +230,7 @@ export type OpenRepositoryPathResultDto = {
   error?: string;
 };
 
-export interface ElectronGitAPI extends GitLfsApi, ElectronRepositorySecretScanAllowlistAPI {
+export interface ElectronGitAPI extends GitLfsApi, GitIdentityApi, ElectronRepositorySecretScanAllowlistAPI {
   inspectCommitMessageEdit: (request: CommitMessageEditRequest) => Promise<IpcResult<CommitMessageEditInspection>>;
   rewordCommitMessage: (request: RewordCommitMessageRequest) => Promise<IpcResult<CommitMessageEditResult>>;
   getCommitMessageEditBackups: (repoPath: string) => Promise<IpcResult<CommitMessageEditBackup[]>>;

@@ -6,6 +6,7 @@ import { I18nProvider } from '@/i18n';
 import type { AiAutoCommitGroupDto } from '@/types/aiDtos';
 import { AiCommitPlan } from './AiCommitPlan';
 import { useAiCommit } from './useAiCommit';
+import { gitClient } from '@/services/gitClient';
 import type { GitStatusWithConflicts } from './types';
 
 const mocks = vi.hoisted(() => ({ run: vi.fn(), cancel: vi.fn(), state: vi.fn(), subscribe: vi.fn() }));
@@ -46,15 +47,31 @@ beforeEach(() => {
   document.body.append(host);
   root = createRoot(host);
   vi.clearAllMocks();
+  vi.spyOn(gitClient, 'ensureCommitIdentity').mockResolvedValue(true);
   mocks.state.mockResolvedValue({ success: true, data: null });
   mocks.subscribe.mockReturnValue(() => {});
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   act(() => root.unmount());
   host.remove();
 });
 
 describe('AI commit plan and run controls', () => {
+  it('does not start AI work or stage files when identity setup is cancelled', async () => {
+    vi.mocked(gitClient.ensureCommitIdentity).mockResolvedValue(false);
+    await act(async () => {
+      root.render(createElement(I18nProvider, { language: 'en', children: createElement(Harness) }));
+    });
+    await act(async () => {
+      await controls.handleAiAutoCommit();
+    });
+    expect(gitClient.ensureCommitIdentity).toHaveBeenCalledExactlyOnceWith('/repo');
+    expect(mocks.run).not.toHaveBeenCalled();
+    expect(controls.isAiCommitting).toBe(false);
+    expect(controls.isAiJobRunning).toBe(false);
+    expect(toast).not.toHaveBeenCalled();
+  });
   it('shows groups, staged source, paths, fallback and durable commit status', async () => {
     await act(async () => {
       root.render(createElement(I18nProvider, { language: 'en', children: createElement(AiCommitPlan, { groups: [group] }) }));

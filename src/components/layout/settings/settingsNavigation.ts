@@ -35,6 +35,16 @@ export const getSettingsGroups = (tr: Translate) =>
       keywords: 'default branch standardbranch history template signoff sign-off vorlage verlauf commit',
     },
     {
+      id: 'git-identity',
+      tab: 'general',
+      title: tr('Git-Commit-Identität', 'Git commit identity'),
+      description: tr(
+        'Name und E-Mail für dieses Repository oder global auf diesem Computer.',
+        'Name and email for this repository or globally on this computer.',
+      ),
+      keywords: 'identity identität identitaet author autor committer user.name user.email git name email e-mail global repository',
+    },
+    {
       id: 'synchronization',
       tab: 'general',
       title: tr('Synchronisierung', 'Synchronization'),

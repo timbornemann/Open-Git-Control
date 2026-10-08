@@ -336,6 +336,7 @@ export const useGitCommandWorkflow = ({
       setActiveGitActionLabel(actionLabel || tr(`Git ${command} wird ausgeführt...`, `Running git ${command}...`));
 
       try {
+        if (command === 'commit' && (!(await gitClient.ensureCommitIdentity(repoAtStart)) || !isStillActiveRepo())) return false;
         const r = await gitClient.runGitCommandForRepo(repoAtStart, command, ...args.slice(1));
         if (!isStillActiveRepo()) return false;
         if (r.success) {

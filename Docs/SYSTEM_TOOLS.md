@@ -4,6 +4,12 @@ Open-Git-Control checks **Git**, **Git LFS** and **GitHub CLI** at startup. Git 
 
 If Git cannot run, the app explains the requirement once per session and keeps a warning triangle beside the update indicator. Saved repositories and their selected repository are preserved. Checks run again on focus, manually, after an installation, and every 30 seconds while Git is unavailable and the app is visible. Repository restoration resumes after a successful check. Checking versions does not change Git configuration, LFS filters or hooks.
 
+## Commit identity
+
+Git installation and hosting sign-in do not configure the name and email recorded in commits. Before a manual commit, AI auto-commit or initial-commit recovery, Open-Git-Control checks Git's effective author and committer identity. Missing or invalid details open a dedicated dialog; cancelling preserves the commit draft and index. Valid existing configuration is retained, and an operating-system fallback is not treated as an explicitly configured identity.
+
+Use **Settings → General → Git commit identity** to edit the values later. Choose **This repository** to save `user.name` and `user.email` in its local Git configuration, or **Globally on this computer** for the user's global Git configuration. Local settings and explicit author/committer overrides take precedence. Global values remain editable when no repository is selected. Saving never rewrites existing commits or derives an email from the hosting account. Git configuration is rechecked before continuing a pending commit; concurrent changes require reloading rather than overwriting stale values.
+
 ## Installation
 
 Installation always requires a click and a review of the tool, package source and command. The app uses an **existing** package manager and existing package sources; it does not install a package manager, add package sources, or install optional tools automatically.
@@ -39,3 +45,5 @@ The tool status is included in diagnostics. Installation IPC accepts only predef
 Unter **Einstellungen → App & Diagnose → Werkzeuge** stehen Status, Version, offizieller Download und automatische Installation für Git sowie optional Git LFS und GitHub CLI bereit. Fehlt Git, erscheint nach abgeschlossener Prüfung einmal pro Sitzung ein Hinweis. Das Warndreieck bleibt bis zur erfolgreichen Prüfung sichtbar. Repositorys und ihre gespeicherte Auswahl bleiben erhalten; nach einer Installation oder einer erneuten Prüfung werden die Git-Funktionen wieder verfügbar.
 
 Die Installation startet ausschließlich nach deiner Auswahl und zeigt Paketquelle und Befehl. Rechte bestätigt das Betriebssystem. Paketmanager und zusätzliche Paketquellen werden nicht eingerichtet. Falls die automatische Installation nicht möglich ist, nutze den offiziellen Download beziehungsweise die Anleitung und den kopierbaren Befehl. LFS-Filter und Hooks werden weiterhin nur durch den bestehenden repositorylokalen LFS-Ablauf eingerichtet.
+
+Unter **Einstellungen → Allgemein → Git-Commit-Identität** kannst du Git-Name und E-Mail nachträglich für das aktuelle Repository oder global auf diesem Computer ändern. Vor einem Commit werden fehlende Angaben im selben Formular eingerichtet. Die Hosting-Anmeldung ersetzt diese Angaben nicht. Repository-Einstellungen haben Vorrang; bereits erstellte Commits bleiben unverändert.

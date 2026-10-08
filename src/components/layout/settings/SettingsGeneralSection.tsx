@@ -3,6 +3,7 @@ import { RotateCcw } from 'lucide-react';
 import type { AppSettingsDto } from '@/types/appDtos';
 import { useI18n } from '@/i18n';
 import { THEME_OPTIONS } from '../settingsShared';
+import { GitIdentitySettings } from '@/components/git-identity/GitIdentitySettings';
 import { inputClass, SettingsField, SettingsSection, SettingsSwitch, type SettingsSectionProps } from './SettingsSectionPrimitives';
 
 const ThemeField = ({ settings, onUpdateSettings, variant }: SettingsSectionProps) => {
@@ -129,6 +130,10 @@ export const SettingsGeneralSection = ({ settings, onUpdateSettings, variant, on
           onChange={(checked) => void onUpdateSettings({ commitSignoffByDefault: checked })}
         />
         <CommitTemplateField settings={settings} onUpdateSettings={onUpdateSettings} variant={variant} />
+      </SettingsSection>
+
+      <SettingsSection group="git-identity" variant={variant}>
+        <GitIdentitySettings />
       </SettingsSection>
 
       <SettingsSection group="synchronization" variant={variant}>

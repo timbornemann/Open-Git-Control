@@ -122,17 +122,6 @@
       "updatedAt": 1785856977969
     },
     {
-      "id": "e1735baf-002f-43a2-b357-8d49e35bb2d6",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Fresh Install: Check for git",
-      "description": "Fresh Install: Check for git: Wenn man Open-Git-Controll frisch insatlliert aber z.b. noch gar kein git installiert hat soll die app ein popup zeigen indem das erklärt wird, ebenfalsl soll ein link zum offiziellen download bereitgestellt werden. gleichzeitig soll in der seitenleiste änlich wie die update info ein warn dreieck sein, das bleib so lange bis git installiert und nutzbar ist. \ngit lfs soll auch als optional gekennzeichet werden auch mit download linkgenau wie github cli\nUnter Windows ist Git LFS normalerweise bereits dabei. Der übliche Git-for-Windows-Installer liefert es mit und aktiviert es standardmäßig; die Option lässt sich allerdings abwählen. Git for Windows\nBei macOS und Linux wird es üblicherweise separat installiert, beispielsweise mit brew install git-lfs beziehungsweise sudo apt install git-lfs.\n\nalternativ zum manuellen donwload soll auch ein automatischer download möglich sein, indem Open git contoll die tool mittels command installiert",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1791460675269,
-      "updatedAt": 1791472550094
-    },
-    {
       "id": "aa11ecd9-6624-4946-844a-7518a72d8aae",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Commit-Identität einrichten",
@@ -141,7 +130,7 @@
       "status": "planned",
       "tags": [],
       "createdAt": 1791462669489,
-      "updatedAt": 1791462669489
+      "updatedAt": 1791487064508
     },
     {
       "id": "05a3ba82-6a57-4f9c-99f5-3ca9a042ed3f",
@@ -208,17 +197,6 @@
       "tags": [],
       "createdAt": 1791464207426,
       "updatedAt": 1791464207426
-    },
-    {
-      "id": "18cb73c5-c23a-4484-afda-c4bd55a3dfb1",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Remote (Github repository) erstellen und remote damit verbinden",
-      "description": "Fürher vor dem multi provider gab es die möglichkeit github repositorys direkt zu ertsellen und einzurichten das geht jetzt nicht mehr so einfach, nur bei remote einstellen, aber da ist keine geführe repo erstellung drinnen, das soll wieder kommen, man soll in de rlage sein github repositorys oder wenn möglich auch für andere anbiter aus der app heraus die repos zu erstellen nahc dem erstellen wird korrekt die remote gesetz und der stand hochgeladen damit alles sauber funktioniert und man einfach und schnell repos erstellen und anlegen kann",
-      "priority": "medium",
-      "status": "bug",
-      "tags": [],
-      "createdAt": 1791473232132,
-      "updatedAt": 1791477137821
     }
   ]
 }

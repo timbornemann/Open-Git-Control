@@ -92,6 +92,18 @@ describe('SettingsMainContent AI and MCP organization', () => {
     expect(onUpdateSettings).not.toHaveBeenCalled();
   });
 
+  it('provides a separate searchable Git identity group in General settings', async () => {
+    await render('general');
+    expect(host.querySelector('#settings-git-identity-title')?.textContent).toBe('Git commit identity');
+    expect(host.querySelector('#settings-git-identity')?.textContent).toContain('Globally on this computer');
+    changeInput(host.querySelector<HTMLInputElement>('input[type="search"]')!, 'user.email');
+    const result = host.querySelector<HTMLButtonElement>('.settings-search-result')!;
+    expect(result.textContent).toContain('Git commit identity');
+    act(() => result.click());
+    expect(onUpdateSettings).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(host.querySelector('#settings-git-identity-title'));
+  });
+
   it('keeps an unsaved URL draft while searching and clearing search', async () => {
     await render('api');
     const url = host.querySelector<HTMLInputElement>('input[placeholder="http://127.0.0.1:11434"]')!;

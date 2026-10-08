@@ -10,6 +10,7 @@ import { Input } from '@/components/Input';
 import { BranchContextMenu } from './BranchContextMenu';
 import { CloneProgressModal } from './CloneProgressModal';
 import { GitTransferProgressNotification } from './GitTransferProgressNotification';
+import { GitIdentityDialog } from '@/components/git-identity/GitIdentityDialog';
 import type { BranchContextMenuState, ConfirmDialogState, InputDialogState } from './layoutTypes';
 
 type RepoSwitcherOverlayState = {
@@ -192,6 +193,7 @@ const DialogOverlays: React.FC<{ state: DialogOverlayState }> = ({ state }) => (
 export const OverlayManager: React.FC<OverlayManagerProps> = ({ repoSwitcher, toasts, branchMenu, dialogs, gitTransfer, cloneProgress, commandPalette }) => (
   <>
     <RepoSwitcherOverlay state={repoSwitcher} />
+    <GitIdentityDialog activeRepo={repoSwitcher.activeRepo} />
 
     <ActionToastViewport toasts={toasts.items} onDismiss={toasts.onDismiss} />
 

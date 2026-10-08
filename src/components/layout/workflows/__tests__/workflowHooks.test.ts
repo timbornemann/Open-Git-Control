@@ -51,6 +51,7 @@ const renderHook = <T>(useHook: () => T): HookRender<T> => {
 };
 
 beforeEach(() => {
+  vi.spyOn(gitClient, 'ensureCommitIdentity').mockResolvedValue(true);
   const dom = new JSDOM('<!doctype html><html><body></body></html>');
   vi.stubGlobal('window', dom.window);
   vi.stubGlobal('document', dom.window.document);

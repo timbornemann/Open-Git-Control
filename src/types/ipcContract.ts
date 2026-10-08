@@ -48,6 +48,8 @@ export const enum IpcChannel {
   GitCommitLogPage = 'git:commitLogPage',
   GitCommitStats = 'git:commitStats',
   GitCreateCommit = 'git:createCommit',
+  GitGetIdentity = 'git:getIdentity',
+  GitSaveIdentity = 'git:saveIdentity',
   GitInspectCommitMessageEdit = 'git:inspectCommitMessageEdit',
   GitRewordCommitMessage = 'git:rewordCommitMessage',
   GitCommitMessageEditBackups = 'git:commitMessageEditBackups',

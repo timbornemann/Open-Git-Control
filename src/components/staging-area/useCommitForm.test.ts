@@ -35,6 +35,7 @@ beforeEach(() => {
   vi.stubGlobal('navigator', dom.window.navigator);
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+  vi.spyOn(gitClient, 'ensureCommitIdentity').mockResolvedValue(true);
   vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: 'Previous title' });
   vi.spyOn(gitClient, 'stagePaths').mockResolvedValue({ success: true, data: '' });
   vi.spyOn(gitClient, 'scanCommitSecrets').mockResolvedValue({
@@ -49,6 +50,89 @@ afterEach(() => {
 });
 
 describe('useCommitForm repository isolation', () => {
+  it.each([false, true])('waits for identity before staging protection and preserves a cancelled commit draft (secret scan: %s)', async (scanEnabled) => {
+    const identity = deferred<boolean>();
+    vi.mocked(gitClient.ensureCommitIdentity).mockReturnValueOnce(identity.promise);
+    const createCommit = vi.spyOn(gitClient, 'createCommit').mockResolvedValue({ success: true });
+    let current!: ReturnType<typeof useCommitForm>;
+    const root = createRoot(document.getElementById('root')!);
+    const Harness = () => {
+      current = useCommitForm({
+        repoPath: repoA,
+        status,
+        setToast: vi.fn(),
+        refresh: vi.fn().mockResolvedValue(undefined),
+        settings: { ...DEFAULT_SETTINGS, secretScanBeforeCommitEnabled: scanEnabled },
+        setConfirmDialog: vi.fn(),
+        onUpdateSettings: vi.fn().mockResolvedValue(undefined),
+      });
+      return null;
+    };
+    act(() => root.render(createElement(Harness)));
+    act(() => {
+      current.setCommitMsg('Keep my title');
+      current.setCommitDescription('Keep my details');
+    });
+    let pending!: Promise<void>;
+    act(() => {
+      pending = current.handleCommit();
+      void current.handleCommit();
+    });
+    expect(gitClient.ensureCommitIdentity).toHaveBeenCalledExactlyOnceWith(repoA);
+    expect(gitClient.scanCommitSecrets).not.toHaveBeenCalled();
+    expect(createCommit).not.toHaveBeenCalled();
+    await act(async () => {
+      identity.resolve(false);
+      await pending;
+    });
+    expect(current.commitMsg).toBe('Keep my title');
+    expect(current.commitDescription).toBe('Keep my details');
+    expect(current.isCommitting).toBe(false);
+    expect(gitClient.stagePaths).not.toHaveBeenCalled();
+    await act(async () => {
+      await current.handleCommit();
+    });
+    expect(createCommit).toHaveBeenCalledWith(expect.objectContaining({ repoPath: repoA, title: 'Keep my title', description: 'Keep my details' }));
+    expect(gitClient.scanCommitSecrets).toHaveBeenCalledTimes(scanEnabled ? 1 : 0);
+    act(() => root.unmount());
+  });
+  it('does not continue a prepared commit when its repository changes during identity setup', async () => {
+    const identity = deferred<boolean>();
+    vi.mocked(gitClient.ensureCommitIdentity).mockReturnValueOnce(identity.promise);
+    const createCommit = vi.spyOn(gitClient, 'createCommit').mockResolvedValue({ success: true });
+    let repoPath = repoA,
+      current!: ReturnType<typeof useCommitForm>;
+    const root = createRoot(document.getElementById('root')!);
+    const Harness = () => {
+      current = useCommitForm({
+        repoPath,
+        status,
+        setToast: vi.fn(),
+        refresh: vi.fn().mockResolvedValue(undefined),
+        settings: DEFAULT_SETTINGS,
+        setConfirmDialog: vi.fn(),
+        onUpdateSettings: vi.fn().mockResolvedValue(undefined),
+      });
+      return null;
+    };
+    act(() => root.render(createElement(Harness)));
+    act(() => current.setCommitMsg('Old draft'));
+    let pending!: Promise<void>;
+    act(() => {
+      pending = current.handleCommit();
+    });
+    repoPath = repoB;
+    act(() => root.render(createElement(Harness)));
+    act(() => current.setCommitMsg('New draft'));
+    await act(async () => {
+      identity.resolve(true);
+      await pending;
+    });
+    expect(createCommit).not.toHaveBeenCalled();
+    expect(gitClient.scanCommitSecrets).not.toHaveBeenCalled();
+    expect(current.commitMsg).toBe('New draft');
+    act(() => root.unmount());
+  });
   it('resets amend on repository changes and ignores a late success from the previous repository', async () => {
     const pendingCommit = deferred<{ success: boolean; error?: string }>();
     vi.spyOn(gitClient, 'createCommit').mockReturnValue(pendingCommit.promise);
@@ -76,8 +160,9 @@ describe('useCommitForm repository isolation', () => {
     });
 
     let commitPromise!: Promise<void>;
-    act(() => {
+    await act(async () => {
       commitPromise = current!.handleCommit();
+      await Promise.resolve();
     });
     expect(gitClient.createCommit).toHaveBeenCalledWith(expect.objectContaining({ repoPath: repoA, title: 'Commit in A' }));
     expect(current!.isCommitting).toBe(true);
@@ -363,8 +448,9 @@ describe('useCommitForm repository isolation', () => {
     act(render);
     act(() => current!.setCommitMsg('Commit in A'));
     let oldCommit!: Promise<void>;
-    act(() => {
+    await act(async () => {
       oldCommit = current!.handleCommit();
+      await Promise.resolve();
     });
 
     repoPath = repoB;

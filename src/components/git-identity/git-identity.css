@@ -1,0 +1,61 @@
+.git-identity-settings {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: 760px;
+}
+.git-identity-fields {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.git-identity-hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.git-identity-scope {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 320px;
+}
+.git-identity-fields label > span {
+  font-size: 12px;
+  color: var(--text-primary);
+}
+.git-identity-context {
+  overflow-wrap: anywhere;
+}
+.git-identity-inputs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.git-identity-inputs label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.git-identity-inputs input {
+  width: 100%;
+  min-width: 0;
+}
+.git-identity-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+@media (max-width: 560px) {
+  .git-identity-inputs {
+    grid-template-columns: 1fr;
+  }
+}
+@container (max-width: 460px) {
+  .git-identity-inputs {
+    grid-template-columns: 1fr;
+  }
+}

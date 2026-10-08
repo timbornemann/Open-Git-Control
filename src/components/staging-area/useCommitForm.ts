@@ -210,11 +210,6 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
       return;
     }
 
-    if (!settings.secretScanBeforeCommitEnabled) {
-      await commitPreparedChanges();
-      return;
-    }
-
     const repoAtStart = repoPath;
     const repoGeneration = repoGenerationRef.current;
     const scanOperationId = ++nextSecretScanOperationIdRef.current;
@@ -224,6 +219,11 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
     isSecretScanInProgressRef.current = true;
     setIsCommitting(true);
     try {
+      if (!(await gitClient.ensureCommitIdentity(repoAtStart)) || !isCurrentScan()) return;
+      if (!settings.secretScanBeforeCommitEnabled) {
+        await commitPreparedChanges();
+        return;
+      }
       const scan = await gitClient.scanCommitSecrets({ repoPath: repoAtStart });
       if (!isCurrentScan()) return;
       if (!scan.success) {

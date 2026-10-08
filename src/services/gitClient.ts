@@ -10,6 +10,7 @@ import { workingTreeReads } from './workingTreeReads';
 import { commitMessageEdits } from './commitMessageEdits';
 import { repositoryFileClient } from './repositoryFileClient';
 import { isSystemToolAvailable } from './systemToolsAvailability';
+import { ensureCommitIdentity } from '@/app/state/gitIdentityStore';
 
 export type GitCommandArgs = [GitCommandName, ...string[]];
 
@@ -35,9 +36,8 @@ const sanitizeBranchSuffix = (value: string): string => value.replace(/[^a-zA-Z0
 const command = <TCommand extends GitCommandName>(commandName: TCommand, ...args: string[]): [TCommand, ...string[]] => [commandName, ...args];
 export const gitClient = cachedClient('git', {
   ...commitMessageEdits,
-  isAvailable(): boolean {
-    return Boolean(getElectronApi()) && isSystemToolAvailable('git');
-  },
+  ensureCommitIdentity,
+  isAvailable: (): boolean => Boolean(getElectronApi()) && isSystemToolAvailable('git'),
 
   onJobEvent(...args: Parameters<ElectronAPI['onJobEvent']>): ReturnType<ElectronAPI['onJobEvent']> {
     return requireElectronGitApi().onJobEvent(...args);

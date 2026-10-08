@@ -3,6 +3,7 @@ import type { ToastMessage } from '@/types/git';
 import type { AiAutoCommitGroupDto, AiAutoCommitResultDto } from '@/types/aiDtos';
 import { useI18n } from '@/i18n';
 import { aiClient } from '@/services/aiClient';
+import { gitClient } from '@/services/gitClient';
 import type { GitStatusWithConflicts } from './types';
 
 const AI_STATE_POLL_INTERVAL_MS = 500;
@@ -314,30 +315,33 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
       return;
     }
 
-    clearTerminalClearTimer();
-    cancelRequestedRef.current = false;
     aiStartLockRef.current = true;
-    lastKnownStatusRef.current = 'start';
-    lastEventTimestampRef.current = Date.now() - 1;
-    lastRefreshAtRef.current = 0;
-    lastNotifiedCommitCountRef.current = 0;
-    aiTotalFilesRef.current = totalFiles;
-
-    setAiPhase('snapshot');
-    setAiMode('normal');
-    setAiLastCommit(null);
-    setAiGroupId(null);
-    setAiGroupSize(null);
-    setAiTotalCommits(null);
-    setAiGroups([]);
-    setAiProcessedFiles(0);
-    setAiRemainingFiles(totalFiles);
-    setAiProgressMessage(t('generated.components.staging_area.useaicommit.ai_is_starting_e50f32f8'));
     setIsAiCommitting(true);
-    setIsAiJobRunning(true);
-    maybeRefresh();
-
     try {
+      if (!(await gitClient.ensureCommitIdentity(repoPath)) || generation !== runGenerationRef.current || repoPathRef.current !== repoPath) return;
+
+      clearTerminalClearTimer();
+      cancelRequestedRef.current = false;
+      lastKnownStatusRef.current = 'start';
+      lastEventTimestampRef.current = Date.now() - 1;
+      lastRefreshAtRef.current = 0;
+      lastNotifiedCommitCountRef.current = 0;
+      aiTotalFilesRef.current = totalFiles;
+
+      setAiPhase('snapshot');
+      setAiMode('normal');
+      setAiLastCommit(null);
+      setAiGroupId(null);
+      setAiGroupSize(null);
+      setAiTotalCommits(null);
+      setAiGroups([]);
+      setAiProcessedFiles(0);
+      setAiRemainingFiles(totalFiles);
+      setAiProgressMessage(t('generated.components.staging_area.useaicommit.ai_is_starting_e50f32f8'));
+      setIsAiCommitting(true);
+      setIsAiJobRunning(true);
+      maybeRefresh();
+
       const result = await aiClient.runAutoCommit({ repoPath });
       if (generation !== runGenerationRef.current || repoPathRef.current !== repoPath) return;
       if (!result.success) {

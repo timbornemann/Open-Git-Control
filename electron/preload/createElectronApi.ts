@@ -29,6 +29,7 @@ import { createRepositoryFileApi } from './createRepositoryFileApi';
 import { createRepositoryIconApi } from './createRepositoryIconApi';
 import type { ReleaseNotesGenerationParamsDto } from '../../src/types/releaseNotes';
 import type { ScanPushSecretsRequestDto } from '../../src/types/secretScan';
+import type { GitIdentityRequest, SaveGitIdentityRequest } from '../../src/shared/ipc/gitIdentity';
 
 type PreloadIpcRenderer = Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener'>;
 
@@ -83,6 +84,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     ...createRepositorySecretScanAllowlistApi(ipcRenderer),
     ...createRepositoryIconApi(ipcRenderer),
     ...createHostingApi(ipcRenderer),
+    getGitIdentity: (request: GitIdentityRequest) => ipcRenderer.invoke(IpcChannel.GitGetIdentity, request),
+    saveGitIdentity: (request: SaveGitIdentityRequest) => ipcRenderer.invoke(IpcChannel.GitSaveIdentity, request),
     inspectCommitMessageEdit: (request: Parameters<ElectronAPI['inspectCommitMessageEdit']>[0]) =>
       invokeGitOperationForRepo(request.repoPath, 'inspectCommitMessageEdit', IpcChannel.GitInspectCommitMessageEdit, request),
     rewordCommitMessage: (request: Parameters<ElectronAPI['rewordCommitMessage']>[0]) =>
@@ -343,6 +346,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     hosting: { hostingRequest: flatApi.hostingRequest },
     transfers: { remoteTransferRequest: flatApi.remoteTransferRequest },
     git: {
+      getGitIdentity: flatApi.getGitIdentity,
+      saveGitIdentity: flatApi.saveGitIdentity,
       setRepoPath: flatApi.setRepoPath,
       clearRepoPath: flatApi.clearRepoPath,
       runGitCommand: flatApi.runGitCommand,
