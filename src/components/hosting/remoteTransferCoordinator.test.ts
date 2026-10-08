@@ -84,6 +84,47 @@ beforeEach(() => {
 });
 
 describe('shared remote transfer coordinator', () => {
+  it('publishes explicitly captured branches from detached HEAD without applying saved profiles', async () => {
+    snapshot.branch = '';
+    context.branch = '';
+    preferences = { pushRemotes: ['backup'], profiles: [{ id: 'backup', name: 'Backup', remoteNames: ['backup'] }], activeProfileId: 'backup' };
+    const branchTargets = [
+      { sourceBranch: 'main', destinationBranch: 'main', sourceOid: 'a'.repeat(40) },
+      { sourceBranch: 'feature', destinationBranch: 'preview', sourceOid: 'b'.repeat(40) },
+    ];
+    plan.branch = '';
+    plan.branchRefs = branchTargets;
+    await coordinator.start({
+      repoPath: '/repo',
+      mode: 'push',
+      destinationBranch: 'main',
+      constrainedRemoteNames: ['origin'],
+      branchTargets,
+      expectedTagRefs: [],
+    });
+    expect(actionCalls('planPush')[0]).toMatchObject({
+      remoteNames: ['origin'],
+      branchTargets: branchTargets.map(({ sourceBranch, destinationBranch }) => ({ sourceBranch, destinationBranch })),
+      tagNames: [],
+      force: false,
+    });
+    expect(actionCalls('planPush')[0]).not.toHaveProperty('targetBranches');
+    expect(actionCalls('executePush')).toHaveLength(1);
+    expect(mocked.scan).toHaveBeenCalled();
+  });
+  it('stops before scanning or pushing when an explicitly captured branch changed', async () => {
+    plan.branchRefs = [{ sourceBranch: 'main', destinationBranch: 'main', sourceOid: 'b'.repeat(40) }];
+    await coordinator.start({
+      repoPath: '/repo',
+      mode: 'push',
+      destinationBranch: 'main',
+      constrainedRemoteNames: ['origin'],
+      branchTargets: [{ sourceBranch: 'main', destinationBranch: 'main', sourceOid: 'a'.repeat(40) }],
+    });
+    expect(actionCalls('executePush')).toHaveLength(0);
+    expect(mocked.scan).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(expect.stringContaining('branches or tags changed'), true);
+  });
   it('pushes a single remote directly after scanning with no routine review and no implicit tags', async () => {
     preferences = {
       profiles: [{ id: 'old', name: 'Old profile', remoteNames: ['origin'], destinationBranch: 'release', tagNames: ['v1'] }],

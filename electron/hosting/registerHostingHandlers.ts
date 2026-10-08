@@ -22,6 +22,8 @@ import { getHostingReleaseContext } from './HostingReleaseContext';
 import type { GitCredentialEnvironment } from './HostingCredentialBridge';
 import { hasControlCharacters } from './hostingUrls';
 import { parseReleaseCommits, RELEASE_COMMIT_FORMAT } from '../main-process/parsing';
+import { RepositoryPublicationService } from './RepositoryPublicationService';
+import { isAllowedAppNavigation } from '../main-process/security';
 
 type Dependencies = { gitService: GitService; pushGuard?: SecretScanPushGuard; hostingService?: HostingService };
 const MAX_TRANSFER_BYTES = 512 * 1024 * 1024;
@@ -234,10 +236,24 @@ async function releaseNotesCommits(input: HostingOperations['releaseNotesCommits
 
 export function registerHostingHandlers({ gitService, pushGuard, hostingService: service = hostingService }: Dependencies): void {
   const releaseSafety = new HostingReleaseSafety({ gitService, hostingService: service, pushGuard });
+  const publication = new RepositoryPublicationService({ gitService, hostingService: service });
   ipcMain.handle(IpcChannel.HostingRequest, async (event: IpcMainInvokeEvent, operation: HostingOperation, input: unknown) => {
     try {
       let data: unknown;
-      if (operation === 'inspectRelease') data = await releaseSafety.inspect(event, input as HostingOperations['inspectRelease']['input']);
+      if (['publicationContext', 'preparePublication', 'connectPublication', 'finishPublication', 'cancelPublication'].includes(operation)) {
+        if (
+          !event.senderFrame ||
+          event.senderFrame !== event.sender.mainFrame ||
+          !BrowserWindow.fromWebContents(event.sender) ||
+          !isAllowedAppNavigation(event.senderFrame.url, { isDev: process.env.NODE_ENV === 'development', mainProcessDir: path.join(__dirname, '..') })
+        )
+          throw new Error('Repository publication requires the trusted app window.');
+        if (operation === 'cancelPublication') data = publication.cancel((input as HostingOperations['cancelPublication']['input']).repoPath);
+        else if (operation === 'publicationContext') data = await publication.context(input as HostingOperations['publicationContext']['input']);
+        else if (operation === 'preparePublication') data = await publication.prepare(input as HostingOperations['preparePublication']['input']);
+        else if (operation === 'connectPublication') data = await publication.connect(input as HostingOperations['connectPublication']['input']);
+        else data = await publication.finish(input as HostingOperations['finishPublication']['input']);
+      } else if (operation === 'inspectRelease') data = await releaseSafety.inspect(event, input as HostingOperations['inspectRelease']['input']);
       else if (operation === 'createRelease') data = await releaseSafety.create(event, input as HostingOperations['createRelease']['input']);
       else if (operation === 'syncReleaseTag') data = await releaseSafety.syncTag(event, input as HostingOperations['syncReleaseTag']['input']);
       else if (operation === 'downloadArtifact') data = await downloadArtifact(event, input as HostingOperations['downloadArtifact']['input'], service);

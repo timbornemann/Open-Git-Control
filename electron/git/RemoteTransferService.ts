@@ -341,7 +341,9 @@ export class RemoteTransferService {
   ): Promise<GitPushTargetResultDto> {
     const isolated = isolatedPushEnvironment(target.remoteName, target.url, this.isolationSupported === true);
     const base = target.lfsEndpoint ? lfsTransferEnvironment(isolated, target.remoteName, target.lfsEndpoint, target.url) : isolated;
-    let refs = plan.refs.map((ref) => (ref.destinationRef.startsWith('refs/heads/') ? { ...ref, destinationRef: target.destinationRef } : ref));
+    let refs = plan.dto.branchRefs
+      ? [...plan.refs]
+      : plan.refs.map((ref) => (ref.destinationRef.startsWith('refs/heads/') ? { ...ref, destinationRef: target.destinationRef } : ref));
     if (retry) {
       const actual = await this.advertised(repoPath, target, refs, context);
       refs = refs.filter((ref) => actual.get(ref.destinationRef) !== ref.sourceOid);

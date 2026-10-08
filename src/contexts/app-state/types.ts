@@ -28,6 +28,10 @@ export type BaseUIContextValue = SidebarCoreState & {
   onOpenRemoteConfig: () => void;
   onCloseRemoteConfig: () => void;
   isReleaseCreatorOpen: boolean;
+  isRepositoryPublicationOpen?: boolean;
+  publicationConnectionId?: string;
+  onOpenRepositoryPublication?: (connectionId?: string) => void;
+  onCloseRepositoryPublication?: () => void;
   releaseCreatorTarget: HostedRepositoryRef | null;
   onOpenReleaseCreator: (target?: HostedRepositoryRef) => void;
   onCloseReleaseCreator: () => void;

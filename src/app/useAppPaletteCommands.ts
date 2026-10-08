@@ -19,6 +19,14 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
   useMemo(
     () => [
       {
+        id: 'repository-publish',
+        label: state.settings.language === 'de' ? 'Repository veröffentlichen' : 'Publish repository',
+        keywords: ['publish', 'create', 'hosting', 'github', 'forgejo', 'gitlab', 'bitbucket', 'veröffentlichen', 'erstellen'],
+        action: () => {
+          if (state.activeRepo) state.onOpenRepositoryPublication();
+        },
+      },
+      {
         id: 'tab-repos',
         label: t('generated.app.local_repos_c90bebd3'),
         keywords: ['local', 'repos', 'lokal'],

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BookOpen, ChevronRight, GitPullRequest, RefreshCw, Server, Settings2, Tag, Workflow } from 'lucide-react';
+import { BookOpen, ChevronRight, GitPullRequest, RefreshCw, Server, Settings2, Tag, Workflow, UploadCloud } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useGitStore, useUIStore } from '@/contexts/AppStateContext';
 import { RepoCard, RepoCardContent, RepoCardHeader } from '@/components/sidebar/RepoCard';
@@ -25,6 +25,7 @@ export function HostingSidebar({ local = false }: { local?: boolean }) {
   const activeTab = useUIStore((s) => s.activeTab);
   const setActiveTab = useUIStore((s) => s.setActiveTab);
   const onOpenRemoteConfig = useUIStore((s) => s.onOpenRemoteConfig);
+  const onPublish = useUIStore((s) => s.onOpenRepositoryPublication);
   const [collapsed, setCollapsed] = useState(false);
   const target = useRepositoryHosting(activeRepo);
   useEffect(() => {
@@ -107,6 +108,7 @@ export function HostingSidebar({ local = false }: { local?: boolean }) {
           )}
           <nav className="hosting-sidebar__navigation hosting-sidebar__management" aria-label={tr('Hosting-Verwaltung', 'Hosting management')}>
             <span className="hosting-sidebar__group-label">{tr('Verwalten', 'Manage')}</span>
+            {activeRepo && link('repositories', tr('Repository veröffentlichen', 'Publish repository'), <UploadCloud size={14} />, () => onPublish?.())}
             {activeRepo && link('remotes', tr('Remote-Konfiguration', 'Remote configuration'), <Settings2 size={14} />, onOpenRemoteConfig)}
             {link('repositories', tr('Repository-Katalog', 'Repository catalog'), <BookOpen size={14} />)}
             {link('connections', tr('Konten & Server', 'Accounts & servers'), <Server size={14} />)}

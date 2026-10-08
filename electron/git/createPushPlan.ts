@@ -1,8 +1,9 @@
 import { randomUUID } from 'crypto';
-import { readPushSource } from './remoteSnapshot';
+import { assertPushSourceUnchanged } from './remoteSnapshot';
+import { capturePushRefs } from './capturePushRefs';
 import { referencedLfsObjects, lfsEndpoint } from './GitLfsTransfers';
 import { assertGroupedCredentialChoices } from './groupedRemotePush';
-import { isolatedPushEnvironment, normalizeTargetBranches, resolvePushTargetUrls, refName, remoteName, remoteUrl } from './remoteTransferValidation';
+import { isolatedPushEnvironment, normalizeTargetBranches, resolvePushTargetUrls, remoteName, remoteUrl } from './remoteTransferValidation';
 import { digest, boundCredentialGenerations, PLAN_LIFETIME, type Runner, type StoredPlan, type RemoteTransferContext } from './remoteTransferModels';
 import type { PublishedRef } from './remotePushResults';
 import type { GitRemoteSnapshotDto, GitPushPlanDto, GitPushTargetDto, RemotePreferences, RemoteTransferOperations } from '../../src/types/remoteTransfers';
@@ -34,15 +35,12 @@ export async function createPushPlan(
   const targetUrls = resolvePushTargetUrls(input.targetUrls, snapshot, input.remoteNames);
   const targetBranches = input.targetBranches ? normalizeTargetBranches(input.targetBranches, input.remoteNames) : {};
   if (input.force !== undefined && typeof input.force !== 'boolean') throw new Error('Invalid push mode.');
-  const { sourceBranch, destinationRef, sourceOid } = await readPushSource(repoPath, dependencies.git, snapshot.branch, input);
-  const tagNames = [...new Set(input.tagNames ?? [])];
-  if (!Array.isArray(input.tagNames ?? []) || tagNames.length > 64) throw new Error('Invalid selected tags.');
-  const refs: PublishedRef[] = [{ sourceOid, destinationRef }];
-  for (const name of tagNames) {
-    const tagRef = `refs/tags/${refName(name)}`;
-    await dependencies.git.run(repoPath, ['check-ref-format', tagRef]);
-    refs.push({ sourceOid: (await dependencies.git.run(repoPath, ['rev-parse', '--verify', tagRef])).trim(), destinationRef: tagRef });
-  }
+  const { sourceBranch, destinationRef, sourceOid, branchRefs, tagNames, tagRefs, refs } = await capturePushRefs(
+    repoPath,
+    dependencies.git,
+    snapshot.branch,
+    input,
+  );
   const id = randomUUID();
   const lfsObjects = await referencedLfsObjects(
     repoPath,
@@ -84,6 +82,8 @@ export async function createPushPlan(
     sourceOid,
     branch: snapshot.branch,
     ...(input.sourceBranch === undefined ? {} : { sourceBranch }),
+    ...(branchRefs ? { branchRefs } : {}),
+    ...(tagRefs.length ? { tagRefs } : {}),
     tagNames,
     force: input.force === true,
     targets,
@@ -93,6 +93,7 @@ export async function createPushPlan(
   const fingerprint = await dependencies.fingerprint();
   if (fingerprint !== initialFingerprint) throw new Error('Remote configuration or account bindings changed while planning. Review the push again.');
   context.ensureActive();
+  await assertPushSourceUnchanged(repoPath, dependencies.git, dto);
   const connections = Object.fromEntries(targets.map((target) => [target.id, dependencies.connectionId(target.remoteName, target.url)]));
   assertGroupedCredentialChoices(targets, connections);
   return {

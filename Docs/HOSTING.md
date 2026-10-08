@@ -28,6 +28,8 @@ Opening a repository shows its own full-width detail page with **Overview**, pro
 
 ## Repositories with several endpoints
 
+Use **Publish repository** to create an empty hosting repository, add a separate account-bound remote and upload selected local branches and tags through a guided workflow. Existing defaults stay intact unless explicitly replaced. Interrupted setup can be resumed without creating another repository. See [the repository publication assistant](REPOSITORY_PUBLICATION.md).
+
 Add backup servers as separate named remotes, for example `forgejo` and `github-backup`. Existing multiple `pushurl` values are preserved and shown. Fetch URLs and push URLs are managed separately. Repository paths and IDs belong to their connection; equal names or numeric IDs on different servers do not refer to the same repository.
 
 Each local repository has independent selections:

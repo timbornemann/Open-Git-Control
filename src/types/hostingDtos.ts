@@ -114,6 +114,7 @@ export interface HostingPage<T> {
 export interface HostingRepositoryCreation {
   connectionId: string;
   namespace?: string;
+  projectKey?: string;
   name: string;
   description?: string;
   private: boolean;

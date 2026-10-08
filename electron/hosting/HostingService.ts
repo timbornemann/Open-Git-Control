@@ -37,6 +37,8 @@ const isConnection = (value: unknown): value is HostingConnection => {
 const ADAPTER_OPERATIONS = new Set<HostingOperation>([
   'repository',
   'createRepository',
+  'creationTargets',
+  'verifyCreationTarget',
   'fork',
   'branches',
   'tags',

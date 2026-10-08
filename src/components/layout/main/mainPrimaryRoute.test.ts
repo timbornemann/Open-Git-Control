@@ -11,6 +11,20 @@ const base = {
 };
 
 describe('local repository primary route', () => {
+  it('opens repository publication in the repository subpage ahead of timeline and file details', () => {
+    expect(
+      getMainPrimaryRoute({
+        ...base,
+        activeTab: 'repo',
+        showRepositoryPublication: true,
+        showTimeline: true,
+        showRemoteConfig: true,
+        activeDiffRequest: { filePath: 'file' } as never,
+      }),
+    ).toBe('repositoryPublication');
+    expect(hasMainPrimaryHeader('repositoryPublication')).toBe(true);
+    expect(getMainPrimaryRoute({ ...base, activeTab: 'hosting', showRepositoryPublication: true })).toBe('hosting');
+  });
   it('opens repository allowlist settings with a header ahead of detail views', () => {
     expect(
       getMainPrimaryRoute({

@@ -39,6 +39,7 @@ type Props = {
   onOpenRunSettings: () => void;
   onOpenSecretScanAllowlist?: () => void;
   onOpenRemoteConfig?: () => void;
+  onPublishRepository?: () => void;
 };
 
 type SplitOption = {
@@ -77,6 +78,7 @@ export const TopbarActions: React.FC<Props> = ({
   onOpenRunSettings,
   onOpenSecretScanAllowlist,
   onOpenRemoteConfig,
+  onPublishRepository,
 }) => {
   const intent = usePreloadIntent();
   const { t } = useI18n();
@@ -428,6 +430,7 @@ export const TopbarActions: React.FC<Props> = ({
             onOpenRunSettings={onOpenRunSettings}
             onOpenSecretScanAllowlist={onOpenSecretScanAllowlist}
             onOpenRemoteConfig={onOpenRemoteConfig}
+            onPublishRepository={onPublishRepository}
           />
         )}
       </div>

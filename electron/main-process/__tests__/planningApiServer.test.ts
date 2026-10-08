@@ -13,7 +13,7 @@ vi.mock('electron', () => ({
 }));
 
 import type { PlanningApiServerHandle } from '../planningApiServer';
-import { startPlanningApiServer } from '../planningApiServer';
+import { startFixtureServer } from './planningApiTestFixture';
 
 describe('planningApiServer', () => {
   let tempDirectory = '';
@@ -35,7 +35,7 @@ describe('planningApiServer', () => {
   beforeEach(async () => {
     tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-planning-api-'));
     getPathMock.mockReturnValue(tempDirectory);
-    server = await startPlanningApiServer({
+    server = await startFixtureServer({
       preferredPort: 0,
       maxPortSearch: 0,
       authToken: 'test-planning-api-token',
@@ -95,7 +95,7 @@ describe('planningApiServer', () => {
   it('uses the current auth token provider value for protected routes', async () => {
     await server!.close();
     let activeToken = 'provider-token-before-rotation';
-    server = await startPlanningApiServer({
+    server = await startFixtureServer({
       preferredPort: 0,
       maxPortSearch: 0,
       authTokenProvider: () => activeToken,

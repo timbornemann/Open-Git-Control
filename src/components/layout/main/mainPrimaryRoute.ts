@@ -10,6 +10,7 @@ export type MainPrimaryRoute =
   | 'secretScanAllowlist'
   | 'remoteConfig'
   | 'releaseCreator'
+  | 'repositoryPublication'
   | 'timeline'
   | 'runConsole'
   | 'hosting'
@@ -31,6 +32,7 @@ type RouteParams = {
   showSecretScanAllowlist?: boolean;
   showRemoteConfig?: boolean;
   showReleaseCreator?: boolean;
+  showRepositoryPublication?: boolean;
 };
 
 type Translate = (key: string, variables?: TranslationVariables) => string;
@@ -47,11 +49,13 @@ export const getMainPrimaryRoute = ({
   showSecretScanAllowlist,
   showRemoteConfig,
   showReleaseCreator,
+  showRepositoryPublication,
 }: RouteParams): MainPrimaryRoute => {
   if (activeTab === 'localRepos') return 'localRepos';
   if (activeTab === 'planner') return 'planner';
   if (activeTab === 'settings') return 'settings';
   if (activeTab === 'repo' && showSecretScanAllowlist) return 'secretScanAllowlist';
+  if (activeTab === 'repo' && showRepositoryPublication) return 'repositoryPublication';
   if (activeTab === 'repo' && showReleaseCreator) return 'releaseCreator';
   if (activeTab === 'repo' && showRemoteConfig) return 'remoteConfig';
   if (activeTab === 'repo' && showRunConfig) return 'runConfig';
@@ -77,6 +81,8 @@ export const getMainPrimaryTitle = (route: MainPrimaryRoute, t: Translate, tr: (
       return tr('Remote-Konfiguration', 'Remote configuration');
     case 'releaseCreator':
       return tr('Release erstellen', 'Create release');
+    case 'repositoryPublication':
+      return tr('Repository veröffentlichen', 'Publish repository');
     case 'timeline':
       return t('generated.components.layout.main.mainprimarypane.codebase_timeline_cd023f25');
     case 'recovery':

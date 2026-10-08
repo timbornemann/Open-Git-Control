@@ -24,6 +24,9 @@ export const useAppState = () => {
   const [isRemoteConfigOpen, setRemoteConfigOpen] = useState(false);
   const [isSecretScanAllowlistOpen, setSecretScanAllowlistOpen] = useState(false);
   const [isReleaseCreatorOpen, setReleaseCreatorOpen] = useState(false);
+  const [isRepositoryPublicationOpen, setRepositoryPublicationOpen] = useState(false);
+  const [publicationConnectionId, setPublicationConnectionId] = useState<string | undefined>();
+  const [publicationReturnTab, setPublicationReturnTab] = useState<'repo' | 'hosting'>('repo');
   const [releaseCreatorTarget, setReleaseCreatorTarget] = useState<HostedRepositoryRef | null>(null);
   const [releaseReturnTab, setReleaseReturnTab] = useState<'repo' | 'hosting'>('repo');
 
@@ -77,6 +80,7 @@ export const useAppState = () => {
     setRunConfigOpen(false);
     setRemoteConfigOpen(false);
     setReleaseCreatorOpen(false);
+    setRepositoryPublicationOpen(false);
     setReleaseCreatorTarget(null);
   }, [resetRepoScopedUi]);
 
@@ -97,6 +101,7 @@ export const useAppState = () => {
       setRunConfigOpen(false);
       setRemoteConfigOpen(false);
       setReleaseCreatorOpen(false);
+      setRepositoryPublicationOpen(false);
       setWorkspaceTab('repo');
       setSecretScanAllowlistOpen(true);
     });
@@ -192,6 +197,7 @@ export const useAppState = () => {
     setActiveTab: workspace.setActiveTab,
     isRunConfigOpen,
     onOpenRunConfig: () => {
+      setRepositoryPublicationOpen(false);
       setSecretScanAllowlistOpen(false);
       setReleaseCreatorOpen(false);
       setRemoteConfigOpen(false);
@@ -200,6 +206,7 @@ export const useAppState = () => {
     onCloseRunConfig: () => setRunConfigOpen(false),
     isRemoteConfigOpen,
     onOpenRemoteConfig: () => {
+      setRepositoryPublicationOpen(false);
       setSecretScanAllowlistOpen(false);
       setReleaseCreatorOpen(false);
       setRunConfigOpen(false);
@@ -215,6 +222,7 @@ export const useAppState = () => {
     onOpenReleaseCreator: (target?: HostedRepositoryRef) => {
       requestWorkingDirectoryNavigation({ kind: 'view', label: 'release' }, () => {
         setSecretScanAllowlistOpen(false);
+        setRepositoryPublicationOpen(false);
         setRunConfigOpen(false);
         setRemoteConfigOpen(false);
         setReleaseCreatorTarget(target ?? null);
@@ -226,6 +234,25 @@ export const useAppState = () => {
     onCloseReleaseCreator: () => {
       setReleaseCreatorOpen(false);
       workspace.setActiveTab(releaseReturnTab);
+    },
+    isRepositoryPublicationOpen,
+    publicationConnectionId,
+    onOpenRepositoryPublication: (connectionId?: string) => {
+      requestWorkingDirectoryNavigation({ kind: 'view', label: 'repository publication' }, () => {
+        setSecretScanAllowlistOpen(false);
+        setRunConfigOpen(false);
+        setRemoteConfigOpen(false);
+        setReleaseCreatorOpen(false);
+        repositoryRun.closeRunConsole();
+        setPublicationConnectionId(connectionId);
+        setPublicationReturnTab(workspace.activeTab === 'hosting' || workspace.activeTab === 'github' ? 'hosting' : 'repo');
+        workspace.setActiveTab('repo');
+        setRepositoryPublicationOpen(true);
+      });
+    },
+    onCloseRepositoryPublication: () => {
+      setRepositoryPublicationOpen(false);
+      workspace.setActiveTab(publicationReturnTab);
     },
     openRepos: workspace.openRepos,
     isRestoringRepos: workspace.isRestoringRepos,

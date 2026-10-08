@@ -319,6 +319,8 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 
 ### Hosting-Integration
 
+**Repository veröffentlichen** führt ein bestehendes lokales Repository durch Anbieter- und Kontowahl, Remote-Einrichtung und den sicheren Upload ausgewählter Branches und Tags. Bestehende Remotes und Tracking bleiben standardmäßig erhalten; unterbrochene Schritte lassen sich fortsetzen. Siehe [Repository-Veröffentlichung](Docs/REPOSITORY_PUBLICATION.md).
+
 Der gemeinsame **Hosting**-Bereich verwaltet mehrere Server und Konten gleichzeitig. Native Git-Funktionen bleiben mit jedem passenden Git-Server nutzbar. Adapter ergänzen Repository-Kataloge, Erstellen, Forks, PRs/MRs, CI und Veröffentlichungen für GitHub, Forgejo, GitLab sowie Bitbucket Cloud und Data Center. Verfügbare Aktionen richten sich nach API, Serverversion und Repository-Berechtigungen. Die [Hosting-Dokumentation](Docs/HOSTING.md) beschreibt Anmeldung, OAuth, Endpunktauswahl und Anbieterunterschiede.
 
 Für jedes lokale Repository werden Fetch-Quelle, Pull-Quelle, Push-Ziele und Hosting-Ziel unabhängig in der **Remote-Konfiguration** gewählt. Ein einzelnes Remote startet normale Transfers direkt. Bei mehreren Remotes kann die Auswahl gespeichert oder jedes Mal abgefragt werden, getrennt für Fetch, Pull und Push. Ein Push-Profil kann denselben geprüften Commit auf einen privaten Forgejo-Server und ein GitHub-Backup veröffentlichen. Das Upstream-Tracking bleibt erhalten. Teil-Erfolge werden angezeigt; Wiederholungen prüfen und adressieren nur erfolglose Ziele. Bestehende mehrere Push-URLs werden erhalten.

@@ -1,5 +1,5 @@
 import React from 'react';
-import { FolderOpen } from 'lucide-react';
+import { FolderOpen, UploadCloud } from 'lucide-react';
 import { IconButton } from '@/components/ui/IconButton';
 import { useRepositoryContext, useUIContext } from '@/contexts/AppStateContext';
 import { BranchPanel } from '@/components/sidebar/BranchPanel';
@@ -31,6 +31,13 @@ export const RepoSidebarContainer: React.FC = React.memo(() => {
             aria-label={tr('Projektordner öffnen', 'Open project folder')}
             icon={<FolderOpen size={14} />}
             onClick={() => void gitClient.openRepositoryPath({ action: 'open', repoPath: repository.activeRepo! })}
+          />
+          <IconButton
+            size="xs"
+            aria-label={tr('Repository veröffentlichen', 'Publish repository')}
+            title={tr('Repository veröffentlichen', 'Publish repository')}
+            icon={<UploadCloud size={14} />}
+            onClick={() => ui.onOpenRepositoryPublication?.()}
           />
         </div>
       </div>

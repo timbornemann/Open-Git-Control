@@ -6,10 +6,13 @@ import { RemoteConfigurationHosting } from './RemoteConfigurationHosting';
 import { useRemoteConfiguration } from './useRemoteConfiguration';
 import './hosting.css';
 import './remote-configuration.css';
+import { useOptionalUIContext } from '@/contexts/AppStateContext';
+import { Button } from '@/components/ui/Button';
 
 export function RemoteConfigurationView({ repoPath }: { repoPath: string | null }) {
   const { tr } = useI18n();
   const editor = useRemoteConfiguration(repoPath);
+  const onPublish = useOptionalUIContext()?.onOpenRepositoryPublication;
   if (!repoPath) return <p className="hosting-empty">{tr('Zuerst ein lokales Repository öffnen.', 'Open a local repository first.')}</p>;
   return (
     <main className="remote-configuration hosting-workspace" aria-label={tr('Remote-Konfiguration', 'Remote configuration')}>
@@ -19,6 +22,9 @@ export function RemoteConfigurationView({ repoPath }: { repoPath: string | null 
           <p>{repoPath}</p>
         </div>
         <div className="hosting-actions">
+          <Button disabled={editor.task.busy || !onPublish} onClick={() => onPublish?.()}>
+            {tr('Repository veröffentlichen', 'Publish repository')}
+          </Button>
           <button type="button" disabled={editor.task.busy || !editor.dirty} onClick={editor.reset}>
             <RotateCcw size={14} />
             {tr('Entwurf verwerfen', 'Discard draft')}

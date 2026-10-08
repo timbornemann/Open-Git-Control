@@ -28,7 +28,9 @@ export async function runGroupedRemotePush(
   assertGroupedCredentialChoices(targets, plan.connections);
   const first = targets[0];
   const connectionId = plan.connections[first.id];
-  const refs = plan.refs.map((ref) => (ref.destinationRef.startsWith('refs/heads/') ? { ...ref, destinationRef: first.destinationRef } : ref));
+  const refs = plan.dto.branchRefs
+    ? plan.refs
+    : plan.refs.map((ref) => (ref.destinationRef.startsWith('refs/heads/') ? { ...ref, destinationRef: first.destinationRef } : ref));
   const base = gitConfigurationEnvironment([
     ['push.followTags', 'false'],
     [`remote.${first.remoteName}.mirror`, 'false'],

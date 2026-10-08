@@ -32,6 +32,9 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
   const onOpenRemoteConfig = useUIStore((state) => state.onOpenRemoteConfig);
   const onCloseRemoteConfig = useUIStore((state) => state.onCloseRemoteConfig);
   const onOpenReleaseCreator = useUIStore((state) => state.onOpenReleaseCreator);
+  const onPublishRepository = useUIStore((state) => state.onOpenRepositoryPublication);
+  const onCloseRepositoryPublication = useUIStore((state) => state.onCloseRepositoryPublication);
+  const isRepositoryPublicationOpen = useUIStore((state) => state.isRepositoryPublicationOpen);
   const onCloseReleaseCreator = useUIStore((state) => state.onCloseReleaseCreator);
   const isReleaseCreatorOpen = useUIStore((state) => state.isReleaseCreatorOpen);
   const activeRepo = useGitStore((state) => state.activeRepo);
@@ -142,6 +145,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
                 onOpenReleaseCreator();
               }}
               onOpenTimeline={() => {
+                if (isRepositoryPublicationOpen) onCloseRepositoryPublication?.();
                 if (isReleaseCreatorOpen) onCloseReleaseCreator();
                 onCloseRunConfig();
                 onCloseRemoteConfig();
@@ -154,6 +158,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
               onStartRepositoryRun={async (action) => {
                 const started = await onStartRepositoryRun(action);
                 if (started) {
+                  if (isRepositoryPublicationOpen) onCloseRepositoryPublication?.();
                   onCloseRunConfig();
                   setActiveTab('repo');
                 }
@@ -161,6 +166,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
               }}
               onStopRepositoryRun={onStopRepositoryRun}
               onOpenRunConsole={() => {
+                if (isRepositoryPublicationOpen) onCloseRepositoryPublication?.();
                 onCloseRunConfig();
                 setActiveTab('repo');
                 onOpenRunConsole();
@@ -172,6 +178,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
               }}
               onOpenSecretScanAllowlist={onOpenSecretScanAllowlist}
               onOpenRemoteConfig={onOpenRemoteConfig}
+              onPublishRepository={() => onPublishRepository?.()}
             />
           )}
           {canShowInspectorPane && (

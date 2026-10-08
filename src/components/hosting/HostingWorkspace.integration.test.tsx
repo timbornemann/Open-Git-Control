@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   addRepo: vi.fn(),
   setTab: vi.fn(),
   openCreator: vi.fn(),
+  openPublication: vi.fn(),
   refreshGit: vi.fn(),
   toast: vi.fn(),
   git: { activeRepo: 'C:/Code/mirrored' as string | null, openRepos: ['C:/Code/mirrored'], currentBranch: 'main' },
@@ -25,7 +26,9 @@ vi.mock('@/services/hostingClient', () => ({
 vi.mock('@/contexts/AppStateContext', () => ({
   useGitStore: (selector: (value: unknown) => unknown) =>
     selector({ ...mocks.git, onSwitchRepo: mocks.switchRepo, onAddRepo: mocks.addRepo, triggerRefresh: mocks.refreshGit, onToast: mocks.toast }),
-  useUIStore: (selector: (value: unknown) => unknown) => selector({ setActiveTab: mocks.setTab }),
+  useUIStore: (selector: (value: unknown) => unknown) => selector({ setActiveTab: mocks.setTab, onOpenRepositoryPublication: mocks.openPublication }),
+  useOptionalRepositoryContext: () => ({ onToast: mocks.toast }),
+  useOptionalUIContext: () => ({ onOpenRepositoryPublication: mocks.openPublication }),
   useAppStateReader: () => () => ({ repository: { ...mocks.git, onSwitchRepo: mocks.switchRepo }, ui: { onOpenReleaseCreator: mocks.openCreator } }),
 }));
 vi.mock('@/i18n', () => ({ useI18n: () => ({ tr: (_de: string, en: string) => en }) }));
@@ -174,6 +177,7 @@ describe('multi-provider hosting acceptance', () => {
       const provider = accounts.find((account) => account.id === repo.ref.connectionId)!.provider;
       if (operation === 'connections') return accounts;
       if (operation === 'repositories') return page([repo]);
+      if (operation === 'creationTargets') return { ...page([]), requiresProject: false, allowsManual: true };
       if (operation === 'cachedRepositories') return { ...page([]), stale: true };
       if (operation === 'repository') return repo;
       if (operation === 'capabilities') return { ...capabilities, ciLabel: provider === 'github' ? 'GitHub Actions' : 'Forgejo Actions' };
@@ -319,8 +323,10 @@ describe('multi-provider hosting acceptance', () => {
     await click(buttons('Open repository by URL')[0]);
     await click(buttons('Close')[0]);
     expect(document.querySelector('[role="dialog"]')).toBeNull();
-    expect(mocks.request.mock.calls.some(([operation]) => ['createRepository', 'clone', 'fork'].includes(operation))).toBe(false);
     expect(useHostingState.getState().selected).toBeNull();
+    await click(buttons('Publish repository')[0]);
+    expect(mocks.openPublication).toHaveBeenCalledTimes(1);
+    expect(mocks.request.mock.calls.some(([operation]) => ['createRepository', 'clone', 'fork', 'connectPublication'].includes(operation))).toBe(false);
   });
 
   it('validates saved credentials at startup and then loads both catalogs', async () => {

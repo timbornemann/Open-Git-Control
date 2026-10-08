@@ -118,6 +118,7 @@ export class GitLabAdapter extends BaseHostingAdapter {
     const result = this.mapRepository(
       await this.json('projects', 'POST', {
         name: input.name,
+        path: input.name,
         namespace_id: namespaceId,
         description: input.description,
         visibility: input.private ? 'private' : 'public',

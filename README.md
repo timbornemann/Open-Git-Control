@@ -323,6 +323,8 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 
 ### Hosting integration
 
+**Publish repository** guides an existing local repository through provider/account selection, remote setup and a secure upload of selected branches and tags. Existing remotes and tracking are preserved by default; interrupted setup can be resumed. See [repository publication](Docs/REPOSITORY_PUBLICATION.md).
+
 The shared **Hosting** area manages several servers and accounts simultaneously. Native Git works with any compatible remote; adapters add catalogs, repository creation, forks, PRs/MRs, CI and publication for GitHub, Forgejo, GitLab, Bitbucket Cloud and Bitbucket Data Center. Capabilities follow the actual provider API and repository permissions. See [Hosting setup, OAuth, endpoint selection and feature differences](Docs/HOSTING.md).
 
 Select independent fetch and pull sources, push targets, and one hosting target for each local repository in **Remote configuration**. A single remote starts normal transfers directly. With several remotes, choose once and save the selection, or ask every time, independently for Fetch, Pull and Push. Push profiles can publish the same checked commit to a private Forgejo server and a GitHub backup while preserving upstream tracking. Existing multiple push URLs are retained. Partial successes remain visible and retries address unsuccessful destinations.

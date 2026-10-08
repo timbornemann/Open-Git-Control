@@ -20,6 +20,7 @@ type Props = {
   onOpenRunConfig: (path: string) => void;
   onOpenSecretScanAllowlist?: (path: string) => void;
   onOpenRemoteConfig: (path: string) => void;
+  onPublishRepository?: (path: string) => void;
   onTogglePin: (path: string) => void;
   onRemove: (path: string) => void;
 };
@@ -35,6 +36,7 @@ export const LocalRepositoryContextMenu: React.FC<Props> = ({
   onOpenRunConfig,
   onOpenSecretScanAllowlist,
   onOpenRemoteConfig,
+  onPublishRepository,
   onTogglePin,
   onRemove,
 }) => {
@@ -134,6 +136,11 @@ export const LocalRepositoryContextMenu: React.FC<Props> = ({
         <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onOpenRemoteConfig(menu.path))}>
           <Settings2 size={14} /> {tr('Remote-Konfiguration', 'Remote configuration')}
         </button>
+        {onPublishRepository && (
+          <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onPublishRepository(menu.path))}>
+            <ArrowUpRight size={14} /> {tr('Repository veröffentlichen', 'Publish repository')}
+          </button>
+        )}
         <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => void openFolder())}>
           <FolderOpen size={14} /> {tr('Im Dateimanager öffnen', 'Open in file manager')}
         </button>

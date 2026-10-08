@@ -151,6 +151,7 @@ export class BitbucketCloudAdapter extends BaseHostingAdapter {
   }
   async createRepository(input: Input<'createRepository'>) {
     if (!input.namespace) throw new HostingHttpError(0, 'workspace_required', 'A Bitbucket workspace is required.');
+    if (!input.projectKey) throw new HostingHttpError(0, 'project_required', 'Select a Bitbucket project explicitly.');
     const slug = input.name.toLowerCase().replace(/\s+/g, '-');
     const repository = this.mapRepository(
       await this.json(`repositories/${encode(input.namespace)}/${encode(slug)}`, 'POST', {
@@ -158,6 +159,7 @@ export class BitbucketCloudAdapter extends BaseHostingAdapter {
         description: input.description,
         is_private: input.private,
         scm: 'git',
+        project: { key: input.projectKey },
       }),
     );
     if (input.initializeReadme || input.readmeContent !== undefined) {

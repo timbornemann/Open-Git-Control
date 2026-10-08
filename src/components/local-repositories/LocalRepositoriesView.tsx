@@ -33,7 +33,7 @@ export const LocalRepositoriesView: React.FC = () => {
     { value: 'createdAtAsc', label: t('generated.components.sidebar.repolist.created_old_new_2f916185') },
   ];
 
-  const openRepoTab = async (path: string, config?: 'run' | 'remote' | 'allowlist') => {
+  const openRepoTab = async (path: string, config?: 'run' | 'remote' | 'allowlist' | 'publish') => {
     if (switchingPath) return;
     setSwitchingPath(path);
     try {
@@ -43,6 +43,7 @@ export const LocalRepositoriesView: React.FC = () => {
         if (config === 'run') ui.onOpenRunConfig();
         else if (config === 'remote') ui.onOpenRemoteConfig();
         else if (config === 'allowlist') ui.onOpenSecretScanAllowlist();
+        else if (config === 'publish') ui.onOpenRepositoryPublication?.();
         else {
           ui.onCloseRunConfig();
           ui.onCloseRemoteConfig();
@@ -206,6 +207,7 @@ export const LocalRepositoriesView: React.FC = () => {
           onOpenRunConfig={(path) => void openRepoTab(path, 'run')}
           onOpenSecretScanAllowlist={(path) => void openRepoTab(path, 'allowlist')}
           onOpenRemoteConfig={(path) => void openRepoTab(path, 'remote')}
+          onPublishRepository={(path) => void openRepoTab(path, 'publish')}
           onTogglePin={repository.onToggleRepoPin}
           onRemove={repository.onCloseRepo}
         />

@@ -19,6 +19,7 @@ export function HostingWorkspace() {
   const state = useHostingState();
   const activeRepo = useGitStore((s) => s.activeRepo);
   const onOpenRemoteConfig = useUIStore((s) => s.onOpenRemoteConfig);
+  const onPublish = useUIStore((s) => s.onOpenRepositoryPublication);
   const catalog = useHostingCatalog();
   const [formMode, setFormMode] = useState<HostingRepositoryFormMode>(null);
   const showDetail = Boolean(state.selected && !['connections', 'remotes'].includes(state.section));
@@ -60,6 +61,11 @@ export function HostingWorkspace() {
                 </p>
               </div>
               <div className="hosting-header-actions">
+                {activeRepo && (
+                  <Button onClick={() => onPublish?.()} icon={<Plus size={14} />}>
+                    {tr('Repository veröffentlichen', 'Publish repository')}
+                  </Button>
+                )}
                 <Button icon={<RefreshCw size={14} />} onClick={state.refresh} disabled={catalog.task.busy || catalog.refreshing}>
                   {tr('Aktualisieren', 'Refresh')}
                 </Button>

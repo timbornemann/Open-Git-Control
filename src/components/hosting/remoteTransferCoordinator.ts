@@ -98,7 +98,7 @@ export class RemoteTransferCoordinator {
         ? JSON.stringify(createRemoteSelectionSnapshot(intent.mode as RemoteTransferAction, snapshot, preferences, selectedRemoteNames))
         : '';
       this.set({ snapshot, preferences, selection, reason: resolved.reason, busy: false });
-      if (resolved.state === 'configure') {
+      if (resolved.state === 'configure' && !intent.branchTargets) {
         this.set({ phase: 'selection' });
         return;
       }
@@ -206,14 +206,28 @@ export class RemoteTransferCoordinator {
         remoteNames: selection.selectedRemoteNames,
         ...(intent.sourceBranch ? { sourceBranch: intent.sourceBranch } : {}),
         ...(intent.constrainedTargetUrls ? { targetUrls: intent.constrainedTargetUrls } : {}),
-        destinationBranch: selection.branch,
-        targetBranches: Object.fromEntries(
-          Object.entries(selection.targetBranches).filter(([name, branch]) => selection.selectedRemoteNames.includes(name) && branch),
-        ),
+        ...(intent.branchTargets
+          ? { branchTargets: intent.branchTargets.map(({ sourceBranch, destinationBranch }) => ({ sourceBranch, destinationBranch })) }
+          : {
+              destinationBranch: selection.branch,
+              targetBranches: Object.fromEntries(
+                Object.entries(selection.targetBranches).filter(([name, branch]) => selection.selectedRemoteNames.includes(name) && branch),
+              ),
+            }),
         tagNames: selection.tagNames,
         force: Boolean(intent.force),
       }),
     );
+    if (
+      (intent.branchTargets && JSON.stringify(plan.branchRefs) !== JSON.stringify(intent.branchTargets)) ||
+      (intent.expectedTagRefs && JSON.stringify(plan.tagRefs ?? []) !== JSON.stringify(intent.expectedTagRefs))
+    )
+      throw new Error(
+        this.environment.tr(
+          'Die ausgewählten Branches oder Tags wurden geändert. Veröffentlichung erneut prüfen.',
+          'Selected branches or tags changed. Review publication again.',
+        ),
+      );
     if (intent.expectedSourceOid && plan.sourceOid !== intent.expectedSourceOid)
       throw new Error(
         this.environment.tr('Der Quell-Commit wurde geändert. Veröffentlichung erneut prüfen.', 'The source commit changed. Inspect the publication again.'),

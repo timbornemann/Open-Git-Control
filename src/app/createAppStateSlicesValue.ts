@@ -88,6 +88,7 @@ const createRepositorySlice = (state: AppState, tr: (deText: string, enText: str
   showSecondaryHistory: state.settings.showSecondaryHistory,
   onMergeBranch: state.handleMergeBranch,
   onOpenRepoWorkspace: () => {
+    if (state.isRepositoryPublicationOpen) state.onCloseRepositoryPublication();
     state.onCloseRunConfig();
     state.onCloseRemoteConfig();
     state.setActiveTab('repo');
@@ -208,6 +209,7 @@ const createUiSlice = ({ state, resetLayout, uiState }: Pick<CreateAppStateSlice
       state.onCloseRemoteConfig();
       state.onCloseSecretScanAllowlist();
       if (state.isReleaseCreatorOpen) state.onCloseReleaseCreator();
+      if (state.isRepositoryPublicationOpen) state.onCloseRepositoryPublication();
     }
     state.setActiveTab(tab);
   },
@@ -221,6 +223,10 @@ const createUiSlice = ({ state, resetLayout, uiState }: Pick<CreateAppStateSlice
   onOpenRemoteConfig: state.onOpenRemoteConfig,
   onCloseRemoteConfig: state.onCloseRemoteConfig,
   isReleaseCreatorOpen: state.isReleaseCreatorOpen,
+  isRepositoryPublicationOpen: state.isRepositoryPublicationOpen,
+  publicationConnectionId: state.publicationConnectionId,
+  onOpenRepositoryPublication: state.onOpenRepositoryPublication,
+  onCloseRepositoryPublication: state.onCloseRepositoryPublication,
   releaseCreatorTarget: state.releaseCreatorTarget,
   onOpenReleaseCreator: state.onOpenReleaseCreator,
   onCloseReleaseCreator: state.onCloseReleaseCreator,

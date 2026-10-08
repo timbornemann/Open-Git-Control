@@ -8,6 +8,8 @@ export type RemoteTransferDialog = {
   pullMode?: 'default' | 'rebase' | 'no-ff' | 'ff-only';
   destinationBranch?: string;
   sourceBranch?: string;
+  branchTargets?: Array<{ sourceBranch: string; destinationBranch: string; sourceOid: string }>;
+  expectedTagRefs?: Array<{ name: string; oid: string }>;
   expectedBranch?: string;
   expectedSourceOid?: string;
   constrainedRemoteNames?: string[];

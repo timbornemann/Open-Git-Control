@@ -33,6 +33,7 @@ type Props = {
   onOpenRunSettings: () => void;
   onOpenSecretScanAllowlist?: () => void;
   onOpenRemoteConfig?: () => void;
+  onPublishRepository?: () => void;
 };
 
 export const TopbarMoreMenu: React.FC<Props> = ({
@@ -57,6 +58,7 @@ export const TopbarMoreMenu: React.FC<Props> = ({
   onOpenRunSettings,
   onOpenSecretScanAllowlist,
   onOpenRemoteConfig,
+  onPublishRepository,
 }) => {
   const { t, tr } = useI18n();
 
@@ -107,6 +109,19 @@ export const TopbarMoreMenu: React.FC<Props> = ({
   return (
     <div className="topbar-dropdown topbar-more-dropdown">
       <div className="topbar-dropdown-header">{t('generated.components.topbar.topbaractions.more_actions_a53b5e21')}</div>
+      {onPublishRepository && (
+        <button
+          className="topbar-dropdown-item"
+          disabled={!activeRepo || isGitActionRunning}
+          onClick={() => {
+            setView(null);
+            onPublishRepository();
+          }}
+        >
+          <span className="topbar-dropdown-item-label">{tr('Repository veröffentlichen', 'Publish repository')}</span>
+          <span className="topbar-dropdown-item-hint">{tr('Erstellen, verbinden und hochladen', 'Create, connect and upload')}</span>
+        </button>
+      )}
       <button
         className="topbar-dropdown-item"
         onClick={() => {

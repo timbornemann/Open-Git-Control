@@ -27,6 +27,13 @@ import type {
 } from '../../../types/hostingDtos';
 import type { IpcResult } from '../../../types/ipc';
 import type { ReleaseContext } from '../../../types/releaseNotes';
+import type {
+  HostingCreationTargets,
+  HostingCreationTarget,
+  PublicationContext,
+  PublicationSelection,
+  RepositoryPublication,
+} from '../../../types/repositoryPublication';
 
 export interface HostingOperations {
   connections: { input: undefined; output: HostingConnection[] };
@@ -46,6 +53,16 @@ export interface HostingOperations {
   repository: { input: { repository: HostedRepositoryRef }; output: HostedRepository };
   resolveRepository: { input: { connectionId: string; url: string; cachedOnly?: boolean }; output: HostedRepository | null };
   createRepository: { input: HostingRepositoryCreation; output: HostedRepository };
+  creationTargets: { input: { connectionId: string; parent?: string; cursor?: string; search?: string }; output: HostingCreationTargets };
+  verifyCreationTarget: { input: HostingRepositoryCreation; output: HostingCreationTarget };
+  publicationContext: { input: { repoPath: string }; output: PublicationContext };
+  preparePublication: { input: { selection: PublicationSelection; publicationId?: string }; output: RepositoryPublication };
+  connectPublication: {
+    input: { repoPath: string; publicationId: string; confirmCandidate?: boolean; retryCreation?: boolean };
+    output: RepositoryPublication;
+  };
+  finishPublication: { input: { repoPath: string; publicationId: string; inspectOnly?: boolean }; output: RepositoryPublication };
+  cancelPublication: { input: { repoPath: string }; output: true };
   clone: { input: { repository: HostedRepositoryRef; targetDir: string; targetName?: string; useSsh?: boolean }; output: { path: string } };
   checkoutChangeRequest: { input: { repoPath: string; repository: HostedRepositoryRef; id: string; expectedHeadSha: string }; output: true };
   fork: { input: HostingForkRequest; output: HostedRepository };

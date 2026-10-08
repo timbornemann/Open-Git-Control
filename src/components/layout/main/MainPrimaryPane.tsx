@@ -17,6 +17,7 @@ import { RepositoryRunConsole } from '@/components/repository-run/RepositoryRunC
 import { LocalRepositoriesView } from '@/components/local-repositories/LocalRepositoriesView';
 import { RepositoryRunConfigView } from '@/components/repository-run/RepositoryRunConfigView';
 import { RemoteConfigurationView } from '@/components/hosting/RemoteConfigurationView';
+import { RepositoryPublicationView } from '@/components/repository-publication/RepositoryPublicationView';
 import { useCommitMessageEditor } from '@/components/commit-graph/useCommitMessageEditor';
 
 const CommitGraph = viewModules.repo.View;
@@ -103,6 +104,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
     showSecretScanAllowlist: ui.isSecretScanAllowlistOpen,
     showRemoteConfig: ui.isRemoteConfigOpen,
     showReleaseCreator: ui.isReleaseCreatorOpen,
+    showRepositoryPublication: ui.isRepositoryPublicationOpen,
   });
   const isSettingsView = route === 'settings';
   const isPlannerView = route === 'planner';
@@ -114,6 +116,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   const isSecretScanAllowlistView = route === 'secretScanAllowlist';
   const isRemoteConfigView = route === 'remoteConfig';
   const isReleaseCreatorView = route === 'releaseCreator';
+  const isRepositoryPublicationView = route === 'repositoryPublication';
   const primaryPaneTitle = getMainPrimaryTitle(route, t, tr);
   const shouldShowPrimaryPaneHeader = hasMainPrimaryHeader(route);
   const lazyPaneFallback = (
@@ -144,6 +147,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
         isRemoteConfigView ||
         isSecretScanAllowlistView ||
         isReleaseCreatorView ||
+        isRepositoryPublicationView ||
         !showInspectorPane
           ? { minWidth: 0 }
           : { flex: `0 0 ${primaryPaneBasis}`, minWidth: `${PRIMARY_PANE_MIN_WIDTH}px` }
@@ -153,7 +157,11 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
       {shouldShowPrimaryPaneHeader && (
         <div className={`pane-header pane-header-main${activeConflictPath ? ' pane-header-main--conflict' : ''}`}>
           <span className="pane-header-main-title">{primaryPaneTitle}</span>
-          {isSettingsView ? null : isReleaseCreatorView ? (
+          {isSettingsView ? null : isRepositoryPublicationView ? (
+            <button className="icon-btn pane-header-nav-btn" onClick={ui.onCloseRepositoryPublication}>
+              {tr('Zurück', 'Back')}
+            </button>
+          ) : isReleaseCreatorView ? (
             <button className="icon-btn pane-header-nav-btn" onClick={ui.onCloseReleaseCreator}>
               {tr('Zurück', 'Back')}
             </button>
@@ -186,7 +194,9 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
       )}
 
       <div className="pane-content" style={{ padding: 0 }}>
-        {isSecretScanAllowlistView ? (
+        {isRepositoryPublicationView ? (
+          <RepositoryPublicationView key={repository.activeRepo ?? ''} repoPath={repository.activeRepo} requestedConnectionId={ui.publicationConnectionId} />
+        ) : isSecretScanAllowlistView ? (
           <RepositorySecretScanAllowlistView key={repository.activeRepo ?? ''} />
         ) : isReleaseCreatorView ? (
           <RepositoryReleaseCreator repoPath={repository.activeRepo} requestedTarget={ui.releaseCreatorTarget} />

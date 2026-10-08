@@ -11,6 +11,7 @@ import type {
 } from '../../../src/types/hostingDtos';
 import type { CredentialGetter, HostingAdapter } from '../HostingAdapter';
 import { HostingHttpError, HostingHttpTransport } from './HostingHttpTransport';
+import { listCreationTargets, verifyCreationTarget, updateDefaultBranch } from './creationTargets';
 
 export type Input<K extends keyof HostingOperations> = HostingOperations[K]['input'];
 export type Output<K extends keyof HostingOperations> = HostingOperations[K]['output'];
@@ -150,6 +151,16 @@ export abstract class BaseHostingAdapter implements HostingAdapter {
 
   protected ref(id: unknown, fullPath: string): HostedRepositoryRef {
     return { connectionId: this.connection.id, repositoryId: string(id), fullPath };
+  }
+  creationTargets(input: Input<'creationTargets'>): Promise<Output<'creationTargets'>> {
+    return listCreationTargets(this.connection, this.http, input);
+  }
+  verifyCreationTarget(input: Input<'verifyCreationTarget'>): Promise<Output<'verifyCreationTarget'>> {
+    return verifyCreationTarget(this.connection, this.http, input);
+  }
+  async setDefaultBranch(repository: HostedRepositoryRef, branch: string): Promise<void> {
+    this.assertRepository(repository);
+    await updateDefaultBranch(this.connection, this.http, repository, branch);
   }
   protected assertRepository(repository: HostedRepositoryRef): void {
     if (

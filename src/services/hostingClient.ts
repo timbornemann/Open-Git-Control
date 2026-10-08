@@ -5,6 +5,7 @@ import { queryClient } from '@/data/queryClient';
 
 const reads = new Set<HostingOperation>([
   'capabilities',
+  'creationTargets',
   'repositories',
   'cachedRepositories',
   'repository',
@@ -92,7 +93,9 @@ export const hostingClient = {
       operation !== 'releaseContext' &&
       operation !== 'releaseNotesCommits' &&
       operation !== 'localWorkflows' &&
-      operation !== 'inspectRelease'
+      operation !== 'inspectRelease' &&
+      operation !== 'verifyCreationTarget' &&
+      operation !== 'publicationContext'
     ) {
       await queryClient.cancelQueries({ queryKey: ['hosting', connectionId] });
       queryClient.removeQueries({ queryKey: ['hosting', connectionId] });

@@ -18,6 +18,9 @@ export interface HostingAdapter {
   repositories(input: Input<'repositories'>): Promise<Output<'repositories'>>;
   repository(input: Input<'repository'>): Promise<Output<'repository'>>;
   createRepository(input: Input<'createRepository'>): Promise<Output<'createRepository'>>;
+  creationTargets(input: Input<'creationTargets'>): Promise<Output<'creationTargets'>>;
+  verifyCreationTarget(input: Input<'verifyCreationTarget'>): Promise<Output<'verifyCreationTarget'>>;
+  setDefaultBranch(repository: HostedRepositoryRef, branch: string): Promise<void>;
   fork(input: Input<'fork'>): Promise<Output<'fork'>>;
   branches(input: Input<'branches'>): Promise<Output<'branches'>>;
   tags(input: Input<'tags'>): Promise<Output<'tags'>>;
