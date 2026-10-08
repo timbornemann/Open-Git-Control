@@ -1,7 +1,8 @@
 import type { GitService } from './GitService';
 import { scanLfsSecrets } from './git/GitLfsSecretScanner';
 import { SecretScanProgress } from './git/SecretScanProgress';
-import type { SecretScanProgressDto } from '../src/types/secretScan';
+import type { SecretScanProgressDto, SecretScanPushScopeDto } from '../src/types/secretScan';
+import type { PushSecretScanScope } from './git/PushSecretScanScope';
 
 export type SecretScanStrictness = 'low' | 'medium' | 'high';
 export type SecretScanSource = 'staged' | 'to-push' | 'tag';
@@ -46,6 +47,7 @@ export interface SecretScanResult {
   notes: string[];
   /** True when at least one requested push source could not be fully inspected. */
   historyScanIncomplete?: boolean;
+  pushScope?: SecretScanPushScopeDto;
   stats: {
     checkedLines: number;
     stagedLines: number;
@@ -378,6 +380,8 @@ export class SecretScanService {
     revisions?: string[];
     excludeRemote?: string;
     pushArgs?: string[];
+    /** Main-owned freshly verified endpoint scope; never provided through IPC. */
+    pushScanScope?: PushSecretScanScope;
     /** Restricts the scan to the staged diff, for the fast pre-commit check. */
     includePushHistory?: boolean;
     /** Internal-only Git environment overrides, used for private AI indexes. */
@@ -386,16 +390,17 @@ export class SecretScanService {
   }): Promise<SecretScanResult> {
     const strictness = options.strictness;
     const allowlistRules = parseAllowlist(options.allowlistText || '');
-    const notes: string[] = [];
+    const notes: string[] = [...(options.pushScanScope?.notes ?? [])];
     const findings: SecretScanFinding[] = [];
-    let historyScanIncomplete = false;
+    let historyScanIncomplete = options.pushScanScope?.historyScanIncomplete === true;
     let stagedLines = 0;
     let toPushLines = 0;
     let tagLines = 0;
     let findingLimitNoted = false;
-    const progress = new SecretScanProgress(options.onScanProgress);
+    const progress = new SecretScanProgress(options.onScanProgress, options.pushScanScope?.summary);
     progress.phase('preparing');
-    const pushPlan = options.pushArgs ? await this.resolvePushPlan(options.repoPath, options.pushArgs) : null;
+    const pushPlan = options.pushArgs && !options.pushScanScope ? await this.resolvePushPlan(options.repoPath, options.pushArgs) : null;
+    if (pushPlan && options.includePushHistory !== false) notes.push('Full history scan: this request has no verified endpoint-bound push plan.');
     const scannedCommits = new Set<string>();
     const scannedLfs = new Set<string>();
     const scanLfs = async (commits: string[] | null, source: SecretScanSource) => {
@@ -672,8 +677,13 @@ export class SecretScanService {
     );
     if (options.includePushHistory !== false) {
       progress.phase('preparing');
-      await scanPushSourceCommits();
-      await scanTagCommits();
+      if (options.pushScanScope) {
+        await scanCommits(options.pushScanScope.historyCommits, 'to-push');
+        await scanCommits(options.pushScanScope.tagCommits, 'tag');
+      } else {
+        await scanPushSourceCommits();
+        await scanTagCommits();
+      }
     }
     progress.phase('lfs');
     await scanLfs(null, 'staged');
@@ -688,6 +698,7 @@ export class SecretScanService {
       findings,
       notes,
       historyScanIncomplete: historyScanIncomplete || undefined,
+      ...(options.pushScanScope ? { pushScope: options.pushScanScope.summary } : {}),
       stats: {
         checkedLines: stagedLines + toPushLines + tagLines,
         stagedLines,

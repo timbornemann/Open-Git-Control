@@ -1,16 +1,19 @@
 import { useI18n } from '@/i18n';
 import type { GitPushBatchDto } from '@/types/remoteTransfers';
+import type { SecretScanResultDto } from '@/types/gitDtos';
 
 export function PushTransferResults({
   batch,
   busy,
   canRetry,
   reviewRetry,
+  scan,
 }: {
   batch: GitPushBatchDto;
   busy: boolean;
   canRetry: boolean;
   reviewRetry: () => void;
+  scan?: SecretScanResultDto | null;
 }) {
   const { tr } = useI18n();
   return (
@@ -18,6 +21,14 @@ export function PushTransferResults({
       <strong>
         {tr('Push-Ergebnis', 'Push result')}: {batch.state}
       </strong>
+      {scan?.pushScope?.fallbackReasons.length ? (
+        <details>
+          <summary>{tr('Prüfdetails', 'Check details')}</summary>
+          {scan.notes.map((note) => (
+            <p key={note}>{note}</p>
+          ))}
+        </details>
+      ) : null}
       {batch.targets.map((target) => (
         <div key={target.id}>
           <p>

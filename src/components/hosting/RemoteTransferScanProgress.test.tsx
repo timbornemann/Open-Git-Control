@@ -172,6 +172,43 @@ describe('push secret-scan notification progress', () => {
     expect(bar()).toBeNull();
   });
 
+  it('reports skipped synchronized history in the existing notification', async () => {
+    await start();
+    await progress({ phase: 'verifying', checkedLines: 0, pushScope: { mode: 'incremental', endpointCount: 1, totalCommits: 0, fallbackReasons: [] } });
+    expect(container.textContent).toContain('No new commits');
+    expect(container.textContent).toContain('History scan skipped');
+    expect(bar()?.hasAttribute('aria-valuenow')).toBe(false);
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('shows the fallback reason with the actual full-scan count and progress', async () => {
+    await start();
+    await progress({
+      phase: 'history',
+      processedCommits: 2,
+      totalCommits: 4,
+      checkedLines: 12,
+      pushScope: { mode: 'mixed', endpointCount: 2, totalCommits: 4, fallbackReasons: ['Full history scan for backup: remote objects unavailable locally.'] },
+    });
+    expect(container.textContent).toContain('4 commits to check across 2 push endpoints');
+    expect(container.textContent).toContain('remote objects unavailable locally');
+    expect(bar()?.getAttribute('aria-valuenow')).toBe('50');
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    const pushScope = {
+      mode: 'mixed' as const,
+      endpointCount: 2,
+      totalCommits: 4,
+      fallbackReasons: ['Remote objects unavailable locally.', 'Backup is unreachable.'],
+    };
+    await flush(() => completeScan({ success: true, data: { ...cleanScan, pushScope, notes: pushScope.fallbackReasons } }));
+    await flush(() => completePush({ ...plan, planId: 'plan', state: 'success' }));
+    expect(container.textContent).toContain('Remote objects unavailable locally');
+    expect(container.textContent).toContain('1 more explanations in Check details');
+    const result = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Open transfer result')!;
+    await flush(() => result.click());
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('Backup is unreachable');
+  });
+
   it('ignores progress from another repository or scan and resets counters on retry', async () => {
     await start();
     const oldId = useRemoteTransferState.getState().scanProgressId!;

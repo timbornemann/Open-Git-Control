@@ -30,6 +30,8 @@ export default defineConfig({
         'electron/*.ts',
         'electron/hosting/**/*.ts',
         'electron/git/Remote*.ts',
+        'electron/git/PushSecretScanScope.ts',
+        'electron/git/createPushPlan.ts',
         'electron/git/GitLfs*.ts',
         'src/components/staging-area/useStagingLfs.ts',
         'electron/git/remote*.ts',

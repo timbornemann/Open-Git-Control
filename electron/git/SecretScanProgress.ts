@@ -1,15 +1,19 @@
-import type { SecretScanProgressDto } from '../../src/types/secretScan';
+import type { SecretScanProgressDto, SecretScanPushScopeDto } from '../../src/types/secretScan';
 
 /** No guessed percentages: a commit advances only after its batch was inspected. */
 export class SecretScanProgress {
   private state: SecretScanProgressDto = { phase: 'preparing', checkedLines: 0 };
   private lastEmittedAt = 0;
   private lastEmittedLines = 0;
-  constructor(private readonly notify?: (progress: SecretScanProgressDto) => void) {}
+  private completedCommits = 0;
+  constructor(
+    private readonly notify?: (progress: SecretScanProgressDto) => void,
+    private readonly pushScope?: SecretScanPushScopeDto,
+  ) {}
   private emit() {
     this.lastEmittedAt = Date.now();
     this.lastEmittedLines = this.state.checkedLines;
-    this.notify?.({ ...this.state });
+    this.notify?.({ ...this.state, ...(this.pushScope ? { pushScope: this.pushScope } : {}) });
   }
   phase(phase: SecretScanProgressDto['phase']) {
     this.state = { phase, checkedLines: this.state.checkedLines };
@@ -20,11 +24,17 @@ export class SecretScanProgress {
     if (this.notify && checkedLines - this.lastEmittedLines >= 250 && Date.now() - this.lastEmittedAt >= 100) this.emit();
   }
   beginCommits(totalCommits: number, tags: boolean) {
-    this.state = { phase: tags ? 'tags' : 'history', checkedLines: this.state.checkedLines, processedCommits: 0, totalCommits };
+    this.state = {
+      phase: tags ? 'tags' : 'history',
+      checkedLines: this.state.checkedLines,
+      processedCommits: this.pushScope ? this.completedCommits : 0,
+      totalCommits: this.pushScope?.totalCommits ?? totalCommits,
+    };
     this.emit();
   }
   completeBatch(count: number) {
     this.state.processedCommits = Math.min(this.state.totalCommits ?? 0, (this.state.processedCommits ?? 0) + count);
+    this.completedCommits = this.state.processedCommits;
     this.emit();
   }
 }

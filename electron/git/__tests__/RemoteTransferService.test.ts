@@ -344,14 +344,28 @@ describe('RemoteTransferService with real Git', () => {
     const invalid = await service.planPush(f.repo, { repoPath: f.repo, remoteNames: ['forgejo', 'github'] }, f.context);
     generations['github-account']++;
     await expect(service.executePush(f.repo, invalid.id, f.context)).rejects.toThrow('Hosting authentication changed');
+    await expect(service.getPushScanScope(f.repo, invalid.secretScanArgs, f.context)).rejects.toThrow('Hosting authentication changed');
     expect(credentials).not.toHaveBeenCalled();
     const plan = await service.planPush(f.repo, { repoPath: f.repo, remoteNames: ['forgejo', 'github'] }, f.context);
+    const scope = await service.getPushScanScope(f.repo, plan.secretScanArgs, f.context);
+    expect(scope?.summary).toMatchObject({ mode: 'incremental', endpointCount: 2, totalCommits: 1 });
+    await scope!.assertCurrent();
+    expect(credentials.mock.calls.map(([input]) => [input.connectionId, input.urls, input.expectedGeneration])).toEqual([
+      ['forgejo-account', [a], 3],
+      ['github-account', [b], 8],
+      ['forgejo-account', [a], 3],
+      ['github-account', [b], 8],
+    ]);
+    credentials.mockClear();
+    dispose.mockClear();
     expect((await service.executePush(f.repo, plan.id, f.context)).state).toBe('success');
     expect(credentials.mock.calls.map(([input]) => [input.connectionId, input.urls, input.expectedGeneration])).toEqual([
       ['forgejo-account', [a], 3],
       ['github-account', [b], 8],
     ]);
     expect(dispose).toHaveBeenCalledTimes(2);
+    generations['github-account']++;
+    await expect(scope!.assertCurrent()).rejects.toThrow('Hosting authentication changed');
     const preferences = f.store.read(f.repo);
     preferences.bindings![1].credentialMode = 'system';
     await service.setPreferences(f.repo, preferences, f.context);
@@ -362,7 +376,7 @@ describe('RemoteTransferService with real Git', () => {
     expect((await service.executePush(f.repo, nativePlan.id, f.context)).state).toBe('success');
     expect(credentials).toHaveBeenCalledWith(expect.objectContaining({ connectionId: null, urls: [b], expectedGeneration: undefined }));
     expect(f.store.read(f.repo).bindings![1].repository?.connectionId).toBe('github-account');
-  }, 20_000);
+  }, 30_000);
 
   it('reports partial publication within one endpoint and retries only the missing selected ref', async () => {
     const f = fixture();

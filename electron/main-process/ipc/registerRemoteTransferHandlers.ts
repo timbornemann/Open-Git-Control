@@ -49,6 +49,7 @@ export function registerRemoteTransferHandlers({
   readStoredRepoPaths = () => readStoreData().repos.map((repo) => repo.path),
 }: Dependencies): RemoteTransferService {
   const service = new RemoteTransferService(gitService.runner, preferencesStore, createCredentialEnvironment, getCredentialGeneration);
+  pushGuard.setPushScanResolver?.((repoPath, args, context) => service.getPushScanScope(repoPath, args, context));
   const running = new Map<string, Set<AbortController>>();
 
   ipcMain.handle(

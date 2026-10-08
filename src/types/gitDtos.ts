@@ -1,6 +1,7 @@
 import type { GitCommandName } from '../shared/ipc/gitCommands';
 import type { IpcResult } from './ipc';
 import type { SecretScanSourceDto, SecretScanStrictnessDto } from './appDtos';
+import type { SecretScanPushScopeDto } from './secretScan';
 
 export type GitCommandNameDto = GitCommandName;
 export type GitCommandResultDto = IpcResult<string>;
@@ -30,6 +31,7 @@ export interface SecretScanResultDto {
   notes: string[];
   /** True when at least one requested push source could not be fully inspected. */
   historyScanIncomplete?: boolean;
+  pushScope?: SecretScanPushScopeDto;
   stats: {
     checkedLines: number;
     stagedLines: number;

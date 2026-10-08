@@ -5,7 +5,7 @@ import type { NotificationMessage } from '@/types/notifications';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { useRemoteTransferState, type RemoteTransferState } from './remoteTransferState';
 import type { RemoteTransferCoordinator } from './remoteTransferCoordinator';
-import { secretScanNotification } from './secretScanNotification';
+import { secretScanNotification, secretScanFallbackDetail } from './secretScanNotification';
 
 const pushOperations = new Set(['git:executePush', 'git:retryPush', 'git:planPush']);
 const notificationTitle = (current: RemoteTransferState) =>
@@ -50,9 +50,17 @@ export function useRemoteTransferNotifications(coordinator: RemoteTransferCoordi
         isError,
         kind: cancelled ? (completed ? 'warning' : 'info') : batch?.state === 'partial' ? 'warning' : isError ? 'error' : 'success',
         detail:
-          batch && batch.targets.length
-            ? translate.current(`${completed} von ${batch.targets.length} Zielen abgeschlossen.`, `${completed} of ${batch.targets.length} targets completed.`)
-            : undefined,
+          [
+            batch && batch.targets.length
+              ? translate.current(
+                  `${completed} von ${batch.targets.length} Zielen abgeschlossen.`,
+                  `${completed} of ${batch.targets.length} targets completed.`,
+                )
+              : undefined,
+            secretScanFallbackDetail(current.scan?.pushScope, translate.current),
+          ]
+            .filter(Boolean)
+            .join('\n') || undefined,
         // Cancelled operations expire just like ordinary informational messages.
         autoHideMs: cancelled ? (canOpen ? 6000 : 3000) : undefined,
         actions: canOpen

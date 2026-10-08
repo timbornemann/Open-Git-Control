@@ -47,7 +47,7 @@ export function RemoteTransferPanel({
         />
       )}
       {state.phase === 'result' && state.batch && (
-        <PushTransferResults batch={state.batch} busy={state.busy} canRetry={Boolean(state.plan)} reviewRetry={retryPush} />
+        <PushTransferResults batch={state.batch} busy={state.busy} canRetry={Boolean(state.plan)} reviewRetry={retryPush} scan={state.scan} />
       )}
       {state.phase === 'result' && state.failedPull && (
         <PullTransferRecovery failedPull={state.failedPull} busy={state.busy} retry={retryPull} openWorkspace={openWorkspace} />

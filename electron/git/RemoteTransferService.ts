@@ -1,6 +1,8 @@
+import { createPushPlan } from './createPushPlan';
 import { randomUUID } from 'crypto';
-import { readRemoteSnapshot, readPushSource, assertPushSourceUnchanged, probePushUrlIsolation, remoteConfigurationFingerprint } from './remoteSnapshot';
-import { referencedLfsObjects, lfsEndpoint, lfsTransferEnvironment, uploadLfsObjects } from './GitLfsTransfers';
+import { readPushSecretScanScope, type PushSecretScanScope } from './PushSecretScanScope';
+import { readRemoteSnapshot, assertPushSourceUnchanged, probePushUrlIsolation, remoteConfigurationFingerprint } from './remoteSnapshot';
+import { lfsEndpoint, lfsTransferEnvironment, uploadLfsObjects } from './GitLfsTransfers';
 import type {
   GitRemoteSnapshotDto,
   GitPushBatchDto,
@@ -15,13 +17,11 @@ import type { GitProcessResult } from './GitProcessTypes';
 import { redactGitSensitiveText } from './GitErrorFormatter';
 import { RemotePreferencesStore } from './RemotePreferencesStore';
 import { reconcileRemotePreferences } from './reconcileRemotePreferences';
-import { assertGroupedCredentialChoices, runGroupedRemotePush } from './groupedRemotePush';
+import { runGroupedRemotePush } from './groupedRemotePush';
 import {
   isolatedPushEnvironment,
   normalizeRemotePreferences,
   referencedRemotePreferenceNames,
-  normalizeTargetBranches,
-  resolvePushTargetUrls,
   refName,
   remoteName,
   remoteUrl,
@@ -33,10 +33,8 @@ import { repositoryPathKey } from '../main-process/activeRepositoryAuthorization
 export type { CredentialEnvironmentFactory, RemoteTransferContext } from './remoteTransferModels';
 import {
   digest,
-  boundCredentialGenerations,
   pruneTransfers,
   lines,
-  PLAN_LIFETIME,
   type CredentialEnvironmentFactory,
   type RemoteTransferContext,
   type StoredPlan,
@@ -225,84 +223,50 @@ export class RemoteTransferService {
 
   async planPush(repoPath: string, input: RemoteTransferOperations['planPush']['input'], context: RemoteTransferContext): Promise<GitPushPlanDto> {
     pruneTransfers(this.plans, this.batches);
-    const initialFingerprint = await this.fingerprint(repoPath);
-    const credentialGenerations = Object.fromEntries(
-      (this.getPreferences(repoPath).bindings ?? [])
-        .filter((binding) => binding.repository && binding.credentialMode !== 'system')
-        .map((binding) => [binding.repository!.connectionId, this.getCredentialGeneration?.(binding.repository!.connectionId) ?? 0]),
-    );
-    const snapshot = await this.getRemotes(repoPath);
-    if (!Array.isArray(input.remoteNames) || !input.remoteNames.length || input.remoteNames.length > 32) throw new Error('Select at least one push remote.');
-    const targetUrls = resolvePushTargetUrls(input.targetUrls, snapshot, input.remoteNames);
-    const targetBranches = input.targetBranches ? normalizeTargetBranches(input.targetBranches, input.remoteNames) : {};
-    if (input.force !== undefined && typeof input.force !== 'boolean') throw new Error('Invalid push mode.');
-    const { sourceBranch, destinationRef, sourceOid } = await readPushSource(repoPath, this.git, snapshot.branch, input);
-    const tagNames = [...new Set(input.tagNames ?? [])];
-    if (!Array.isArray(input.tagNames ?? []) || tagNames.length > 64) throw new Error('Invalid selected tags.');
-    const refs: PublishedRef[] = [{ sourceOid, destinationRef }];
-    for (const name of tagNames) {
-      const tagRef = `refs/tags/${refName(name)}`;
-      await this.git.run(repoPath, ['check-ref-format', tagRef]);
-      refs.push({ sourceOid: (await this.git.run(repoPath, ['rev-parse', '--verify', tagRef])).trim(), destinationRef: tagRef });
-    }
-    const id = randomUUID();
-    const lfsObjects = await referencedLfsObjects(
-      repoPath,
-      refs.map((ref) => ref.sourceOid),
-      this.git,
-      { signal: context.signal },
-    );
-    const targets: GitPushTargetDto[] = [];
-    for (const name of [...new Set(input.remoteNames.map(remoteName))]) {
-      const targetDestinationRef = targetBranches[name] ? `refs/heads/${targetBranches[name]}` : destinationRef;
-      await this.git.run(repoPath, ['check-ref-format', targetDestinationRef]);
-      const remote = snapshot.remotes.find((candidate) => candidate.name === name);
-      if (!remote) throw new Error('Unknown push remote.');
-      const grouped = remote.pushUrls.length > 1 && !snapshot.supportsPushUrlIsolation;
-      if (grouped && input.force) throw new Error('Force-with-lease requires isolated push URLs. Update Git or configure separate named remotes.');
-      for (const value of targetUrls[name]) {
-        const url = remoteUrl(value);
-        const target: GitPushTargetDto = { id: digest([id, name, url]).slice(0, 32), remoteName: name, url, destinationRef: targetDestinationRef, sourceOid };
-        if (lfsObjects.length)
-          target.lfsEndpoint = await lfsEndpoint(repoPath, name, this.git, isolatedPushEnvironment(name, url, snapshot.supportsPushUrlIsolation), true, url);
-        if (grouped) target.grouped = true;
-        if (input.force)
-          target.leaseOid =
-            (await this.advertised(repoPath, target, [{ sourceOid, destinationRef: targetDestinationRef }], context)).get(targetDestinationRef) ?? null;
-        targets.push(target);
-      }
-    }
-    if (!targets.length || targets.length > 64) throw new Error('Invalid push endpoint count.');
-    const marker = `__ogc_transfer_scan_${id}__`;
-    const dto: GitPushPlanDto = {
-      id,
-      repoPath,
-      sourceOid,
-      branch: snapshot.branch,
-      ...(input.sourceBranch === undefined ? {} : { sourceBranch }),
-      tagNames,
-      force: input.force === true,
-      targets,
-      secretScanArgs: [marker, ...refs.map((ref) => `${ref.sourceOid}:${ref.destinationRef}`)],
-      ...(lfsObjects.length ? { lfsObjects } : {}),
-    };
-    const fingerprint = await this.fingerprint(repoPath);
-    if (fingerprint !== initialFingerprint) throw new Error('Remote configuration or account bindings changed while planning. Review the push again.');
-    context.ensureActive();
-    const connections = Object.fromEntries(targets.map((target) => [target.id, this.connectionId(repoPath, target.remoteName, target.url)]));
-    assertGroupedCredentialChoices(targets, connections);
-    this.plans.set(id, {
-      dto,
-      refs,
-      fingerprint,
-      ownerId: context.ownerId,
-      generation: context.generation,
-      expiresAt: Date.now() + PLAN_LIFETIME,
-      executed: false,
-      connections,
-      credentialGenerations: boundCredentialGenerations(connections, credentialGenerations),
+    const plan = await createPushPlan(repoPath, input, context, {
+      git: this.git,
+      getPreferences: () => this.getPreferences(repoPath),
+      getRemotes: () => this.getRemotes(repoPath),
+      fingerprint: () => this.fingerprint(repoPath),
+      getCredentialGeneration: this.getCredentialGeneration,
+      advertised: (target, refs) => this.advertised(repoPath, target, refs, context),
+      connectionId: (name, url) => this.connectionId(repoPath, name, url),
     });
-    return structuredClone(dto);
+    this.plans.set(plan.dto.id, plan);
+    return structuredClone(plan.dto);
+  }
+
+  async getPushScanScope(repoPath: string, args: string[], context: RemoteTransferContext): Promise<PushSecretScanScope | null> {
+    if (!args[0]?.startsWith('__ogc_transfer_scan_')) return null;
+    const id = /^__ogc_transfer_scan_([a-f0-9-]{36})__$/.exec(args[0])?.[1];
+    if (!id) throw new Error('Invalid secret-scan push plan.');
+    const plan = await this.validatePlan(repoPath, id, context);
+    if (digest(args) !== digest(plan.dto.secretScanArgs)) throw new Error('Secret-scan sources no longer match the reviewed push plan.');
+    return readPushSecretScanScope({
+      repoPath,
+      refs: plan.refs,
+      targets: plan.dto.targets,
+      git: this.git,
+      context,
+      validatePlan: () => this.validatePlan(repoPath, id, context),
+      advertise: (target) => {
+        const connectionId = plan.connections[target.id];
+        return this.withCredentials(
+          repoPath,
+          target.remoteName,
+          target.url,
+          context,
+          {},
+          (envOverrides, signal) =>
+            this.git.run(repoPath, ['ls-remote', '--heads', '--tags', '--', target.url], {
+              envOverrides,
+              signal: AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(30_000)]),
+            }),
+          connectionId,
+          connectionId ? plan.credentialGenerations[connectionId] : undefined,
+        );
+      },
+    });
   }
 
   private async validatePlan(repoPath: string, id: string, context: RemoteTransferContext): Promise<StoredPlan> {

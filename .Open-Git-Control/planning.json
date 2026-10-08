@@ -131,6 +131,28 @@
       "tags": [],
       "createdAt": 1785856977969,
       "updatedAt": 1785856977969
+    },
+    {
+      "id": "3261f05f-793c-4373-8254-3a4bffcb3f6d",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Secret scann allow list",
+      "description": "Jedes repo bekommt seien eigene allowlist, nicht zentral in den einstellungen sondern im lokalen .Open-Git-Control order eine secret scann alow list, damit diese mit versioniert werdne kann und unter teams geteilt werden kann",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1791460457077,
+      "updatedAt": 1791460457077
+    },
+    {
+      "id": "e1735baf-002f-43a2-b357-8d49e35bb2d6",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Fresh Install: Check for git",
+      "description": "Wenn man Open-Git-Controll frisch insatlliert aber z.b. noch gar kein git installiert hat soll die app ein popup zeigen indem das erklärt wird, ebenfalsl soll ein link zum offiziellen download bereitgestellt werden. gleichzeitig soll in der seitenleiste änlich wie die update info ein warn dreieck sein, das bleib so lange bis git installiert und nutzbar ist. \ngit lfs soll auch als optional gekennzeichet werden auch mit download linkgenau wie github cli\nUnter Windows ist Git LFS normalerweise bereits dabei. Der übliche Git-for-Windows-Installer liefert es mit und aktiviert es standardmäßig; die Option lässt sich allerdings abwählen. Git for Windows\nBei macOS und Linux wird es üblicherweise separat installiert, beispielsweise mit brew install git-lfs beziehungsweise sudo apt install git-lfs.\n\nalternativ zum manuellen donwload soll auch ein automatischer download möglich sein, indem Open git contoll die tool mittels command installiert",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1791460675269,
+      "updatedAt": 1791460782461
     }
   ]
 }

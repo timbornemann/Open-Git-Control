@@ -69,6 +69,28 @@ describe('secret scan progress', () => {
     expect(events.some((event) => event.phase === 'verifying')).toBe(false);
   });
 
+  it('keeps a single actual total across branch and tag passes of a verified endpoint scope', async () => {
+    const commits = hashes(4);
+    const events: SecretScanProgressDto[] = [];
+    const service = new SecretScanService({ streamCommandLinesAtPath: vi.fn(async () => {}) } as any);
+    const summary = { mode: 'incremental' as const, endpointCount: 2, totalCommits: 4, fallbackReasons: [] };
+    const result = await service.scanPushDiffs({
+      ...options,
+      pushScanScope: { historyCommits: commits.slice(0, 2), tagCommits: commits.slice(2), summary, notes: [], assertCurrent: vi.fn() },
+      onScanProgress: (event) => events.push(event),
+    });
+    expect(
+      events.filter((event) => ['history', 'tags'].includes(event.phase)).map(({ processedCommits, totalCommits }) => [processedCommits, totalCommits]),
+    ).toEqual([
+      [0, 4],
+      [2, 4],
+      [2, 4],
+      [4, 4],
+    ]);
+    expect(result.pushScope).toEqual(summary);
+    expect(events.every((event) => event.pushScope === summary)).toBe(true);
+  });
+
   it('updates long-running line scans without flooding IPC and preserves immutable event snapshots', () => {
     vi.useFakeTimers();
     const events: SecretScanProgressDto[] = [];
