@@ -136,6 +136,7 @@ const DialogOverlays: React.FC<{ state: DialogOverlayState }> = ({ state }) => (
         irreversible={state.confirmDialog.irreversible}
         consequences={state.confirmDialog.consequences}
         confirmLabel={state.confirmDialog.confirmLabel}
+        focusConfirm={state.confirmDialog.focusConfirm}
         onConfirm={state.onConfirm}
         secondaryActionLabel={state.confirmDialog.secondaryActionLabel}
         secondaryActionVariant={state.confirmDialog.secondaryActionVariant}

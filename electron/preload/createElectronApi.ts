@@ -1,4 +1,5 @@
 import { createRepositorySecretScanAllowlistApi } from './createRepositorySecretScanAllowlistApi';
+import { createRepositoryLocationApi } from './createRepositoryLocationApi';
 import { createSystemToolsApi } from './createSystemToolsApi';
 import type { PreviewSnapshot, ReadRequest } from '../../src/shared/cache/resource';
 import type { IpcRenderer, IpcRendererEvent } from 'electron';
@@ -83,6 +84,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     ...createSystemToolsApi(ipcRenderer),
     ...createRepositorySecretScanAllowlistApi(ipcRenderer),
     ...createRepositoryIconApi(ipcRenderer),
+    ...createRepositoryLocationApi(ipcRenderer),
     ...createHostingApi(ipcRenderer),
     getGitIdentity: (request: GitIdentityRequest) => ipcRenderer.invoke(IpcChannel.GitGetIdentity, request),
     saveGitIdentity: (request: SaveGitIdentityRequest) => ipcRenderer.invoke(IpcChannel.GitSaveIdentity, request),
@@ -476,6 +478,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       onJobEvent: flatApi.onJobEvent,
     },
     repos: {
+      recheckRepository: flatApi.recheckRepository,
+      selectRepositoryLocation: flatApi.selectRepositoryLocation,
       ...createRepositoryIconApi(ipcRenderer),
       getStoredRepos: flatApi.getStoredRepos,
       setStoredRepos: flatApi.setStoredRepos,

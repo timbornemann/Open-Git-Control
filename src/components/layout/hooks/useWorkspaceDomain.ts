@@ -11,6 +11,7 @@ import { getLicenseTemplateRequirements, LICENSE_TEMPLATE_OPTIONS, isLicenseTemp
 import type { Dispatch, SetStateAction } from 'react';
 import { confirmWorkingDirectoryNavigation, requestWorkingDirectoryNavigation } from '@/components/working-directory/workingDirectoryNavigationGuard';
 import { openSystemTools, useGitAvailable } from '@/app/state/systemToolsStore';
+import { notifyRepositoryLocationChanged } from '@/services/repositoryLocationBus';
 
 type Params = {
   triggerRefresh: () => void;
@@ -123,6 +124,7 @@ export const useWorkspaceDomain = ({
   const [repoSortBy, setRepoSortBy] = useState<RepoSortByDto>(DEFAULT_REPO_SORT_BY);
   const [reposLoaded, setReposLoaded] = useState(false);
   const [isRestoringRepos, setIsRestoringRepos] = useState(true);
+  const [isRecoveringRepo, setIsRecoveringRepo] = useState(false);
   const repoOperationSequenceRef = useRef(0);
   const repoRestoreSequenceRef = useRef(0);
   const openReposRef = useRef(openRepos);
@@ -327,7 +329,7 @@ export const useWorkspaceDomain = ({
   }, [gitReady, migrateRepoPathToCanonical, onNoActiveRepo]);
 
   useEffect(() => {
-    if (!gitReady || !restoredWithGit.current || !reposLoaded || isRestoringRepos || !appClient.isAvailable()) return;
+    if (!gitReady || !restoredWithGit.current || !reposLoaded || isRestoringRepos || isRecoveringRepo || !appClient.isAvailable()) return;
 
     const now = Date.now();
     const repos = sortedOpenRepos.map((repoPath) => ({
@@ -342,7 +344,67 @@ export const useWorkspaceDomain = ({
       activeRepo,
       sortBy: repoSortBy,
     });
-  }, [gitReady, sortedOpenRepos, repoMeta, activeRepo, repoSortBy, reposLoaded, isRestoringRepos]);
+  }, [gitReady, sortedOpenRepos, repoMeta, activeRepo, repoSortBy, reposLoaded, isRestoringRepos, isRecoveringRepo]);
+
+  const handleRecoverRepo = async (repoPath: string, selectNewLocation: boolean): Promise<boolean> => {
+    const matches = () => normalizeRepoPathKey(activeRepoRef.current || '') === normalizeRepoPathKey(repoPath);
+    if (!matches() || !appClient.isAvailable()) return false;
+    if (!gitReady) {
+      openSystemTools();
+      return false;
+    }
+    if (!(await confirmWorkingDirectoryNavigation({ kind: 'view', label: 'repository recovery' })) || !matches()) return false;
+    const operationId = ++repoOperationSequenceRef.current;
+    setIsRecoveringRepo(true);
+    try {
+      const result = await (selectNewLocation ? appClient.selectRepositoryLocation({ repoPath }) : appClient.recheckRepository({ repoPath }));
+      if (!result.success) throw new Error(result.error);
+      if (!result.data) return false;
+      if (repoPath !== result.data) notifyRepositoryLocationChanged({ oldPath: repoPath, newPath: result.data });
+      // The main process has already persisted a relocation. Keep its list entry
+      // even if activation is superseded; never turn this into remove + add.
+      if (repoOperationSequenceRef.current !== operationId || !matches()) {
+        migrateRepoPathToCanonical(repoPath, result.data);
+        return false;
+      }
+      let canonical: string;
+      try {
+        canonical = await appClient.setRepoPath(result.data);
+      } catch (error) {
+        if (repoOperationSequenceRef.current === operationId) {
+          // Activation may fail after the backend has selected the new path
+          // (e.g. recovery of an interrupted commit). Retain the relocated list
+          // entry, but clear both selections so a normal reopen can retry safely.
+          await appClient.clearRepoPath();
+          if (repoOperationSequenceRef.current === operationId) {
+            activeRepoRef.current = null;
+            setActiveRepo(null);
+            onNoActiveRepo();
+            setGitActionToast({
+              msg: tr(
+                `Repository gefunden, konnte aber nicht geöffnet werden: ${String(error instanceof Error ? error.message : error)}`,
+                `Repository located, but could not be opened: ${String(error instanceof Error ? error.message : error)}`,
+              ),
+              isError: true,
+            });
+          }
+        }
+        return false;
+      } finally {
+        migrateRepoPathToCanonical(repoPath, result.data);
+      }
+      if (repoOperationSequenceRef.current !== operationId) return false;
+      migrateRepoPathToCanonical(result.data, canonical);
+      activeRepoRef.current = canonical;
+      setActiveRepo(canonical);
+      setReposLoaded(true);
+      onRepoActivated();
+      triggerRefresh();
+      return true;
+    } finally {
+      setIsRecoveringRepo(false);
+    }
+  };
 
   const handleSwitchRepo = async (repoPath: string) => {
     if (!gitReady) {
@@ -689,6 +751,7 @@ export const useWorkspaceDomain = ({
     setRepoSortBy: handleSetRepoSortBy,
     handleSwitchRepo,
     handleCloseRepo,
+    handleRecoverRepo,
     handleOpenFolder,
     addOpenRepo,
     toggleRepoPin,

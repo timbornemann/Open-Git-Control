@@ -500,6 +500,7 @@ remote: https://github.com/acme/repo/security/secret-scanning/unblock-secret/tok
     const setGitActionToast = vi.fn();
     const hook = renderHook(() =>
       useRepoUnavailableWorkflow({
+        handleRecoverRepo: vi.fn().mockResolvedValue(false),
         activeRepo: 'C:\\repos\\demo',
         handleCloseRepo,
         setPlannerRefreshSignal,
@@ -525,7 +526,8 @@ remote: https://github.com/acme/repo/security/secret-scanning/unblock-secret/tok
     );
 
     await act(async () => {
-      await dialog.onConfirm?.();
+      dialog.contextAction?.onClick();
+      await (setConfirmDialog.mock.calls.at(-1)?.[0] as ConfirmDialogState).onConfirm?.();
     });
 
     expect(plannerClient.deleteRepositoryProjectByPath).toHaveBeenCalledWith('C:\\repos\\demo');
@@ -549,6 +551,7 @@ remote: https://github.com/acme/repo/security/secret-scanning/unblock-secret/tok
     const setConfirmDialog = vi.fn();
     const hook = renderHook(() =>
       useRepoUnavailableWorkflow({
+        handleRecoverRepo: vi.fn().mockResolvedValue(false),
         activeRepo: null,
         handleCloseRepo: vi.fn(),
         setPlannerRefreshSignal: vi.fn(),
@@ -568,6 +571,7 @@ remote: https://github.com/acme/repo/security/secret-scanning/unblock-secret/tok
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(false);
     const unavailableHook = renderHook(() =>
       useRepoUnavailableWorkflow({
+        handleRecoverRepo: vi.fn().mockResolvedValue(false),
         activeRepo: 'C:\\repos\\demo',
         handleCloseRepo: vi.fn(),
         setPlannerRefreshSignal: vi.fn(),
@@ -596,6 +600,7 @@ remote: https://github.com/acme/repo/security/secret-scanning/unblock-secret/tok
     const setGitActionToast = vi.fn();
     const hook = renderHook(() =>
       useRepoUnavailableWorkflow({
+        handleRecoverRepo: vi.fn().mockResolvedValue(false),
         activeRepo: 'C:\\repos\\demo',
         handleCloseRepo,
         setPlannerRefreshSignal: vi.fn(),
@@ -617,7 +622,8 @@ remote: https://github.com/acme/repo/security/secret-scanning/unblock-secret/tok
     expect(setConfirmDialog).toHaveBeenCalledTimes(2);
     const secondDialog = setConfirmDialog.mock.calls[1]?.[0] as ConfirmDialogState;
     await act(async () => {
-      await secondDialog.onConfirm?.();
+      secondDialog.contextAction?.onClick();
+      await (setConfirmDialog.mock.calls.at(-1)?.[0] as ConfirmDialogState).onConfirm?.();
     });
 
     expect(deleteRepositoryProjectByPath).not.toHaveBeenCalled();
@@ -644,6 +650,7 @@ remote: https://github.com/acme/repo/security/secret-scanning/unblock-secret/tok
     const setGitActionToast = vi.fn();
     const hook = renderHook(() =>
       useRepoUnavailableWorkflow({
+        handleRecoverRepo: vi.fn().mockResolvedValue(false),
         activeRepo: 'C:\\repos\\demo',
         handleCloseRepo: vi.fn().mockResolvedValue(undefined),
         setPlannerRefreshSignal: vi.fn(),
@@ -659,7 +666,8 @@ remote: https://github.com/acme/repo/security/secret-scanning/unblock-secret/tok
     const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
 
     await act(async () => {
-      await dialog.onConfirm?.();
+      dialog.contextAction?.onClick();
+      await (setConfirmDialog.mock.calls.at(-1)?.[0] as ConfirmDialogState).onConfirm?.();
     });
 
     expect(setGitActionToast).toHaveBeenCalledWith(

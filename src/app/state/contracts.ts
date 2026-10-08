@@ -56,6 +56,7 @@ export type ConfirmDialogState = {
   irreversible: boolean;
   consequences: string;
   confirmLabel?: string;
+  focusConfirm?: boolean;
   onConfirm: () => Promise<void> | void;
   onCancel?: () => Promise<void> | void;
   secondaryActionLabel?: string;

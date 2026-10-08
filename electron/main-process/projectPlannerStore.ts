@@ -66,6 +66,13 @@ export function onProjectPlannerDataChanged(listener: () => void): () => void {
   return () => plannerDataListeners.delete(listener);
 }
 
+/** The project file keeps its IDs; only its in-memory directory association changes. */
+export function relocateKnownPlannerRepository(oldPath: string, newPath: string): void {
+  knownRepositoryPaths.delete(getRepositoryProjectKey(oldPath));
+  rememberRepositoryPath(newPath);
+  notifyDataChanged();
+}
+
 const readLegacyData = (): ProjectPlannerData => {
   try {
     return parsePlannerData(fs.readFileSync(getLegacyStorePath(), 'utf8'), 'Planner data');

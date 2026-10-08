@@ -137,6 +137,7 @@ export const useAppState = () => {
   useRepoUnavailableWorkflow({
     activeRepo: workspace.activeRepo,
     handleCloseRepo: workspace.handleCloseRepo,
+    handleRecoverRepo: workspace.handleRecoverRepo,
     setPlannerRefreshSignal,
     setConfirmDialog,
     setGitActionToast,

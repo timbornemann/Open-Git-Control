@@ -1,6 +1,6 @@
 import { updateResource, cacheDiagnostics } from '@/data/queryClient';
 import { backgroundQueue } from '@/data/backgroundQueue';
-import { cachedClient, resourceKey } from '@/data/clientCache';
+import { cachedClient, resourceKey, invalidateResources } from '@/data/clientCache';
 import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
 import { getElectronApi, requireElectronAppApi, requireElectronReposApi, requireElectronSettingsApi } from './electronApi';
 
@@ -131,6 +131,19 @@ export const appClient = cachedClient('app', {
 
   async clearRepoPath(...args: Parameters<ElectronAPI['clearRepoPath']>): ReturnType<ElectronAPI['clearRepoPath']> {
     return requireElectronReposApi().clearRepoPath(...args);
+  },
+
+  recheckRepository(...args: Parameters<ElectronAPI['recheckRepository']>) {
+    return requireElectronReposApi().recheckRepository(...args);
+  },
+
+  async selectRepositoryLocation(...args: Parameters<ElectronAPI['selectRepositoryLocation']>) {
+    const result = await requireElectronReposApi().selectRepositoryLocation(...args);
+    if (result.success && result.data) {
+      invalidateResources('app', undefined, ['getStoredRepos']);
+      invalidateResources('planner');
+    }
+    return result;
   },
 
   async getDiagnosticsReport(...args: Parameters<ElectronAPI['getDiagnosticsReport']>): ReturnType<ElectronAPI['getDiagnosticsReport']> {

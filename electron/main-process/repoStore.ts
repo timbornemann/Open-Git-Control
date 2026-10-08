@@ -105,8 +105,7 @@ export function onRepoStoreChanged(listener: () => void): () => void {
   return () => storeListeners.delete(listener);
 }
 
-export function writeStoreData(data: StoredData): void {
-  writeTextFileAtomically(getStorePath(), JSON.stringify(normalizeStoredData(data), null, 2));
+export function notifyRepoStoreChanged(): void {
   for (const listener of storeListeners) {
     try {
       listener();
@@ -114,4 +113,9 @@ export function writeStoreData(data: StoredData): void {
       // A listener failure must not turn an already persisted write into an error.
     }
   }
+}
+
+export function writeStoreData(data: StoredData): void {
+  writeTextFileAtomically(getStorePath(), JSON.stringify(normalizeStoredData(data), null, 2));
+  notifyRepoStoreChanged();
 }

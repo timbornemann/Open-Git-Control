@@ -3,6 +3,17 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { createElectronApi } from '../createElectronApi';
 
 describe('createElectronApi', () => {
+  it('exposes saved repository recovery in both namespaces without accepting a replacement path from the renderer', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true, data: null });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+    const request = { repoPath: 'C:/missing' };
+    await api.repos.recheckRepository(request);
+    await api.selectRepositoryLocation(request);
+    expect(invoke.mock.calls).toEqual([
+      [IpcChannel.ReposRecheck, request],
+      [IpcChannel.ReposSelectLocation, request],
+    ]);
+  });
   it('exposes checked Git identity reads and writes in both namespaces', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

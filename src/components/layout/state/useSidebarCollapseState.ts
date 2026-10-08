@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { onRepositoryLocationChanged } from '@/services/repositoryLocationBus';
+import { normalizeRepoPathKey } from '@/utils/repoPath';
 import {
   DEFAULT_SIDEBAR_COLLAPSE_STATE,
   DEFAULT_SIDEBAR_GENERAL_COLLAPSE_STATE,
@@ -18,6 +20,20 @@ type UseSidebarCollapseStateParams = {
 export const useSidebarCollapseState = ({ activeRepo }: UseSidebarCollapseStateParams) => {
   const [sidebarCollapseByRepo, setSidebarCollapseByRepo] = useState<SidebarCollapseByRepo>({});
   const [sidebarGeneralCollapseState, setSidebarGeneralCollapseState] = useState<SidebarGeneralCollapseState>(DEFAULT_SIDEBAR_GENERAL_COLLAPSE_STATE);
+
+  useEffect(
+    () =>
+      onRepositoryLocationChanged(({ oldPath, newPath }) => {
+        setSidebarCollapseByRepo((previous) => {
+          const oldKey = Object.keys(previous).find((key) => normalizeRepoPathKey(key) === normalizeRepoPathKey(oldPath));
+          if (!oldKey) return previous;
+          const next = { ...previous, [newPath]: previous[oldKey] };
+          if (oldKey !== newPath) delete next[oldKey];
+          return next;
+        });
+      }),
+    [],
+  );
 
   useEffect(() => {
     try {

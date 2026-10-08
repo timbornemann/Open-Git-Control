@@ -122,17 +122,6 @@
       "updatedAt": 1785856977969
     },
     {
-      "id": "aa11ecd9-6624-4946-844a-7518a72d8aae",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Commit-Identität einrichten",
-      "description": "Einen eigenen Dialog für Git-Name und E-Mail habe ich nicht gefunden. Vor dem ersten Commit fehlende Angaben erkennen und direkt einrichten lassen – wahlweise für dieses Repository oder global. Die Hosting-Anmeldung ersetzt diese Angaben nicht.",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1791462669489,
-      "updatedAt": 1791487064508
-    },
-    {
       "id": "05a3ba82-6a57-4f9c-99f5-3ca9a042ed3f",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Deaktivierte Aktionen erklären",
@@ -147,12 +136,12 @@
       "id": "e71bd637-2f40-4aae-8b73-18fe0b44a8cd",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Verschobene Repositories wiederfinden",
-      "description": "Bei nicht verfügbaren Repositories gibt es derzeit Entfernen oder Abbrechen. „Neuen Speicherort auswählen“ und „Erneut prüfen“ ergänzen. So könnten Einstellungen und Planungsdaten bei einem verschobenen Projekt erhalten bleiben.",
+      "description": "Verschobene Repositories wiederfinden: Bei nicht verfügbaren Repositories gibt es derzeit Entfernen oder Abbrechen. „Neuen Speicherort auswählen“ und „Erneut prüfen“ ergänzen. So könnten Einstellungen und Planungsdaten bei einem verschobenen Projekt erhalten bleiben.",
       "priority": "medium",
       "status": "planned",
       "tags": [],
       "createdAt": 1791462712888,
-      "updatedAt": 1791462712888
+      "updatedAt": 1791493051355
     },
     {
       "id": "a2e2a3e1-2cfe-4d15-ab32-83912311496d",

@@ -28,6 +28,7 @@ import { registerRemoteTransferHandlers } from './registerRemoteTransferHandlers
 import { registerRepositoryIconHandlers } from './registerRepositoryIconHandlers';
 import { registerRepositorySecretScanAllowlistHandlers } from './registerRepositorySecretScanAllowlistHandlers';
 import { registerGitIdentityHandlers } from './registerGitIdentityHandlers';
+import { registerRepositoryLocationHandlers } from './registerRepositoryLocationHandlers';
 
 type SetupIpcDeps = {
   gitService: GitService;
@@ -78,6 +79,7 @@ export function setupIPC({
   registerRepoSettingsHandlers({ updaterManager, githubService });
   registerRepositoryIconHandlers();
   registerGitIdentityHandlers(gitService);
+  registerRepositoryLocationHandlers(gitService);
   registerRepositorySecretScanAllowlistHandlers({ gitService, repoJobRegistry, readSettingsWithMigration });
   registerProjectPlannerHandlers({ gitService });
   registerUpdaterHandlers({ updaterManager });

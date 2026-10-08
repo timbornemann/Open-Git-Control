@@ -17,6 +17,7 @@ interface DialogFrameProps {
   secondaryActionVariant?: 'default' | 'danger';
   closeOnBackdrop?: boolean;
   initialFocusRef?: React.RefObject<HTMLElement | null>;
+  focusConfirm?: boolean;
   children: React.ReactNode;
 }
 
@@ -47,9 +48,11 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
   secondaryActionVariant = 'default',
   closeOnBackdrop = true,
   initialFocusRef,
+  focusConfirm = false,
   children,
 }) => {
   const dialogRef = useRef<HTMLDivElement | null>(null);
+  const confirmRef = useRef<HTMLButtonElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const dialogIdRef = useRef<number | null>(null);
   const onCloseRef = useRef(onClose);
@@ -71,7 +74,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     const focusDialog = window.setTimeout(() => {
-      const preferred = initialFocusRef?.current;
+      const preferred = initialFocusRef?.current ?? (focusConfirm ? confirmRef.current : null);
       if (preferred) {
         preferred.focus();
         return;
@@ -93,7 +96,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
 
       if (event.key === 'Enter' && onEnterRef.current) {
         const target = event.target as HTMLElement | null;
-        if (target?.tagName !== 'TEXTAREA' && !target?.dataset.dialogNoEnter) {
+        if (target?.tagName !== 'TEXTAREA' && target?.tagName !== 'BUTTON' && !target?.dataset.dialogNoEnter) {
           event.preventDefault();
           onEnterRef.current();
           return;
@@ -129,7 +132,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
       if (index >= 0) openDialogIds.splice(index, 1);
       previousFocusRef.current?.focus();
     };
-  }, [open, initialFocusRef]);
+  }, [open, initialFocusRef, focusConfirm]);
 
   if (!open) return null;
 
@@ -156,6 +159,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
           )}
           {onConfirm && (
             <button
+              ref={confirmRef}
               className={`dialog-btn ${confirmVariant === 'danger' ? 'dialog-btn-danger' : 'dialog-btn-primary'}`}
               onClick={onConfirm}
               disabled={confirmDisabled}

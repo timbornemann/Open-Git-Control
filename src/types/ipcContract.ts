@@ -150,6 +150,8 @@ export const enum IpcChannel {
   PlanningApiGetInfo = 'planning-api:getInfo',
   ReposGetStored = 'repos:getStored',
   ReposSetStored = 'repos:setStored',
+  ReposRecheck = 'repos:recheck',
+  ReposSelectLocation = 'repos:selectLocation',
   RepositoryRunConfigChanged = 'repositoryRun:configChanged',
   RepositoryRunEvent = 'repositoryRun:event',
   RepositoryRunGetConfig = 'repositoryRun:getConfig',

@@ -14,6 +14,7 @@ interface ConfirmProps {
   irreversible?: boolean;
   consequences?: string;
   confirmLabel?: string;
+  focusConfirm?: boolean;
   secondaryActionLabel?: string;
   cancelLabel?: string;
   onConfirm: () => void;
@@ -32,6 +33,7 @@ export const Confirm: React.FC<ConfirmProps> = ({
   irreversible = false,
   consequences,
   confirmLabel,
+  focusConfirm,
   secondaryActionLabel,
   cancelLabel,
   onConfirm,
@@ -49,6 +51,7 @@ export const Confirm: React.FC<ConfirmProps> = ({
       onClose={onCancel}
       onConfirm={onConfirm}
       onEnter={onConfirm}
+      focusConfirm={focusConfirm}
       confirmLabel={confirmLabel ?? t('generated.components.confirm.continue_f7e20a9a')}
       secondaryActionLabel={secondaryActionLabel}
       cancelLabel={cancelLabel ?? t('generated.components.confirm.cancel_035b7526')}
