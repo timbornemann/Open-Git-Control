@@ -6,7 +6,8 @@ import { cx } from './classNames';
 type Props = {
   children: ReactElement<ButtonHTMLAttributes<HTMLButtonElement>>;
   reason?: string | null;
-  remedy?: { label: string; onClick: () => void };
+  /** Omit the label to make the explanation itself the configuration link. */
+  remedy?: { label?: string; onClick: () => void };
   className?: string;
 };
 
@@ -21,15 +22,31 @@ export function ActionRequirement({ children, reason, remedy, className }: Props
         title: reason,
         'aria-describedby': [children.props['aria-describedby'], descriptionId].filter(Boolean).join(' '),
       })}
-      <div className="ui-action-requirement__help">
-        <Info size={13} aria-hidden="true" />
-        <span id={descriptionId}>{reason}</span>
-        {remedy && (
-          <Button className="ui-action-requirement__remedy" size="xs" variant="ghost" onClick={remedy.onClick}>
-            {remedy.label}
-          </Button>
-        )}
-      </div>
+      <ActionRequirementHelp id={descriptionId} reason={reason} remedy={remedy} />
+    </div>
+  );
+}
+
+/** Shared guidance for a disabled action or the field needed to enable it. */
+export function ActionRequirementHelp({ id, reason, remedy }: Pick<Props, 'reason' | 'remedy'> & { id: string }) {
+  if (!reason) return null;
+  return (
+    <div className="ui-action-requirement__help">
+      <Info size={13} aria-hidden="true" />
+      {remedy && !remedy.label ? (
+        <Button id={id} className="ui-action-requirement__remedy" size="xs" variant="ghost" onClick={remedy.onClick}>
+          {reason}
+        </Button>
+      ) : (
+        <>
+          <span id={id}>{reason}</span>
+          {remedy && (
+            <Button className="ui-action-requirement__remedy" size="xs" variant="ghost" onClick={remedy.onClick}>
+              {remedy.label}
+            </Button>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -337,10 +337,58 @@
   font-size: 0.8rem;
 }
 
+.staging-commit-title-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 .staging-commit-bar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.staging-commit-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.staging-commit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: min(100%, 280px);
+  max-width: 100%;
+}
+
+.staging-commit-actions > button,
+.staging-commit-actions > .ui-action-requirement > button {
+  min-height: 28px;
+}
+
+/* Prerequisites occupy their own row, without changing the button alignment. */
+.staging-commit-actions > .ui-action-requirement {
+  display: contents;
+}
+
+.staging-commit-actions .ui-action-requirement__help {
+  order: 1;
+  flex: 1 0 100%;
+  max-width: 100%;
+}
+
+.staging-commit-actions .ui-action-requirement__help > span {
+  flex: 0 1 auto;
 }
 
 .staging-commit-btn {

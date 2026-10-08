@@ -1,5 +1,5 @@
 export { Button } from './Button';
-export { ActionRequirement } from './ActionRequirement';
+export { ActionRequirement, ActionRequirementHelp } from './ActionRequirement';
 export type { ButtonProps } from './Button';
 export { IconButton } from './IconButton';
 export type { IconButtonProps } from './IconButton';

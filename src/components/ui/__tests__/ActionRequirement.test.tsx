@@ -67,4 +67,29 @@ describe('action prerequisites', () => {
     act(() => host.querySelector('button')!.click());
     expect(execute).toHaveBeenCalledOnce();
   });
+  it('can present the explanation as a single accessible configuration link', () => {
+    const configure = vi.fn(),
+      execute = vi.fn();
+    act(() =>
+      root.render(
+        createElement(ActionRequirement, {
+          reason: 'Enter commit title',
+          remedy: { onClick: configure },
+          children: createElement('button', { onClick: execute }, 'Commit'),
+        }),
+      ),
+    );
+    const [action, remedy] = host.querySelectorAll('button');
+    expect(host.textContent?.match(/Enter commit title/g)).toHaveLength(1);
+    expect(document.getElementById(action.getAttribute('aria-describedby')!)).toBe(remedy);
+    expect(action.disabled).toBe(true);
+    expect(remedy.disabled).toBe(false);
+    expect(remedy.type).toBe('button');
+    act(() => {
+      action.click();
+      remedy.click();
+    });
+    expect(configure).toHaveBeenCalledOnce();
+    expect(execute).not.toHaveBeenCalled();
+  });
 });

@@ -53,18 +53,44 @@ describe('commit prerequisites', () => {
     expect(props.aiCommit.handleAiAutoCommit).not.toHaveBeenCalled();
     expect(props.aiConfigEnabled).toBe(false);
   });
-  it('explains missing title and staged content, then removes the help once ready', () => {
+  it('keeps normal empty staging quiet, then offers one title link once there are staged changes', () => {
+    props.aiConfigEnabled = true;
     render();
+    expect(host.querySelector('.ui-action-requirement__help')).toBeNull();
+    expect(button('Commit').disabled).toBe(true);
+    props.status.staged = ['file.txt'];
+    render();
+    expect(host.textContent?.match(/Enter commit title/g)).toHaveLength(1);
+    expect(host.textContent).not.toContain('Enter a commit title.');
+    const commitButton = button('Commit');
+    const titleLink = button('Enter commit title');
+    const titleField = host.querySelector<HTMLTextAreaElement>('.staging-commit-input')!;
+    expect(document.getElementById(commitButton.getAttribute('aria-describedby')!)!).toBe(titleLink);
+    expect(document.getElementById(titleField.getAttribute('aria-describedby')!)).toBe(titleLink);
+    expect(host.querySelector('.staging-commit-actions')?.textContent).not.toContain('Enter commit title');
     act(() => button('Enter commit title').click());
-    expect(document.activeElement).toBe(host.querySelector('.staging-commit-input'));
+    expect(document.activeElement).toBe(titleField);
     expect(button('Commit').disabled).toBe(true);
     props.commitForm.commitMsg = 'Ready';
     render();
-    expect(host.textContent).toContain('Stage the changes for this commit first.');
-    props.status.staged = ['file.txt'];
+    expect(button('Commit').disabled).toBe(false);
+    expect(button('Enter commit title')).toBeUndefined();
+    props.status.staged = [];
+    props.commitForm.commitMsg = '';
+    render();
+    expect(button('Enter commit title')).toBeUndefined();
+    expect(button('Commit').disabled).toBe(true);
+    expect(props.commitForm.handleCommit).not.toHaveBeenCalled();
+  });
+  it('still offers the title link when amending a commit without newly staged changes', () => {
+    props.commitForm.amendCommit = true;
+    render();
+    act(() => button('Enter commit title').click());
+    expect(document.activeElement).toBe(host.querySelector('.staging-commit-input'));
+    props.commitForm.commitMsg = 'Corrected title';
     render();
     expect(button('Commit').disabled).toBe(false);
-    expect(host.textContent).not.toContain('Stage the changes');
+    expect(button('Enter commit title')).toBeUndefined();
     expect(props.commitForm.handleCommit).not.toHaveBeenCalled();
   });
   it('keeps conflict and running-operation protection', () => {
