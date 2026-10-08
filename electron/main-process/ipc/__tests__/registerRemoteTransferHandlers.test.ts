@@ -61,6 +61,50 @@ describe('repository authority for structured remote transfers', () => {
     await expect(invoke('getRemotes', { repoPath: 'C:/repos/saved/child' })).resolves.toMatchObject({ success: false });
     expect(mocked.editRemote).not.toHaveBeenCalled();
   });
+  it('stops later push endpoints if the saved policy changes after authorization', async () => {
+    let policy = 'v1';
+    const pushed: string[] = [];
+    pushGuard.createPushPolicyVerifier = vi.fn(async () => {
+      const version = policy;
+      return () => {
+        if (policy !== version) throw new Error('Secret-scan allowlist changed.');
+      };
+    });
+    mocked.executePush.mockImplementation(async (_repoPath, _planId, context) => {
+      await context.authorizePush(['plan-marker']);
+      for (const endpoint of ['origin', 'backup']) {
+        context.ensureActive();
+        pushed.push(endpoint);
+        policy = 'v2';
+      }
+      return { state: 'success' };
+    });
+    await expect(invoke('executePush', { repoPath: activeRepo, planId: 'plan' })).resolves.toMatchObject({
+      success: false,
+      error: 'Secret-scan allowlist changed.',
+    });
+    expect(pushed).toEqual(['origin']);
+  });
+  it('rejects a policy edit during push authorization before publishing any endpoint', async () => {
+    const verify = vi.fn();
+    pushGuard.createPushPolicyVerifier = vi.fn().mockResolvedValue(verify);
+    vi.mocked(pushGuard.requirePushSecretScanApproval).mockImplementationOnce(async () => {
+      verify.mockImplementation(() => {
+        throw new Error('Secret-scan allowlist changed.');
+      });
+      return null;
+    });
+    const publish = vi.fn();
+    mocked.executePush.mockImplementation(async (_repoPath, _planId, context) => {
+      await context.authorizePush(['plan-marker']);
+      publish();
+    });
+    await expect(invoke('executePush', { repoPath: activeRepo, planId: 'plan' })).resolves.toMatchObject({
+      success: false,
+      error: 'Secret-scan allowlist changed.',
+    });
+    expect(publish).not.toHaveBeenCalled();
+  });
   it('discards a read after a repository switch and binds push scanning to the initiating sender and repo', async () => {
     let finishRead!: (value: unknown) => void;
     mocked.getRemotes.mockReturnValueOnce(

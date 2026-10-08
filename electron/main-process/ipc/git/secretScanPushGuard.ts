@@ -1,3 +1,4 @@
+import { repositorySecretScanAllowlistService, type RepositorySecretScanAllowlistReader } from '../../repositorySecretScanAllowlist';
 import { createHash } from 'crypto';
 import { ipcMain } from 'electron';
 import type { GitService } from '../../../GitService';
@@ -17,6 +18,7 @@ type PushScanResolver = (repoPath: string, args: string[], context: RemoteTransf
 type SecretScanPushGuardDeps = {
   gitService: GitService;
   secretScanService: SecretScanService;
+  allowlistReader?: RepositorySecretScanAllowlistReader;
   readSettingsWithMigration: () => AppSettings;
   repoJobRegistry: RepoJobRegistry;
 };
@@ -42,6 +44,8 @@ export type SecretScanPushGuard = {
   abortActiveScan: () => void;
   /** Registers a Main-owned plan resolver; no remote exclusions cross IPC. */
   setPushScanResolver?: (resolve: PushScanResolver) => void;
+  /** Keeps every endpoint in a batch bound to the policy checked before authorization. */
+  createPushPolicyVerifier?: (repoPath: string) => Promise<() => void>;
 };
 
 const senderIdOf = (event: any): number | null => {
@@ -82,7 +86,7 @@ const relevantPushConfig = (rawConfig: string): string => {
  * publishes. Only the SHA-256 digest is retained; remote URLs or other
  * potentially sensitive configuration values never leave this function.
  */
-const readPushStateFingerprint = async (gitService: GitService, repoPath: string): Promise<string> => {
+const readPushStateFingerprint = async (gitService: GitService, repoPath: string, allowlistReader: RepositorySecretScanAllowlistReader): Promise<string> => {
   try {
     const head = await gitService.runCommandAtPath(repoPath, ['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=no']);
     const index = await gitService.runCommandAtPath(repoPath, ['ls-files', '--stage', '-v', '--full-name', '-z']);
@@ -95,6 +99,7 @@ const readPushStateFingerprint = async (gitService: GitService, repoPath: string
       ['index', index],
       ['refs', refs],
       ['config', config],
+      ['allowlist', allowlistReader.read(repoPath).version],
     ] as const) {
       hash.update(label, 'utf8');
       hash.update('\0', 'utf8');
@@ -111,6 +116,7 @@ const readPushStateFingerprint = async (gitService: GitService, repoPath: string
 export function registerSecretScanPushGuard({
   gitService,
   secretScanService,
+  allowlistReader = repositorySecretScanAllowlistService,
   readSettingsWithMigration,
   repoJobRegistry,
 }: SecretScanPushGuardDeps): SecretScanPushGuard {
@@ -199,14 +205,15 @@ export function registerSecretScanPushGuard({
     });
 
     try {
-      const bindsPushState = Array.isArray(params.pushArgs);
-      const stateFingerprintBefore = bindsPushState ? await readPushStateFingerprint(gitService, repoJob.repoPath) : null;
-      const { pushScanScope, ensureActive, options: scopeOptions } = await preparePushScope(event, params.pushArgs, repoJob, controller);
       const settings = readSettingsWithMigration();
+      const allowlist = await allowlistReader.prepare(repoJob.repoPath);
+      const bindsPushState = Array.isArray(params.pushArgs);
+      const stateFingerprintBefore = bindsPushState ? await readPushStateFingerprint(gitService, repoJob.repoPath, allowlistReader) : null;
+      const { pushScanScope, ensureActive, options: scopeOptions } = await preparePushScope(event, params.pushArgs, repoJob, controller);
       const result = await secretScanService.scanPushDiffs({
         repoPath: repoJob.repoPath,
         strictness: settings.secretScanStrictness,
-        allowlistText: settings.secretScanAllowlist,
+        allowlistText: allowlist.text,
         includeTags: params?.includeTags === true,
         revisions: Array.isArray(params.revisions) ? params.revisions.map((revision) => String(revision || '')).slice(0, 8) : undefined,
         excludeRemote: typeof params.excludeRemote === 'string' ? params.excludeRemote : undefined,
@@ -225,9 +232,10 @@ export function registerSecretScanPushGuard({
         },
       });
       await pushScanScope?.assertCurrent();
+      allowlistReader.assertVersion(repoJob.repoPath, allowlist.version);
       ensureActive();
 
-      const stateFingerprintAfter = bindsPushState ? await readPushStateFingerprint(gitService, repoJob.repoPath) : null;
+      const stateFingerprintAfter = bindsPushState ? await readPushStateFingerprint(gitService, repoJob.repoPath, allowlistReader) : null;
       repoJob.ensureActive();
       if (stateFingerprintBefore !== stateFingerprintAfter) {
         throw new Error(PUSH_STATE_CHANGED_ERROR);
@@ -242,7 +250,10 @@ export function registerSecretScanPushGuard({
           senderId: senderIdOf(event),
           expiresAt: Date.now() + 120_000,
           hasFindings: findingCount > 0,
-          verifyRemote: pushScanScope?.assertCurrent,
+          verifyRemote: async () => {
+            await pushScanScope?.assertCurrent();
+            allowlistReader.assertVersion(repoJob.repoPath, allowlist.version);
+          },
         };
         completedRendererScan = scanRecord;
         if (!scanRecord.hasFindings) secretScanPushApproval = scanRecord;
@@ -313,7 +324,7 @@ export function registerSecretScanPushGuard({
       approval.argsKey === argsKey
     ) {
       try {
-        const currentFingerprint = await readPushStateFingerprint(gitService, expectedRepoPath);
+        const currentFingerprint = await readPushStateFingerprint(gitService, expectedRepoPath, allowlistReader);
         requireActiveRepositoryPath(expectedRepoPath, gitService.getRepoPath(), 'git:command push secret-scan approval');
         if (currentFingerprint === approval.stateFingerprint) {
           await approval.verifyRemote?.();
@@ -386,7 +397,7 @@ export function registerSecretScanPushGuard({
     }
     let stateFingerprint: string;
     try {
-      stateFingerprint = await readPushStateFingerprint(gitService, repoPath);
+      stateFingerprint = await readPushStateFingerprint(gitService, repoPath, allowlistReader);
       requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), IpcChannel.GitApproveSecretScanPush);
       await scan.verifyRemote?.();
     } catch {
@@ -423,6 +434,11 @@ export function registerSecretScanPushGuard({
   });
 
   return {
+    createPushPolicyVerifier: async (repoPath) => {
+      if (!readSettingsWithMigration().secretScanBeforePushEnabled) return () => {};
+      const policy = await allowlistReader.prepare(repoPath);
+      return () => allowlistReader.assertVersion(repoPath, policy.version);
+    },
     requirePushSecretScanApproval,
     setPushScanResolver: (resolve) => {
       resolvePushScan = resolve;

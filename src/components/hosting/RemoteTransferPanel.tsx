@@ -13,6 +13,8 @@ export function RemoteTransferPanel({
   choose,
   approve,
   retryScan,
+  allowlistAndRescan,
+  openAllowlist,
   retryPush,
   retryPull,
   openWorkspace,
@@ -23,6 +25,8 @@ export function RemoteTransferPanel({
   choose: (selection: RemoteTransferSelection, mode: RemoteSelectionMode) => void;
   approve: () => void;
   retryScan: () => void;
+  allowlistAndRescan?: () => void;
+  openAllowlist?: () => void;
   retryPush: () => void;
   retryPull: () => void;
   openWorkspace: () => void;
@@ -44,6 +48,8 @@ export function RemoteTransferPanel({
           busy={state.busy}
           executePush={approve}
           retryScan={retryScan}
+          allowlistAndRescan={allowlistAndRescan}
+          openAllowlist={openAllowlist}
         />
       )}
       {state.phase === 'result' && state.batch && (

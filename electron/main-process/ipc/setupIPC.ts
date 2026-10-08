@@ -26,6 +26,7 @@ import { registerHostingHandlers } from '../../hosting/registerHostingHandlers';
 import { hostingService } from '../../hosting/HostingService';
 import { registerRemoteTransferHandlers } from './registerRemoteTransferHandlers';
 import { registerRepositoryIconHandlers } from './registerRepositoryIconHandlers';
+import { registerRepositorySecretScanAllowlistHandlers } from './registerRepositorySecretScanAllowlistHandlers';
 
 type SetupIpcDeps = {
   gitService: GitService;
@@ -75,6 +76,7 @@ export function setupIPC({
   });
   registerRepoSettingsHandlers({ updaterManager, githubService });
   registerRepositoryIconHandlers();
+  registerRepositorySecretScanAllowlistHandlers({ gitService, repoJobRegistry, readSettingsWithMigration });
   registerProjectPlannerHandlers({ gitService });
   registerUpdaterHandlers({ updaterManager });
   registerAiHandlers({

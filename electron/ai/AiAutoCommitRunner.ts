@@ -5,6 +5,7 @@ import { AiAutoCommitRunSession } from './AiAutoCommitRunSession';
 import type { AiAutoCommitResult, AiProgressUpdate } from './aiServiceTypes';
 
 export type AiAutoCommitRunOptions = {
+  verifySecretScanContext?: () => void;
   beforeCommit?: (privateIndexPath: string, baseTree?: string) => Promise<void>;
 };
 
@@ -33,6 +34,7 @@ export class AiAutoCommitRunner {
       shouldCancel,
       getOpenAiApiKey,
       options.beforeCommit,
+      options.verifySecretScanContext,
     ).run();
   }
 }

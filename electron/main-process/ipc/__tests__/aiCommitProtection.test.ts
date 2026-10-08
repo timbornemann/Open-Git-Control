@@ -7,6 +7,13 @@ import { DEFAULT_SETTINGS } from '../../../settings';
 
 const { handleMock } = vi.hoisted(() => ({ handleMock: vi.fn() }));
 vi.mock('electron', () => ({ ipcMain: { handle: handleMock }, shell: { openPath: vi.fn() } }));
+vi.mock('../../repositorySecretScanAllowlist', () => ({
+  repositorySecretScanAllowlistService: {
+    prepare: async () => ({ text: '', version: 'missing' }),
+    read: () => ({ text: '', version: 'missing' }),
+    assertVersion: () => {},
+  },
+}));
 const handlers = new Map<string, (...args: any[]) => Promise<any>>();
 const event = { sender: { send: vi.fn() } };
 const repoPath = '/tmp/ai-commit-guard';
@@ -74,6 +81,7 @@ describe('shared AI commit protection', () => {
     });
     const running = handlers.get('git:aiAutoCommit')!(event, { repoPath });
     try {
+      await vi.waitFor(() => expect(resolve).toBeTypeOf('function'));
       expect(() => ensureCommitProtectionIsIdle(repoPath)).toThrow('protected commit operation');
       expect((await handlers.get('git:stagePaths')!(event, ['changed.ts'], repoPath)).error).toContain('protected commit operation');
       expect((await handlers.get('git:createCommit')!(event, { repoPath, title: 'manual' })).error).toContain('protected commit operation');
@@ -99,6 +107,7 @@ describe('shared AI commit protection', () => {
       throw new Error('Repository changed');
     }, registry);
     const running = handlers.get('git:aiAutoCommit')!(event, { repoPath });
+    await vi.waitFor(() => expect(resolve).toBeTypeOf('function'));
     registry.cancelForRepoChange('/tmp/next');
     resolve();
     expect((await running).error).toContain('Repository-Wechsel');

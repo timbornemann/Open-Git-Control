@@ -13,7 +13,6 @@ export const DEFAULT_SETTINGS: AppSettingsDto = {
   secretScanBeforeCommitEnabled: true,
   secretScanBeforePushEnabled: true,
   secretScanStrictness: 'medium',
-  secretScanAllowlist: '',
   aiAutoCommitEnabled: false,
   aiProvider: 'ollama',
   aiCommitMessageStyle: 'conventional',

@@ -206,6 +206,7 @@ const createUiSlice = ({ state, resetLayout, uiState }: Pick<CreateAppStateSlice
     if (tab !== 'repo') {
       state.onCloseRunConfig();
       state.onCloseRemoteConfig();
+      state.onCloseSecretScanAllowlist();
       if (state.isReleaseCreatorOpen) state.onCloseReleaseCreator();
     }
     state.setActiveTab(tab);
@@ -213,6 +214,9 @@ const createUiSlice = ({ state, resetLayout, uiState }: Pick<CreateAppStateSlice
   isRunConfigOpen: state.isRunConfigOpen,
   onOpenRunConfig: state.onOpenRunConfig,
   onCloseRunConfig: state.onCloseRunConfig,
+  isSecretScanAllowlistOpen: state.isSecretScanAllowlistOpen,
+  onOpenSecretScanAllowlist: state.onOpenSecretScanAllowlist,
+  onCloseSecretScanAllowlist: state.onCloseSecretScanAllowlist,
   isRemoteConfigOpen: state.isRemoteConfigOpen,
   onOpenRemoteConfig: state.onOpenRemoteConfig,
   onCloseRemoteConfig: state.onCloseRemoteConfig,

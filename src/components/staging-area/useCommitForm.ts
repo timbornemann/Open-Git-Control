@@ -1,10 +1,11 @@
+import { requestSecretScanAllowlistEditor } from '@/components/repository-security/secretScanAllowlistNavigation';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettingsDto } from '@/types/appDtos';
 import type { ToastMessage } from '@/types/git';
 import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
-import { appClient } from '@/services/appClient';
-import { addFindingPathsToSecretScanAllowlistText } from '@/shared/secretScanAllowlist';
+import { addSecretScanFindingPaths } from '@/services/repositorySecretScanAllowlistClient';
+import { SECRET_SCAN_ALLOWLIST_PATH } from '@/types/repositorySecretScanAllowlist';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import type { GitStatusWithConflicts } from './types';
 import { getCommitFormDraft, resetCommitFormDraft, updateCommitFormDraft } from './commitFormDraft';
@@ -22,17 +23,7 @@ type Params = {
   onUpdateSettings: SettingsUpdateHandler;
 };
 
-export const useCommitForm = ({
-  repoPath,
-  status,
-  setToast,
-  refresh,
-  onRepoChanged,
-  onCommitsCreated,
-  settings,
-  setConfirmDialog,
-  onUpdateSettings,
-}: Params) => {
+export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChanged, onCommitsCreated, settings, setConfirmDialog }: Params) => {
   const { t, tr } = useI18n();
   const [commitMsg, setCommitMsgState] = useState(() => getCommitFormDraft(repoPath, settings.commitTemplate).commitMsg);
   const [commitDescription, setCommitDescriptionState] = useState(() => getCommitFormDraft(repoPath, settings.commitTemplate).commitDescription);
@@ -182,22 +173,15 @@ export const useCommitForm = ({
 
   const addFindingsToAllowlist = useCallback(
     async (findings: { filePath: string }[], isCurrent: () => boolean = () => true) => {
-      const update = addFindingPathsToSecretScanAllowlistText(settings.secretScanAllowlist, findings);
-      if (update.addedPaths.length === 0) return true;
       try {
-        if (!appClient.isAvailable()) throw new Error(tr('Die Einstellungen sind nicht verfuegbar.', 'Settings are unavailable.'));
-        await onUpdateSettings({ secretScanAllowlist: update.allowlistText });
+        if (!repoPath || !isCurrent()) return false;
+        await addSecretScanFindingPaths(repoPath, findings);
         if (!isCurrent()) return false;
-        const persisted = await appClient.getSettings();
+        const staged = await gitClient.stagePaths([SECRET_SCAN_ALLOWLIST_PATH], repoPath);
         if (!isCurrent()) return false;
-        const remaining = addFindingPathsToSecretScanAllowlistText(
-          persisted.secretScanAllowlist,
-          update.addedPaths.map((filePath) => ({ filePath })),
-        );
-        if (remaining.addedPaths.length > 0) {
-          throw new Error(tr('Die Secret-Scan-Allowlist wurde nicht gespeichert.', 'The secret scan allowlist was not saved.'));
-        }
-        return true;
+        if (!staged.success) throw new Error(staged.error || tr('Die Allowlist konnte nicht gestagt werden.', 'Could not stage the allowlist.'));
+        await refresh();
+        return isCurrent();
       } catch (error: unknown) {
         if (!isCurrent()) return false;
         setToast({
@@ -210,10 +194,10 @@ export const useCommitForm = ({
         return false;
       }
     },
-    [onUpdateSettings, setToast, settings.secretScanAllowlist, tr],
+    [repoPath, refresh, setToast, tr],
   );
 
-  const handleCommit = useCallback(async () => {
+  const handleCommit = useCallback(async (): Promise<void> => {
     if (isSecretScanInProgressRef.current || isCommittingRef.current || !repoPath || !commitMsg.trim() || !gitClient.isAvailable() || !status) return;
 
     if (status.conflicts.length > 0) {
@@ -286,15 +270,21 @@ export const useCommitForm = ({
         })),
         irreversible: true,
         consequences: tr(
-          'Pruefe die Dateien vor dem Commit. Das Allowlisten einer Datei unterdrueckt kuenftige Treffer in dieser Datei.',
-          'Review the files before committing. Allowlisting a file suppresses future findings in that file.',
+          'Pruefe die Dateien vor dem Commit. Das Allowlisten einer Datei unterdrueckt kuenftige Treffer in dieser Datei. „Dateien allowlisten und committen“ stagt die gesamte aktualisierte Allowlist und nimmt sie in denselben Commit auf.',
+          'Review the files before committing. Allowlisting a file suppresses future findings in that file. “Allowlist files and commit” stages the entire updated allowlist and includes it in the same commit.',
         ),
+        contextAction: {
+          label: tr('Allowlist bearbeiten', 'Edit allowlist'),
+          onClick: () => {
+            if (isCurrentRepo()) requestSecretScanAllowlistEditor(repoAtStart);
+          },
+        },
         confirmLabel: tr('Trotzdem committen', 'Commit anyway'),
         secondaryActionLabel: tr('Dateien allowlisten und committen', 'Allowlist files and commit'),
         secondaryActionVariant: 'default',
         onSecondaryAction: async () => {
           if (!isCurrentRepo() || !(await addFindingsToAllowlist(findings, isCurrentRepo)) || !isCurrentRepo()) return;
-          await continueCommit();
+          await handleCommit();
         },
         onConfirm: continueCommit,
       });

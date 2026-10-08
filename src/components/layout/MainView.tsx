@@ -16,6 +16,8 @@ const MainViewComponent: React.FC = () => {
   const setActiveTab = useUIStore((state) => state.setActiveTab);
   const isRunConfigOpen = useUIStore((state) => state.isRunConfigOpen);
   const onCloseRunConfig = useUIStore((state) => state.onCloseRunConfig);
+  const isSecretScanAllowlistOpen = useUIStore((state) => state.isSecretScanAllowlistOpen);
+  const onCloseSecretScanAllowlist = useUIStore((state) => state.onCloseSecretScanAllowlist);
   const isRemoteConfigOpen = useUIStore((state) => state.isRemoteConfigOpen);
   const onCloseRemoteConfig = useUIStore((state) => state.onCloseRemoteConfig);
   const isReleaseCreatorOpen = useUIStore((state) => state.isReleaseCreatorOpen);
@@ -88,14 +90,15 @@ const MainViewComponent: React.FC = () => {
   const handleRepositoryStagingOpen = React.useCallback(() => {
     onCloseRunConfig();
     onCloseRemoteConfig();
+    onCloseSecretScanAllowlist();
     if (isReleaseCreatorOpen) onCloseReleaseCreator();
     setShowTimeline(false);
     handleStageCommitOpen();
-  }, [handleStageCommitOpen, onCloseRunConfig, onCloseRemoteConfig, onCloseReleaseCreator, isReleaseCreatorOpen, setShowTimeline]);
+  }, [handleStageCommitOpen, onCloseRunConfig, onCloseRemoteConfig, onCloseSecretScanAllowlist, onCloseReleaseCreator, isReleaseCreatorOpen, setShowTimeline]);
 
   React.useEffect(() => {
-    if (isReleaseCreatorOpen) setShowTimeline(false);
-  }, [isReleaseCreatorOpen, setShowTimeline]);
+    if (isReleaseCreatorOpen || isSecretScanAllowlistOpen) setShowTimeline(false);
+  }, [isReleaseCreatorOpen, isSecretScanAllowlistOpen, setShowTimeline]);
 
   React.useEffect(() => {
     const handleOpenStagingCommit = () => {
@@ -116,7 +119,7 @@ const MainViewComponent: React.FC = () => {
     !isPlannerView &&
     !isHostingView &&
     !isLocalReposView &&
-    !(activeTab === 'repo' && (isRunConfigOpen || isRemoteConfigOpen || isReleaseCreatorOpen));
+    !(activeTab === 'repo' && (isRunConfigOpen || isRemoteConfigOpen || isSecretScanAllowlistOpen || isReleaseCreatorOpen));
   const showInspectorPane = canShowInspectorPane && isInspectorPaneVisible;
 
   return (

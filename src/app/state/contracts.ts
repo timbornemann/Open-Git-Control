@@ -48,6 +48,7 @@ export interface InputDialogField {
 }
 
 export type ConfirmDialogState = {
+  contextAction?: { label: string; onClick: () => void };
   variant: 'confirm' | 'danger';
   title: string;
   message: string;

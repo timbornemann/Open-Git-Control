@@ -5,8 +5,9 @@ import { rememberRemoteTransferSelection } from '@/utils/remoteTransferSelection
 import { RemoteTransferCoordinator, type RemoteTransferContext } from './remoteTransferCoordinator';
 import { initialRemoteTransferState, useRemoteTransferState } from './remoteTransferState';
 
-const mocked = vi.hoisted(() => ({ request: vi.fn(), scan: vi.fn(), approve: vi.fn(), cancelScan: vi.fn(), command: vi.fn() }));
+const mocked = vi.hoisted(() => ({ request: vi.fn(), scan: vi.fn(), approve: vi.fn(), cancelScan: vi.fn(), command: vi.fn(), addAllowlist: vi.fn() }));
 vi.mock('@/services/hostingClient', () => ({ transferClient: { request: mocked.request } }));
+vi.mock('@/services/repositorySecretScanAllowlistClient', () => ({ addSecretScanFindingPaths: mocked.addAllowlist }));
 vi.mock('@/services/gitClient', () => ({
   gitClient: { scanPushSecrets: mocked.scan, approveSecretScanPush: mocked.approve, cancelSecretScan: mocked.cancelScan, runGitCommandForRepo: mocked.command },
 }));
@@ -78,6 +79,7 @@ beforeEach(() => {
   mocked.approve.mockResolvedValue({ success: true, data: true });
   mocked.cancelScan.mockResolvedValue({ success: true });
   mocked.command.mockResolvedValue({ success: true, data: '' });
+  mocked.addAllowlist.mockResolvedValue(undefined);
   coordinator = new RemoteTransferCoordinator({ getContext: () => context, toast, refresh, openConfiguration, tr: (_de, en) => en });
 });
 
@@ -171,6 +173,54 @@ describe('shared remote transfer coordinator', () => {
     await coordinator.approve();
     expect(mocked.approve).toHaveBeenCalledWith(plan.secretScanArgs, '/repo');
     expect(actionCalls('executePush')).toHaveLength(1);
+  });
+  it('saves repository exceptions and rescans the same captured plan before pushing', async () => {
+    const findings = [{ id: 'finding', filePath: 'docs/example.env', lineNumber: 1, ruleId: 'secret' }];
+    mocked.scan.mockResolvedValueOnce({ success: true, data: { ...cleanScan, findings } });
+    await coordinator.start({ repoPath: '/repo', mode: 'push' });
+    await coordinator.allowlistAndRescan();
+    expect(mocked.addAllowlist).toHaveBeenCalledWith('/repo', findings);
+    expect(mocked.scan.mock.calls.map(([input]) => input.pushArgs)).toEqual([plan.secretScanArgs, plan.secretScanArgs]);
+    expect(actionCalls('planPush')).toHaveLength(1);
+    expect(mocked.approve).not.toHaveBeenCalled();
+    expect(actionCalls('executePush')).toEqual([{ repoPath: '/repo', planId: plan.id }]);
+  });
+  it('retains force confirmation after exceptions have been saved and rescanned', async () => {
+    mocked.scan.mockResolvedValueOnce({ success: true, data: { ...cleanScan, findings: [{ filePath: 'docs/example.env' }] } });
+    await coordinator.start({ repoPath: '/repo', mode: 'push', force: true });
+    await coordinator.allowlistAndRescan();
+    expect(useRemoteTransferState.getState().phase).toBe('review');
+    expect(mocked.scan).toHaveBeenCalledTimes(2);
+    expect(actionCalls('executePush')).toHaveLength(0);
+  });
+  it('never pushes or approves an old scan when the policy could not be saved', async () => {
+    mocked.scan.mockResolvedValueOnce({ success: true, data: { ...cleanScan, findings: [{ filePath: 'docs/example.env' }] } });
+    mocked.addAllowlist.mockRejectedValueOnce(new Error('Secret-scan allowlist changed.'));
+    await coordinator.start({ repoPath: '/repo', mode: 'push' });
+    await coordinator.allowlistAndRescan();
+    expect(useRemoteTransferState.getState().error).toContain('allowlist changed');
+    expect(mocked.scan).toHaveBeenCalledTimes(1);
+    expect(mocked.approve).not.toHaveBeenCalled();
+    expect(actionCalls('executePush')).toHaveLength(0);
+  });
+  it('does not resume an old repository transfer after saving exceptions finishes', async () => {
+    mocked.scan.mockResolvedValueOnce({ success: true, data: { ...cleanScan, findings: [{ filePath: 'docs/example.env' }] } });
+    let finish!: () => void;
+    mocked.addAllowlist.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await coordinator.start({ repoPath: '/repo', mode: 'push' });
+    const saving = coordinator.allowlistAndRescan();
+    for (let index = 0; index < 20 && !finish; index++) await Promise.resolve();
+    context = { ...context, repoPath: '/other' };
+    coordinator.invalidate();
+    finish();
+    await saving;
+    expect(mocked.scan).toHaveBeenCalledTimes(1);
+    expect(actionCalls('executePush')).toHaveLength(0);
   });
   it('blocks an incomplete history scan', async () => {
     mocked.scan.mockResolvedValue({ success: true, data: { ...cleanScan, historyScanIncomplete: true } });

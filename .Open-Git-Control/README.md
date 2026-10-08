@@ -4,8 +4,9 @@ This directory contains repository-local data created by [Open Git Control](http
 
 - `run.json` is the repository-local workflow configuration for optional command workflows in the **Run** menu.
 - `planning.json` contains this repository's project plan and todos.
+- `secret-scan-allowlist.txt` contains shared secret-scan exceptions. Saved working-tree rules apply immediately; commit the file to share them with your team.
 
-Commit this directory when you want to share and version these workflows and planning data with your team. Both files are optional and are only created when their respective feature is used.
+Commit this directory when you want to share and version these workflows and planning data with your team. These files are optional and are only created when their respective feature is used.
 
 ## Created with Open Git Control
 

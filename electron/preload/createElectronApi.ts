@@ -1,3 +1,4 @@
+import { createRepositorySecretScanAllowlistApi } from './createRepositorySecretScanAllowlistApi';
 import type { PreviewSnapshot, ReadRequest } from '../../src/shared/cache/resource';
 import type { IpcRenderer, IpcRendererEvent } from 'electron';
 import { IpcChannel } from '../../src/types/ipcContract';
@@ -77,6 +78,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
   };
 
   const flatApi = {
+    ...createRepositorySecretScanAllowlistApi(ipcRenderer),
     ...createRepositoryIconApi(ipcRenderer),
     ...createHostingApi(ipcRenderer),
     inspectCommitMessageEdit: (request: Parameters<ElectronAPI['inspectCommitMessageEdit']>[0]) =>
@@ -368,6 +370,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       gitFetch: flatApi.gitFetch,
       gitPull: flatApi.gitPull,
       gitPush: flatApi.gitPush,
+      ...createRepositorySecretScanAllowlistApi(ipcRenderer),
       scanCommitSecrets: flatApi.scanCommitSecrets,
       approveSecretScanCommit: flatApi.approveSecretScanCommit,
       scanPushSecrets: flatApi.scanPushSecrets,

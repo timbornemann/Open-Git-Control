@@ -18,6 +18,7 @@ type Props = {
   onClose: () => void;
   onOpenRepoTab: (path: string) => void;
   onOpenRunConfig: (path: string) => void;
+  onOpenSecretScanAllowlist?: (path: string) => void;
   onOpenRemoteConfig: (path: string) => void;
   onTogglePin: (path: string) => void;
   onRemove: (path: string) => void;
@@ -32,6 +33,7 @@ export const LocalRepositoryContextMenu: React.FC<Props> = ({
   onClose,
   onOpenRepoTab,
   onOpenRunConfig,
+  onOpenSecretScanAllowlist,
   onOpenRemoteConfig,
   onTogglePin,
   onRemove,
@@ -119,6 +121,15 @@ export const LocalRepositoryContextMenu: React.FC<Props> = ({
         </button>
         <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onOpenRunConfig(menu.path))}>
           <Settings2 size={14} /> {tr('Run-Konfiguration', 'Run configuration')}
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          className="repo-list-context-action"
+          onClick={() => run(() => onOpenSecretScanAllowlist?.(menu.path))}
+          disabled={!onOpenSecretScanAllowlist}
+        >
+          <Settings2 size={14} /> {tr('Secret-Scan-Allowlist', 'Secret-scan allowlist')}
         </button>
         <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onOpenRemoteConfig(menu.path))}>
           <Settings2 size={14} /> {tr('Remote-Konfiguration', 'Remote configuration')}

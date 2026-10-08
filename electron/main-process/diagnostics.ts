@@ -53,9 +53,7 @@ export function buildDiagnosticsReportFactory(deps: BuildDiagnosticsReportDepend
     lines.push(`secretScanBeforeCommitEnabled=${settings.secretScanBeforeCommitEnabled}`);
     lines.push(`secretScanBeforePushEnabled=${settings.secretScanBeforePushEnabled}`);
     lines.push(`secretScanStrictness=${settings.secretScanStrictness}`);
-    lines.push(
-      `secretScanAllowlistEntries=${settings.secretScanAllowlist.split(/\r?\n/).filter((line) => line.trim() && !line.trim().startsWith('#')).length}`,
-    );
+    lines.push('secretScanAllowlistScope=repository');
     lines.push(`aiProvider=${settings.aiProvider}`);
     lines.push(`githubHost=${settings.githubHost}`);
     lines.push(`oauthConfigured=${githubService.isDeviceFlowConfigured(settings.githubOauthClientId, settings.githubHost)}`);

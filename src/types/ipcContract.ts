@@ -1,4 +1,9 @@
 export const enum IpcChannel {
+  RepositorySecretScanAllowlistGet = 'repositorySecretScanAllowlist:get',
+  RepositorySecretScanAllowlistSave = 'repositorySecretScanAllowlist:save',
+  RepositorySecretScanAllowlistAddPaths = 'repositorySecretScanAllowlist:addPaths',
+  RepositorySecretScanAllowlistWatch = 'repositorySecretScanAllowlist:watch',
+  RepositorySecretScanAllowlistChanged = 'repositorySecretScanAllowlist:changed',
   HostingRequest = 'hosting:request',
   RemoteTransferRequest = 'git:remoteTransfer',
   RepositoryIconGet = 'repos:icon:get',

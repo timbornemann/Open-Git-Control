@@ -1,3 +1,4 @@
+import { repositorySecretScanAllowlistService, type RepositorySecretScanAllowlistReader } from '../../repositorySecretScanAllowlist';
 import { createHash } from 'crypto';
 import type { GitService } from '../../../GitService';
 import type { SecretScanResult, SecretScanService } from '../../../SecretScanService';
@@ -12,6 +13,7 @@ import { IpcChannel } from '../../../../src/types/ipcContract';
 type SecretScanCommitGuardDeps = {
   gitService: GitService;
   secretScanService: SecretScanService;
+  allowlistReader?: RepositorySecretScanAllowlistReader;
   readSettingsWithMigration: () => AppSettings;
   repoJobRegistry: RepoJobRegistry;
 };
@@ -37,7 +39,7 @@ const senderIdOf = (event: any): number | null => (typeof event?.sender?.id === 
 const COMMIT_STATE_CHANGED_ERROR = 'Repository state changed after the secret scan. Run the secret scan again before committing.';
 const COMMIT_STATE_VERIFICATION_ERROR = 'Repository state could not be verified. Run the secret scan again before committing.';
 
-const readCommitStateFingerprint = async (gitService: GitService, repoPath: string): Promise<string> => {
+const readCommitStateFingerprint = async (gitService: GitService, repoPath: string, allowlistReader: RepositorySecretScanAllowlistReader): Promise<string> => {
   try {
     const [head, index] = await Promise.all([
       gitService.runCommandAtPath(repoPath, ['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=no']),
@@ -51,6 +53,8 @@ const readCommitStateFingerprint = async (gitService: GitService, repoPath: stri
     hash.update('index', 'utf8');
     hash.update('\0', 'utf8');
     hash.update(index, 'utf8');
+    hash.update('\0allowlist\0', 'utf8');
+    hash.update(allowlistReader.read(repoPath).version, 'utf8');
     return hash.digest('hex');
   } catch {
     throw new Error(COMMIT_STATE_VERIFICATION_ERROR);
@@ -68,6 +72,7 @@ const emptyScanResult = (strictness: AppSettings['secretScanStrictness']): Secre
 export function registerSecretScanCommitGuard({
   gitService,
   secretScanService,
+  allowlistReader = repositorySecretScanAllowlistService,
   readSettingsWithMigration,
   repoJobRegistry,
 }: SecretScanCommitGuardDeps): SecretScanCommitGuard {
@@ -99,11 +104,13 @@ export function registerSecretScanCommitGuard({
     });
 
     try {
-      const stateFingerprintBefore = await readCommitStateFingerprint(gitService, repoJob.repoPath);
+      const allowlist = await allowlistReader.prepare(repoJob.repoPath);
+      repoJob.ensureActive();
+      const stateFingerprintBefore = await readCommitStateFingerprint(gitService, repoJob.repoPath, allowlistReader);
       const result = await secretScanService.scanStagedDiffs({
         repoPath: repoJob.repoPath,
         strictness: settings.secretScanStrictness,
-        allowlistText: settings.secretScanAllowlist,
+        allowlistText: allowlist.text,
         signal: repoJob.signal,
         onProgress: (checkedLines) => {
           emitJobEvent(event.sender, {
@@ -117,7 +124,8 @@ export function registerSecretScanCommitGuard({
         },
       });
       repoJob.ensureActive();
-      const stateFingerprintAfter = await readCommitStateFingerprint(gitService, repoJob.repoPath);
+      allowlistReader.assertVersion(repoJob.repoPath, allowlist.version);
+      const stateFingerprintAfter = await readCommitStateFingerprint(gitService, repoJob.repoPath, allowlistReader);
       repoJob.ensureActive();
       if (stateFingerprintBefore !== stateFingerprintAfter) {
         throw new Error(COMMIT_STATE_CHANGED_ERROR);
@@ -170,7 +178,7 @@ export function registerSecretScanCommitGuard({
       return { success: false };
     }
     try {
-      const stateFingerprint = await readCommitStateFingerprint(gitService, repoPath);
+      const stateFingerprint = await readCommitStateFingerprint(gitService, repoPath, allowlistReader);
       requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), IpcChannel.GitApproveSecretScanCommit);
       if (stateFingerprint !== scan.stateFingerprint) return { success: false };
       commitApproval = { ...scan, stateFingerprint };
@@ -188,7 +196,7 @@ export function registerSecretScanCommitGuard({
     commitApproval = null;
     if (approval && approval.expiresAt > Date.now() && approval.senderId === senderIdOf(event) && approval.repoKey === repositoryPathKey(expectedRepoPath)) {
       try {
-        const stateFingerprint = await readCommitStateFingerprint(gitService, expectedRepoPath);
+        const stateFingerprint = await readCommitStateFingerprint(gitService, expectedRepoPath, allowlistReader);
         requireActiveRepositoryPath(expectedRepoPath, gitService.getRepoPath(), 'git:commit secret-scan approval');
         if (stateFingerprint === approval.stateFingerprint) return null;
         return { success: false, error: COMMIT_STATE_CHANGED_ERROR };

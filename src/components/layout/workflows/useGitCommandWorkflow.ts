@@ -25,7 +25,7 @@ type WorkspaceBridge = {
 
 type Params = {
   workspace: WorkspaceBridge;
-  settings: Pick<AppSettingsDto, 'confirmDangerousOps' | 'defaultBranch' | 'language' | 'secretScanBeforePushEnabled' | 'secretScanAllowlist'>;
+  settings: Pick<AppSettingsDto, 'confirmDangerousOps' | 'defaultBranch' | 'language' | 'secretScanBeforePushEnabled'>;
   onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
   triggerRefresh: () => void;
   setConfirmDialog: Dispatch<SetStateAction<ConfirmDialogState | null>>;

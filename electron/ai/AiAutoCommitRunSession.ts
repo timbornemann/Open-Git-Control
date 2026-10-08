@@ -32,6 +32,7 @@ export class AiAutoCommitRunSession {
     private readonly shouldCancel: () => boolean = () => false,
     private readonly getOpenAiApiKey: () => string = () => '',
     private readonly beforeCommit?: (privateIndexPath: string, baseTree?: string) => Promise<void>,
+    private readonly verifySecretScanContext?: () => void,
   ) {
     this.transaction = new AiAutoCommitIndexTransaction(git, repoPath, beforeCommit, {
       signoff: settings.commitSignoffByDefault,
@@ -226,6 +227,7 @@ export class AiAutoCommitRunSession {
   }
 
   private ensureActive(): void {
+    this.verifySecretScanContext?.();
     if (this.shouldCancel() || this.control.signal.aborted) throw new Error('KI Auto-Commit wurde abgebrochen.');
   }
 

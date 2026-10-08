@@ -11,6 +11,19 @@ const base = {
 };
 
 describe('local repository primary route', () => {
+  it('opens repository allowlist settings with a header ahead of detail views', () => {
+    expect(
+      getMainPrimaryRoute({
+        ...base,
+        activeTab: 'repo',
+        showSecretScanAllowlist: true,
+        showReleaseCreator: true,
+        activeDiffRequest: { filePath: 'file' } as never,
+      }),
+    ).toBe('secretScanAllowlist');
+    expect(getMainPrimaryRoute({ ...base, activeTab: 'hosting', showSecretScanAllowlist: true })).toBe('hosting');
+    expect(hasMainPrimaryHeader('secretScanAllowlist')).toBe(true);
+  });
   it('uses the standalone view even when repository detail state remains mounted', () => {
     expect(getMainPrimaryRoute({ ...base, activeConflictPath: 'conflicted.txt', showTimeline: true })).toBe('localRepos');
     expect(hasMainPrimaryHeader('localRepos')).toBe(false);

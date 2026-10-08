@@ -21,6 +21,9 @@ export type BaseUIContextValue = SidebarCoreState & {
   isRunConfigOpen: boolean;
   onOpenRunConfig: () => void;
   onCloseRunConfig: () => void;
+  isSecretScanAllowlistOpen: boolean;
+  onOpenSecretScanAllowlist: () => void;
+  onCloseSecretScanAllowlist: () => void;
   isRemoteConfigOpen: boolean;
   onOpenRemoteConfig: () => void;
   onCloseRemoteConfig: () => void;

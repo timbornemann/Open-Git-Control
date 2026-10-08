@@ -109,7 +109,7 @@ describe('normalizeSettings', () => {
     expect(normalized.secretScanBeforeCommitEnabled).toBe(false);
     expect(normalized.secretScanBeforePushEnabled).toBe(false);
     expect(normalized.secretScanStrictness).toBe('high');
-    expect(normalized.secretScanAllowlist.length).toBe(8_000);
+    expect(normalized).not.toHaveProperty('secretScanAllowlist');
     expect(normalizeSettings({ secretScanStrictness: 'invalid' as never }).secretScanStrictness).toBe('medium');
   });
 

@@ -1,8 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { registerAiHandlers } from '../registerAiHandlers';
 
-const { handleMock } = vi.hoisted(() => ({
+const { handleMock, policy } = vi.hoisted(() => ({
   handleMock: vi.fn(),
+  policy: { text: '', version: 'v1' },
+}));
+
+vi.mock('../../repositorySecretScanAllowlist', () => ({
+  repositorySecretScanAllowlistService: {
+    prepare: async () => ({ ...policy }),
+    assertVersion: (_repoPath: string, version: string) => {
+      if (version !== policy.version) throw new Error('Secret-scan allowlist changed.');
+    },
+  },
 }));
 
 vi.mock('electron', () => ({
@@ -17,6 +27,8 @@ describe('registerAiHandlers', () => {
   beforeEach(() => {
     handlers.clear();
     handleMock.mockReset();
+    policy.text = 'path:docs/example.env';
+    policy.version = 'v1';
     handleMock.mockImplementation((channel: string, callback: (...args: any[]) => Promise<any>) => {
       handlers.set(channel, callback);
     });
@@ -108,6 +120,34 @@ describe('registerAiHandlers', () => {
         'Requested repository is not the active repository while handling "git:aiAutoCommit". Requested repository: "/tmp/private-other-repo". Active repository: "/tmp/active-repo".',
     });
     expect(aiService.runAutoCommitWithOptions).not.toHaveBeenCalled();
+  });
+
+  it.each(['scan', 'publication'])('keeps AI commits bound to the repository policy during %s', async (phase) => {
+    const publish = vi.fn();
+    const scan = vi.fn(async (input) => {
+      expect(input).toMatchObject({ repoPath: '/tmp/repo', allowlistText: policy.text, envOverrides: { GIT_INDEX_FILE: '/private-index' } });
+      if (phase === 'scan') policy.version = 'v2';
+      return { findings: [], notes: [], historyScanIncomplete: false };
+    });
+    const aiService = {
+      runAutoCommitWithOptions: vi.fn(async (_repo: string, _settings: any, _key: any, _progress: any, _cancel: any, _openAi: any, options: any) => {
+        await options.beforeCommit('/private-index', 'base-tree');
+        policy.version = 'v2';
+        options.verifySecretScanContext();
+        publish();
+      }),
+    } as any;
+    registerAiHandlers({
+      aiService,
+      readSettingsWithMigration: () => ({ secretScanBeforeCommitEnabled: true, secretScanStrictness: 'balanced' }) as any,
+      getGeminiApiKeyFromSecureStore: () => '',
+      getOpenAiApiKeyFromSecureStore: () => '',
+      getActiveRepoPath: () => '/tmp/repo',
+      secretScanService: { scanStagedDiffs: scan } as any,
+    });
+    const result = await handlers.get('git:aiAutoCommit')!({ sender: { send: vi.fn() } }, { repoPath: '/tmp/repo' });
+    expect(result).toEqual({ success: false, error: 'Secret-scan allowlist changed.' });
+    expect(publish).not.toHaveBeenCalled();
   });
 
   it('preserves explicit release-note fallback metadata for the renderer', async () => {

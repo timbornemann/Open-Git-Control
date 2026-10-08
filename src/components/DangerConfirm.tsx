@@ -8,6 +8,7 @@ interface DangerConfirmProps {
   title: string;
   message: string;
   contextItems?: DialogContextItem[];
+  contextAction?: { label: string; onClick: () => void };
   irreversible?: boolean;
   consequences?: string;
   confirmLabel?: string;
@@ -23,6 +24,7 @@ export const DangerConfirm: React.FC<DangerConfirmProps> = ({
   open,
   title,
   message,
+  contextAction,
   contextItems = [],
   irreversible = true,
   consequences,
@@ -41,6 +43,7 @@ export const DangerConfirm: React.FC<DangerConfirmProps> = ({
       open={open}
       title={title}
       message={message}
+      contextAction={contextAction}
       contextItems={contextItems}
       irreversible={irreversible}
       consequences={consequences}

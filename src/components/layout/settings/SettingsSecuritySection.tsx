@@ -61,26 +61,12 @@ export const SettingsSecuritySection = ({ settings, onUpdateSettings, variant }:
   );
 
   const allowlist = (
-    <>
-      <label className={fieldClass(variant)}>
-        {variant === 'sidebar'
-          ? t('generated.components.layout.sidebar.settingssidebarcontent.allowlist_c0b9c2b4')
-          : t('generated.components.layout.settingsmaincontent.project_allowlist_for_secret_scan_1a0883fd')}
-        <textarea
-          className={inputClass(variant)}
-          rows={variant === 'sidebar' ? 3 : 8}
-          value={settings.secretScanAllowlist}
-          onChange={(event) => void onUpdateSettings({ secretScanAllowlist: event.target.value })}
-          placeholder={
-            variant === 'sidebar'
-              ? t('generated.components.layout.sidebar.settingssidebarcontent.path_regex_da8488ca')
-              : t('generated.components.layout.settingsmaincontent.one_rule_per_line_e_g_path_docs_example_env_or_regex_dum_ecc58f86')
-          }
-          style={variant === 'sidebar' ? { resize: 'vertical' } : undefined}
-        />
-      </label>
-      {variant === 'main' && <p>{t('generated.components.layout.settingsmaincontent.allowlist_formats_path_regex_or_plain_text_comment_lines_50352f69')}</p>}
-    </>
+    <p>
+      {tr(
+        'Allowlist-Ausnahmen werden pro Repository unter .Open-Git-Control/secret-scan-allowlist.txt gespeichert. Öffne die Secret-Scan-Allowlist über das Repository-Menü.',
+        'Allowlist exceptions are stored per repository in .Open-Git-Control/secret-scan-allowlist.txt. Open the secret-scan allowlist from the repository menu.',
+      )}
+    </p>
   );
 
   if (variant === 'sidebar') {

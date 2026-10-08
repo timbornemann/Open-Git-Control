@@ -31,6 +31,7 @@ type Props = {
   onStopRepositoryRun: () => Promise<boolean>;
   onOpenRunConsole: () => void;
   onOpenRunSettings: () => void;
+  onOpenSecretScanAllowlist?: () => void;
   onOpenRemoteConfig?: () => void;
 };
 
@@ -54,6 +55,7 @@ export const TopbarMoreMenu: React.FC<Props> = ({
   onStopRepositoryRun,
   onOpenRunConsole,
   onOpenRunSettings,
+  onOpenSecretScanAllowlist,
   onOpenRemoteConfig,
 }) => {
   const { t, tr } = useI18n();
@@ -132,6 +134,16 @@ export const TopbarMoreMenu: React.FC<Props> = ({
         disabled={!activeRepo || !onOpenRemoteConfig}
       >
         <span className="topbar-dropdown-item-label">{tr('Remote-Konfiguration', 'Remote configuration')}</span>
+      </button>
+      <button
+        className="topbar-dropdown-item"
+        onClick={() => {
+          setView(null);
+          onOpenSecretScanAllowlist?.();
+        }}
+        disabled={!activeRepo || !onOpenSecretScanAllowlist}
+      >
+        <span className="topbar-dropdown-item-label">{tr('Secret-Scan-Allowlist', 'Secret-scan allowlist')}</span>
       </button>
       <button
         className="topbar-dropdown-item"

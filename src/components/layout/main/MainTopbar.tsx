@@ -28,6 +28,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
   const setActiveTab = useUIStore((state) => state.setActiveTab);
   const onOpenRunConfig = useUIStore((state) => state.onOpenRunConfig);
   const onCloseRunConfig = useUIStore((state) => state.onCloseRunConfig);
+  const onOpenSecretScanAllowlist = useUIStore((state) => state.onOpenSecretScanAllowlist);
   const onOpenRemoteConfig = useUIStore((state) => state.onOpenRemoteConfig);
   const onCloseRemoteConfig = useUIStore((state) => state.onCloseRemoteConfig);
   const onOpenReleaseCreator = useUIStore((state) => state.onOpenReleaseCreator);
@@ -169,6 +170,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
                 setActiveTab('repo');
                 onOpenRunConfig();
               }}
+              onOpenSecretScanAllowlist={onOpenSecretScanAllowlist}
               onOpenRemoteConfig={onOpenRemoteConfig}
             />
           )}

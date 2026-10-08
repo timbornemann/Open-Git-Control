@@ -1,3 +1,4 @@
+import { repositorySecretScanAllowlistClient } from '@/services/repositorySecretScanAllowlistClient';
 import { JSDOM } from 'jsdom';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -395,7 +396,11 @@ remote: https://github.com/acme/repo/security/secret-scanning/unblock-secret/tok
     });
     const approve = vi.spyOn(gitClient, 'approveSecretScanPush').mockResolvedValue({ success: true });
     vi.spyOn(appClient, 'isAvailable').mockReturnValue(true);
-    vi.spyOn(appClient, 'getSettings').mockResolvedValue({ secretScanAllowlist: '' } as any);
+    vi.spyOn(repositorySecretScanAllowlistClient, 'get').mockResolvedValue({
+      success: true,
+      data: { repoPath: 'C:/repo', relativePath: '', text: '', version: 'missing', exists: false },
+    });
+    const save = vi.spyOn(repositorySecretScanAllowlistClient, 'addPaths').mockResolvedValue({ success: false, error: 'Could not save allowlist.' });
     const runGitCommand = vi.fn<GitCommandRunner>().mockResolvedValue(true);
     const setConfirmDialog = vi.fn();
     const setGitActionToast = vi.fn();
@@ -431,7 +436,8 @@ remote: https://github.com/acme/repo/security/secret-scanning/unblock-secret/tok
       await dialog.onSecondaryAction?.();
     });
 
-    expect(onUpdateSettings).toHaveBeenCalledWith({ secretScanAllowlist: 'path:.env' });
+    expect(onUpdateSettings).not.toHaveBeenCalled();
+    expect(save).toHaveBeenCalledWith({ repoPath: 'C:/repo', paths: ['.env'], expectedVersion: 'missing' });
     expect(approve).not.toHaveBeenCalled();
     expect(runGitCommand).not.toHaveBeenCalled();
     expect(setGitActionToast).toHaveBeenCalledWith(expect.objectContaining({ isError: true }));

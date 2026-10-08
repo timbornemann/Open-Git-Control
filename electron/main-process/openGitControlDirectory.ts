@@ -6,7 +6,7 @@ import { writeTextFileAtomically } from './atomicFile';
 export const OPEN_GIT_CONTROL_DIRECTORY = '.Open-Git-Control';
 export const OPEN_GIT_CONTROL_README_FILE = 'README.md';
 
-const OPEN_GIT_CONTROL_README_CONTENT = `# Open Git Control repository data
+const PREVIOUS_REPOSITORY_README_CONTENT = `# Open Git Control repository data
 
 This directory contains repository-local data created by [Open Git Control](https://github.com/timbornemann/Open-Git-Control):
 
@@ -22,6 +22,11 @@ Commit this directory when you want to share and version these workflows and pla
 - [Open the Open Git Control repository](https://github.com/timbornemann/Open-Git-Control)
 - [View Open Git Control releases](https://github.com/timbornemann/Open-Git-Control/releases)
 `;
+
+const OPEN_GIT_CONTROL_README_CONTENT = PREVIOUS_REPOSITORY_README_CONTENT.replace('Both files are optional', 'These files are optional').replace(
+  "- `planning.json` contains this repository's project plan and todos.",
+  "- `planning.json` contains this repository's project plan and todos.\n- `secret-scan-allowlist.txt` contains shared secret-scan exceptions. Saved working-tree rules apply immediately; commit the file to share them with your team.",
+);
 
 const LEGACY_RUN_WORKFLOW_README_CONTENT = `# Open Git Control run workflows
 
@@ -62,7 +67,8 @@ export function ensureOpenGitControlReadme(repoPath: string): void {
     writeTextFileAtomically(readmePath, OPEN_GIT_CONTROL_README_CONTENT);
     return;
   }
-  if (fs.readFileSync(readmePath, 'utf8') === LEGACY_RUN_WORKFLOW_README_CONTENT) {
+  const existing = fs.readFileSync(readmePath, 'utf8');
+  if (existing === LEGACY_RUN_WORKFLOW_README_CONTENT || existing === PREVIOUS_REPOSITORY_README_CONTENT) {
     writeTextFileAtomically(readmePath, OPEN_GIT_CONTROL_README_CONTENT);
   }
 }

@@ -59,6 +59,14 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         },
       },
       {
+        id: 'secret-scan-allowlist',
+        label: state.settings.language === 'en' ? 'Secret-scan allowlist' : 'Secret-Scan-Allowlist',
+        keywords: ['secret', 'scan', 'allowlist', 'security', 'ausnahmen'],
+        action: () => {
+          if (state.activeRepo) state.onOpenSecretScanAllowlist();
+        },
+      },
+      {
         id: 'release-create',
         label: state.settings.language === 'en' ? 'Create release' : 'Release erstellen',
         keywords: ['release', 'creator', 'version', 'notes', 'veröffentlichen'],

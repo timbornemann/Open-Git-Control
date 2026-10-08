@@ -70,7 +70,7 @@ describe('secret scan renderer approval', () => {
     expect(setGitActionToast).toHaveBeenCalledWith(expect.objectContaining({ isError: true }));
   });
 
-  it('adds finding paths to the allowlist before continuing the approved push', async () => {
+  it('adds repository finding paths and rescans before continuing the push', async () => {
     vi.stubGlobal('window', {
       setTimeout: globalThis.setTimeout,
       clearTimeout: globalThis.clearTimeout,
@@ -86,16 +86,22 @@ describe('secret scan renderer approval', () => {
         contextLine: '[REDACTED_SECRET]',
       },
     ];
-    vi.spyOn(gitClient, 'scanPushSecrets').mockResolvedValue({
-      success: true,
-      data: {
-        scanned: true,
-        strictness: 'medium',
-        findings,
-        notes: [],
-        stats: { checkedLines: 1, stagedLines: 0, toPushLines: 1, tagLines: 0 },
-      },
-    });
+    const scan = vi
+      .spyOn(gitClient, 'scanPushSecrets')
+      .mockResolvedValueOnce({
+        success: true,
+        data: {
+          scanned: true,
+          strictness: 'medium',
+          findings,
+          notes: [],
+          stats: { checkedLines: 1, stagedLines: 0, toPushLines: 1, tagLines: 0 },
+        },
+      })
+      .mockResolvedValue({
+        success: true,
+        data: { scanned: true, strictness: 'medium', findings: [], notes: [], stats: { checkedLines: 1, stagedLines: 0, toPushLines: 1, tagLines: 0 } },
+      });
     const approve = vi.spyOn(gitClient, 'approveSecretScanPush').mockResolvedValue({ success: true });
     const addSecretScanFindingsToAllowlist = vi.fn().mockResolvedValue(true);
     const runWithOptions = vi.fn();
@@ -126,8 +132,9 @@ describe('secret scan renderer approval', () => {
     expect(dialog.secondaryActionLabel).toBe('Allowlist files and push');
     await dialog.onSecondaryAction?.();
 
-    expect(addSecretScanFindingsToAllowlist).toHaveBeenCalledWith(findings);
-    expect(approve).toHaveBeenCalledWith(['origin', 'main'], 'C:/repo');
+    expect(addSecretScanFindingsToAllowlist).toHaveBeenCalledWith(findings, 'C:/repo');
+    expect(scan).toHaveBeenCalledTimes(2);
+    expect(approve).not.toHaveBeenCalled();
     expect(runWithOptions).toHaveBeenCalledWith(
       ['push', 'origin', 'main'],
       'pushed',

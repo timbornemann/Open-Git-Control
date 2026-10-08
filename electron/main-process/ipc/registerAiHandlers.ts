@@ -1,3 +1,4 @@
+import { repositorySecretScanAllowlistService } from '../repositorySecretScanAllowlist';
 import { ipcMain } from 'electron';
 import type { AiService, ReleaseCommitInput } from '../../AiService';
 import type { SecretScanService } from '../../SecretScanService';
@@ -112,6 +113,12 @@ export function registerAiHandlers({
 
     try {
       const settings = readSettingsWithMigration();
+      const allowlist = settings.secretScanBeforeCommitEnabled ? await repositorySecretScanAllowlistService.prepare(repoJob.repoPath) : null;
+      const verifySecretScanContext = () => {
+        repoJob.ensureActive();
+        if (allowlist) repositorySecretScanAllowlistService.assertVersion(repoJob.repoPath, allowlist.version);
+      };
+      verifySecretScanContext();
       const result = await aiService.runAutoCommitWithOptions(
         repoJob.repoPath,
         settings,
@@ -133,17 +140,19 @@ export function registerAiHandlers({
         () => repoJob.signal.aborted || (currentAiAutoCommitJob?.id === jobId && currentAiAutoCommitJob.cancelRequested),
         getOpenAiApiKeyFromSecureStore,
         {
+          verifySecretScanContext,
           beforeCommit: async (privateIndexPath, baseTree) => {
             repoJob.ensureActive();
             if (!settings.secretScanBeforeCommitEnabled) return;
             const scan = await secretScanService.scanStagedDiffs({
               repoPath: repoJob.repoPath,
               strictness: settings.secretScanStrictness,
-              allowlistText: settings.secretScanAllowlist,
+              allowlistText: allowlist?.text ?? '',
               signal: repoJob.signal,
               envOverrides: { GIT_INDEX_FILE: privateIndexPath, GIT_OPTIONAL_LOCKS: '0' },
               stagedBaseTree: baseTree,
             });
+            verifySecretScanContext();
             if (scan.historyScanIncomplete) throw new Error(`Git LFS content could not be fully scanned. ${scan.notes.join(' ')}`);
             if (scan.findings.length > 0) {
               throw new Error('Potential secrets were detected in the AI commit snapshot. Remove them or configure an explicit allowlist before committing.');

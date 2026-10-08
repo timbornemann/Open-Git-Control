@@ -5,8 +5,10 @@ import type { AppSettings } from '../settings';
 import { DEFAULT_SETTINGS, normalizeSettings } from '../settings';
 import { normalizeGeminiApiKey, readSavedGeminiApiKey, readSavedOpenAiApiKey, saveGeminiApiKeySecurely } from './secureStore';
 import { writeTextFileAtomically } from './atomicFile';
+import { secretScanAllowlistMigration } from './repositorySecretScanAllowlist';
+import { readStoreData } from './repoStore';
 
-export type RawSettingsWithLegacyKey = Partial<AppSettings> & { geminiApiKey?: unknown };
+export type RawSettingsWithLegacyKey = Partial<AppSettings> & { geminiApiKey?: unknown; secretScanAllowlist?: unknown };
 
 function getSettingsPath(): string {
   return path.join(app.getPath('userData'), 'settings.json');
@@ -30,15 +32,17 @@ export function readSettings(): AppSettings {
 }
 
 export function writeSettings(settings: AppSettings): void {
+  captureLegacyAllowlist(readRawSettings());
   const normalized = normalizeSettings(settings);
   writeTextFileAtomically(getSettingsPath(), JSON.stringify(normalized, null, 2));
 }
 
 export function readSettingsWithMigration(): AppSettings {
   const rawSettings = readRawSettings();
+  captureLegacyAllowlist(rawSettings);
   let settings = normalizeSettings(rawSettings);
   const legacyGeminiApiKey = normalizeGeminiApiKey(rawSettings?.geminiApiKey);
-  let dirty = false;
+  let dirty = Boolean(rawSettings && Object.prototype.hasOwnProperty.call(rawSettings, 'secretScanAllowlist'));
   let retainLegacyGeminiApiKey = false;
 
   if (legacyGeminiApiKey) {
@@ -82,6 +86,15 @@ export function readSettingsWithMigration(): AppSettings {
   }
 
   return settings;
+}
+
+function captureLegacyAllowlist(rawSettings: RawSettingsWithLegacyKey | null): void {
+  if (!rawSettings || !Object.prototype.hasOwnProperty.call(rawSettings, 'secretScanAllowlist')) return;
+  const stored = readStoreData();
+  secretScanAllowlistMigration.capture(rawSettings.secretScanAllowlist, [
+    ...stored.repos.map((repo) => repo.path),
+    ...(stored.activeRepo ? [stored.activeRepo] : []),
+  ]);
 }
 
 export function getGeminiApiKeyFromSecureStore(): string {

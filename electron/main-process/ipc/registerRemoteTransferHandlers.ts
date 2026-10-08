@@ -89,6 +89,7 @@ export function registerRemoteTransferHandlers({
         const set = running.get(key) ?? new Set<AbortController>();
         set.add(controller);
         running.set(key, set);
+        let verifyPushPolicy: (() => void) | undefined;
         const context: RemoteTransferContext = {
           ownerId,
           generation: job.generation,
@@ -98,12 +99,16 @@ export function registerRemoteTransferHandlers({
             job!.ensureActive();
             if (!readonly) requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), IpcChannel.RemoteTransferRequest);
             if (writes.has(operation)) ensureCommitProtectionIsIdle(repoPath);
+            verifyPushPolicy?.();
           },
           onProgress: (message) =>
             emitJobEvent(event.sender, { id: jobId, operation: jobOperation, status: 'progress', message, details: { repoPath }, timestamp: Date.now() }),
           authorizePush: async (args) => {
+            const verifyPolicy = await pushGuard.createPushPolicyVerifier?.(repoPath);
             const blocked = await pushGuard.requirePushSecretScanApproval(event, args, repoPath);
             if (blocked) throw new Error(blocked.error);
+            verifyPolicy?.();
+            verifyPushPolicy = verifyPolicy;
           },
         };
         if (transfers.has(operation))

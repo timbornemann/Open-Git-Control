@@ -23,17 +23,6 @@
       "updatedAt": 1782821503810
     },
     {
-      "id": "df8bc249-6f7b-42e3-ae1b-172023ddb5cb",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Modernisiere Release Seite",
-      "description": "Verbessere aussehen und mache es einfacher und übersichtlicher\nauch markdown preeview für releasenotes",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1784027077147,
-      "updatedAt": 1784044445488
-    },
-    {
       "id": "6ed3b4a4-fa6a-4fc9-8d0e-41164f2c621f",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Modernisiere Recovery center",
@@ -136,12 +125,12 @@
       "id": "3261f05f-793c-4373-8254-3a4bffcb3f6d",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Secret scann allow list",
-      "description": "Jedes repo bekommt seien eigene allowlist, nicht zentral in den einstellungen sondern im lokalen .Open-Git-Control order eine secret scann alow list, damit diese mit versioniert werdne kann und unter teams geteilt werden kann",
+      "description": "Secret scann allow list: Jedes repo bekommt seien eigene allowlist, nicht zentral in den einstellungen sondern im lokalen .Open-Git-Control order eine secret scann alow list, damit diese mit versioniert werdne kann und unter teams geteilt werden kann",
       "priority": "medium",
       "status": "planned",
       "tags": [],
       "createdAt": 1791460457077,
-      "updatedAt": 1791460457077
+      "updatedAt": 1791462196831
     },
     {
       "id": "e1735baf-002f-43a2-b357-8d49e35bb2d6",
@@ -153,6 +142,94 @@
       "tags": [],
       "createdAt": 1791460675269,
       "updatedAt": 1791460782461
+    },
+    {
+      "id": "cf918ae2-db5b-4b53-90bd-46b599040d42",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Modernisiere einstellungs seite",
+      "description": "",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1791462640163,
+      "updatedAt": 1791462640163
+    },
+    {
+      "id": "aa11ecd9-6624-4946-844a-7518a72d8aae",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Commit-Identität einrichten",
+      "description": "Einen eigenen Dialog für Git-Name und E-Mail habe ich nicht gefunden. Vor dem ersten Commit fehlende Angaben erkennen und direkt einrichten lassen – wahlweise für dieses Repository oder global. Die Hosting-Anmeldung ersetzt diese Angaben nicht.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1791462669489,
+      "updatedAt": 1791462669489
+    },
+    {
+      "id": "05a3ba82-6a57-4f9c-99f5-3ca9a042ed3f",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Deaktivierte Aktionen erklären",
+      "description": "Beispielsweise ist „Im Browser anmelden“ ohne OAuth-Client-ID deaktiviert. Direkt erklären, welche Voraussetzung fehlt, und zur passenden Einstellung führen. Das gleiche Prinzip auf andere gesperrte Aktionen anwenden.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1791462698961,
+      "updatedAt": 1791462698961
+    },
+    {
+      "id": "e71bd637-2f40-4aae-8b73-18fe0b44a8cd",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Verschobene Repositories wiederfinden",
+      "description": "Bei nicht verfügbaren Repositories gibt es derzeit Entfernen oder Abbrechen. „Neuen Speicherort auswählen“ und „Erneut prüfen“ ergänzen. So könnten Einstellungen und Planungsdaten bei einem verschobenen Projekt erhalten bleiben.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1791462712888,
+      "updatedAt": 1791462712888
+    },
+    {
+      "id": "a2e2a3e1-2cfe-4d15-ab32-83912311496d",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Git-Fehler verständlich aufbereiten",
+      "description": "Einige Fehler erscheinen weitgehend als technische Git-Ausgabe. Eine kurze Erklärung mit Folgeaktion ergänzen: „Anmelden“, „Git installieren“, „Verbindung erneut prüfen“ oder „Konflikt öffnen“. Technische Details bleiben aufklappbar.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1791462773059,
+      "updatedAt": 1791462773059
+    },
+    {
+      "id": "20722a1d-0f20-4a43-98c6-cec1542d792a",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Voraussetzungen für Run-Templates prüfen",
+      "description": "Templates werden anhand von Projektdateien erkannt. Für bekannte Templates zusätzlich prüfen, ob beispielsweise npm, Python oder Cargo verfügbar ist. Fehlende Programme vor dem Start verständlich anzeigen.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1791462817621,
+      "updatedAt": 1791462817621
+    },
+    {
+      "id": "f8dd801b-b89e-404b-8cb1-49724137a887",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Diagnosebericht vervollständigen",
+      "description": "Der vorhandene Bericht enthält App-, Electron- und Node-Version sowie Git-Status. Git-/LFS-Version, verwendeter Git-Pfad und Verfügbarkeit sicherer Zugangsdaten-Speicherung würden die Fehlersuche deutlich erleichtern.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1791462857290,
+      "updatedAt": 1791462857290
+    },
+    {
+      "id": "2f7bd303-5fff-489c-a6da-fb94fc8d64c6",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Pull-Strategie in der Remote-Konfiguratio",
+      "description": "Pull-Strategie in der Remote-Konfiguration ergänzen: Pro Repository „Git-Standard verwenden“, „Rebase“, „Merge“ oder „Nur Fast-forward“ auswählbar und speicherbar machen. Beim Git-Standard das wirksame konfigurierte Verhalten anzeigen. Alle Pull-Einstiege berücksichtigen diese Einstellung; ausdrückliche Dropdown-Auswahlen gelten nur einmalig. „No fast-forward“ mit zusätzlichem --no-rebase korrigieren. Fehlerwiederholungen behalten Quelle, Branch und Strategie bei. Bestehende Repositories verwenden weiterhin den Git-Standard; Regressionstests ergänzen.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1791464207426,
+      "updatedAt": 1791464207426
     }
   ]
 }

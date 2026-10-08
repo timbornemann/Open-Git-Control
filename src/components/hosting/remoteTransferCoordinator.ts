@@ -1,3 +1,4 @@
+import { addSecretScanFindingPaths } from '@/services/repositorySecretScanAllowlistClient';
 import { transferClient } from '@/services/hostingClient';
 import { gitClient } from '@/services/gitClient';
 import { createRemoteSelectionSnapshot, rememberRemoteTransferSelection, resolveRemoteTransferSelection } from '@/utils/remoteTransferSelection';
@@ -241,6 +242,19 @@ export class RemoteTransferCoordinator {
         if (!approval.success) throw new Error(this.environment.tr('Freigabe abgelaufen. Erneut prüfen.', 'Approval expired. Check again.'));
       }
       await this.execute();
+    });
+  }
+  async allowlistAndRescan() {
+    const { intent, plan, scan } = this.state;
+    if (this.state.busy || !intent || !plan || !scan?.findings.length) return;
+    const findings = scan.findings;
+    this.set({ phase: 'preparing', busy: true, scan: null, error: '', transferStage: 'preparing' });
+    await this.run(async () => {
+      await this.verifyTargets();
+      await this.scoped(() => addSecretScanFindingPaths(intent.repoPath, findings));
+      await this.verifyTargets();
+      await this.scanPlan();
+      await this.executeOrReview();
     });
   }
   async retryScan() {

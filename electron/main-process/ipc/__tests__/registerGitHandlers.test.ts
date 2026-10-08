@@ -4,6 +4,10 @@ import { registerGitHandlers } from '../registerGitHandlers';
 const { handleMock } = vi.hoisted(() => ({
   handleMock: vi.fn(),
 }));
+vi.mock('../../repositorySecretScanAllowlist', () => {
+  const read = (repoPath: string) => ({ repoPath, relativePath: '.Open-Git-Control/secret-scan-allowlist.txt', exists: false, text: '', version: 'missing' });
+  return { repositorySecretScanAllowlistService: { read, prepare: async (repoPath: string) => read(repoPath), assertVersion: () => {} } };
+});
 vi.mock('electron', () => ({
   ipcMain: {
     handle: handleMock,

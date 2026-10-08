@@ -1,3 +1,4 @@
+import { requestSecretScanAllowlistEditor } from '@/components/repository-security/secretScanAllowlistNavigation';
 import { freshRead } from '@/data/clientCache';
 import { gitClient } from '@/services/gitClient';
 import { countChangedEntriesFromPorcelainV2, parseBranchSyncFromPorcelainV2 } from '@/utils/gitParsing';
@@ -24,7 +25,7 @@ export type GitCommandGuardRuntime = {
   runWithOptions: (args: string[], successMsg: string, actionLabel: string | undefined, options: RunGitCommandOptions | undefined) => Promise<void>;
   setConfirmDialog: SetConfirmDialog;
   setGitActionToast: (toast: Toast) => void;
-  addSecretScanFindingsToAllowlist: (findings: { filePath: string }[]) => Promise<boolean>;
+  addSecretScanFindingsToAllowlist: (findings: { filePath: string }[], repoPath: string) => Promise<boolean>;
   t: Translate;
   tr: TranslatePair;
 };
@@ -223,11 +224,19 @@ export const runSecretScanGuard = async (request: GitCommandGuardRequest, runtim
       irreversible: true,
       consequences: t('generated.components.layout.workflows.usegitcommandguardworkflow.please_review_these_findings_pushing_can_irreversibly_pu_fb7def03'),
       confirmLabel: t('generated.components.layout.workflows.usegitcommandguardworkflow.push_anyway_46f5aba1'),
+      contextAction: {
+        label: tr('Allowlist bearbeiten', 'Edit allowlist'),
+        onClick: () => {
+          if (runtime.isRepoCurrent(repoPath)) requestSecretScanAllowlistEditor(repoPath);
+        },
+      },
       secondaryActionLabel: tr('Dateien allowlisten und pushen', 'Allowlist files and push'),
       secondaryActionVariant: 'default',
       onSecondaryAction: async () => {
-        if (!(await runtime.addSecretScanFindingsToAllowlist(findings))) return;
-        await continuePush();
+        if (!runtime.isRepoCurrent(repoPath) || !(await runtime.addSecretScanFindingsToAllowlist(findings, repoPath)) || !runtime.isRepoCurrent(repoPath))
+          return;
+        const guarded = await runSecretScanGuard(request, runtime, includeTags);
+        if (!guarded && runtime.isRepoCurrent(repoPath)) await runWithOptions(args, successMsg, actionLabel, boundOptions(request, { skipSecretScan: true }));
       },
       onConfirm: continuePush,
     });

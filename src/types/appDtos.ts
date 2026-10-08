@@ -69,7 +69,6 @@ export interface AppSettingsDto {
   secretScanBeforeCommitEnabled: boolean;
   secretScanBeforePushEnabled: boolean;
   secretScanStrictness: SecretScanStrictnessDto;
-  secretScanAllowlist: string;
   aiAutoCommitEnabled: boolean;
   aiProvider: AiProviderDto;
   aiCommitMessageStyle: AiCommitMessageStyleDto;

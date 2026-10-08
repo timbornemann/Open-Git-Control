@@ -1,3 +1,4 @@
+import { requestSecretScanAllowlistEditor } from '@/components/repository-security/secretScanAllowlistNavigation';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useGitStore, useSettingsStore, useUIStore } from '@/contexts/AppStateContext';
 import { DialogFrame } from '@/components/DialogFrame';
@@ -73,6 +74,12 @@ export function RemoteTransferHost({ onOpenConfiguration }: { onOpenConfiguratio
           choose={(selection, mode) => void coordinator.choose(selection, mode)}
           approve={() => void coordinator.approve()}
           retryScan={() => void coordinator.retryScan()}
+          allowlistAndRescan={() => void coordinator.allowlistAndRescan()}
+          openAllowlist={() => {
+            const path = state.intent?.repoPath;
+            coordinator.close();
+            if (path) requestSecretScanAllowlistEditor(path);
+          }}
           retryPush={() => void coordinator.retryPush()}
           retryPull={() => void coordinator.retryPull()}
           openWorkspace={() => {

@@ -11,6 +11,8 @@ export function PushTransferReview({
   busy,
   executePush,
   retryScan,
+  allowlistAndRescan,
+  openAllowlist,
 }: {
   plan: GitPushPlanDto;
   batch: GitPushBatchDto | null;
@@ -20,6 +22,8 @@ export function PushTransferReview({
   busy: boolean;
   executePush: (approve?: boolean) => void;
   retryScan: () => void;
+  allowlistAndRescan?: () => void;
+  openAllowlist?: () => void;
 }) {
   const { tr } = useI18n();
   return (
@@ -62,6 +66,16 @@ export function PushTransferReview({
           </ul>
         </>
       ) : null}
+      {scan?.findings.length && allowlistAndRescan ? (
+        <button disabled={busy || scan.historyScanIncomplete} onClick={allowlistAndRescan}>
+          {tr('Dateien allowlisten und erneut prüfen', 'Allowlist files and check again')}
+        </button>
+      ) : null}
+      {openAllowlist && (
+        <button disabled={busy} onClick={openAllowlist}>
+          {tr('Allowlist bearbeiten', 'Edit allowlist')}
+        </button>
+      )}
       {scan?.historyScanIncomplete && (
         <p className="hosting-error" role="alert">
           {tr(

@@ -14,6 +14,7 @@ vi.mock('electron', () => ({
 }));
 
 type PushState = {
+  allowlist: string;
   head: string;
   index: string;
   remoteRef: string;
@@ -30,6 +31,7 @@ const findingsResult = {
 
 const createHarness = (scanPushDiffs: ReturnType<typeof vi.fn>) => {
   const state: PushState = {
+    allowlist: '',
     head: '1111111111111111111111111111111111111111',
     index: 'H 100644 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 0\tapp.ts\0',
     remoteRef: '1111111111111111111111111111111111111111',
@@ -66,18 +68,69 @@ const createHarness = (scanPushDiffs: ReturnType<typeof vi.fn>) => {
     runCommandAtPath,
   } as any;
   const settings = { secretScanBeforePushEnabled: true, secretScanStrictness: 'medium' as const, secretScanAllowlist: '' };
+  const readSettingsWithMigration = vi.fn(() => settings as any);
   const guard = registerSecretScanPushGuard({
     gitService,
+    allowlistReader: {
+      read: () => ({ repoPath: 'C:/repo', relativePath: '', exists: Boolean(state.allowlist), text: state.allowlist, version: state.allowlist }),
+      prepare: async () => ({ repoPath: 'C:/repo', relativePath: '', exists: Boolean(state.allowlist), text: state.allowlist, version: state.allowlist }),
+      assertVersion: (_repo: string, version: string) => {
+        if (version !== state.allowlist) throw new Error('Secret-scan allowlist changed.');
+      },
+    },
     secretScanService: { scanPushDiffs } as any,
-    readSettingsWithMigration: vi.fn(() => settings as any),
+    readSettingsWithMigration,
     repoJobRegistry: new RepoJobRegistry(),
   });
   const event = { sender: { id: 7, send: vi.fn() } };
 
-  return { state, runCommandAtPath, guard, event };
+  return { state, runCommandAtPath, guard, event, readSettingsWithMigration };
 };
 
 describe('secret scan push state binding', () => {
+  it('prepares the migrated repository policy even when the first scan precedes the settings UI', async () => {
+    const scan = vi.fn().mockResolvedValue({ ...findingsResult, findings: [] });
+    const harness = createHarness(scan);
+    harness.readSettingsWithMigration.mockImplementation(() => {
+      harness.state.allowlist = 'path:docs/example.env';
+      return { secretScanBeforePushEnabled: true, secretScanStrictness: 'medium' };
+    });
+    const result = await handlers.get('git:scanPushSecrets')!(harness.event, { repoPath: 'C:/repo', pushArgs: ['origin', 'main'] });
+    expect(result.success).toBe(true);
+    expect(scan).toHaveBeenCalledWith(expect.objectContaining({ allowlistText: 'path:docs/example.env' }));
+  });
+  it('keeps a batch policy verifier bound to the saved version between endpoints', async () => {
+    const harness = createHarness(vi.fn().mockResolvedValue(findingsResult));
+    const verify = await harness.guard.createPushPolicyVerifier!('C:/repo');
+    expect(() => verify()).not.toThrow();
+    harness.state.allowlist = 'path:docs/example.env';
+    expect(() => verify()).toThrow('Secret-scan allowlist changed.');
+  });
+  it('uses a repository policy snapshot and blocks a mid-scan edit', async () => {
+    let harness: ReturnType<typeof createHarness>;
+    const scan = vi.fn(async ({ allowlistText }) => {
+      expect(allowlistText).toBe('path:sample.env');
+      harness.state.allowlist = '';
+      return { ...findingsResult, findings: [] };
+    });
+    harness = createHarness(scan);
+    harness.state.allowlist = 'path:sample.env';
+    expect(await handlers.get('git:scanPushSecrets')!(harness.event, { repoPath: 'C:/repo', pushArgs: ['origin', 'main'] })).toMatchObject({ success: false });
+  });
+
+  it('binds clean and manually granted push approvals to saved policy', async () => {
+    for (const findings of [[], findingsResult.findings]) {
+      const harness = createHarness(vi.fn().mockResolvedValue({ ...findingsResult, findings }));
+      const args = ['origin', 'main'];
+      await handlers.get('git:scanPushSecrets')!(harness.event, { repoPath: 'C:/repo', pushArgs: args });
+      if (findings.length) expect(await handlers.get('git:approveSecretScanPush')!(harness.event, args, 'C:/repo')).toEqual({ success: true });
+      harness.state.allowlist = 'path:sample.env';
+      expect(await harness.guard.requirePushSecretScanApproval(harness.event, args, 'C:/repo')).toMatchObject({
+        success: false,
+        error: expect.stringContaining('changed'),
+      });
+    }
+  });
   beforeEach(() => {
     handlers.clear();
   });

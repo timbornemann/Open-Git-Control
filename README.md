@@ -524,7 +524,17 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
   - low
   - medium
   - high
-- Secret scan allowlist formats:
+- Repository secret-scan allowlist: `.Open-Git-Control/secret-scan-allowlist.txt`
+  - open **Secret-scan allowlist** from the repository menu, local repository context menu, Command Palette, or scan dialog
+  - saved working-tree rules apply immediately to commit, push and AI auto-commit scans; staging or committing the file is not required
+  - **Allowlist files and commit** stages the entire updated allowlist, rescans the index, and includes it in the same commit; failed staging stops the commit
+  - saving in the editor or allowlisting during push does not stage or commit the file; commit it normally to share those changes with the team
+  - missing files mean no exceptions; reads do not create the file
+  - saves detect concurrent edits; policy changes invalidate existing scan approvals
+  - **Allowlist files** appends repository-relative paths and runs a new scan before continuing
+  - legacy settings migrate only provably matching `path:` rules to already known repositories; existing repository policies remain untouched
+  - general text, regex and unassignable legacy rules are omitted; unavailable known repositories are retried when opened
+  - rule formats (one per line, UTF-8, maximum 256 KiB):
   - `path:...`
   - `regex:...`
   - plain text
@@ -574,7 +584,7 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
   - secret scan before commit
   - secret scan before push
   - strictness
-  - allowlist
+  - repository allowlists are configured on the repository's **Secret-scan allowlist** subpage
 - System settings:
   - installed app version
   - updater status
@@ -909,6 +919,7 @@ Expected release assets:
 - Inspect the reported file and line.
 - Remove the secret or rotate it if it was committed accidentally.
 - Use the dialog's allowlist action only for intentional test or example values; it allowlists the affected file path for future scans.
+- Exceptions are saved to `.Open-Git-Control/secret-scan-allowlist.txt` of the current repository. Commit this file to share them. If the file changed externally, reload the editor, review your preserved draft, and save again.
 - Add a narrow allowlist rule only for intentional dummy/example values.
 
 ### Auto-update is unavailable

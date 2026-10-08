@@ -7,6 +7,7 @@ export type MainPrimaryRoute =
   | 'planner'
   | 'settings'
   | 'runConfig'
+  | 'secretScanAllowlist'
   | 'remoteConfig'
   | 'releaseCreator'
   | 'timeline'
@@ -27,6 +28,7 @@ type RouteParams = {
   showTimeline: boolean;
   showRunConsole: boolean;
   showRunConfig?: boolean;
+  showSecretScanAllowlist?: boolean;
   showRemoteConfig?: boolean;
   showReleaseCreator?: boolean;
 };
@@ -42,12 +44,14 @@ export const getMainPrimaryRoute = ({
   showTimeline,
   showRunConsole,
   showRunConfig,
+  showSecretScanAllowlist,
   showRemoteConfig,
   showReleaseCreator,
 }: RouteParams): MainPrimaryRoute => {
   if (activeTab === 'localRepos') return 'localRepos';
   if (activeTab === 'planner') return 'planner';
   if (activeTab === 'settings') return 'settings';
+  if (activeTab === 'repo' && showSecretScanAllowlist) return 'secretScanAllowlist';
   if (activeTab === 'repo' && showReleaseCreator) return 'releaseCreator';
   if (activeTab === 'repo' && showRemoteConfig) return 'remoteConfig';
   if (activeTab === 'repo' && showRunConfig) return 'runConfig';
@@ -67,6 +71,8 @@ export const getMainPrimaryTitle = (route: MainPrimaryRoute, t: Translate, tr: (
       return t('generated.components.layout.main.mainprimarypane.settings_c6256784');
     case 'runConfig':
       return tr('Run-Konfiguration', 'Run configuration');
+    case 'secretScanAllowlist':
+      return tr('Secret-Scan-Allowlist', 'Secret-scan allowlist');
     case 'remoteConfig':
       return tr('Remote-Konfiguration', 'Remote configuration');
     case 'releaseCreator':

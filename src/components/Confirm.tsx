@@ -10,6 +10,7 @@ interface ConfirmProps {
   title: string;
   message: string;
   contextItems?: DialogContextItem[];
+  contextAction?: { label: string; onClick: () => void };
   irreversible?: boolean;
   consequences?: string;
   confirmLabel?: string;
@@ -26,6 +27,7 @@ export const Confirm: React.FC<ConfirmProps> = ({
   open,
   title,
   message,
+  contextAction,
   contextItems = [],
   irreversible = false,
   consequences,
@@ -55,6 +57,11 @@ export const Confirm: React.FC<ConfirmProps> = ({
       onSecondaryAction={onSecondaryAction}
     >
       <p className="dialog-message">{message}</p>
+      {contextAction && (
+        <button className="dialog-btn dialog-btn-secondary" onClick={contextAction.onClick}>
+          {contextAction.label}
+        </button>
+      )}
       {contextItems.length > 0 && (
         <dl className="dialog-context-list">
           {contextItems.map((item) => (

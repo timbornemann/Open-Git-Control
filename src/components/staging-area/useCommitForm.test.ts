@@ -3,8 +3,9 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS } from '@/app/state/defaultSettings';
-import { appClient } from '@/services/appClient';
+import { repositorySecretScanAllowlistClient } from '@/services/repositorySecretScanAllowlistClient';
 import { gitClient } from '@/services/gitClient';
+import { SECRET_SCAN_ALLOWLIST_PATH } from '@/types/repositorySecretScanAllowlist';
 import type { GitStatusWithConflicts } from './types';
 import { clearCommitFormDraftsForTests } from './commitFormDraft';
 import { useCommitForm } from './useCommitForm';
@@ -35,6 +36,7 @@ beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
   vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: 'Previous title' });
+  vi.spyOn(gitClient, 'stagePaths').mockResolvedValue({ success: true, data: '' });
   vi.spyOn(gitClient, 'scanCommitSecrets').mockResolvedValue({
     success: true,
     data: { scanned: true, strictness: 'medium', findings: [], notes: [], stats: { checkedLines: 0, stagedLines: 0, toPushLines: 0, tagLines: 0 } },
@@ -122,11 +124,12 @@ describe('useCommitForm repository isolation', () => {
       await current!.handleCommit();
     });
     expect(current!.amendCommit).toBe(false);
+    expect(gitClient.stagePaths).not.toHaveBeenCalled();
     expect(setToast).not.toHaveBeenCalledWith(expect.objectContaining({ isError: false }));
     act(() => root.unmount());
   });
 
-  it('opens the app dialog and persists an allowlist entry before committing findings', async () => {
+  it('stages the updated allowlist before rescanning and committing findings', async () => {
     const findings = [
       {
         id: 'finding-1',
@@ -138,14 +141,23 @@ describe('useCommitForm repository isolation', () => {
         contextLine: '[REDACTED_SECRET]',
       },
     ];
-    vi.spyOn(gitClient, 'scanCommitSecrets').mockResolvedValue({
+    const scan = vi.spyOn(gitClient, 'scanCommitSecrets').mockResolvedValueOnce({
       success: true,
       data: { scanned: true, strictness: 'medium', findings, notes: [], stats: { checkedLines: 1, stagedLines: 1, toPushLines: 0, tagLines: 0 } },
     });
+    scan.mockResolvedValue({
+      success: true,
+      data: { scanned: true, strictness: 'medium', findings: [], notes: [], stats: { checkedLines: 1, stagedLines: 1, toPushLines: 0, tagLines: 0 } },
+    });
     const approve = vi.spyOn(gitClient, 'approveSecretScanCommit').mockResolvedValue({ success: true });
     const createCommit = vi.spyOn(gitClient, 'createCommit').mockResolvedValue({ success: true });
-    vi.spyOn(appClient, 'isAvailable').mockReturnValue(true);
-    vi.spyOn(appClient, 'getSettings').mockResolvedValue({ ...DEFAULT_SETTINGS, secretScanAllowlist: 'path:data.ini' });
+    vi.spyOn(repositorySecretScanAllowlistClient, 'get').mockResolvedValue({
+      success: true,
+      data: { repoPath: repoA, relativePath: '.Open-Git-Control/secret-scan-allowlist.txt', text: '', exists: false, version: 'missing' },
+    });
+    const save = vi
+      .spyOn(repositorySecretScanAllowlistClient, 'addPaths')
+      .mockResolvedValue({ success: true, data: { repoPath: repoA, relativePath: '', text: 'path:data.ini', exists: true, version: 'saved' } });
     const setConfirmDialog = vi.fn();
     const onUpdateSettings = vi.fn().mockResolvedValue(undefined);
     let current: ReturnType<typeof useCommitForm> | null = null;
@@ -175,13 +187,19 @@ describe('useCommitForm repository isolation', () => {
       await dialog.onSecondaryAction();
     });
 
-    expect(onUpdateSettings).toHaveBeenCalledWith({ secretScanAllowlist: 'path:data.ini' });
-    expect(approve).toHaveBeenCalledWith(repoA);
+    expect(onUpdateSettings).not.toHaveBeenCalled();
+    expect(save).toHaveBeenCalledWith({ repoPath: repoA, paths: ['data.ini'], expectedVersion: 'missing' });
+    expect(gitClient.stagePaths).toHaveBeenCalledExactlyOnceWith([SECRET_SCAN_ALLOWLIST_PATH], repoA);
+    expect(save.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(gitClient.stagePaths).mock.invocationCallOrder[0]);
+    expect(vi.mocked(gitClient.stagePaths).mock.invocationCallOrder[0]).toBeLessThan(scan.mock.invocationCallOrder[1]);
+    expect(scan.mock.invocationCallOrder[1]).toBeLessThan(createCommit.mock.invocationCallOrder[0]);
+    expect(scan).toHaveBeenCalledTimes(2);
+    expect(approve).not.toHaveBeenCalled();
     expect(createCommit).toHaveBeenCalledWith(expect.objectContaining({ repoPath: repoA }));
     act(() => root.unmount());
   });
 
-  it('does not commit when the allowlist update cannot be verified', async () => {
+  it.each(['save', 'stage'])('does not commit when the allowlist %s fails', async (failure) => {
     const findings = [
       {
         id: 'finding-1',
@@ -199,8 +217,16 @@ describe('useCommitForm repository isolation', () => {
     });
     const approve = vi.spyOn(gitClient, 'approveSecretScanCommit').mockResolvedValue({ success: true });
     const createCommit = vi.spyOn(gitClient, 'createCommit').mockResolvedValue({ success: true });
-    vi.spyOn(appClient, 'isAvailable').mockReturnValue(true);
-    vi.spyOn(appClient, 'getSettings').mockResolvedValue({ ...DEFAULT_SETTINGS, secretScanAllowlist: '' });
+    vi.spyOn(repositorySecretScanAllowlistClient, 'get').mockResolvedValue({
+      success: true,
+      data: { repoPath: repoA, relativePath: '.Open-Git-Control/secret-scan-allowlist.txt', text: '', exists: false, version: 'missing' },
+    });
+    vi.spyOn(repositorySecretScanAllowlistClient, 'addPaths').mockResolvedValue(
+      failure === 'save'
+        ? { success: false, error: 'Allowlist changed.' }
+        : { success: true, data: { repoPath: repoA, relativePath: SECRET_SCAN_ALLOWLIST_PATH, text: 'path:data.ini', exists: true, version: 'saved' } },
+    );
+    if (failure === 'stage') vi.mocked(gitClient.stagePaths).mockResolvedValue({ success: false, error: 'The Git index is busy.' });
     const setConfirmDialog = vi.fn();
     const setToast = vi.fn();
     let current: ReturnType<typeof useCommitForm> | null = null;
@@ -229,7 +255,82 @@ describe('useCommitForm repository isolation', () => {
 
     expect(approve).not.toHaveBeenCalled();
     expect(createCommit).not.toHaveBeenCalled();
+    expect(gitClient.scanCommitSecrets).toHaveBeenCalledTimes(1);
+    expect(gitClient.stagePaths).toHaveBeenCalledTimes(failure === 'save' ? 0 : 1);
+    expect(current!.commitMsg).toBe('feat: protect config');
     expect(setToast).toHaveBeenCalledWith(expect.objectContaining({ isError: true }));
+    act(() => root.unmount());
+  });
+
+  it.each(['save', 'stage'])('does not continue the allowlist commit after switching repositories during %s', async (phase) => {
+    const findings = [
+      {
+        id: 'finding',
+        ruleId: 'secret',
+        severity: 'high' as const,
+        source: 'staged' as const,
+        filePath: 'data.ini',
+        lineNumber: 1,
+        contextLine: '[REDACTED_SECRET]',
+      },
+    ];
+    vi.mocked(gitClient.scanCommitSecrets).mockResolvedValueOnce({
+      success: true,
+      data: { scanned: true, strictness: 'medium', findings, notes: [], stats: { checkedLines: 1, stagedLines: 1, toPushLines: 0, tagLines: 0 } },
+    });
+    const policy = { repoPath: repoA, relativePath: SECRET_SCAN_ALLOWLIST_PATH, text: '', exists: false, version: 'missing' };
+    vi.spyOn(repositorySecretScanAllowlistClient, 'get').mockResolvedValue({ success: true, data: policy });
+    const pending = deferred<any>();
+    vi.spyOn(repositorySecretScanAllowlistClient, 'addPaths').mockImplementation(() =>
+      phase === 'save' ? pending.promise : Promise.resolve({ success: true, data: { ...policy, exists: true, text: 'path:data.ini', version: 'saved' } }),
+    );
+    if (phase === 'stage') vi.mocked(gitClient.stagePaths).mockReturnValue(pending.promise);
+    const createCommit = vi.spyOn(gitClient, 'createCommit').mockResolvedValue({ success: true });
+    const setConfirmDialog = vi.fn();
+    const setToast = vi.fn();
+    let repoPath = repoA;
+    let current: ReturnType<typeof useCommitForm> | null = null;
+    const root = createRoot(document.getElementById('root')!);
+    const Harness = () => {
+      current = useCommitForm({
+        repoPath,
+        status,
+        setToast,
+        refresh: vi.fn().mockResolvedValue(undefined),
+        settings: DEFAULT_SETTINGS,
+        setConfirmDialog,
+        onUpdateSettings: vi.fn(),
+      });
+      return null;
+    };
+    const render = () => root.render(createElement(Harness));
+    act(render);
+    act(() => current!.setCommitMsg('Commit in A'));
+    await act(async () => {
+      await current!.handleCommit();
+    });
+    let action!: Promise<void>;
+    await act(async () => {
+      action = setConfirmDialog.mock.calls[0][0].onSecondaryAction();
+      for (let index = 0; index < 20; index++) await Promise.resolve();
+    });
+    repoPath = repoB;
+    act(render);
+    act(() => current!.setCommitMsg('Draft in B'));
+    await act(async () => {
+      pending.resolve(
+        phase === 'save'
+          ? { success: true, data: { ...policy, exists: true, text: 'path:data.ini', version: 'saved' } }
+          : { success: false, error: 'Old repository staging failed.' },
+      );
+      await action;
+    });
+    expect(gitClient.stagePaths).toHaveBeenCalledTimes(phase === 'save' ? 0 : 1);
+    if (phase === 'stage') expect(gitClient.stagePaths).toHaveBeenCalledWith([SECRET_SCAN_ALLOWLIST_PATH], repoA);
+    expect(gitClient.scanCommitSecrets).toHaveBeenCalledTimes(1);
+    expect(createCommit).not.toHaveBeenCalled();
+    expect(setToast).not.toHaveBeenCalled();
+    expect(current!.commitMsg).toBe('Draft in B');
     act(() => root.unmount());
   });
 

@@ -1,3 +1,4 @@
+import { useRepositorySecretScanAllowlist } from '@/app/state/useRepositorySecretScanAllowlist';
 import { useCallback, useState } from 'react';
 import { useToastQueue } from '@/hooks/useToastQueue';
 import { useDialogControllers } from './hooks/useDialogControllers';
@@ -21,6 +22,7 @@ export const useAppState = () => {
   const [plannerRefreshSignal, setPlannerRefreshSignal] = useState(0);
   const [isRunConfigOpen, setRunConfigOpen] = useState(false);
   const [isRemoteConfigOpen, setRemoteConfigOpen] = useState(false);
+  const [isSecretScanAllowlistOpen, setSecretScanAllowlistOpen] = useState(false);
   const [isReleaseCreatorOpen, setReleaseCreatorOpen] = useState(false);
   const [releaseCreatorTarget, setReleaseCreatorTarget] = useState<HostedRepositoryRef | null>(null);
   const [releaseReturnTab, setReleaseReturnTab] = useState<'repo' | 'hosting'>('repo');
@@ -71,6 +73,7 @@ export const useAppState = () => {
 
   const resetRepositoryView = useCallback(() => {
     resetRepoScopedUi();
+    setSecretScanAllowlistOpen(false);
     setRunConfigOpen(false);
     setRemoteConfigOpen(false);
     setReleaseCreatorOpen(false);
@@ -88,6 +91,17 @@ export const useAppState = () => {
     onNoActiveRepo: resetRepositoryView,
     language: settings.language,
   });
+  const setWorkspaceTab = workspace.setActiveTab;
+  const onOpenSecretScanAllowlist = useCallback(() => {
+    requestWorkingDirectoryNavigation({ kind: 'view', label: 'secret-scan allowlist' }, () => {
+      setRunConfigOpen(false);
+      setRemoteConfigOpen(false);
+      setReleaseCreatorOpen(false);
+      setWorkspaceTab('repo');
+      setSecretScanAllowlistOpen(true);
+    });
+  }, [setWorkspaceTab]);
+  useRepositorySecretScanAllowlist(workspace.activeRepo, settings.language, setGitActionToast, onOpenSecretScanAllowlist);
   const repositoryRun = useRepositoryRun({ activeRepo: workspace.activeRepo, triggerRefresh });
   const { activeGitActionLabel, activeGitCommand, isGitActionRunning, isGitActionRunningRef, runGitCommand, setActiveGitActionLabel } = useGitCommandWorkflow({
     workspace: {
@@ -178,6 +192,7 @@ export const useAppState = () => {
     setActiveTab: workspace.setActiveTab,
     isRunConfigOpen,
     onOpenRunConfig: () => {
+      setSecretScanAllowlistOpen(false);
       setReleaseCreatorOpen(false);
       setRemoteConfigOpen(false);
       setRunConfigOpen(true);
@@ -185,16 +200,21 @@ export const useAppState = () => {
     onCloseRunConfig: () => setRunConfigOpen(false),
     isRemoteConfigOpen,
     onOpenRemoteConfig: () => {
+      setSecretScanAllowlistOpen(false);
       setReleaseCreatorOpen(false);
       setRunConfigOpen(false);
       setRemoteConfigOpen(true);
       workspace.setActiveTab('repo');
     },
     onCloseRemoteConfig: () => setRemoteConfigOpen(false),
+    isSecretScanAllowlistOpen,
+    onCloseSecretScanAllowlist: () => setSecretScanAllowlistOpen(false),
+    onOpenSecretScanAllowlist,
     isReleaseCreatorOpen,
     releaseCreatorTarget,
     onOpenReleaseCreator: (target?: HostedRepositoryRef) => {
       requestWorkingDirectoryNavigation({ kind: 'view', label: 'release' }, () => {
+        setSecretScanAllowlistOpen(false);
         setRunConfigOpen(false);
         setRemoteConfigOpen(false);
         setReleaseCreatorTarget(target ?? null);

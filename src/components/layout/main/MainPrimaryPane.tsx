@@ -1,3 +1,4 @@
+import { RepositorySecretScanAllowlistView } from '@/components/repository-security/RepositorySecretScanAllowlistView';
 import { viewModules } from '@/data/viewModules';
 /* eslint-disable complexity -- this component is the intentionally central primary-pane route switch. */
 import React from 'react';
@@ -99,6 +100,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
     showTimeline,
     showRunConsole: workflow.isRunConsoleOpen && workflow.repositoryRun?.repoPath === repository.activeRepo,
     showRunConfig: ui.isRunConfigOpen,
+    showSecretScanAllowlist: ui.isSecretScanAllowlistOpen,
     showRemoteConfig: ui.isRemoteConfigOpen,
     showReleaseCreator: ui.isReleaseCreatorOpen,
   });
@@ -109,6 +111,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   const isTimelineView = route === 'timeline';
   const isRunConsoleView = route === 'runConsole';
   const isRunConfigView = route === 'runConfig';
+  const isSecretScanAllowlistView = route === 'secretScanAllowlist';
   const isRemoteConfigView = route === 'remoteConfig';
   const isReleaseCreatorView = route === 'releaseCreator';
   const primaryPaneTitle = getMainPrimaryTitle(route, t, tr);
@@ -139,6 +142,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
         isLocalReposView ||
         isRunConfigView ||
         isRemoteConfigView ||
+        isSecretScanAllowlistView ||
         isReleaseCreatorView ||
         !showInspectorPane
           ? { minWidth: 0 }
@@ -152,6 +156,10 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
           {isSettingsView ? null : isReleaseCreatorView ? (
             <button className="icon-btn pane-header-nav-btn" onClick={ui.onCloseReleaseCreator}>
               {tr('Zurück', 'Back')}
+            </button>
+          ) : isSecretScanAllowlistView ? (
+            <button className="icon-btn pane-header-nav-btn" onClick={ui.onCloseSecretScanAllowlist}>
+              {tr('Zurück zum Repository', 'Back to repository')}
             </button>
           ) : isRunConfigView || isRemoteConfigView ? (
             <button className="icon-btn pane-header-nav-btn" onClick={isRemoteConfigView ? ui.onCloseRemoteConfig : ui.onCloseRunConfig}>
@@ -178,7 +186,9 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
       )}
 
       <div className="pane-content" style={{ padding: 0 }}>
-        {isReleaseCreatorView ? (
+        {isSecretScanAllowlistView ? (
+          <RepositorySecretScanAllowlistView key={repository.activeRepo ?? ''} />
+        ) : isReleaseCreatorView ? (
           <RepositoryReleaseCreator repoPath={repository.activeRepo} requestedTarget={ui.releaseCreatorTarget} />
         ) : isRemoteConfigView ? (
           <RemoteConfigurationView key={repository.activeRepo ?? ''} repoPath={repository.activeRepo} />

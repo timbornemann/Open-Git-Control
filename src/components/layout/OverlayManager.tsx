@@ -120,6 +120,18 @@ const DialogOverlays: React.FC<{ state: DialogOverlayState }> = ({ state }) => (
         title={state.confirmDialog.title}
         message={state.confirmDialog.message}
         contextItems={state.confirmDialog.contextItems}
+        contextAction={
+          state.confirmDialog.contextAction
+            ? {
+                label: state.confirmDialog.contextAction.label,
+                onClick: () => {
+                  const action = state.confirmDialog?.contextAction;
+                  state.onCancelConfirm();
+                  action?.onClick();
+                },
+              }
+            : undefined
+        }
         irreversible={state.confirmDialog.irreversible}
         consequences={state.confirmDialog.consequences}
         confirmLabel={state.confirmDialog.confirmLabel}
@@ -137,6 +149,18 @@ const DialogOverlays: React.FC<{ state: DialogOverlayState }> = ({ state }) => (
         title={state.confirmDialog.title}
         message={state.confirmDialog.message}
         contextItems={state.confirmDialog.contextItems}
+        contextAction={
+          state.confirmDialog.contextAction
+            ? {
+                label: state.confirmDialog.contextAction.label,
+                onClick: () => {
+                  const action = state.confirmDialog?.contextAction;
+                  state.onCancelConfirm();
+                  action?.onClick();
+                },
+              }
+            : undefined
+        }
         irreversible={state.confirmDialog.irreversible}
         consequences={state.confirmDialog.consequences}
         confirmLabel={state.confirmDialog.confirmLabel}
