@@ -35,6 +35,7 @@ export default defineConfig({
         'electron/git/GitLfs*.ts',
         'src/components/staging-area/useStagingLfs.ts',
         'electron/git/remote*.ts',
+        'electron/system-tools/**/*.ts',
         'electron/git/reconcileRemotePreferences.ts',
         'electron/git/groupedRemotePush.ts',
         'electron/main-process/**/*.ts',

@@ -5,8 +5,10 @@ import { gitClient } from '@/services/gitClient';
 import { plannerClient } from '@/services/plannerClient';
 import { cacheDiagnostics, queryClient } from './queryClient';
 import { viewModules } from './viewModules';
+import { useGitAvailable } from '@/app/state/systemToolsStore';
 
 export function useAppPreloading(activeRepo: string | null, openRepos: string[], tab: string, showSecondaryHistory: boolean) {
+  const gitReady = useGitAvailable();
   const navigation = useRef({ tab, started: performance.now() });
   if (navigation.current.tab !== tab) navigation.current = { tab, started: performance.now() };
   useLayoutEffect(() => {
@@ -33,9 +35,9 @@ export function useAppPreloading(activeRepo: string | null, openRepos: string[],
     if (tab === 'planner') void plannerClient.getData().catch(() => {});
   }, [tab]);
   useEffect(() => {
-    if (activeRepo) preloadRepository(activeRepo, showSecondaryHistory);
-  }, [activeRepo, showSecondaryHistory]);
+    if (gitReady && activeRepo) preloadRepository(activeRepo, showSecondaryHistory);
+  }, [gitReady, activeRepo, showSecondaryHistory]);
   useEffect(() => {
-    for (const repo of openRepos) void preload(() => gitClient.getRepoOriginUrl(repo), 'startup');
-  }, [openRepos]);
+    if (gitReady) for (const repo of openRepos) void preload(() => gitClient.getRepoOriginUrl(repo), 'startup');
+  }, [gitReady, openRepos]);
 }

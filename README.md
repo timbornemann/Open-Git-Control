@@ -8,6 +8,8 @@ Open-Git-Control is a free, open-source desktop Git client for Windows, macOS, a
 
 Language: **English** | Deutsche Version: [README.de.md](README.de.md)
 
+Git is required; Git LFS and GitHub CLI are optional. The app checks these tools and offers official downloads or installation through an existing package manager under **Settings → App & diagnostics → System tools**. See [tool setup](docs/SYSTEM_TOOLS.md).
+
 ![Open-Git-Control application overview](Docs/App%20Overview.png)
 
 ## Why Open-Git-Control?

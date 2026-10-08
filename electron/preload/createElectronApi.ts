@@ -1,4 +1,5 @@
 import { createRepositorySecretScanAllowlistApi } from './createRepositorySecretScanAllowlistApi';
+import { createSystemToolsApi } from './createSystemToolsApi';
 import type { PreviewSnapshot, ReadRequest } from '../../src/shared/cache/resource';
 import type { IpcRenderer, IpcRendererEvent } from 'electron';
 import { IpcChannel } from '../../src/types/ipcContract';
@@ -78,6 +79,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
   };
 
   const flatApi = {
+    ...createSystemToolsApi(ipcRenderer),
     ...createRepositorySecretScanAllowlistApi(ipcRenderer),
     ...createRepositoryIconApi(ipcRenderer),
     ...createHostingApi(ipcRenderer),
@@ -433,6 +435,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       clearOpenAiApiKey: flatApi.clearOpenAiApiKey,
     },
     app: {
+      ...createSystemToolsApi(ipcRenderer),
       cancelReadRequest: flatApi.cancelReadRequest,
       getBootstrap: flatApi.getBootstrap,
       savePreviews: flatApi.savePreviews,

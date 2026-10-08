@@ -1,3 +1,4 @@
+import { isSystemToolAvailable } from '@/services/systemToolsAvailability';
 import { QueryClient, hashKey, notifyManager } from '@tanstack/react-query';
 import { MEMORY_CACHE_BYTES, type PreviewSnapshot, type ResourceKey, type ReadPriority } from '@/shared/cache/resource';
 import { backgroundQueue } from './backgroundQueue';
@@ -137,6 +138,7 @@ export async function readResource<T>(
 export function refreshVisibleResources() {
   if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
   for (const query of queryClient.getQueryCache().getAll()) {
+    if (query.queryKey[1] === 'git' && !isSystemToolAvailable('git')) continue;
     const reader = readers.get(query.queryHash);
     if (
       reader &&

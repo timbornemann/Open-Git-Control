@@ -1,5 +1,7 @@
 # Open-Git-Control
 
+Git ist erforderlich; Git LFS und GitHub CLI sind optional. Die App prüft diese Werkzeuge und bietet unter **Einstellungen → App & Diagnose → Werkzeuge** offizielle Downloads oder die Installation über einen vorhandenen Paketmanager an. Siehe [Werkzeuge einrichten](docs/SYSTEM_TOOLS.md).
+
 [![CI (Linux, Windows, macOS)](https://github.com/timbornemann/Open-Git-Control/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/timbornemann/Open-Git-Control/actions/workflows/ci.yml?query=branch%3Amaster+event%3Apush)
 [![Latest release](https://img.shields.io/github/v/release/timbornemann/Open-Git-Control?sort=semver)](https://github.com/timbornemann/Open-Git-Control/releases/latest)
 [![License](https://img.shields.io/github/license/timbornemann/Open-Git-Control)](LICENSE)

@@ -1,10 +1,10 @@
+import { openSystemTools } from '@/app/state/systemToolsStore';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
 import type { FileSection, StagingContextMenuState } from './types';
 import type { useFileOperations } from './useFileOperations';
 import { dirname, extensionPattern, toGitPath } from './utils';
 import { escapeGitignoreLiteralPath } from './gitignorePattern';
-import { appClient } from '@/services/appClient';
 
 type StagingContextMenuProps = {
   contextMenu: StagingContextMenuState | null;
@@ -119,7 +119,7 @@ export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextM
                 className="ctx-menu-item"
                 onClick={() => {
                   closeContextMenu();
-                  void appClient.openExternalUrl('https://git-lfs.com/');
+                  openSystemTools('git-lfs');
                 }}
               >
                 {tr('Git LFS installieren…', 'Install Git LFS…')}

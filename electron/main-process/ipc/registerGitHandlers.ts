@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+import { toolExecutable } from '../../system-tools/toolRuntime';
 import type { CommitStatsService } from '../../CommitStatsService';
 import type { GitService } from '../../GitService';
 import type { SecretScanService } from '../../SecretScanService';
@@ -72,12 +73,14 @@ export function registerGitHandlers({
   const commitMessageEdits = registerCommitMessageEditHandlers({ gitService, repoJobRegistry, beginCommitProtection, ensureCommitProtectionIsIdle });
 
   ipcMain.handle(IpcChannel.GitResolveRepoPath, async (_event: any, repoPath: string) => {
+    toolExecutable('git');
     const requestedRepoPath = String(repoPath || '').trim();
     if (!requestedRepoPath) throw new Error('Repository path is required.');
     return gitService.resolveRepositoryPathAsync(requestedRepoPath);
   });
 
   ipcMain.handle(IpcChannel.GitSetRepo, async (_event: any, repoPath: string) => {
+    toolExecutable('git');
     const requestedRepoPath = String(repoPath || '').trim();
     if (!requestedRepoPath) throw new Error('Repository path is required.');
     commitStatsService.interruptBackgroundWork();

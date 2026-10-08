@@ -4,6 +4,7 @@ import type { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '@/i18n';
 import { UpdateNotification } from './UpdateNotification';
 import { RepositoryActivityRail } from './RepositoryActivityRail';
+import { SystemToolsWarning } from '@/components/system-tools/SystemToolsWarning';
 
 type SidebarActivityBarProps = Pick<AppSidebarProps, 'activeTab' | 'setActiveTab'> & {
   isSidebarCollapsed: boolean;
@@ -50,6 +51,7 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({ activeTa
         <RepositoryActivityRail />
       </div>
       <UpdateNotification />
+      <SystemToolsWarning />
       <button className={`icon-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => activateTab('settings')} title={t('sidebar.settings')}>
         <Settings size={22} />
       </button>

@@ -119,6 +119,13 @@ export const getSettingsGroups = (tr: Translate) =>
       keywords: 'update download install version automatic automatisch aktualisierung',
     },
     {
+      id: 'tools',
+      tab: 'system',
+      title: tr('Werkzeuge', 'System tools'),
+      description: tr('Git sowie optional Git LFS und GitHub CLI prüfen und installieren.', 'Check and install Git, and optionally Git LFS and GitHub CLI.'),
+      keywords: 'git lfs github cli gh tools werkzeuge installation download required optional erforderlich package paket homebrew winget',
+    },
+    {
       id: 'feedback',
       tab: 'system',
       title: tr('Feedback & Fehlerberichte', 'Feedback & issue reports'),

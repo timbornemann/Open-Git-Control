@@ -9,6 +9,7 @@ import type { RepoUnavailablePayload } from './repoUnavailableClassifier';
 import { workingTreeReads } from './workingTreeReads';
 import { commitMessageEdits } from './commitMessageEdits';
 import { repositoryFileClient } from './repositoryFileClient';
+import { isSystemToolAvailable } from './systemToolsAvailability';
 
 export type GitCommandArgs = [GitCommandName, ...string[]];
 
@@ -35,7 +36,7 @@ const command = <TCommand extends GitCommandName>(commandName: TCommand, ...args
 export const gitClient = cachedClient('git', {
   ...commitMessageEdits,
   isAvailable(): boolean {
-    return Boolean(getElectronApi());
+    return Boolean(getElectronApi()) && isSystemToolAvailable('git');
   },
 
   onJobEvent(...args: Parameters<ElectronAPI['onJobEvent']>): ReturnType<ElectronAPI['onJobEvent']> {
@@ -52,8 +53,7 @@ export const gitClient = cachedClient('git', {
   },
 
   async runGitCommandForRepo(repoPath: string, commandName: GitCommandName, ...args: string[]): Promise<GitCommandResultDto> {
-    const result = await requireElectronGitApi().runGitCommandForRepo(repoPath, commandName, ...args);
-    return result;
+    return requireElectronGitApi().runGitCommandForRepo(repoPath, commandName, ...args);
   },
 
   async runGitArgs(args: GitCommandArgs): Promise<GitCommandResultDto> {

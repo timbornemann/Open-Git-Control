@@ -8,6 +8,7 @@ import type { GitJobEventDto } from '@/types/aiDtos';
 import type { SettingsTabId } from '@/app/state/contracts';
 import type { SettingsUpdateHandler } from './settings/SettingsSectionPrimitives';
 import { ApiMcpSettingsPanel } from './ApiMcpSettingsPanel';
+import { SettingsToolsSection } from './settings/SettingsToolsSection';
 import {
   SettingsAiSection,
   SettingsGeneralSection,
@@ -157,6 +158,7 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
 
           {activeTab === 'system' && (
             <div className="settings-grid">
+              <SettingsToolsSection />
               <SettingsUpdatesSection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" ai={aiUpdater} locale={locale} />
               <SettingsReleaseNotesCard releaseNotes={aiUpdater.updaterStatus?.releaseNotes} />
               <SettingsFeedbackSection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" />

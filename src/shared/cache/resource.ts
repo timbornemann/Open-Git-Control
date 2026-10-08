@@ -1,4 +1,5 @@
 import type { AppSettingsDto, StoredRepoData } from '../../types/appDtos';
+import type { SystemToolsStatus } from '../ipc/systemTools';
 
 export type ResourceDomain = 'git' | 'github' | 'planner' | 'app' | 'runs';
 export type ResourceKey = readonly ['resource', ResourceDomain, string, string, ...unknown[]];
@@ -15,6 +16,7 @@ export interface PreviewSnapshot {
 }
 
 export interface AppBootstrapDto {
+  systemTools?: SystemToolsStatus;
   settings: AppSettingsDto;
   repositories: StoredRepoData;
   snapshots: PreviewSnapshot[];

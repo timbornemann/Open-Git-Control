@@ -1,0 +1,100 @@
+.system-tools-dialog,
+.system-tools-install-review {
+  width: 100%;
+  font-size: 13px;
+}
+.dialog-modal:has(.system-tools-dialog) {
+  width: min(640px, 100%);
+}
+.system-tools-intro {
+  margin-bottom: 16px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+.system-tool-row {
+  display: flex;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+.system-tool-row:first-child {
+  padding-top: 0;
+}
+.system-tool-icon {
+  flex: none;
+  margin-top: 3px;
+  color: var(--text-secondary);
+}
+.system-tool-content {
+  flex: 1;
+  min-width: 0;
+}
+.system-tool-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.system-tool-heading code {
+  color: var(--text-secondary);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.system-tool-requirement {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.system-tool-content p {
+  margin: 5px 0 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.system-tool-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.system-tools-list > .system-tool-actions {
+  margin-top: 14px;
+}
+.system-tools-hint {
+  margin-top: 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.system-tools-install-review > p {
+  margin-bottom: 10px;
+}
+.system-tool-command,
+.system-tool-agreements,
+.system-tool-detail pre {
+  padding: 10px;
+  margin: 8px 0;
+  background: var(--bg-darker);
+  border-left: 2px solid var(--accent-primary);
+  font: 12px/1.5 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 240px;
+  overflow: auto;
+}
+.system-tool-detail {
+  margin: 8px 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.system-tools-install-review > .ui-button {
+  margin: 4px 8px 4px 0;
+}
+.activity-bar .activity-tools-warning {
+  color: var(--status-warning);
+}
+.activity-bar .activity-tools-warning:hover {
+  background: var(--status-warning-soft);
+}
+@media (max-width: 620px) {
+  .system-tool-icon {
+    display: none;
+  }
+}

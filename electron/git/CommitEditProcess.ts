@@ -1,3 +1,4 @@
+import { toolExecutable, toolEnvironment } from '../system-tools/toolRuntime';
 import { spawn } from 'node:child_process';
 import { redactGitSensitiveText } from './GitErrorFormatter';
 
@@ -5,12 +6,12 @@ import { redactGitSensitiveText } from './GitErrorFormatter';
 export function runCommitEditProcess(cwd: string, args: string[], signal?: AbortSignal, envOverrides?: NodeJS.ProcessEnv): Promise<string> {
   signal?.throwIfAborted();
   return new Promise((resolve, reject) => {
-    const child = spawn('git', args, {
+    const child = spawn(toolExecutable('git'), args, {
       cwd,
       windowsHide: true,
       detached: process.platform !== 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, GIT_NO_REPLACE_OBJECTS: '1', GIT_OPTIONAL_LOCKS: '0', ...envOverrides },
+      env: toolEnvironment({ GIT_NO_REPLACE_OBJECTS: '1', GIT_OPTIONAL_LOCKS: '0', ...envOverrides }),
     });
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];

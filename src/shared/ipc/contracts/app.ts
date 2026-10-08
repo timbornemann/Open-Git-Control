@@ -2,6 +2,7 @@ import type { AppBootstrapDto, PreviewSnapshot } from '../../cache/resource';
 import type { DiagnosticsReportDto, PlanningApiInfoDto, PlanningApiTokenLifetimeDto, UpdaterOneClickResultDto, UpdaterStatusDto } from '../../../types/appDtos';
 import type { IpcResult } from '../../../types/ipc';
 import type { FeedbackReportCapabilityDto, FeedbackReportInputDto, FeedbackReportSubmissionResultDto } from '../../../types/feedbackDtos';
+import type { InstallSystemToolRequest, SystemToolInstallEvent, SystemToolsStatus } from '../systemTools';
 
 export type DirectoryOpenResultDto = {
   path: string;
@@ -14,6 +15,11 @@ export type BasicActionResultDto = {
 };
 
 export interface ElectronAppAPI {
+  getSystemToolsStatus: () => Promise<SystemToolsStatus>;
+  recheckSystemTools: () => Promise<SystemToolsStatus>;
+  installSystemTool: (request: InstallSystemToolRequest) => Promise<IpcResult<SystemToolInstallEvent>>;
+  onSystemToolsStatus: (callback: (status: SystemToolsStatus) => void) => () => void;
+  onSystemToolInstallation: (callback: (event: SystemToolInstallEvent) => void) => () => void;
   cancelReadRequest: (requestId: string) => Promise<void>;
   getBootstrap: () => Promise<AppBootstrapDto>;
   savePreviews: (snapshots: PreviewSnapshot[]) => Promise<void>;

@@ -1,3 +1,4 @@
+import { toolExecutable, toolEnvironment } from '../system-tools/toolRuntime';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -10,7 +11,12 @@ import type { CommitEditGit } from './CommitEditGit';
 /** Called under a scheduler-owned job. Input is streamed; only the small pointer is buffered. */
 export async function cleanLfsContent(repoPath: string, filePath: string, input: Readable, signal?: AbortSignal): Promise<Buffer> {
   signal?.throwIfAborted();
-  const proc = spawn('git', ['lfs', 'clean', '--', filePath], { cwd: repoPath, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  const proc = spawn(toolExecutable('git'), ['lfs', 'clean', '--', filePath], {
+    cwd: repoPath,
+    env: toolEnvironment(),
+    windowsHide: true,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
   let output = Buffer.alloc(0);
   let error = '';
   const abort = () => {
@@ -47,7 +53,12 @@ export async function cleanLfsContent(repoPath: string, filePath: string, input:
 export async function exportGitBlob(repoPath: string, oid: string, outputPath: string, signal?: AbortSignal): Promise<void> {
   if (!/^[a-f0-9]{40,64}$/.test(oid)) throw new Error('Invalid blob identity.');
   signal?.throwIfAborted();
-  const proc = spawn('git', ['cat-file', 'blob', oid], { cwd: repoPath, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  const proc = spawn(toolExecutable('git'), ['cat-file', 'blob', oid], {
+    cwd: repoPath,
+    env: toolEnvironment(),
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
   let error = '';
   const abort = () => proc.kill();
   signal?.addEventListener('abort', abort, { once: true });

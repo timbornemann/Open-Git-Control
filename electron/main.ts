@@ -15,6 +15,8 @@ import type { PlanningApiServerHandle } from './main-process/planningApiServer';
 import { startPlanningApiServer } from './main-process/planningApiServer';
 import { enforceProductionCommandLineSecurity, installAppSecurity } from './main-process/security';
 import { acquireSingleInstanceLock } from './main-process/singleInstance';
+import { systemToolsService } from './system-tools/SystemToolsService';
+import { registerSystemToolsHandlers } from './system-tools/registerSystemToolsHandlers';
 import { IpcChannel } from '../src/types/ipcContract';
 import type { PlanningApiTokenLifetime } from './main-process/planningApiAuth';
 import { clearSavedPlanningApiAuthToken, generateSavedPlanningApiAuthToken, getPlanningApiAuthState } from './main-process/planningApiAuth';
@@ -40,6 +42,7 @@ if (isPrimaryInstance) {
   let planningApiServer: PlanningApiServerHandle | null = null;
   let planningApiError: string | null = null;
   let repositoryRunService: { dispose: () => void } | null = null;
+  let stopSystemTools: (() => void) | undefined;
   const preferredPlanningApiPort = (() => {
     const parsed = Number(process.env.OPEN_GIT_CONTROL_API_PORT || '2990');
     return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 2990;
@@ -113,6 +116,8 @@ if (isPrimaryInstance) {
   });
 
   app.whenReady().then(() => {
+    stopSystemTools = registerSystemToolsHandlers({ isDev, mainProcessDir: __dirname });
+    void systemToolsService.start().catch((error) => console.error('[system-tools] Initial check failed:', error));
     app.setName(APP_DISPLAY_NAME);
     if (process.platform === 'win32') {
       app.setAppUserModelId(WINDOWS_APP_ID);
@@ -155,6 +160,7 @@ if (isPrimaryInstance) {
   });
 
   app.on('before-quit', () => {
+    stopSystemTools?.();
     repositoryRunService?.dispose();
     updaterManager.dispose();
     if (planningApiServer) {

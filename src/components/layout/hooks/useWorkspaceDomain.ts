@@ -10,6 +10,7 @@ import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { getLicenseTemplateRequirements, LICENSE_TEMPLATE_OPTIONS, isLicenseTemplateId } from '@/shared/licenseTemplates';
 import type { Dispatch, SetStateAction } from 'react';
 import { confirmWorkingDirectoryNavigation, requestWorkingDirectoryNavigation } from '@/components/working-directory/workingDirectoryNavigationGuard';
+import { openSystemTools, useGitAvailable } from '@/app/state/systemToolsStore';
 
 type Params = {
   triggerRefresh: () => void;
@@ -113,6 +114,8 @@ export const useWorkspaceDomain = ({
   onNoActiveRepo,
   language,
 }: Params) => {
+  const gitReady = useGitAvailable();
+  const restoredWithGit = useRef(false);
   const [activeTab, setActiveTabState] = useState<AppTabId>('repo');
   const [openRepos, setOpenRepos] = useState<string[]>([]);
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
@@ -222,6 +225,7 @@ export const useWorkspaceDomain = ({
 
   useEffect(() => {
     const loadStored = async () => {
+      restoredWithGit.current = false;
       const restoreId = ++repoRestoreSequenceRef.current;
       if (!appClient.isAvailable()) {
         setReposLoaded(true);
@@ -259,6 +263,8 @@ export const useWorkspaceDomain = ({
           setOpenRepos(provisionalPaths);
           setRepoMeta(provisionalMeta);
           setReposLoaded(true);
+
+          if (!gitReady) return;
 
           if (provisionalPaths.length === 0) {
             await appClient.clearRepoPath();
@@ -311,16 +317,17 @@ export const useWorkspaceDomain = ({
         // active-repository validation) is pending. Restoration still owns this
         // lifecycle flag and must always release persistence for the winner.
         if (repoRestoreSequenceRef.current === restoreId) {
+          restoredWithGit.current = gitReady;
           setReposLoaded(true);
           setIsRestoringRepos(false);
         }
       }
     };
     loadStored();
-  }, [migrateRepoPathToCanonical, onNoActiveRepo]);
+  }, [gitReady, migrateRepoPathToCanonical, onNoActiveRepo]);
 
   useEffect(() => {
-    if (!reposLoaded || isRestoringRepos || !appClient.isAvailable()) return;
+    if (!gitReady || !restoredWithGit.current || !reposLoaded || isRestoringRepos || !appClient.isAvailable()) return;
 
     const now = Date.now();
     const repos = sortedOpenRepos.map((repoPath) => ({
@@ -335,9 +342,13 @@ export const useWorkspaceDomain = ({
       activeRepo,
       sortBy: repoSortBy,
     });
-  }, [sortedOpenRepos, repoMeta, activeRepo, repoSortBy, reposLoaded, isRestoringRepos]);
+  }, [gitReady, sortedOpenRepos, repoMeta, activeRepo, repoSortBy, reposLoaded, isRestoringRepos]);
 
   const handleSwitchRepo = async (repoPath: string) => {
+    if (!gitReady) {
+      openSystemTools();
+      return false;
+    }
     if (!appClient.isAvailable()) return false;
     if (normalizeRepoPathKey(repoPath) === normalizeRepoPathKey(activeRepoRef.current || '')) return true;
     // Close any repository-scoped action dialog before an asynchronous guard
@@ -449,6 +460,10 @@ export const useWorkspaceDomain = ({
   };
 
   const handleOpenFolder = async () => {
+    if (!gitReady) {
+      openSystemTools();
+      return;
+    }
     if (!appClient.isAvailable()) return;
     try {
       const result = await appClient.openDirectory();
@@ -586,6 +601,10 @@ export const useWorkspaceDomain = ({
   };
 
   const addOpenRepo = async (repoPath: string): Promise<boolean> => {
+    if (!gitReady) {
+      openSystemTools();
+      return false;
+    }
     if (!appClient.isAvailable()) return false;
     if (
       normalizeRepoPathKey(repoPath) !== normalizeRepoPathKey(activeRepoRef.current || '') &&

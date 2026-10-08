@@ -4,6 +4,7 @@
 @import './styles/theme-palettes.css' layer(base);
 @import './styles/ui-kit.css' layer(shell);
 @import './styles/settings.css' layer(shell);
+@import './styles/system-tools.css' layer(shell);
 @import './styles/sidebar-repo.css' layer(shell);
 @import './styles/overlays.css' layer(shell);
 @import './styles/staging.css' layer(feature);

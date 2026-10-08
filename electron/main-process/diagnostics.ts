@@ -6,6 +6,7 @@ import { sanitizeRemoteUrl } from './parsing';
 import type { UpdaterStatusPayload } from './updaterManager';
 import { repositoryPathKey } from './activeRepositoryAuthorization';
 import { getAutoCommitDiagnostics } from '../ai/AutoCommitDiagnostics';
+import { systemToolsService } from '../system-tools/SystemToolsService';
 
 type BuildDiagnosticsReportDependencies = {
   gitService: GitService;
@@ -43,6 +44,12 @@ export function buildDiagnosticsReportFactory(deps: BuildDiagnosticsReportDepend
     lines.push(`Node: ${process.version}`);
     lines.push(`Electron: ${process.versions.electron || ''}`);
     lines.push(`Active repo: ${activeRepo || '(none)'}`);
+    lines.push('');
+    lines.push('[System tools]');
+    const tools = systemToolsService.snapshot();
+    lines.push(`checkedAt=${tools.checkedAt || 'pending'}`);
+    for (const tool of tools.tools)
+      lines.push(`${tool.id}: ${tool.state}; required=${tool.required}; version=${tool.version || ''}; executable=${tool.executable || ''}`);
     lines.push('');
     lines.push('[Settings]');
     lines.push(`language=${settings.language}`);

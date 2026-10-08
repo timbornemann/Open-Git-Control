@@ -5,6 +5,21 @@ import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
 import { getElectronApi, requireElectronAppApi, requireElectronReposApi, requireElectronSettingsApi } from './electronApi';
 
 export const appClient = cachedClient('app', {
+  getSystemToolsStatus() {
+    return requireElectronAppApi().getSystemToolsStatus();
+  },
+  recheckSystemTools() {
+    return requireElectronAppApi().recheckSystemTools();
+  },
+  installSystemTool(...args: Parameters<ElectronAPI['installSystemTool']>) {
+    return requireElectronAppApi().installSystemTool(...args);
+  },
+  onSystemToolsStatus(...args: Parameters<ElectronAPI['onSystemToolsStatus']>) {
+    return requireElectronAppApi().onSystemToolsStatus(...args);
+  },
+  onSystemToolInstallation(...args: Parameters<ElectronAPI['onSystemToolInstallation']>) {
+    return requireElectronAppApi().onSystemToolInstallation(...args);
+  },
   isAvailable(): boolean {
     return Boolean(getElectronApi());
   },

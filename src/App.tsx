@@ -18,6 +18,7 @@ import { FeedbackReportProvider } from './contexts/FeedbackReportContext';
 import { QuickRepositoryTodoDialog } from './components/project-planner/QuickRepositoryTodoDialog';
 import { requestRemoteTransfer } from './components/hosting/remoteTransferDialogState';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { SystemToolsRuntime } from './components/system-tools/SystemToolsRuntime';
 
 const App: React.FC = () => {
   const state = useAppState();
@@ -117,6 +118,7 @@ const App: React.FC = () => {
     <I18nProvider language={state.settings.language}>
       <AppStateSlicesProvider value={appStateSlices}>
         <NotificationProvider value={state.notifications}>
+          <SystemToolsRuntime />
           <FeedbackReportProvider>
             <ProjectPlannerProvider
               activeRepo={state.activeRepo}

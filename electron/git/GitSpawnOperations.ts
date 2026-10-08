@@ -1,3 +1,4 @@
+import { toolExecutable, toolEnvironment } from '../system-tools/toolRuntime';
 import { spawn } from 'child_process';
 import { StringDecoder } from 'string_decoder';
 import type { DiffPreviewResult, GitBufferRunOptions, GitCloneProgressResult, GitTransferOptions } from './GitProcessTypes';
@@ -10,11 +11,11 @@ const MAX_STREAM_OUTPUT_BYTES = 8 * 1024 * 1024;
 export class GitSpawnOperations {
   runBuffer(repoPath: string, args: string[], options: GitBufferRunOptions, signal: AbortSignal): Promise<Buffer> {
     return new Promise<Buffer>((resolve, reject) => {
-      const proc = spawn('git', args, {
+      const proc = spawn(toolExecutable('git'), args, {
         cwd: repoPath,
         windowsHide: true,
         stdio: [options.input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
-        env: options.envOverrides ? { ...process.env, ...options.envOverrides } : process.env,
+        env: toolEnvironment(options.envOverrides),
       });
       const chunks: Buffer[] = [];
       let capturedBytes = 0;
@@ -67,11 +68,11 @@ export class GitSpawnOperations {
 
   runWithInput(repoPath: string, args: string[], input: string | Buffer, signal: AbortSignal, envOverrides?: NodeJS.ProcessEnv): Promise<string> {
     return new Promise<string>((resolve, reject) => {
-      const proc = spawn('git', args, {
+      const proc = spawn(toolExecutable('git'), args, {
         cwd: repoPath,
         stdio: ['pipe', 'pipe', 'pipe'],
         windowsHide: true,
-        env: envOverrides ? { ...process.env, ...envOverrides } : process.env,
+        env: toolEnvironment(envOverrides),
       });
       let stdout = '';
       let stderr = '';
@@ -113,7 +114,7 @@ export class GitSpawnOperations {
 
   getDiffPreview(repoPath: string, args: string[], maxBytes: number, maxLines: number, signal: AbortSignal): Promise<DiffPreviewResult> {
     return new Promise<DiffPreviewResult>((resolve, reject) => {
-      const proc = spawn('git', args, { cwd: repoPath, stdio: ['ignore', 'pipe', 'pipe'] });
+      const proc = spawn(toolExecutable('git'), args, { cwd: repoPath, env: toolEnvironment(), stdio: ['ignore', 'pipe', 'pipe'] });
       const chunks: Buffer[] = [];
       let capturedBytes = 0;
       let lineCount = 0;
@@ -179,10 +180,10 @@ export class GitSpawnOperations {
     return new Promise<void>((resolve, reject) => {
       const redactOutput = options.redactOutput !== false;
       const redactLine = (line: string) => (redactOutput ? redactGitSensitiveText(line) : line);
-      const proc = spawn('git', args, {
+      const proc = spawn(toolExecutable('git'), args, {
         cwd: repoPath,
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: options.envOverrides ? { ...process.env, ...options.envOverrides } : process.env,
+        env: toolEnvironment(options.envOverrides),
       });
       let pending = '';
       let stderr = '';
@@ -246,7 +247,12 @@ export class GitSpawnOperations {
 
   streamOutput(repoPath: string, args: string[], onLine: (line: string) => void, signal: AbortSignal, envOverrides?: NodeJS.ProcessEnv): Promise<string> {
     return new Promise<string>((resolve, reject) => {
-      const proc = spawn('git', args, { cwd: repoPath, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, env: { ...process.env, ...envOverrides } });
+      const proc = spawn(toolExecutable('git'), args, {
+        cwd: repoPath,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+        env: toolEnvironment(envOverrides),
+      });
       const stdoutPending = { value: '' };
       const stderrPending = { value: '' };
       let stdout = '';
@@ -331,10 +337,10 @@ export class GitSpawnOperations {
           // Ignore progress delivery failures; the clone itself continues.
         }
       };
-      const proc = spawn('git', ['clone', '--progress', '--', cloneUrl, repoPath], {
+      const proc = spawn(toolExecutable('git'), ['clone', '--progress', '--', cloneUrl, repoPath], {
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
-        env: { ...process.env, ...options.envOverrides },
+        env: toolEnvironment(options.envOverrides),
       });
       const abort = () => proc.kill();
       options.signal?.addEventListener('abort', abort, { once: true });

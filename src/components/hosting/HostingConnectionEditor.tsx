@@ -1,3 +1,5 @@
+import { openSystemTools } from '@/app/state/systemToolsStore';
+import { isSystemToolAvailable } from '@/services/systemToolsAvailability';
 import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -126,6 +128,10 @@ export function HostingConnectionEditor({ connection, onClose }: { connection: H
     });
   const authenticate = (method: 'token' | 'browser' | 'device' | 'cli' | 'save') =>
     void task.run(async () => {
+      if (method === 'cli' && !isSystemToolAvailable('github-cli')) {
+        openSystemTools('github-cli');
+        return;
+      }
       const generation = ++auth.current.generation;
       setCliPreview(null);
       setDevice(null);

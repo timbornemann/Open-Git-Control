@@ -4,9 +4,10 @@ import { useRepositoryRemotes } from './useRepositoryRemotes';
 import { useRepositorySubmodules } from './useRepositorySubmodules';
 import { useRepositoryTags } from './useRepositoryTags';
 import type { RepositoryDomainParams } from './repositoryDomainTypes';
+import { useGitAvailable } from '@/app/state/systemToolsStore';
 
 export const useRepositoryDomain = ({
-  activeRepo,
+  activeRepo: selectedRepo,
   refreshTrigger,
   triggerRefresh,
   setGitActionToast,
@@ -19,6 +20,8 @@ export const useRepositoryDomain = ({
   language,
   onNavigateToCommit,
 }: RepositoryDomainParams) => {
+  const gitReady = useGitAvailable();
+  const activeRepo = gitReady ? selectedRepo : null;
   const remotes = useRepositoryRemotes({
     activeRepo,
     refreshTrigger,

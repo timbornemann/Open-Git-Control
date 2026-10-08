@@ -1,3 +1,4 @@
+import { toolExecutable, toolEnvironment } from '../system-tools/toolRuntime';
 import { createRepoUnavailableErrorMessage } from '../../src/shared/git/errors';
 import { GitErrorFormatter, redactGitSensitiveText } from './GitErrorFormatter';
 import { GitIndexLockRecovery, INDEX_LOCK_RETRY_MAX_ATTEMPTS } from './GitIndexLockRecovery';
@@ -14,7 +15,7 @@ export class GitProcessExecutor {
 
   async runResult(repoPath: string, args: string[], options: GitExecFileOptions): Promise<GitProcessResult> {
     try {
-      const result = await this.execFileAsyncRunner('git', args, options);
+      const result = await this.execFileAsyncRunner(toolExecutable('git'), args, { ...options, env: toolEnvironment(options.env) });
       return { ...result, exitCode: 0 };
     } catch (error: unknown) {
       if (options.signal?.aborted || readGitProcessErrorText(error, 'name') === 'AbortError') throw createAbortError('Git operation was aborted.');
@@ -33,7 +34,7 @@ export class GitProcessExecutor {
 
     while (true) {
       try {
-        const { stdout } = await this.execFileAsyncRunner('git', args, execOptions);
+        const { stdout } = await this.execFileAsyncRunner(toolExecutable('git'), args, { ...execOptions, env: toolEnvironment(execOptions.env) });
         return stdout.trimEnd();
       } catch (error: unknown) {
         const errorName = readGitProcessErrorText(error, 'name');

@@ -34,7 +34,7 @@ const createBucket = (): ApiBucket =>
     {},
     {
       get(target, property: string) {
-        if (!target[property]) {
+        if (!target[property] && property !== 'getSystemToolsStatus') {
           target[property] = vi.fn().mockResolvedValue({ success: true, data: property });
         }
         return target[property];

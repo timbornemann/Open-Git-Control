@@ -1,3 +1,4 @@
+import { toolExecutable, toolEnvironment } from '../system-tools/toolRuntime';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 
@@ -36,8 +37,9 @@ function throwIfAborted(signal?: AbortSignal): void {
 
 async function runGhCommand(args: string[], timeoutMs: number, signal?: AbortSignal): Promise<{ stdout: string; stderr: string }> {
   throwIfAborted(signal);
-  const result = await execFileAsync('gh', args, {
+  const result = await execFileAsync(toolExecutable('github-cli'), args, {
     windowsHide: true,
+    env: toolEnvironment(),
     timeout: timeoutMs,
     maxBuffer: 10 * 1024 * 1024,
     signal,

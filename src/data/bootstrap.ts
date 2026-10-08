@@ -5,6 +5,8 @@ import { hydratePreviews, queryClient, refreshVisibleResources } from './queryCl
 import { resourceKey } from './clientCache';
 import { backgroundQueue } from './backgroundQueue';
 import { prepareRestoredGraphs } from './preloading';
+import { receiveSystemTools, useSystemTools } from '@/app/state/systemToolsStore';
+import { isSystemToolAvailable } from '@/services/systemToolsAvailability';
 
 let started = false;
 let bootstrapPromise: Promise<void> | undefined;
@@ -17,6 +19,7 @@ export function startDataRuntime() {
   bootstrapPromise = api
     ?.getBootstrap?.()
     .then((result) => {
+      if (result.systemTools && !useSystemTools.getState().status) receiveSystemTools(result.systemTools);
       for (const [name, value] of [
         ['getSettings', result.settings],
         ['getStoredRepos', result.repositories],
@@ -28,7 +31,7 @@ export function startDataRuntime() {
         result.snapshots.filter((entry) => entry.key[1] !== 'github'),
         startedAt,
       );
-      void prepareRestoredGraphs(result.snapshots).catch(() => {});
+      if (isSystemToolAvailable('git')) void prepareRestoredGraphs(result.snapshots).catch(() => {});
     })
     .catch(() => {
       /* Existing client reads remain available on a cold or damaged cache. */

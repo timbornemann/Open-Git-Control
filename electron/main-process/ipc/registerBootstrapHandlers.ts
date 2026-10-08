@@ -4,6 +4,7 @@ import type { PreviewSnapshot } from '../../../src/shared/cache/resource';
 import { readSettingsWithMigration } from '../settingsStore';
 import { readStoreData } from '../repoStore';
 import { readPreviewCache, savePreviewCache } from '../previewCache';
+import { systemToolsService } from '../../system-tools/SystemToolsService';
 
 const repoKey = (value: string) => {
   const normalized = value.replace(/\\/g, '/').replace(/\/$/, '');
@@ -29,7 +30,7 @@ export function registerBootstrapHandlers() {
         (entry.key[1] === 'planner' ||
           (entry.key[1] === 'git' && entry.key[3] === 'getRepositoryChangeSummary' ? registered.has(entry.key[2]) : recent.has(entry.key[2]))),
     );
-    return { settings, repositories, snapshots };
+    return { settings, repositories, snapshots, systemTools: systemToolsService.snapshot() };
   });
   ipcMain.handle(IpcChannel.AppSavePreviews, async (_event, entries: unknown) => {
     if (!Array.isArray(entries)) return;
