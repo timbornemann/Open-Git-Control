@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { ActionRequirement } from '@/components/ui/ActionRequirement';
 import { useI18n } from '@/i18n';
 import type { GitRemoteSnapshotDto, RemotePreferences } from '@/types/remoteTransfers';
 import { getRemoteTransferDefaults, resolveRemoteTransferSelection } from '@/utils/remoteTransferSelection';
@@ -11,6 +12,17 @@ type Props = {
   disabled: boolean;
   setUpstream: (remote: string, branch: string) => void;
 };
+function upstreamRequirement(remote: string | null | undefined, branch: string, tr: (de: string, en: string) => string) {
+  if (!remote) return tr('Wähle zuerst eine Pull-Quelle.', 'Choose a pull source first.');
+  if (!branch)
+    return tr('Wechsle zuerst auf einen lokalen Branch; Detached HEAD hat keinen Upstream.', 'Switch to a local branch first; detached HEAD has no upstream.');
+  return null;
+}
+function profileRequirement(selected: string[], name: string, tr: (de: string, en: string) => string) {
+  if (!selected.length) return tr('Wähle mindestens ein Push-Ziel für das Profil.', 'Choose at least one push target for the profile.');
+  if (!name.trim()) return tr('Gib dem Push-Profil einen Namen.', 'Enter a name for the push profile.');
+  return null;
+}
 export function RemoteConfigurationSelection({ snapshot, preferences, update, disabled, setUpstream }: Props) {
   const { tr } = useI18n();
   const [profileName, setProfileName] = useState(preferences.profiles?.find((profile) => profile.id === preferences.activeProfileId)?.name ?? '');
@@ -19,6 +31,7 @@ export function RemoteConfigurationSelection({ snapshot, preferences, update, di
     setProfileName(activeProfile?.name ?? '');
   }, [activeProfile?.id, activeProfile?.name]);
   const [mappingBranch, setMappingBranch] = useState(snapshot.branch);
+  const profileField = useRef<HTMLInputElement>(null);
   const pullDefaults = getRemoteTransferDefaults('pull', snapshot, preferences);
   const pushDefaults = resolveRemoteTransferSelection('push', snapshot, preferences);
   const selected = preferences.pushRemotes ?? pushDefaults.selectedRemoteNames;
@@ -44,13 +57,15 @@ export function RemoteConfigurationSelection({ snapshot, preferences, update, di
           )}
         </p>
         <div className="hosting-actions">
-          <button
-            type="button"
-            disabled={disabled || !pullDefaults.remote || !snapshot.branch}
-            onClick={() => pullDefaults.remote && setUpstream(pullDefaults.remote, upstreamBranch)}
-          >
-            {tr('Als Upstream setzen', 'Set as upstream')}
-          </button>
+          <ActionRequirement reason={disabled ? null : upstreamRequirement(pullDefaults.remote, snapshot.branch, tr)}>
+            <button
+              type="button"
+              disabled={disabled || !pullDefaults.remote || !snapshot.branch}
+              onClick={() => pullDefaults.remote && setUpstream(pullDefaults.remote, upstreamBranch)}
+            >
+              {tr('Als Upstream setzen', 'Set as upstream')}
+            </button>
+          </ActionRequirement>
           {pullDefaults.remote && (
             <small>
               {snapshot.branch} → {pullDefaults.remote}/{upstreamBranch}
@@ -159,28 +174,34 @@ export function RemoteConfigurationSelection({ snapshot, preferences, update, di
         </label>
         <div className="hosting-actions">
           <input
+            ref={profileField}
             aria-label={tr('Profilname', 'Profile name')}
             placeholder={tr('Profilname', 'Profile name')}
             value={profileName}
             onChange={(event) => setProfileName(event.target.value)}
             disabled={disabled}
           />
-          <button
-            type="button"
-            disabled={disabled || !profileName.trim() || !selected.length}
-            onClick={() => {
-              const profile = {
-                id: crypto.randomUUID(),
-                name: profileName.trim(),
-                remoteNames: [...selected],
-                targetBranches: { ...(preferences.pushBranches?.[snapshot.branch] ?? {}) },
-              };
-              update({ ...preferences, profiles: [...(preferences.profiles ?? []), profile], activeProfileId: profile.id });
-              setProfileName('');
-            }}
+          <ActionRequirement
+            reason={disabled ? null : profileRequirement(selected, profileName, tr)}
+            remedy={!profileName.trim() ? { label: tr('Profil benennen', 'Name profile'), onClick: () => profileField.current?.focus() } : undefined}
           >
-            {tr('Auswahl als Profil hinzufügen', 'Add selection as profile')}
-          </button>
+            <button
+              type="button"
+              disabled={disabled || !profileName.trim() || !selected.length}
+              onClick={() => {
+                const profile = {
+                  id: crypto.randomUUID(),
+                  name: profileName.trim(),
+                  remoteNames: [...selected],
+                  targetBranches: { ...(preferences.pushBranches?.[snapshot.branch] ?? {}) },
+                };
+                update({ ...preferences, profiles: [...(preferences.profiles ?? []), profile], activeProfileId: profile.id });
+                setProfileName('');
+              }}
+            >
+              {tr('Auswahl als Profil hinzufügen', 'Add selection as profile')}
+            </button>
+          </ActionRequirement>
           <button
             type="button"
             disabled={disabled || !preferences.activeProfileId || !profileName.trim() || !selected.length}

@@ -7,6 +7,7 @@ import { AiOptionToggle } from './AiOptionToggle';
 import type { HostingCapabilities } from '@/types/hostingDtos';
 import { ReleaseNotesActions } from './ReleaseNotesActions';
 import { ReleaseNotesEditor } from './ReleaseNotesEditor';
+import { ActionRequirement } from '@/components/ui/ActionRequirement';
 
 type ReleaseNotesWorkbenchProps = {
   releaseForm: ReleaseDraft;
@@ -24,6 +25,8 @@ type ReleaseNotesWorkbenchProps = {
   notesOptions: ReleaseNotesOptions;
   setNotesOptions: (updater: (prev: ReleaseNotesOptions) => ReleaseNotesOptions) => void;
   canGenerateNotes: boolean;
+  notesRequirement?: string | null;
+  onRefreshNotesContext?: () => Promise<void>;
   effectiveVersionBump: ReleaseVersionBump;
   onGenerateNotes: (versionBump: ReleaseVersionBump) => Promise<void>;
   canGenerateOfflineNotes: boolean;
@@ -54,6 +57,8 @@ export const ReleaseNotesWorkbench = ({
   notesOptions,
   setNotesOptions,
   canGenerateNotes,
+  notesRequirement,
+  onRefreshNotesContext,
   effectiveVersionBump,
   onGenerateNotes,
   canGenerateOfflineNotes,
@@ -165,12 +170,19 @@ export const ReleaseNotesWorkbench = ({
             </div>
 
             <div className="release-ai-main-actions">
-              <button className="release-ai-generate-btn" onClick={() => void onGenerateNotes(effectiveVersionBump)} disabled={!canGenerateNotes}>
-                <Sparkles size={16} />
-                {notesGenerating && notesGenerationMode !== 'offline'
-                  ? t('generated.components.releasecreator.ai_is_generating_release_notes_106c5b32')
-                  : t('generated.components.releasecreator.generate_release_notes_with_ai_2905a726')}
-              </button>
+              <ActionRequirement
+                reason={notesRequirement}
+                remedy={
+                  onRefreshNotesContext ? { label: tr('Verlauf aktualisieren', 'Refresh history'), onClick: () => void onRefreshNotesContext() } : undefined
+                }
+              >
+                <button className="release-ai-generate-btn" onClick={() => void onGenerateNotes(effectiveVersionBump)} disabled={!canGenerateNotes}>
+                  <Sparkles size={16} />
+                  {notesGenerating && notesGenerationMode !== 'offline'
+                    ? t('generated.components.releasecreator.ai_is_generating_release_notes_106c5b32')
+                    : t('generated.components.releasecreator.generate_release_notes_with_ai_2905a726')}
+                </button>
+              </ActionRequirement>
             </div>
           </div>
 

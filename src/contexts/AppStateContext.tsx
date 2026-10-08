@@ -138,6 +138,10 @@ export const useOptionalUIContext = () => {
   const store = useContext(AppStateStoreContext);
   return store?.getState().ui ?? null;
 };
+export const useOptionalSettingsContext = () => {
+  const store = useContext(AppStateStoreContext);
+  return store?.getState().settings ?? null;
+};
 
 export const AppStateSlicesProvider = ({ value, children }: { value: AppStateSlicesValue; children: ReactNode }) => {
   const storeRef = useRef<AppStateStore | null>(null);

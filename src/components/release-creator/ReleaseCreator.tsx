@@ -9,6 +9,7 @@ import { ReleaseCreatorHeader } from './ReleaseCreatorHeader';
 import { ReleaseHistoryPanel } from './ReleaseHistoryPanel';
 import { ReleaseNotesWorkbench } from './ReleaseNotesWorkbench';
 import { ReleaseVersionStep } from './ReleaseVersionStep';
+import { aiNotesRequirement } from './releaseActionRequirements';
 import '@/styles/release-creator.css';
 
 type Props = {
@@ -165,9 +166,16 @@ export const ReleaseCreator: React.FC<Props> = ({
   };
 
   const createHint = useMemo(() => {
+    if (published) return tr('Dieser Release wurde bereits erstellt.', 'This release has already been created.');
+    if (releaseSubmitting) return tr('Die Veröffentlichung läuft.', 'Publication is running.');
+    if (notesGenerating) return tr('Warte, bis die Notes erstellt wurden.', 'Wait until note generation finishes.');
+    if (contextLoading) return tr('Das Veröffentlichungsziel wird noch geprüft.', 'The publication target is still being checked.');
     if (!repositoryLabel) {
       return tr('Wähle ein Hosting-Ziel für dieses Repository.', 'Choose a hosting target for this repository.');
     }
+    if (!contextMatchesTarget)
+      return tr('Aktualisiere den Verlauf für den gewählten Zielbranch oder Commit.', 'Refresh history for the selected target branch or commit.');
+    if (!capabilities) return tr('Die Fähigkeiten des Hosting-Ziels sind noch nicht verfügbar.', 'The hosting target capabilities are not available yet.');
     if (tagAlreadyExists) {
       return t('generated.components.releasecreator.this_tag_already_exists_please_use_a_new_tag_a371149d');
     }
@@ -175,7 +183,34 @@ export const ReleaseCreator: React.FC<Props> = ({
       return validationMessage;
     }
     return tr('Die Veröffentlichung verwendet ausschließlich das ausgewählte Hosting-Ziel.', 'Publication uses only the selected hosting target.');
-  }, [repositoryLabel, tr, t, tagAlreadyExists, validation.valid, validationMessage]);
+  }, [
+    published,
+    releaseSubmitting,
+    notesGenerating,
+    contextLoading,
+    repositoryLabel,
+    contextMatchesTarget,
+    capabilities,
+    tr,
+    t,
+    tagAlreadyExists,
+    validation.valid,
+    validationMessage,
+  ]);
+  const notesRequirement = aiNotesRequirement(
+    {
+      available: canGenerateNotes,
+      submitting: releaseSubmitting,
+      generating: notesGenerating,
+      published,
+      loading: contextLoading,
+      repository: Boolean(repositoryLabel),
+      contextMatches: contextMatchesTarget,
+      hasTag: Boolean(trimmedTagName),
+      commits: commitsCount,
+    },
+    tr,
+  );
 
   return (
     <div className="release-creator release-creator--clean">
@@ -213,6 +248,8 @@ export const ReleaseCreator: React.FC<Props> = ({
               notesOptions={notesOptions}
               setNotesOptions={setNotesOptions}
               canGenerateNotes={canGenerateNotes}
+              notesRequirement={notesRequirement}
+              onRefreshNotesContext={repositoryLabel && !contextLoading && !contextMatchesTarget ? onRefreshContext : undefined}
               effectiveVersionBump={effectiveVersionBump}
               onGenerateNotes={onGenerateNotes}
               canGenerateOfflineNotes={hasLocalRepository && !published && !releaseSubmitting && !notesGenerating && Boolean(trimmedTagName)}

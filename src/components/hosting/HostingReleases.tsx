@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Download, FolderOpen, Loader2, RefreshCw, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { ActionRequirement } from '@/components/ui/ActionRequirement';
 import { hostingClient } from '@/services/hostingClient';
 import { useAppStateReader, useGitStore } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
@@ -35,6 +36,7 @@ export function HostingReleases({
   const [page, setPage] = useState<HostingPage<HostingRelease>>({ items: [], nextCursor: null });
   const [selectedPath, setSelectedPath] = useState('');
   const [pendingPath, setPendingPath] = useState('');
+  const cloneField = useRef<HTMLSelectElement>(null);
   const paths = [...new Set([...(repoPath ? [repoPath] : []), ...localPaths])];
   const path = paths.find((candidate) => normalizeRepoPathKey(candidate) === normalizeRepoPathKey(selectedPath)) || (paths.length === 1 ? paths[0] : '');
   const reload = useCallback(() => hostingClient.request('releases', { repository: repository.ref }), [repository]);
@@ -71,6 +73,7 @@ export function HostingReleases({
         <div className="hosting-releases-toolbar__actions">
           {paths.length > 1 && (
             <select
+              ref={cloneField}
               className="ui-field"
               aria-label={tr('Lokaler Klon', 'Local clone')}
               value={path}
@@ -91,9 +94,14 @@ export function HostingReleases({
             {tr('Aktualisieren', 'Refresh')}
           </Button>
           {paths.length ? (
-            <Button variant="primary" icon={<Plus size={14} />} disabled={task.busy || !path} onClick={openCreator}>
-              {capabilities.releases === 'native' ? tr('Release erstellen', 'Create release') : tr('Tag & Notes erstellen', 'Create tag & notes')}
-            </Button>
+            <ActionRequirement
+              reason={!task.busy && !path ? tr('Wähle den lokalen Klon für die Release-Erstellung.', 'Choose the local clone for release creation.') : null}
+              remedy={{ label: tr('Klon auswählen', 'Choose clone'), onClick: () => cloneField.current?.focus() }}
+            >
+              <Button variant="primary" icon={<Plus size={14} />} disabled={task.busy || !path} onClick={openCreator}>
+                {capabilities.releases === 'native' ? tr('Release erstellen', 'Create release') : tr('Tag & Notes erstellen', 'Create tag & notes')}
+              </Button>
+            </ActionRequirement>
           ) : (
             <>
               {onClone && (

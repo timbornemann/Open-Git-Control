@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { ActionRequirement } from '@/components/ui/ActionRequirement';
 import { TextField } from '@/components/ui/TextField';
 import { useGitStore, useUIStore } from '@/contexts/AppStateContext';
 import { hostingClient } from '@/services/hostingClient';
@@ -26,6 +27,53 @@ export function HostingRepositoryForms({ mode, onClose }: { mode: HostingReposit
   const [initializeReadme, setInitializeReadme] = useState(true);
   const task = useHostingTask(`${connectionId}/${mode}/${activeRepo ?? ''}`);
   const connection = state.connections.find((c) => c.id === connectionId && c.authenticated);
+  const accountField = useRef<HTMLSelectElement>(null);
+  const nameField = useRef<HTMLInputElement>(null);
+  const urlField = useRef<HTMLInputElement>(null);
+  const targetFields = useRef<HTMLDivElement>(null);
+  const hasAccounts = state.connections.some((account) => account.authenticated);
+  const missingField = !connection
+    ? 'account'
+    : mode === 'url'
+      ? !repositoryUrl.trim()
+        ? 'url'
+        : null
+      : !name.trim()
+        ? 'name'
+        : !namespace
+          ? 'namespace'
+          : connection.provider === 'bitbucket-cloud' && !projectKey
+            ? 'project'
+            : null;
+  const requirement =
+    missingField === 'account'
+      ? hasAccounts
+        ? tr('Wähle zuerst ein angemeldetes Konto.', 'Choose a signed-in account first.')
+        : tr('Verbinde zuerst ein Hosting-Konto.', 'Connect a hosting account first.')
+      : missingField === 'url'
+        ? tr('Gib die Repository-URL ein.', 'Enter the repository URL.')
+        : missingField === 'name'
+          ? tr('Gib einen Repository-Namen ein.', 'Enter a repository name.')
+          : missingField === 'namespace'
+            ? tr(
+                'Wähle das Konto, die Organisation, den Namespace oder Workspace für die Erstellung.',
+                'Choose the account, organization, namespace or workspace for creation.',
+              )
+            : missingField === 'project'
+              ? tr('Wähle ausdrücklich ein Bitbucket-Projekt.', 'Select a Bitbucket project explicitly.')
+              : null;
+  const remedy = {
+    label: missingField === 'account' && !hasAccounts ? tr('Konto verbinden', 'Connect account') : tr('Angabe ergänzen', 'Complete field'),
+    onClick: () => {
+      if (missingField === 'account' && !hasAccounts) {
+        onClose();
+        state.navigate('connections');
+      } else if (missingField === 'account') accountField.current?.focus();
+      else if (missingField === 'name') nameField.current?.focus();
+      else if (missingField === 'url') urlField.current?.focus();
+      else targetFields.current?.querySelector<HTMLElement>(`[data-creation-field="${missingField}"]`)?.focus();
+    },
+  };
   const create = () =>
     void task.run(
       async () => {
@@ -87,7 +135,7 @@ export function HostingRepositoryForms({ mode, onClose }: { mode: HostingReposit
       >
         <label>
           {tr('Server und Konto', 'Server and account')}
-          <select required value={connectionId} onChange={(event) => setConnectionId(event.target.value)} disabled={task.busy}>
+          <select ref={accountField} required value={connectionId} onChange={(event) => setConnectionId(event.target.value)} disabled={task.busy}>
             <option value="">{tr('Konto auswählen', 'Select account')}</option>
             {state.connections
               .filter((c) => c.authenticated)
@@ -109,31 +157,36 @@ export function HostingRepositoryForms({ mode, onClose }: { mode: HostingReposit
             <label>
               {tr('Repository-URL', 'Repository URL')}
               <TextField
+                ref={urlField}
                 required
                 value={repositoryUrl}
                 onChange={(event) => setRepositoryUrl(event.target.value)}
                 placeholder="https://git.example.com/team/project"
               />
             </label>
-            <Button type="submit" variant="primary" disabled={task.busy || !connection || !repositoryUrl.trim()}>
-              {tr('Repository öffnen', 'Open repository')}
-            </Button>
+            <ActionRequirement reason={!task.busy ? requirement : null} remedy={remedy}>
+              <Button type="submit" variant="primary" disabled={task.busy || Boolean(missingField)}>
+                {tr('Repository öffnen', 'Open repository')}
+              </Button>
+            </ActionRequirement>
           </>
         ) : (
           <>
             <label>
               {tr('Name', 'Name')}
-              <TextField required value={name} onChange={(event) => setName(event.target.value)} placeholder="my-project" />
+              <TextField ref={nameField} required value={name} onChange={(event) => setName(event.target.value)} placeholder="my-project" />
             </label>
-            <RepositoryCreationTarget
-              connection={connection}
-              creation={{ connectionId, name, namespace, projectKey, private: isPrivate }}
-              onChange={(value) => {
-                setNamespace(value.namespace || '');
-                setProjectKey(value.projectKey);
-              }}
-              disabled={task.busy}
-            />
+            <div ref={targetFields}>
+              <RepositoryCreationTarget
+                connection={connection}
+                creation={{ connectionId, name, namespace, projectKey, private: isPrivate }}
+                onChange={(value) => {
+                  setNamespace(value.namespace || '');
+                  setProjectKey(value.projectKey);
+                }}
+                disabled={task.busy}
+              />
+            </div>
             <label>
               {tr('Beschreibung', 'Description')}
               <TextField as="textarea" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} />
@@ -161,14 +214,11 @@ export function HostingRepositoryForms({ mode, onClose }: { mode: HostingReposit
                 {tr('Lokales Repository veröffentlichen …', 'Publish local repository …')}
               </Button>
             )}
-            <Button
-              type="submit"
-              variant="primary"
-              icon={<Plus size={14} />}
-              disabled={task.busy || !connection || !name.trim() || !namespace || (connection.provider === 'bitbucket-cloud' && !projectKey)}
-            >
-              {tr('Repository erstellen', 'Create repository')}
-            </Button>
+            <ActionRequirement reason={!task.busy ? requirement : null} remedy={remedy}>
+              <Button type="submit" variant="primary" icon={<Plus size={14} />} disabled={task.busy || Boolean(missingField)}>
+                {tr('Repository erstellen', 'Create repository')}
+              </Button>
+            </ActionRequirement>
           </>
         )}
         {task.busy && (

@@ -22,6 +22,7 @@ import {
 import { useSettingsPanelModel } from './settings/useSettingsPanelModel';
 import { SettingsDiagnosticsSection } from './settings/SettingsDiagnosticsSection';
 import { getSettingsCategories, searchSettingsGroups } from './settings/settingsNavigation';
+import { clearSettingsDestination, useSettingsNavigation } from '@/app/state/settingsNavigationStore';
 
 type SettingsMainContentProps = {
   settings: AppSettingsDto;
@@ -52,8 +53,20 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
   const category = categories.find((item) => item.id === activeTab)!;
   const searching = Boolean(query.trim());
   const matches = searchSettingsGroups(query, tr);
+  const destination = useSettingsNavigation((state) => state.destination);
 
   useEffect(() => {
+    if (destination) {
+      pendingGroupRef.current = destination;
+      if (activeTab !== destination.tab) {
+        onSelectTab(destination.tab);
+        return;
+      }
+      if (searching) {
+        setQuery('');
+        return;
+      }
+    }
     if (previousTabRef.current !== activeTab) {
       previousTabRef.current = activeTab;
       setQuery('');
@@ -65,8 +78,9 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
       heading?.scrollIntoView?.({ block: 'start' });
       heading?.focus({ preventScroll: true });
       pendingGroupRef.current = null;
+      if (destination) clearSettingsDestination(destination);
     }
-  }, [activeTab, searching]);
+  }, [activeTab, searching, destination, onSelectTab]);
 
   return (
     <div className="settings-main">

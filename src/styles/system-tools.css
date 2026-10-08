@@ -51,6 +51,7 @@
 }
 .system-tool-actions {
   display: flex;
+  align-items: flex-start;
   flex-wrap: wrap;
   gap: 6px;
 }

@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { BookOpen, Link, Plus, RefreshCw, Server, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { ActionRequirement } from '@/components/ui/ActionRequirement';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { useGitStore, useUIStore } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
@@ -30,6 +31,7 @@ export function HostingWorkspace() {
     if (scroller.current) scroller.current.scrollTop = detailKey ? 0 : catalogScroll.current;
   }, [detailKey]);
   const accounts = state.section === 'connections';
+  const hasAccount = state.connections.some((connection) => connection.authenticated);
   return (
     <div
       className="hosting-workspace"
@@ -70,14 +72,18 @@ export function HostingWorkspace() {
                   {tr('Aktualisieren', 'Refresh')}
                 </Button>
                 {!accounts && (
-                  <Button
-                    variant="primary"
-                    icon={<Plus size={14} />}
-                    onClick={() => setFormMode('create')}
-                    disabled={!state.connections.some((c) => c.authenticated)}
+                  <ActionRequirement
+                    reason={
+                      !hasAccount
+                        ? tr('Für die Erstellung fehlt ein angemeldetes Hosting-Konto.', 'Creating a repository requires a signed-in hosting account.')
+                        : null
+                    }
+                    remedy={{ label: tr('Konto verbinden', 'Connect account'), onClick: () => state.navigate('connections') }}
                   >
-                    {tr('Neues Repository', 'New repository')}
-                  </Button>
+                    <Button variant="primary" icon={<Plus size={14} />} onClick={() => setFormMode('create')} disabled={!hasAccount}>
+                      {tr('Neues Repository', 'New repository')}
+                    </Button>
+                  </ActionRequirement>
                 )}
               </div>
             </header>

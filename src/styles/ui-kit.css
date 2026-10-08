@@ -110,6 +110,46 @@
   white-space: nowrap;
 }
 
+.ui-action-requirement {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ui-action-requirement__help {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  max-width: 55ch;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.ui-action-requirement__help > svg {
+  flex-shrink: 0;
+}
+
+.ui-action-requirement__help > span {
+  flex: 1 1 18ch;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ui-action-requirement__remedy {
+  color: var(--accent-primary);
+  white-space: normal;
+  text-align: left;
+}
+
+.ui-action-requirement__remedy .ui-button__label {
+  white-space: normal;
+}
+
 .ui-icon-button {
   display: inline-flex;
   align-items: center;

@@ -61,6 +61,7 @@ export function RepositoryCreationTarget({ connection, creation, onChange, disab
         {namespaceLabel}
         {manual ? (
           <Input
+            data-creation-field="namespace"
             value={creation.namespace || ''}
             disabled={disabled}
             placeholder={connection?.username || namespaceLabel}
@@ -68,6 +69,7 @@ export function RepositoryCreationTarget({ connection, creation, onChange, disab
           />
         ) : (
           <select
+            data-creation-field="namespace"
             aria-label={namespaceLabel}
             value={creation.namespace || ''}
             disabled={disabled || targets.busy}
@@ -89,9 +91,15 @@ export function RepositoryCreationTarget({ connection, creation, onChange, disab
         <label>
           {tr('Projekt (erforderlich)', 'Project (required)')}
           {manual ? (
-            <Input value={creation.projectKey || ''} disabled={disabled} onChange={(event) => onChange({ ...creation, projectKey: event.target.value })} />
+            <Input
+              data-creation-field="project"
+              value={creation.projectKey || ''}
+              disabled={disabled}
+              onChange={(event) => onChange({ ...creation, projectKey: event.target.value })}
+            />
           ) : (
             <select
+              data-creation-field="project"
               aria-label={tr('Projekt', 'Project')}
               value={creation.projectKey || ''}
               disabled={disabled || projects.busy || !creation.namespace}

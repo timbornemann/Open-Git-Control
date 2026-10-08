@@ -1,6 +1,8 @@
 import { openSystemTools } from '@/app/state/systemToolsStore';
 import { isSystemToolAvailable } from '@/services/systemToolsAvailability';
 import { Button } from '@/components/ui/Button';
+import { HostingAuthenticationActions } from './HostingAuthenticationActions';
+import { browserSignInRequirement } from './hostingConnectionRequirements';
 import { TextField } from '@/components/ui/TextField';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { HostingDialog } from './HostingDialog';
@@ -34,6 +36,22 @@ export function HostingConnectionEditor({ connection, onClose }: { connection: H
   const [clientSecret, setClientSecret] = useState('');
   const [redirectUri, setRedirectUri] = useState(connection?.oauth?.redirectUri ?? 'http://127.0.0.1:42873/oauth/callback');
   const [allowHttpLoopback, setAllowHttpLoopback] = useState(connection?.oauth?.allowHttpLoopback ?? false);
+  const oauthSettings = useRef<HTMLDetailsElement>(null);
+  const clientIdField = useRef<HTMLInputElement>(null);
+  const serverField = useRef<HTMLInputElement>(null);
+  const callbackField = useRef<HTMLInputElement>(null);
+  const loopbackField = useRef<HTMLInputElement>(null);
+  const browserRequirement = browserSignInRequirement(
+    { provider, clientId, serverUrl: baseUrl || defaultServerUrls[provider], redirectUri, allowHttpLoopback },
+    tr,
+  );
+  const configureBrowser = () => {
+    if (!browserRequirement) return;
+    if (oauthSettings.current && browserRequirement.field !== 'server') oauthSettings.current.open = true;
+    const field = { clientId: clientIdField, server: serverField, callback: callbackField, loopback: loopbackField }[browserRequirement.field];
+    field.current?.focus();
+    field.current?.scrollIntoView?.({ block: 'nearest' });
+  };
   const [device, setDevice] = useState<{ connectionId: string; code: string; userCode: string; url: string; interval: number; expires: number } | null>(null);
   const [cliPreview, setCliPreview] = useState<{ connectionId: string; username: string; host: string } | null>(null);
   const task = useHostingTask('connections');
@@ -211,12 +229,13 @@ export function HostingConnectionEditor({ connection, onClose }: { connection: H
         <label>
           {tr('Server-URL', 'Server URL')}
           <TextField
+            ref={serverField}
             value={baseUrl}
             onChange={(event) => setBaseUrl(event.target.value)}
             placeholder={defaultServerUrls[provider] || 'https://git.example.com'}
           />
         </label>
-        <details>
+        <details ref={oauthSettings}>
           <summary>{tr('API-Adresse und Browser-Anmeldung', 'API address and browser sign-in')}</summary>
           <div className="hosting-form hosting-form--nested">
             <label>
@@ -229,7 +248,7 @@ export function HostingConnectionEditor({ connection, onClose }: { connection: H
             </label>
             <label>
               OAuth Client ID / Consumer Key
-              <TextField value={clientId} onChange={(event) => setClientId(event.target.value)} />
+              <TextField ref={clientIdField} value={clientId} onChange={(event) => setClientId(event.target.value)} />
             </label>
             {(provider === 'bitbucket-cloud' || provider === 'bitbucket-data-center') && (
               <label>
@@ -245,11 +264,11 @@ export function HostingConnectionEditor({ connection, onClose }: { connection: H
             )}
             <label>
               {tr('Registrierte Callback-URL', 'Registered callback URL')}
-              <TextField value={redirectUri} onChange={(event) => setRedirectUri(event.target.value)} />
+              <TextField ref={callbackField} value={redirectUri} onChange={(event) => setRedirectUri(event.target.value)} />
             </label>
             {provider === 'bitbucket-data-center' && (
               <label className="hosting-checkbox">
-                <input type="checkbox" checked={allowHttpLoopback} onChange={(event) => setAllowHttpLoopback(event.target.checked)} />
+                <input ref={loopbackField} type="checkbox" checked={allowHttpLoopback} onChange={(event) => setAllowHttpLoopback(event.target.checked)} />
                 {tr('Administrator erlaubt diesen HTTP-Loopback-Callback', 'Administrator permits this HTTP loopback callback')}
               </label>
             )}
@@ -275,19 +294,14 @@ export function HostingConnectionEditor({ connection, onClose }: { connection: H
             <TextField type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
           </label>
         )}
-        <div className="hosting-actions">
-          <Button type="submit" variant="primary" disabled={task.busy}>
-            {token ? tr('Mit Token anmelden', 'Sign in with token') : tr('Speichern', 'Save')}
-          </Button>
-          <Button type="button" disabled={task.busy || !clientId} onClick={() => authenticate(provider === 'github' ? 'device' : 'browser')}>
-            {tr('Im Browser anmelden', 'Sign in in browser')}
-          </Button>
-          {provider === 'github' && (
-            <Button type="button" disabled={task.busy} onClick={() => authenticate('cli')}>
-              GitHub CLI
-            </Button>
-          )}
-        </div>
+        <HostingAuthenticationActions
+          busy={task.busy}
+          token={Boolean(token)}
+          requirement={browserRequirement}
+          configure={configureBrowser}
+          signIn={() => authenticate(provider === 'github' ? 'device' : 'browser')}
+          signInWithCli={provider === 'github' ? () => authenticate('cli') : undefined}
+        />
       </form>
       {device && (
         <p>

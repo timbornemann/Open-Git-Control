@@ -79,6 +79,7 @@ describe('ReleaseCreator while AI notes are generating', () => {
     });
     expect((document.querySelector('.release-primary-btn') as HTMLButtonElement).disabled).toBe(true);
     expect((document.querySelector('.release-ai-generate-btn') as HTMLButtonElement).disabled).toBe(true);
+    expect(document.querySelector('.release-publish-panel')?.textContent).toContain('The publication target is still being checked.');
 
     await act(async () => {
       root.render(
@@ -96,6 +97,22 @@ describe('ReleaseCreator while AI notes are generating', () => {
     });
     expect((document.querySelector('.release-primary-btn') as HTMLButtonElement).disabled).toBe(true);
     expect((document.querySelector('.release-ai-generate-btn') as HTMLButtonElement).disabled).toBe(true);
+    expect(document.querySelector('.release-ai-main-actions')?.textContent).toContain('Refresh history for the selected target.');
+    const refresh = [...document.querySelectorAll<HTMLButtonElement>('.release-ai-main-actions button')].find(
+      (button) => button.textContent?.trim() === 'Refresh history',
+    );
+    expect(refresh?.disabled).toBe(false);
+    act(() => root.unmount());
+  });
+  it('explains empty AI context and leaves the offline template usable', async () => {
+    const root = createRoot(document.getElementById('root')!);
+    const props = createReleaseCreatorProps({ context: { ...createReleaseCreatorProps().context!, commitsSinceLastRelease: [] } });
+    await act(async () => root.render(createElement(I18nProvider, { language: 'en' }, createElement(ReleaseCreator, props))));
+    expect(document.querySelector('.release-ai-main-actions')?.textContent).toContain('no new commits for AI notes');
+    expect((document.querySelector('.release-ai-generate-btn') as HTMLButtonElement).disabled).toBe(true);
+    expect((document.querySelector('.release-offline-generate-btn') as HTMLButtonElement).disabled).toBe(false);
+    act(() => (document.querySelector('.release-ai-generate-btn') as HTMLButtonElement).click());
+    expect(props.onGenerateNotes).not.toHaveBeenCalled();
     act(() => root.unmount());
   });
 

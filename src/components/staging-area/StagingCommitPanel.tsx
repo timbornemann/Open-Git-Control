@@ -1,4 +1,7 @@
 import { useI18n } from '@/i18n';
+import { ActionRequirement } from '@/components/ui/ActionRequirement';
+import { useOpenSettingsGroup } from '@/hooks/useOpenSettingsGroup';
+import { useRef } from 'react';
 import { AiCommitPlan } from './AiCommitPlan';
 import type { GitStatusWithConflicts } from './types';
 import type { useAiCommit } from './useAiCommit';
@@ -45,6 +48,20 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
   openAiCommitMessageDialog,
 }) => {
   const { t, tr } = useI18n();
+  const openSettings = useOpenSettingsGroup();
+  const titleField = useRef<HTMLTextAreaElement>(null);
+  const busy = fileOps.isMutating || commitForm.isCommitting || aiCommit.isAiCommitting || aiCommit.isAiJobRunning;
+  const commitRequirement = busy
+    ? null
+    : hasOpenConflicts
+      ? tr('Löse zuerst die offenen Konflikte.', 'Resolve the open conflicts first.')
+      : !status
+        ? tr('Der Repository-Status wird noch geladen.', 'Repository status is still loading.')
+        : !commitForm.commitMsg.trim()
+          ? tr('Gib einen Commit-Titel ein.', 'Enter a commit title.')
+          : !status.staged.length && !commitForm.amendCommit
+            ? tr('Stage zuerst die Änderungen für diesen Commit.', 'Stage the changes for this commit first.')
+            : null;
   const phaseLabels: Record<string, string> = {
     snapshot: tr('Änderungen erfassen', 'Capturing changes'),
     context: tr('Kontext analysieren', 'Analyzing context'),
@@ -62,6 +79,7 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
     <div className="staging-commit-area">
       <AiCommitPlan groups={aiCommit.aiGroups} />
       <textarea
+        ref={titleField}
         className="staging-commit-input"
         placeholder={
           hasOpenConflicts
@@ -193,48 +211,66 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
             ? t('generated.components.staging_area.stagingcommitpanel.ai_generating_3587dac6')
             : t('generated.components.staging_area.stagingcommitpanel.ai_message_5546e8b1')}
         </button>
-        <button
-          className="staging-tool-btn"
-          type="button"
-          onClick={aiCommit.handleAiAutoCommit}
-          disabled={isAiAutoCommitDisabled({
-            aiConfigEnabled,
-            isMutating: fileOps.isMutating,
-            isCommitting: commitForm.isCommitting,
-            isAiCommitting: aiCommit.isAiCommitting,
-            isAiJobRunning: aiCommit.isAiJobRunning,
-            hasStatus: Boolean(status),
-          })}
-          title={
-            aiConfigEnabled
-              ? t('generated.components.staging_area.stagingcommitpanel.ai_decides_staging_commit_messages_automatically_97a774eb')
-              : t('generated.components.staging_area.stagingcommitpanel.enable_ai_auto_commit_in_settings_first_6a044c8d')
-          }
-          style={{ opacity: aiConfigEnabled ? 1 : 0.7 }}
-        >
-          {aiCommit.isAiCommitting || aiCommit.isAiJobRunning
-            ? t('generated.components.staging_area.stagingcommitpanel.ai_is_working_2f3bf7e0')
-            : t('generated.components.staging_area.stagingcommitpanel.ai_auto_commit_57e8ea6c')}
-        </button>
-        <button
-          className="staging-commit-btn"
-          onClick={commitForm.handleCommit}
-          disabled={
-            fileOps.isMutating ||
-            hasOpenConflicts ||
-            !commitForm.commitMsg.trim() ||
-            commitForm.isCommitting ||
-            aiCommit.isAiCommitting ||
-            !status ||
-            (status.staged.length === 0 && !commitForm.amendCommit)
+        <ActionRequirement
+          reason={!busy && !aiConfigEnabled ? tr('KI-Auto-Commit ist in den Einstellungen ausgeschaltet.', 'AI auto-commit is turned off in settings.') : null}
+          remedy={
+            openSettings
+              ? { label: tr('KI-Auto-Commit einstellen', 'Configure AI auto-commit'), onClick: () => openSettings({ tab: 'api', id: 'ai-automation' }) }
+              : undefined
           }
         >
-          {hasOpenConflicts
-            ? tr('Konflikte', 'Conflicts')
-            : commitForm.isCommitting
-              ? t('generated.components.staging_area.stagingcommitpanel.committing_1888ee3c')
-              : t('generated.components.commit_graph.commitgraph.commit_b9ec78bd')}
-        </button>
+          <button
+            className="staging-tool-btn"
+            type="button"
+            onClick={aiCommit.handleAiAutoCommit}
+            disabled={isAiAutoCommitDisabled({
+              aiConfigEnabled,
+              isMutating: fileOps.isMutating,
+              isCommitting: commitForm.isCommitting,
+              isAiCommitting: aiCommit.isAiCommitting,
+              isAiJobRunning: aiCommit.isAiJobRunning,
+              hasStatus: Boolean(status),
+            })}
+            title={
+              aiConfigEnabled
+                ? t('generated.components.staging_area.stagingcommitpanel.ai_decides_staging_commit_messages_automatically_97a774eb')
+                : t('generated.components.staging_area.stagingcommitpanel.enable_ai_auto_commit_in_settings_first_6a044c8d')
+            }
+            style={{ opacity: aiConfigEnabled ? 1 : 0.7 }}
+          >
+            {aiCommit.isAiCommitting || aiCommit.isAiJobRunning
+              ? t('generated.components.staging_area.stagingcommitpanel.ai_is_working_2f3bf7e0')
+              : t('generated.components.staging_area.stagingcommitpanel.ai_auto_commit_57e8ea6c')}
+          </button>
+        </ActionRequirement>
+        <ActionRequirement
+          reason={commitRequirement}
+          remedy={
+            !busy && !hasOpenConflicts && status && !commitForm.commitMsg.trim()
+              ? { label: tr('Commit-Titel eingeben', 'Enter commit title'), onClick: () => titleField.current?.focus() }
+              : undefined
+          }
+        >
+          <button
+            className="staging-commit-btn"
+            onClick={commitForm.handleCommit}
+            disabled={
+              fileOps.isMutating ||
+              hasOpenConflicts ||
+              !commitForm.commitMsg.trim() ||
+              commitForm.isCommitting ||
+              aiCommit.isAiCommitting ||
+              !status ||
+              (status.staged.length === 0 && !commitForm.amendCommit)
+            }
+          >
+            {hasOpenConflicts
+              ? tr('Konflikte', 'Conflicts')
+              : commitForm.isCommitting
+                ? t('generated.components.staging_area.stagingcommitpanel.committing_1888ee3c')
+                : t('generated.components.commit_graph.commitgraph.commit_b9ec78bd')}
+          </button>
+        </ActionRequirement>
       </div>
     </div>
   );

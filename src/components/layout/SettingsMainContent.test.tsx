@@ -10,6 +10,7 @@ import { SettingsMainContent } from './SettingsMainContent';
 import { hostingClient } from '@/services/hostingClient';
 import { useHostingState } from '@/components/hosting/hostingState';
 import * as feedbackContext from '@/contexts/FeedbackReportContext';
+import { requestSettingsDestination, useSettingsNavigation } from '@/app/state/settingsNavigationStore';
 
 describe('SettingsMainContent AI and MCP organization', () => {
   let host: HTMLDivElement;
@@ -45,6 +46,7 @@ describe('SettingsMainContent AI and MCP organization', () => {
   };
 
   beforeEach(() => {
+    useSettingsNavigation.setState({ destination: null });
     vi.clearAllMocks();
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     useHostingState.getState().setConnections([]);
@@ -61,6 +63,7 @@ describe('SettingsMainContent AI and MCP organization', () => {
   });
 
   afterEach(() => {
+    useSettingsNavigation.setState({ destination: null });
     act(() => root.unmount());
     host.remove();
     vi.restoreAllMocks();
@@ -75,6 +78,23 @@ describe('SettingsMainContent AI and MCP organization', () => {
     await render('api');
     expect(host.textContent).toContain('Enable AI auto-commit');
     expect(host.textContent).toContain('Local API');
+  });
+  it('resolves an action link after the settings page mounts and focuses the exact group', async () => {
+    requestSettingsDestination({ tab: 'api', id: 'ai-automation' });
+    await render('general');
+    expect(onSelectTab).toHaveBeenCalledWith('api');
+    await render('api');
+    expect(document.activeElement).toBe(host.querySelector('#settings-ai-automation-title'));
+    expect(useSettingsNavigation.getState().destination).toBeNull();
+    expect(onUpdateSettings).not.toHaveBeenCalled();
+  });
+  it('clears a search when an action links to another settings group', async () => {
+    await render('api');
+    changeInput(host.querySelector<HTMLInputElement>('input[type="search"]')!, 'secret');
+    act(() => requestSettingsDestination({ tab: 'api', id: 'ai-provider' }));
+    expect(host.querySelector<HTMLInputElement>('input[type="search"]')!.value).toBe('');
+    expect(document.activeElement).toBe(host.querySelector('#settings-ai-provider-title'));
+    expect(onUpdateSettings).not.toHaveBeenCalled();
   });
 
   it('finds a setting in another category and focuses its group after navigation', async () => {
