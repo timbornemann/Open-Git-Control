@@ -33,6 +33,7 @@ type Props = {
   onOpenRunSettings: () => void;
   onOpenSecretScanAllowlist?: () => void;
   onOpenRemoteConfig?: () => void;
+  onOpenRepositoryAnalytics?: () => void;
   onPublishRepository?: () => void;
 };
 
@@ -58,6 +59,7 @@ export const TopbarMoreMenu: React.FC<Props> = ({
   onOpenRunSettings,
   onOpenSecretScanAllowlist,
   onOpenRemoteConfig,
+  onOpenRepositoryAnalytics,
   onPublishRepository,
 }) => {
   const { t, tr } = useI18n();
@@ -109,6 +111,17 @@ export const TopbarMoreMenu: React.FC<Props> = ({
   return (
     <div className="topbar-dropdown topbar-more-dropdown">
       <div className="topbar-dropdown-header">{t('generated.components.topbar.topbaractions.more_actions_a53b5e21')}</div>
+      <button
+        className="topbar-dropdown-item"
+        disabled={!activeRepo || !onOpenRepositoryAnalytics}
+        onClick={() => {
+          setView(null);
+          onOpenRepositoryAnalytics?.();
+        }}
+      >
+        <span className="topbar-dropdown-item-label">{tr('Statistik & Analyse', 'Statistics & analytics')}</span>
+        <span className="topbar-dropdown-item-hint">{tr('Lokale Git-Historie auswerten', 'Analyze local Git history')}</span>
+      </button>
       {onPublishRepository && (
         <button
           className="topbar-dropdown-item"

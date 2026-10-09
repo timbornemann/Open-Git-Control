@@ -7,6 +7,7 @@ import { GitRepositoryProbe } from './GitRepositoryProbe';
 import { GitSpawnOperations } from './GitSpawnOperations';
 import type { CommitEditGit } from './CommitEditGit';
 import { runCommitEditProcess } from './CommitEditProcess';
+import { runGitChunkStream } from './GitChunkStream';
 const commandToken = (value: string | undefined): string =>
   String(value || '')
     .trim()
@@ -317,6 +318,24 @@ export class GitRunner {
       'interactive',
       args[0] || 'stream',
       (schedulerSignal) => this.spawnOperations.streamLines(repoPath, args, onLine, schedulerSignal, options),
+      { signal },
+    );
+  }
+
+  async streamRead(
+    repoPath: string,
+    args: string[],
+    onChunk: (chunk: Buffer) => void,
+    signal: AbortSignal,
+    input?: string | Buffer,
+    envOverrides?: NodeJS.ProcessEnv,
+  ): Promise<void> {
+    this.assertRepoPathAvailable(repoPath);
+    await this.schedule(
+      repoPath,
+      'background',
+      args[0] || 'read',
+      (activeSignal) => runGitChunkStream(repoPath, args, onChunk, activeSignal, input, envOverrides),
       { signal },
     );
   }

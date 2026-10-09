@@ -1,4 +1,5 @@
 import { createRepositorySecretScanAllowlistApi } from './createRepositorySecretScanAllowlistApi';
+import { createRepositoryAnalyticsApi } from './createRepositoryAnalyticsApi';
 import { createRepositoryLocationApi } from './createRepositoryLocationApi';
 import { createSystemToolsApi } from './createSystemToolsApi';
 import type { PreviewSnapshot, ReadRequest } from '../../src/shared/cache/resource';
@@ -229,6 +230,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
         ? invokeGitOperationForRepo(repoPath, 'show', IpcChannel.GitReadRepoFile, filePath, repoPath)
         : invokeGitOperation('show', IpcChannel.GitReadRepoFile, filePath),
     ...createRepositoryFileApi(invokeGitOperationForRepo),
+    ...createRepositoryAnalyticsApi(ipcRenderer),
     getMarkdownPreviewFile: (params: { source: 'unstaged' | 'staged' | 'commit'; path: string; commitHash?: string; repoPath?: string }) =>
       params.repoPath
         ? invokeGitOperationForRepo(params.repoPath, 'show', IpcChannel.GitMarkdownPreviewFile, params)
@@ -348,6 +350,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     hosting: { hostingRequest: flatApi.hostingRequest },
     transfers: { remoteTransferRequest: flatApi.remoteTransferRequest },
     git: {
+      ...createRepositoryAnalyticsApi(ipcRenderer),
       getGitIdentity: flatApi.getGitIdentity,
       saveGitIdentity: flatApi.saveGitIdentity,
       setRepoPath: flatApi.setRepoPath,

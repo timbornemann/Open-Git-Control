@@ -530,6 +530,17 @@ export class GitService {
     await this.gitRunner.streamLines(repoPath, args, onLine, signal, options);
   }
 
+  async streamReadAtPath(
+    repoPath: string,
+    args: string[],
+    onChunk: (chunk: Buffer) => void,
+    signal: AbortSignal,
+    input?: string | Buffer,
+    envOverrides?: NodeJS.ProcessEnv,
+  ): Promise<void> {
+    await this.gitRunner.streamRead(repoPath, args, onChunk, signal, input, envOverrides);
+  }
+
   async readPrivateIndexFileBufferAtPath(repoPath: string, relativePath: string, privateIndexPath: string, maxBytes: number): Promise<Buffer> {
     const normalizedPath = normalizeRepositoryRelativePath(relativePath);
     return this.gitRunner.runBuffer(repoPath, ['show', `:./${normalizedPath}`], {

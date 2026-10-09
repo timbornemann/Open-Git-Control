@@ -27,6 +27,9 @@ const ProjectPlannerView = viewModules.planner.View;
 const HostingWorkspaceView = viewModules.hosting.View;
 const SettingsMainContent = viewModules.settings.View;
 const RepositoryReleaseCreator = viewModules.release.View;
+const RepositoryAnalyticsView = React.lazy(() =>
+  import('@/components/repository-analytics/RepositoryAnalyticsView').then((module) => ({ default: module.RepositoryAnalyticsView })),
+);
 
 type MainPrimaryPaneProps = {
   primaryPaneBasis: string;
@@ -103,6 +106,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
     showRunConfig: ui.isRunConfigOpen,
     showSecretScanAllowlist: ui.isSecretScanAllowlistOpen,
     showRemoteConfig: ui.isRemoteConfigOpen,
+    showRepositoryAnalytics: ui.isRepositoryAnalyticsOpen,
     showReleaseCreator: ui.isReleaseCreatorOpen,
     showRepositoryPublication: ui.isRepositoryPublicationOpen,
   });
@@ -115,6 +119,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   const isRunConfigView = route === 'runConfig';
   const isSecretScanAllowlistView = route === 'secretScanAllowlist';
   const isRemoteConfigView = route === 'remoteConfig';
+  const isAnalyticsView = route === 'analytics';
   const isReleaseCreatorView = route === 'releaseCreator';
   const isRepositoryPublicationView = route === 'repositoryPublication';
   const primaryPaneTitle = getMainPrimaryTitle(route, t, tr);
@@ -145,6 +150,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
         isLocalReposView ||
         isRunConfigView ||
         isRemoteConfigView ||
+        isAnalyticsView ||
         isSecretScanAllowlistView ||
         isReleaseCreatorView ||
         isRepositoryPublicationView ||
@@ -157,7 +163,11 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
       {shouldShowPrimaryPaneHeader && (
         <div className={`pane-header pane-header-main${activeConflictPath ? ' pane-header-main--conflict' : ''}`}>
           <span className="pane-header-main-title">{primaryPaneTitle}</span>
-          {isSettingsView ? null : isRepositoryPublicationView ? (
+          {isSettingsView ? null : isAnalyticsView ? (
+            <button className="icon-btn pane-header-nav-btn" onClick={ui.onCloseRepositoryAnalytics}>
+              {tr('Zurück zum Repository', 'Back to repository')}
+            </button>
+          ) : isRepositoryPublicationView ? (
             <button className="icon-btn pane-header-nav-btn" onClick={ui.onCloseRepositoryPublication}>
               {tr('Zurück', 'Back')}
             </button>
@@ -193,8 +203,25 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
         </div>
       )}
 
-      <div className="pane-content" style={{ padding: 0 }}>
-        {isRepositoryPublicationView ? (
+      <div className="pane-content" style={{ padding: 0, ...(isAnalyticsView ? { overflow: 'hidden' } : {}) }}>
+        {isAnalyticsView ? (
+          <React.Suspense fallback={lazyPaneFallback}>
+            <RepositoryAnalyticsView
+              key={repository.activeRepo ?? ''}
+              repoPath={repository.activeRepo}
+              refreshTrigger={repository.refreshTrigger}
+              busy={workflow.isGitActionRunning}
+              onOpenCommit={(hash) => {
+                ui.onCloseRepositoryAnalytics?.();
+                repository.onNavigateToCommit(hash);
+              }}
+              onOpenFile={(path, hash) => {
+                ui.onCloseRepositoryAnalytics?.();
+                handleOpenDiff({ path, source: 'commit', commitHash: hash });
+              }}
+            />
+          </React.Suspense>
+        ) : isRepositoryPublicationView ? (
           <RepositoryPublicationView key={repository.activeRepo ?? ''} repoPath={repository.activeRepo} requestedConnectionId={ui.publicationConnectionId} />
         ) : isSecretScanAllowlistView ? (
           <RepositorySecretScanAllowlistView key={repository.activeRepo ?? ''} />

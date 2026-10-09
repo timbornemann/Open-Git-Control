@@ -1,4 +1,5 @@
 import { registerReadCancellation } from '../readRequests';
+import { registerRepositoryAnalyticsHandlers } from './registerRepositoryAnalyticsHandlers';
 import { registerBootstrapHandlers } from './registerBootstrapHandlers';
 import type { AiService } from '../../AiService';
 import type { GitService } from '../../GitService';
@@ -79,6 +80,7 @@ export function setupIPC({
   registerRepoSettingsHandlers({ updaterManager, githubService });
   registerRepositoryIconHandlers();
   registerGitIdentityHandlers(gitService);
+  registerRepositoryAnalyticsHandlers(gitService);
   registerRepositoryLocationHandlers(gitService);
   registerRepositorySecretScanAllowlistHandlers({ gitService, repoJobRegistry, readSettingsWithMigration });
   registerProjectPlannerHandlers({ gitService });

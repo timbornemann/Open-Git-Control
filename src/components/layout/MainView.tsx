@@ -19,6 +19,8 @@ const MainViewComponent: React.FC = () => {
   const isSecretScanAllowlistOpen = useUIStore((state) => state.isSecretScanAllowlistOpen);
   const onCloseSecretScanAllowlist = useUIStore((state) => state.onCloseSecretScanAllowlist);
   const isRemoteConfigOpen = useUIStore((state) => state.isRemoteConfigOpen);
+  const isRepositoryAnalyticsOpen = useUIStore((state) => state.isRepositoryAnalyticsOpen);
+  const onCloseRepositoryAnalytics = useUIStore((state) => state.onCloseRepositoryAnalytics);
   const onCloseRemoteConfig = useUIStore((state) => state.onCloseRemoteConfig);
   const isReleaseCreatorOpen = useUIStore((state) => state.isReleaseCreatorOpen);
   const isRepositoryPublicationOpen = useUIStore((state) => state.isRepositoryPublicationOpen);
@@ -90,6 +92,7 @@ const MainViewComponent: React.FC = () => {
   });
 
   const handleRepositoryStagingOpen = React.useCallback(() => {
+    onCloseRepositoryAnalytics?.();
     onCloseRunConfig();
     onCloseRemoteConfig();
     onCloseSecretScanAllowlist();
@@ -99,6 +102,7 @@ const MainViewComponent: React.FC = () => {
     handleStageCommitOpen();
   }, [
     handleStageCommitOpen,
+    onCloseRepositoryAnalytics,
     onCloseRunConfig,
     onCloseRemoteConfig,
     onCloseSecretScanAllowlist,
@@ -110,8 +114,8 @@ const MainViewComponent: React.FC = () => {
   ]);
 
   React.useEffect(() => {
-    if (isReleaseCreatorOpen || isSecretScanAllowlistOpen || isRepositoryPublicationOpen) setShowTimeline(false);
-  }, [isReleaseCreatorOpen, isSecretScanAllowlistOpen, isRepositoryPublicationOpen, setShowTimeline]);
+    if (isReleaseCreatorOpen || isSecretScanAllowlistOpen || isRepositoryPublicationOpen || isRepositoryAnalyticsOpen) setShowTimeline(false);
+  }, [isReleaseCreatorOpen, isSecretScanAllowlistOpen, isRepositoryPublicationOpen, isRepositoryAnalyticsOpen, setShowTimeline]);
 
   React.useEffect(() => {
     const handleOpenStagingCommit = () => {
@@ -132,6 +136,7 @@ const MainViewComponent: React.FC = () => {
     !isPlannerView &&
     !isHostingView &&
     !isLocalReposView &&
+    !isRepositoryAnalyticsOpen &&
     !(activeTab === 'repo' && (isRunConfigOpen || isRemoteConfigOpen || isSecretScanAllowlistOpen || isReleaseCreatorOpen || isRepositoryPublicationOpen));
   const showInspectorPane = canShowInspectorPane && isInspectorPaneVisible;
 

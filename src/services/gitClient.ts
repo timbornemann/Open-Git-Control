@@ -9,6 +9,7 @@ import type { RepoUnavailablePayload } from './repoUnavailableClassifier';
 import { workingTreeReads } from './workingTreeReads';
 import { commitMessageEdits } from './commitMessageEdits';
 import { repositoryFileClient } from './repositoryFileClient';
+import { repositoryAnalyticsClient } from './repositoryAnalyticsClient';
 import { isSystemToolAvailable } from './systemToolsAvailability';
 import { ensureCommitIdentity } from '@/app/state/gitIdentityStore';
 
@@ -36,6 +37,7 @@ const sanitizeBranchSuffix = (value: string): string => value.replace(/[^a-zA-Z0
 const command = <TCommand extends GitCommandName>(commandName: TCommand, ...args: string[]): [TCommand, ...string[]] => [commandName, ...args];
 export const gitClient = cachedClient('git', {
   ...commitMessageEdits,
+  ...repositoryAnalyticsClient,
   ensureCommitIdentity,
   isAvailable: (): boolean => Boolean(getElectronApi()) && isSystemToolAvailable('git'),
 
@@ -47,10 +49,7 @@ export const gitClient = cachedClient('git', {
     return requireElectronGitApi().onRepoUnavailable(callback);
   },
 
-  async runGitCommand(commandName: GitCommandName, ...args: string[]): Promise<GitCommandResultDto> {
-    const result = await requireElectronGitApi().runGitCommand(commandName, ...args);
-    return result;
-  },
+  runGitCommand: (commandName: GitCommandName, ...args: string[]): Promise<GitCommandResultDto> => requireElectronGitApi().runGitCommand(commandName, ...args),
 
   async runGitCommandForRepo(repoPath: string, commandName: GitCommandName, ...args: string[]): Promise<GitCommandResultDto> {
     return requireElectronGitApi().runGitCommandForRepo(repoPath, commandName, ...args);

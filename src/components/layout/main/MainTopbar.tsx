@@ -30,6 +30,8 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
   const onCloseRunConfig = useUIStore((state) => state.onCloseRunConfig);
   const onOpenSecretScanAllowlist = useUIStore((state) => state.onOpenSecretScanAllowlist);
   const onOpenRemoteConfig = useUIStore((state) => state.onOpenRemoteConfig);
+  const onOpenRepositoryAnalytics = useUIStore((state) => state.onOpenRepositoryAnalytics);
+  const onCloseRepositoryAnalytics = useUIStore((state) => state.onCloseRepositoryAnalytics);
   const onCloseRemoteConfig = useUIStore((state) => state.onCloseRemoteConfig);
   const onOpenReleaseCreator = useUIStore((state) => state.onOpenReleaseCreator);
   const onPublishRepository = useUIStore((state) => state.onOpenRepositoryPublication);
@@ -145,6 +147,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
                 onOpenReleaseCreator();
               }}
               onOpenTimeline={() => {
+                onCloseRepositoryAnalytics?.();
                 if (isRepositoryPublicationOpen) onCloseRepositoryPublication?.();
                 if (isReleaseCreatorOpen) onCloseReleaseCreator();
                 onCloseRunConfig();
@@ -178,6 +181,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
               }}
               onOpenSecretScanAllowlist={onOpenSecretScanAllowlist}
               onOpenRemoteConfig={onOpenRemoteConfig}
+              onOpenRepositoryAnalytics={onOpenRepositoryAnalytics}
               onPublishRepository={() => onPublishRepository?.()}
             />
           )}

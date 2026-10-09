@@ -39,6 +39,7 @@ type Props = {
   onOpenRunSettings: () => void;
   onOpenSecretScanAllowlist?: () => void;
   onOpenRemoteConfig?: () => void;
+  onOpenRepositoryAnalytics?: () => void;
   onPublishRepository?: () => void;
 };
 
@@ -78,6 +79,7 @@ export const TopbarActions: React.FC<Props> = ({
   onOpenRunSettings,
   onOpenSecretScanAllowlist,
   onOpenRemoteConfig,
+  onOpenRepositoryAnalytics,
   onPublishRepository,
 }) => {
   const intent = usePreloadIntent();
@@ -449,6 +451,7 @@ export const TopbarActions: React.FC<Props> = ({
             onOpenRunSettings={onOpenRunSettings}
             onOpenSecretScanAllowlist={onOpenSecretScanAllowlist}
             onOpenRemoteConfig={onOpenRemoteConfig}
+            onOpenRepositoryAnalytics={onOpenRepositoryAnalytics}
             onPublishRepository={onPublishRepository}
           />
         )}

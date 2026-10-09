@@ -89,6 +89,7 @@ const createRepositorySlice = (state: AppState, tr: (deText: string, enText: str
   showSecondaryHistory: state.settings.showSecondaryHistory,
   onMergeBranch: state.handleMergeBranch,
   onOpenRepoWorkspace: () => {
+    state.onCloseRepositoryAnalytics();
     if (state.isRepositoryPublicationOpen) state.onCloseRepositoryPublication();
     state.onCloseRunConfig();
     state.onCloseRemoteConfig();
@@ -198,6 +199,7 @@ const createUiSlice = ({ state, resetLayout, uiState }: Pick<CreateAppStateSlice
   activeTab: state.activeTab,
   setActiveTab: (tab) => {
     if (tab !== 'repo') {
+      state.onCloseRepositoryAnalytics();
       state.onCloseRunConfig();
       state.onCloseRemoteConfig();
       state.onCloseSecretScanAllowlist();
@@ -207,6 +209,9 @@ const createUiSlice = ({ state, resetLayout, uiState }: Pick<CreateAppStateSlice
     state.setActiveTab(tab);
   },
   isRunConfigOpen: state.isRunConfigOpen,
+  isRepositoryAnalyticsOpen: state.isRepositoryAnalyticsOpen,
+  onOpenRepositoryAnalytics: state.onOpenRepositoryAnalytics,
+  onCloseRepositoryAnalytics: state.onCloseRepositoryAnalytics,
   onOpenRunConfig: state.onOpenRunConfig,
   onCloseRunConfig: state.onCloseRunConfig,
   isSecretScanAllowlistOpen: state.isSecretScanAllowlistOpen,

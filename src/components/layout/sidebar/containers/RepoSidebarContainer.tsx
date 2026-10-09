@@ -1,5 +1,5 @@
 import React from 'react';
-import { FolderOpen, UploadCloud } from 'lucide-react';
+import { FolderOpen, UploadCloud, BarChart3 } from 'lucide-react';
 import { IconButton } from '@/components/ui/IconButton';
 import { useRepositoryContext, useUIContext } from '@/contexts/AppStateContext';
 import { BranchPanel } from '@/components/sidebar/BranchPanel';
@@ -41,6 +41,10 @@ export const RepoSidebarContainer: React.FC = React.memo(() => {
           />
         </div>
       </div>
+      <button className="repo-cockpit-analysis" aria-current={ui.isRepositoryAnalyticsOpen ? 'page' : undefined} onClick={ui.onOpenRepositoryAnalytics}>
+        <BarChart3 size={14} />
+        <span>{tr('Statistik & Analyse', 'Statistics & analytics')}</span>
+      </button>
       <HostingSidebar local />
       <RepositoryLicensePanel repoPath={repository.activeRepo} />
       <BranchPanel

@@ -11,6 +11,19 @@ const base = {
 };
 
 describe('local repository primary route', () => {
+  it('shows analytics as a repository subpage ahead of timeline and file details', () => {
+    expect(
+      getMainPrimaryRoute({
+        ...base,
+        activeTab: 'repo',
+        showRepositoryAnalytics: true,
+        showTimeline: true,
+        activeDiffRequest: { source: 'commit', path: 'a.ts' },
+      }),
+    ).toBe('analytics');
+    expect(hasMainPrimaryHeader('analytics')).toBe(true);
+    expect(getMainPrimaryRoute({ ...base, activeTab: 'settings', showRepositoryAnalytics: true })).toBe('settings');
+  });
   it('opens repository publication in the repository subpage ahead of timeline and file details', () => {
     expect(
       getMainPrimaryRoute({

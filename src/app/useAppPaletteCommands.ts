@@ -19,6 +19,14 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
   useMemo(
     () => [
       {
+        id: 'repository-analytics',
+        label: state.settings.language === 'de' ? 'Statistik & Analyse' : 'Statistics & analytics',
+        keywords: ['analytics', 'statistics', 'statistik', 'analyse', 'hotspots', 'churn', 'contributions'],
+        action: () => {
+          if (state.activeRepo) state.onOpenRepositoryAnalytics();
+        },
+      },
+      {
         id: 'repository-publish',
         label: state.settings.language === 'de' ? 'Repository veröffentlichen' : 'Publish repository',
         keywords: ['publish', 'create', 'hosting', 'github', 'forgejo', 'gitlab', 'bitbucket', 'veröffentlichen', 'erstellen'],

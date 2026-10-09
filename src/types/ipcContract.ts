@@ -1,4 +1,8 @@
 export const enum IpcChannel {
+  GitAnalyticsSnapshot = 'git:analytics:snapshot',
+  GitAnalyticsRefresh = 'git:analytics:refresh',
+  GitAnalyticsDetails = 'git:analytics:details',
+  GitAnalyticsProgress = 'git:analytics:progress',
   RepositorySecretScanAllowlistGet = 'repositorySecretScanAllowlist:get',
   RepositorySecretScanAllowlistSave = 'repositorySecretScanAllowlist:save',
   RepositorySecretScanAllowlistAddPaths = 'repositorySecretScanAllowlist:addPaths',
