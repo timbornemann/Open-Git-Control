@@ -25,7 +25,7 @@ export function HostingConnectionEditor({ connection, onClose }: { connection: H
   const { tr } = useI18n();
   const { setConnections, refresh } = useHostingState();
   const [editing, setEditing] = useState<string | undefined>(connection?.id);
-  const [provider, setProvider] = useState<HostingProvider>(connection?.provider ?? 'forgejo');
+  const [provider, setProvider] = useState<HostingProvider>(connection?.provider ?? 'github');
   const [label, setLabel] = useState(connection?.label ?? '');
   const [baseUrl, setBaseUrl] = useState(connection?.baseUrl ?? '');
   const [apiBaseUrl, setApiBaseUrl] = useState(connection?.apiBaseUrl ?? '');

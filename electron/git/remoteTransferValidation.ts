@@ -158,6 +158,10 @@ export function normalizeRemotePreferences(value: unknown): RemotePreferences {
   if (input.hostingRemote !== undefined) result.hostingRemote = remoteName(input.hostingRemote);
   if (input.fetchRemote !== undefined) result.fetchRemote = remoteName(input.fetchRemote);
   if (input.pullRemote !== undefined) result.pullRemote = remoteName(input.pullRemote);
+  if (input.pullStrategy !== undefined) {
+    if (!['default', 'rebase', 'merge', 'ff-only'].includes(input.pullStrategy)) throw new Error('Invalid pull strategy.');
+    result.pullStrategy = input.pullStrategy;
+  }
   if (input.selectionModes !== undefined) result.selectionModes = normalizeSelectionModes(input.selectionModes);
   if (input.selectionSnapshots !== undefined) result.selectionSnapshots = normalizeSelectionSnapshots(input.selectionSnapshots);
   if (input.pullBranches !== undefined) result.pullBranches = normalizeBranchMappings(input.pullBranches);

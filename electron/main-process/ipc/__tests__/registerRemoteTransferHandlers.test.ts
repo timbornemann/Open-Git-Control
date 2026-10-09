@@ -9,6 +9,7 @@ const mocked = vi.hoisted(() => ({
   handlers: new Map<string, (...args: any[]) => Promise<any>>(),
   getRemotes: vi.fn(),
   getPreferences: vi.fn(),
+  getPullConfiguration: vi.fn(),
   checkConnection: vi.fn(),
   editRemote: vi.fn(),
   executePush: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock('../../../git/RemoteTransferService', () => ({
   RemoteTransferService: class {
     getRemotes = mocked.getRemotes;
     getPreferences = mocked.getPreferences;
+    getPullConfiguration = mocked.getPullConfiguration;
     checkConnection = mocked.checkConnection;
     editRemote = mocked.editRemote;
     executePush = mocked.executePush;
@@ -44,6 +46,7 @@ describe('repository authority for structured remote transfers', () => {
     };
     mocked.getRemotes.mockResolvedValue({ remotes: [] });
     mocked.getPreferences.mockReturnValue({});
+    mocked.getPullConfiguration.mockResolvedValue({ branch: 'main', rebase: null, fastForward: null, mergeOptions: null });
     mocked.checkConnection.mockResolvedValue(true);
     mocked.editRemote.mockResolvedValue({ remotes: [] });
     registerRemoteTransferHandlers({
@@ -57,6 +60,9 @@ describe('repository authority for structured remote transfers', () => {
     await expect(invoke('getRemotes', { repoPath: 'C:/repos/saved' })).resolves.toMatchObject({ success: true });
     expect(mocked.getRemotes).toHaveBeenCalledWith('C:/repos/saved');
     await expect(invoke('getPreferences', { repoPath: 'C:/repos/saved' })).resolves.toMatchObject({ success: true });
+    await expect(invoke('getPullConfiguration', { repoPath: 'C:/repos/saved' })).resolves.toMatchObject({ success: true, data: { branch: 'main' } });
+    expect(mocked.getPullConfiguration).toHaveBeenCalledWith('C:/repos/saved', expect.any(AbortSignal));
+    await expect(invoke('getPullConfiguration', { repoPath: 'C:/repos/unknown' })).resolves.toMatchObject({ success: false });
     await expect(invoke('editRemote', { repoPath: 'C:/repos/saved', mutation: { action: 'remove', name: 'origin' } })).resolves.toMatchObject({
       success: false,
     });

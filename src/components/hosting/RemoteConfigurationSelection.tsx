@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActionRequirement } from '@/components/ui/ActionRequirement';
 import { useI18n } from '@/i18n';
-import type { GitRemoteSnapshotDto, RemotePreferences } from '@/types/remoteTransfers';
+import type { GitPullConfigurationDto, GitRemoteSnapshotDto, RemotePreferences } from '@/types/remoteTransfers';
 import { getRemoteTransferDefaults, resolveRemoteTransferSelection } from '@/utils/remoteTransferSelection';
 import { RemoteConfigurationActions } from './RemoteConfigurationActions';
 
 type Props = {
   snapshot: GitRemoteSnapshotDto;
   preferences: RemotePreferences;
+  pullConfiguration: GitPullConfigurationDto | null;
   update: (next: RemotePreferences) => void;
   disabled: boolean;
   setUpstream: (remote: string, branch: string) => void;
@@ -23,7 +24,7 @@ function profileRequirement(selected: string[], name: string, tr: (de: string, e
   if (!name.trim()) return tr('Gib dem Push-Profil einen Namen.', 'Enter a name for the push profile.');
   return null;
 }
-export function RemoteConfigurationSelection({ snapshot, preferences, update, disabled, setUpstream }: Props) {
+export function RemoteConfigurationSelection({ snapshot, preferences, pullConfiguration, update, disabled, setUpstream }: Props) {
   const { tr } = useI18n();
   const [profileName, setProfileName] = useState(preferences.profiles?.find((profile) => profile.id === preferences.activeProfileId)?.name ?? '');
   const activeProfile = preferences.profiles?.find((profile) => profile.id === preferences.activeProfileId);
@@ -43,6 +44,7 @@ export function RemoteConfigurationSelection({ snapshot, preferences, update, di
       <RemoteConfigurationActions
         snapshot={snapshot}
         preferences={preferences}
+        pullConfiguration={pullConfiguration}
         update={update}
         disabled={disabled}
         selected={selected}

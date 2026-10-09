@@ -1,6 +1,7 @@
 import { createPushPlan } from './createPushPlan';
 import { randomUUID } from 'crypto';
 import { readPushSecretScanScope, type PushSecretScanScope } from './PushSecretScanScope';
+import { pullStrategyArguments, readGitPullConfiguration } from './GitPullConfiguration';
 import { readRemoteSnapshot, assertPushSourceUnchanged, probePushUrlIsolation, remoteConfigurationFingerprint } from './remoteSnapshot';
 import { lfsEndpoint, lfsTransferEnvironment, uploadLfsObjects } from './GitLfsTransfers';
 import type {
@@ -73,6 +74,10 @@ export class RemoteTransferService {
 
   getPreferences(repoPath: string): RemotePreferences {
     return this.preferences.read(repoPath);
+  }
+
+  getPullConfiguration(repoPath: string, signal?: AbortSignal) {
+    return readGitPullConfiguration(repoPath, this.git, signal);
   }
 
   async setPreferences(repoPath: string, input: RemotePreferences, context?: RemoteTransferContext): Promise<RemotePreferences> {
@@ -199,10 +204,9 @@ export class RemoteTransferService {
   async pull(repoPath: string, input: RemoteTransferOperations['pull']['input'], context: RemoteTransferContext): Promise<{ output: string }> {
     const remote = await this.selectedRemote(repoPath, input.remote);
     await this.git.run(repoPath, ['check-ref-format', `refs/heads/${refName(input.branch)}`]);
-    const flags: Record<string, string[]> = { default: [], rebase: ['--rebase'], 'no-ff': ['--no-ff'], 'ff-only': ['--ff-only'] };
-    if (!Object.hasOwn(flags, input.mode)) throw new Error('Unsupported pull strategy.');
+    const flags = pullStrategyArguments(input.mode, input.autostash);
     const endpoint = await lfsEndpoint(repoPath, input.remote, this.git).catch(() => '');
-    const base = endpoint ? lfsTransferEnvironment({}, input.remote, endpoint, remote.fetchUrls[0]) : {};
+    const base = { ...(endpoint ? lfsTransferEnvironment({}, input.remote, endpoint, remote.fetchUrls[0]) : {}), GIT_MERGE_AUTOEDIT: 'no' };
     const output = await this.withCredentials(
       repoPath,
       input.remote,
@@ -212,7 +216,7 @@ export class RemoteTransferService {
       (envOverrides, signal) =>
         this.git.streamOutput(
           repoPath,
-          ['pull', ...flags[input.mode], '--no-recurse-submodules', '--', input.remote, input.branch],
+          ['pull', ...flags, '--no-recurse-submodules', '--', input.remote, input.branch],
           context.onProgress ?? (() => {}),
           signal,
           { envOverrides },

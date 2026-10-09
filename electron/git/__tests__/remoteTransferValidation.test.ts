@@ -23,6 +23,7 @@ describe('remote selection preference validation', () => {
     const input = {
       fetchRemote: 'origin',
       pullRemote: 'backup',
+      pullStrategy: 'rebase',
       selectionModes: { fetch: 'remember', pull: 'ask', push: 'remember' },
       selectionSnapshots: { fetch: selection, push: selection },
       pullBranches: { 'feature/demo': 'private/demo' },
@@ -35,6 +36,10 @@ describe('remote selection preference validation', () => {
     { selectionModes: { fetch: 'auto' } },
     { selectionModes: { remove: 'ask' } },
     { pullRemote: '-unsafe' },
+    { pullStrategy: 'no-ff' },
+    { pullStrategy: '--rebase' },
+    { pullStrategy: null },
+    { pullStrategy: false },
     { pullBranches: { main: 'bad branch' } },
     { pushBranches: { main: { '-unsafe': 'main' } } },
     { pushBranches: { main: { origin: '--delete' } } },

@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { assertAllowedGitCommand, normalizeArgs, normalizeCommandArgs, validateCommandArgs } from '../gitCommandPolicy';
 
 describe('gitCommandPolicy', () => {
+  it('allows explicit merge pulls and no-fast-forward without rebase', () => {
+    expect(() => validateCommandArgs('pull', ['--no-rebase'])).not.toThrow();
+    expect(() => validateCommandArgs('pull', ['--no-rebase', '--no-ff'])).not.toThrow();
+    expect(() => validateCommandArgs('pull', ['--no-rebase', '--exec=unsafe'])).toThrow();
+  });
   it('allows known command names', () => {
     expect(() => assertAllowedGitCommand('status')).not.toThrow();
     expect(() => assertAllowedGitCommand('forensicHistory')).not.toThrow();

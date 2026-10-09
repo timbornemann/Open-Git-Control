@@ -122,17 +122,6 @@
       "updatedAt": 1785856977969
     },
     {
-      "id": "a2e2a3e1-2cfe-4d15-ab32-83912311496d",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Git-Fehler verständlich aufbereiten",
-      "description": "Git-Fehler verständlich aufbereiten: Einige Fehler erscheinen weitgehend als technische Git-Ausgabe. Eine kurze Erklärung mit Folgeaktion ergänzen: „Anmelden“, „Git installieren“, „Verbindung erneut prüfen“ oder „Konflikt öffnen“. Technische Details bleiben aufklappbar.",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1791462773059,
-      "updatedAt": 1791501411998
-    },
-    {
       "id": "20722a1d-0f20-4a43-98c6-cec1542d792a",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Voraussetzungen für Run-Templates prüfen",
@@ -147,12 +136,12 @@
       "id": "2f7bd303-5fff-489c-a6da-fb94fc8d64c6",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Pull-Strategie in der Remote-Konfiguratio",
-      "description": "Pull-Strategie in der Remote-Konfiguration ergänzen: Pro Repository „Git-Standard verwenden“, „Rebase“, „Merge“ oder „Nur Fast-forward“ auswählbar und speicherbar machen. Beim Git-Standard das wirksame konfigurierte Verhalten anzeigen. Alle Pull-Einstiege berücksichtigen diese Einstellung; ausdrückliche Dropdown-Auswahlen gelten nur einmalig. „No fast-forward“ mit zusätzlichem --no-rebase korrigieren. Fehlerwiederholungen behalten Quelle, Branch und Strategie bei. Bestehende Repositories verwenden weiterhin den Git-Standard; Regressionstests ergänzen.",
+      "description": "Pull-Strategie in der Remote-Konfiguratio: Pull-Strategie in der Remote-Konfiguration ergänzen: Pro Repository „Git-Standard verwenden“, „Rebase“, „Merge“ oder „Nur Fast-forward“ auswählbar und speicherbar machen. Beim Git-Standard das wirksame konfigurierte Verhalten anzeigen. Alle Pull-Einstiege berücksichtigen diese Einstellung; ausdrückliche Dropdown-Auswahlen gelten nur einmalig. „No fast-forward“ mit zusätzlichem --no-rebase korrigieren. Fehlerwiederholungen behalten Quelle, Branch und Strategie bei. Bestehende Repositories verwenden weiterhin den Git-Standard; Regressionstests ergänzen.",
       "priority": "medium",
       "status": "planned",
       "tags": [],
       "createdAt": 1791464207426,
-      "updatedAt": 1791464207426
+      "updatedAt": 1791543652690
     },
     {
       "id": "7833490f-b7d6-4c20-836b-64d2ba36e7d9",
@@ -175,17 +164,6 @@
       "tags": [],
       "createdAt": 1791504660702,
       "updatedAt": 1791504660702
-    },
-    {
-      "id": "303ad02e-e99e-4c83-8ccb-280c4d367478",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Add conection",
-      "description": "standard sol github in der auswahl sien nicht forgejo",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1791504782119,
-      "updatedAt": 1791504782119
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { GitPushBatchDto, GitPushPlanDto, GitRemoteSnapshotDto, RemotePreferences } from '@/types/remoteTransfers';
+import type { GitPushBatchDto, GitPushPlanDto, GitRemoteSnapshotDto, PullStrategy, RemotePreferences } from '@/types/remoteTransfers';
 import type { SecretScanResultDto } from '@/types/gitDtos';
 import { rememberRemoteTransferSelection } from '@/utils/remoteTransferSelection';
 import { RemoteTransferCoordinator, type RemoteTransferContext } from './remoteTransferCoordinator';
@@ -84,6 +84,31 @@ beforeEach(() => {
 });
 
 describe('shared remote transfer coordinator', () => {
+  it('saves a multi-remote source without persisting a one-off strategy override', async () => {
+    preferences.pullStrategy = 'merge';
+    snapshot.remotes.push({ name: 'backup', fetchUrls: ['backup'], pushUrls: ['backup'] });
+    await coordinator.start({ repoPath: '/repo', mode: 'pull', pullMode: 'rebase' });
+    await choose(['backup'], 'private-main');
+    expect(preferences).toMatchObject({ pullRemote: 'backup', pullStrategy: 'merge', selectionModes: { pull: 'remember' } });
+    await coordinator.start({ repoPath: '/repo', mode: 'pull' });
+    expect(actionCalls('pull').map(({ remote, branch, mode }) => [remote, branch, mode])).toEqual([
+      ['backup', 'private-main', 'rebase'],
+      ['backup', 'private-main', 'merge'],
+    ]);
+  });
+  it.each<PullStrategy>(['default', 'rebase', 'merge', 'ff-only'])(
+    'uses saved %s for every normal pull and keeps dropdown overrides one-off',
+    async (pullStrategy) => {
+      preferences.pullStrategy = pullStrategy;
+      await coordinator.start({ repoPath: '/repo', mode: 'pull' });
+      await coordinator.start({ repoPath: '/repo', mode: 'pull', pullMode: 'no-ff' });
+      await coordinator.start({ repoPath: '/repo', mode: 'pull' });
+      expect(actionCalls('pull').map((input) => input.mode)).toEqual([pullStrategy, 'no-ff', pullStrategy]);
+      expect(actionCalls('pull').map((input) => [input.remote, input.branch])).toEqual(Array(3).fill(['origin', 'upstream-main']));
+      expect(actionCalls('setPreferences')).toHaveLength(0);
+      expect(preferences.pullStrategy).toBe(pullStrategy);
+    },
+  );
   it('publishes explicitly captured branches from detached HEAD without applying saved profiles', async () => {
     snapshot.branch = '';
     context.branch = '';
@@ -338,8 +363,11 @@ describe('shared remote transfer coordinator', () => {
       if (operation === 'pull' && pulls++ === 0) throw new Error('Conflict');
       return original(operation, input);
     });
-    await coordinator.start({ repoPath: '/repo', mode: 'pull', pullMode: 'ff-only' });
-    expect(useRemoteTransferState.getState().failedPull).toEqual({ repoPath: '/repo', remote: 'origin', branch: 'upstream-main', mode: 'ff-only' });
+    preferences.pullStrategy = 'merge';
+    await coordinator.start({ repoPath: '/repo', mode: 'pull' });
+    expect(useRemoteTransferState.getState().failedPull).toEqual({ repoPath: '/repo', remote: 'origin', branch: 'upstream-main', mode: 'merge' });
+    preferences = { pullStrategy: 'rebase', pullRemote: 'backup', pullBranches: { main: 'other' } };
+    snapshot.remotes.push({ name: 'backup', fetchUrls: ['backup'], pushUrls: ['backup'] });
     await coordinator.retryPull();
     expect(actionCalls('pull')[1]).toEqual(actionCalls('pull')[0]);
   });

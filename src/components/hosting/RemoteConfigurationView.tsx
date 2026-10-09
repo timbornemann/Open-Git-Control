@@ -3,6 +3,7 @@ import { useI18n } from '@/i18n';
 import { RemoteEndpointEditor } from './RemoteEndpointEditor';
 import { RemoteConfigurationSelection } from './RemoteConfigurationSelection';
 import { RemoteConfigurationHosting } from './RemoteConfigurationHosting';
+import { RemotePullStrategy } from './RemotePullStrategy';
 import { useRemoteConfiguration } from './useRemoteConfiguration';
 import './hosting.css';
 import './remote-configuration.css';
@@ -52,10 +53,21 @@ export function RemoteConfigurationView({ repoPath }: { repoPath: string | null 
             <RemoteConfigurationSelection
               snapshot={editor.snapshot}
               preferences={editor.preferences}
+              pullConfiguration={editor.pullConfiguration}
               update={editor.update}
               disabled={editor.task.busy}
               setUpstream={editor.setUpstream}
             />
+          )}
+          {editor.snapshot.remotes.length === 0 && (
+            <section className="remote-configuration__section">
+              <RemotePullStrategy
+                preferences={editor.preferences}
+                configuration={editor.pullConfiguration}
+                update={editor.update}
+                disabled={editor.task.busy}
+              />
+            </section>
           )}
           <section className="remote-configuration__section">
             <h2>{tr('Verbundene Remotes', 'Connected remotes')}</h2>

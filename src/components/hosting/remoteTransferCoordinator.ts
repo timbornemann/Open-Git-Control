@@ -175,7 +175,13 @@ export class RemoteTransferCoordinator {
       this.finish(this.environment.tr(`Fetch von ${remote} abgeschlossen.`, `Fetch from ${remote} completed.`));
       return;
     }
-    const input = { repoPath: intent.repoPath, remote, branch: selection.branch, mode: intent.pullMode ?? 'default' };
+    const input = {
+      repoPath: intent.repoPath,
+      remote,
+      branch: selection.branch,
+      mode: intent.pullMode ?? this.state.preferences.pullStrategy ?? 'default',
+      ...(intent.autostash ? { autostash: true } : {}),
+    };
     const generation = this.generation;
     try {
       await this.scoped(() => transferClient.request('pull', input));

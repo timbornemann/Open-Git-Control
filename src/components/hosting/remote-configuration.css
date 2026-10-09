@@ -70,6 +70,13 @@
   padding-top: 14px;
   border-top: 1px solid var(--border-color);
 }
+.remote-configuration__pull-behavior {
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+.remote-configuration__pull-behavior code {
+  display: block;
+}
 .remote-configuration__advanced summary {
   cursor: pointer;
   font-size: 0.85rem;

@@ -1,11 +1,13 @@
 import { create } from 'zustand';
+import type { PullMode } from '@/types/remoteTransfers';
 
 export type RemoteTransferDialog = {
   repoPath: string;
   requestId?: string;
   mode: 'remotes' | 'push' | 'pull' | 'fetch';
   force?: boolean;
-  pullMode?: 'default' | 'rebase' | 'no-ff' | 'ff-only';
+  pullMode?: PullMode;
+  autostash?: boolean;
   destinationBranch?: string;
   sourceBranch?: string;
   branchTargets?: Array<{ sourceBranch: string; destinationBranch: string; sourceOid: string }>;

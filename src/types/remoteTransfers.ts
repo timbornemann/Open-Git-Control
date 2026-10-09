@@ -30,6 +30,14 @@ export interface GitPushProfile {
 }
 export type RemoteTransferAction = 'fetch' | 'pull' | 'push';
 export type RemoteSelectionMode = 'remember' | 'ask';
+export type PullStrategy = 'default' | 'rebase' | 'merge' | 'ff-only';
+export type PullMode = PullStrategy | 'no-ff';
+export interface GitPullConfigurationDto {
+  branch: string;
+  rebase: { key: string; value: 'false' | 'true' | 'merges' | 'interactive' } | null;
+  fastForward: { key: string; value: 'false' | 'true' | 'only' } | null;
+  mergeOptions: string | null;
+}
 export interface RemoteSelectionSnapshot {
   remotes: Array<{ name: string; urls: string[]; bindings: RepositoryEndpoint[] }>;
 }
@@ -39,6 +47,8 @@ export interface RemotePreferences {
   bindings?: RepositoryEndpoint[];
   fetchRemote?: string;
   pullRemote?: string;
+  /** Absence preserves the existing Git configuration. One-off overrides are never stored here. */
+  pullStrategy?: PullStrategy;
   selectionModes?: Partial<Record<RemoteTransferAction, RemoteSelectionMode>>;
   selectionSnapshots?: Partial<Record<RemoteTransferAction, RemoteSelectionSnapshot>>;
   pullBranches?: Record<string, string>;
@@ -91,9 +101,10 @@ export interface RemoteTransferOperations {
   getRemotes: { input: { repoPath: string }; output: GitRemoteSnapshotDto };
   editRemote: { input: { repoPath: string; mutation: RemoteMutation }; output: GitRemoteSnapshotDto };
   getPreferences: { input: { repoPath: string }; output: RemotePreferences };
+  getPullConfiguration: { input: { repoPath: string }; output: GitPullConfigurationDto };
   setPreferences: { input: { repoPath: string; preferences: RemotePreferences }; output: RemotePreferences };
   fetch: { input: { repoPath: string; remote: string; tagsOnly?: boolean }; output: { output: string } };
-  pull: { input: { repoPath: string; remote: string; branch: string; mode: 'default' | 'rebase' | 'no-ff' | 'ff-only' }; output: { output: string } };
+  pull: { input: { repoPath: string; remote: string; branch: string; mode: PullMode; autostash?: boolean }; output: { output: string } };
   setUpstream: { input: { repoPath: string; remote: string; branch: string }; output: true };
   planPush: {
     input: {

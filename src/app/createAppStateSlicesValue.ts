@@ -12,6 +12,7 @@ import type {
 import type { TranslationVariables } from '@/i18n';
 import { buildCherryPickAbortDialog, buildMergeAbortDialog, buildRebaseAbortDialog } from '@/components/staging-area/conflictAbortDialogs';
 import { gitClient } from '@/services/gitClient';
+import { requestRemoteTransfer } from '@/components/hosting/remoteTransferDialogState';
 
 type AppState = ReturnType<typeof useAppState>;
 type Translate = (key: string, variables?: TranslationVariables) => string;
@@ -100,26 +101,18 @@ const createWorkflowSlice = (state: AppState, t: Translate, tr: (deText: string,
   activeGitActionLabel: state.activeGitActionLabel,
   runGitCommand: state.runGitCommand,
   onFetch: () => state.refreshRemoteState(true),
-  onPull: () =>
-    state.runGitCommand(gitClient.buildPullArgs(), t('generated.app.pull_completed_successfully_a760cd36'), t('generated.app.running_pull_282e1a76')),
-  onPullRebase: () =>
-    state.runGitCommand(
-      gitClient.buildPullRebaseArgs(),
-      t('generated.app.pull_with_rebase_completed_successfully_732a6b7f'),
-      t('generated.app.running_pull_rebase_f9ca4da2'),
-    ),
-  onPullFfOnly: () =>
-    state.runGitCommand(
-      gitClient.buildPullArgs(['--ff-only']),
-      t('generated.app.pull_with_ff_only_completed_successfully_01a725eb'),
-      t('generated.app.running_pull_ff_only_efd80da9'),
-    ),
-  onPullNoFf: () =>
-    state.runGitCommand(
-      gitClient.buildPullArgs(['--no-ff']),
-      t('generated.app.pull_with_no_ff_completed_0271e730'),
-      t('generated.app.running_pull_no_ff_222dffa5'),
-    ),
+  onPull: () => {
+    if (state.activeRepo) requestRemoteTransfer({ repoPath: state.activeRepo, mode: 'pull' });
+  },
+  onPullRebase: () => {
+    if (state.activeRepo) requestRemoteTransfer({ repoPath: state.activeRepo, mode: 'pull', pullMode: 'rebase' });
+  },
+  onPullFfOnly: () => {
+    if (state.activeRepo) requestRemoteTransfer({ repoPath: state.activeRepo, mode: 'pull', pullMode: 'ff-only' });
+  },
+  onPullNoFf: () => {
+    if (state.activeRepo) requestRemoteTransfer({ repoPath: state.activeRepo, mode: 'pull', pullMode: 'no-ff' });
+  },
   onPush: () =>
     state.runGitCommand(gitClient.buildPushArgs(), t('generated.app.push_completed_successfully_edf8c1c9'), t('generated.app.running_push_0ab33329')),
   onPushForceWithLease: () =>

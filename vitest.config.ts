@@ -30,6 +30,7 @@ export default defineConfig({
         'electron/*.ts',
         'electron/hosting/**/*.ts',
         'electron/git/Remote*.ts',
+        'electron/git/GitPullConfiguration.ts',
         'electron/git/PushSecretScanScope.ts',
         'electron/git/createPushPlan.ts',
         'electron/git/GitLfs*.ts',

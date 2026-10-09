@@ -2,8 +2,15 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { hostingClient, transferClient } from '@/services/hostingClient';
 import { useI18n } from '@/i18n';
 import type { HostingConnection } from '@/types/hostingDtos';
-import type { GitRemoteSnapshotDto, RemotePreferences, RemoteTransferOperation, RemoteTransferOperations } from '@/types/remoteTransfers';
+import type {
+  GitPullConfigurationDto,
+  GitRemoteSnapshotDto,
+  RemotePreferences,
+  RemoteTransferOperation,
+  RemoteTransferOperations,
+} from '@/types/remoteTransfers';
 import { useHostingTask } from './useHostingTask';
+import { useOptionalNotifications } from '@/contexts/NotificationContext';
 import {
   clearRemoteConfigurationDraft,
   readRemoteConfigurationDraft,
@@ -14,8 +21,10 @@ import {
 
 export function useRemoteConfiguration(repoPath: string | null) {
   const { tr } = useI18n();
+  const notifications = useOptionalNotifications();
   const task = useHostingTask(repoPath ?? '');
   const [snapshot, setSnapshot] = useState<GitRemoteSnapshotDto | null>(null);
+  const [pullConfiguration, setPullConfiguration] = useState<GitPullConfigurationDto | null>(null);
   const [preferences, setPreferences] = useState<RemotePreferences>({});
   const [persisted, setPersisted] = useState<RemotePreferences>({});
   const [connections, setConnections] = useState<HostingConnection[]>([]);
@@ -28,6 +37,7 @@ export function useRemoteConfiguration(repoPath: string | null) {
     const activeLifecycle = lifecycle;
     lifecycle.current++;
     setSnapshot(null);
+    setPullConfiguration(null);
     setPreferences({});
     setPersisted({});
     setMessage('');
@@ -44,19 +54,36 @@ export function useRemoteConfiguration(repoPath: string | null) {
   };
   const request = <K extends RemoteTransferOperation>(operation: K, input: RemoteTransferOperations[K]['input']) =>
     scoped(() => transferClient.request(operation, input));
+  const readPullConfiguration = async (repoPath: string) => {
+    const generation = lifecycle.current;
+    try {
+      return await request('getPullConfiguration', { repoPath });
+    } catch (error) {
+      if (generation === lifecycle.current)
+        notifications?.publish({
+          msg: tr('Die Git-Pull-Konfiguration konnte nicht gelesen werden.', 'Could not read the Git pull configuration.'),
+          isError: true,
+          technicalDetails: error instanceof Error ? error.message : String(error),
+          gitContext: { repoPath },
+        });
+      return null;
+    }
+  };
   useEffect(() => {
     if (!repoPath) return;
     void task.run(
       async () => {
-        const [nextSnapshot, nextPreferences, accounts] = await Promise.all([
+        const [nextSnapshot, nextPreferences, accounts, pullConfiguration] = await Promise.all([
           request('getRemotes', { repoPath }),
           request('getPreferences', { repoPath }),
           scoped(() => hostingClient.request('connections', undefined)),
+          readPullConfiguration(repoPath),
         ]);
-        return { nextSnapshot, nextPreferences, accounts };
+        return { nextSnapshot, nextPreferences, accounts, pullConfiguration };
       },
-      ({ nextSnapshot, nextPreferences, accounts }) => {
+      ({ nextSnapshot, nextPreferences, accounts, pullConfiguration }) => {
         setSnapshot(nextSnapshot);
+        setPullConfiguration(pullConfiguration);
         setPersisted(nextPreferences);
         setPreferences(readRemoteConfigurationDraft(nextSnapshot, nextPreferences) ?? nextPreferences);
         setConnections(accounts);
@@ -73,9 +100,14 @@ export function useRemoteConfiguration(repoPath: string | null) {
   };
   const reload = async () => {
     if (!repoPath) return;
-    const [nextSnapshot, nextPreferences] = await Promise.all([request('getRemotes', { repoPath }), request('getPreferences', { repoPath })]);
+    const [nextSnapshot, nextPreferences, pullConfiguration] = await Promise.all([
+      request('getRemotes', { repoPath }),
+      request('getPreferences', { repoPath }),
+      readPullConfiguration(repoPath),
+    ]);
     const rebased = snapshot ? rebaseRemoteConfigurationDraft(snapshot, nextSnapshot, currentPreferences.current) : nextPreferences;
     setSnapshot(nextSnapshot);
+    setPullConfiguration(pullConfiguration);
     setPersisted(nextPreferences);
     setPreferences(rebased);
     writeRemoteConfigurationDraft(nextSnapshot, rebased, nextPreferences);
@@ -118,15 +150,18 @@ export function useRemoteConfiguration(repoPath: string | null) {
     void task.run(
       async () => {
         if (!snapshot || !repoPath) return null;
-        const current = await request('getRemotes', { repoPath });
+        const [current, pullConfiguration] = await Promise.all([request('getRemotes', { repoPath }), readPullConfiguration(repoPath)]);
         if (current.branch !== snapshot.branch)
           throw new Error(tr('Der aktuelle Branch wurde geändert. Seite neu öffnen.', 'The current branch changed. Reopen this page.'));
         if (JSON.stringify(current.remotes) !== JSON.stringify(snapshot.remotes))
           throw new Error(tr('Remotes wurden außerhalb der Anwendung geändert. Seite neu öffnen.', 'Remotes changed outside the app. Reopen this page.'));
-        return request('setPreferences', { repoPath, preferences: stampRemoteConfiguration(current, currentPreferences.current) });
+        const saved = await request('setPreferences', { repoPath, preferences: stampRemoteConfiguration(current, currentPreferences.current) });
+        return { saved, pullConfiguration };
       },
-      (saved) => {
-        if (!saved || !repoPath) return;
+      (result) => {
+        if (!result || !repoPath) return;
+        const { saved, pullConfiguration } = result;
+        setPullConfiguration(pullConfiguration);
         setPreferences(saved);
         setPersisted(saved);
         clearRemoteConfigurationDraft(repoPath);
@@ -157,6 +192,7 @@ export function useRemoteConfiguration(repoPath: string | null) {
     );
   return {
     snapshot,
+    pullConfiguration,
     preferences,
     connections,
     bindingConnection,

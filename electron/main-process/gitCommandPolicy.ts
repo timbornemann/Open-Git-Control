@@ -232,7 +232,7 @@ const validateAdoptRemoteTagArgs = (args: string[]): void => {
 };
 
 const validatePullArgs = (args: string[]): void => {
-  assertAllOptions(args, new Set(['--rebase', '--ff-only', '--no-ff', '--autostash']), 'pull');
+  assertAllOptions(args, new Set(['--rebase', '--no-rebase', '--ff-only', '--no-ff', '--autostash']), 'pull');
 };
 
 const validatePushArgs = (args: string[]): void => {

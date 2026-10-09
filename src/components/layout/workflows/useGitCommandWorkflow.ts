@@ -14,6 +14,7 @@ import { useGitCommandGuardWorkflow } from './useGitCommandGuardWorkflow';
 import { useGitSyncRecoveryWorkflow, type GitCommandRunner } from './useGitSyncRecoveryWorkflow';
 import { useRemoteRecoveryWorkflow } from './useRemoteRecoveryWorkflow';
 import { requestRemoteTransfer } from '@/components/hosting/remoteTransferDialogState';
+import { awaitPullTransfer, pullIntentFromArguments } from '@/components/hosting/awaitPullTransfer';
 
 type Toast = { msg: string; isError: boolean };
 
@@ -50,6 +51,7 @@ export const useGitCommandWorkflow = ({
   const nextGitWorkflowRunIdRef = useRef(0);
   const runGitCommandRef = useRef<GitCommandRunner | null>(null);
   const activeRepoRef = useRef<string | null>(workspace.activeRepo);
+  const pullAbort = useRef(new AbortController());
 
   useLayoutEffect(() => {
     activeRepoRef.current = workspace.activeRepo;
@@ -58,6 +60,9 @@ export const useGitCommandWorkflow = ({
     setIsGitActionRunning(false);
     setActiveGitCommand(null);
     setActiveGitActionLabel(null);
+    const controller = new AbortController();
+    pullAbort.current = controller;
+    return () => controller.abort();
   }, [workspace.activeRepo]);
 
   const { t, tr } = useLanguageTranslations(settings.language as AppLanguage);
@@ -112,6 +117,20 @@ export const useGitCommandWorkflow = ({
       };
 
       const command = args[0] as GitCommandNameDto;
+      if (command === 'pull') {
+        setIsGitActionRunning(true);
+        setActiveGitCommand(command);
+        setActiveGitActionLabel(actionLabel || tr('Pull wird ausgeführt …', 'Running pull …'));
+        try {
+          await awaitPullTransfer(pullIntentFromArguments(repoAtStart, args), pullAbort.current.signal);
+          return isStillActiveRepo();
+        } catch {
+          // The coordinator retains the exact failed source, branch and strategy for recovery.
+          return false;
+        } finally {
+          releaseWorkflowRun();
+        }
+      }
       // This central recovery path deliberately routes every known Git failure.
       // eslint-disable-next-line complexity
       const recoverFromGitCommandFailure = async (failureMessage: unknown, fallbackErrorMessage?: string): Promise<boolean> => {

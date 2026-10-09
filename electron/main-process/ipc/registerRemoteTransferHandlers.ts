@@ -27,6 +27,7 @@ const operations = new Set<RemoteTransferOperation>([
   'checkConnection',
   'editRemote',
   'getPreferences',
+  'getPullConfiguration',
   'setPreferences',
   'fetch',
   'pull',
@@ -66,7 +67,7 @@ export function registerRemoteTransferHandlers({
       try {
         if (!operations.has(operation) || !input || typeof input !== 'object' || typeof input.repoPath !== 'string' || !input.repoPath.trim())
           throw new Error('Invalid remote transfer request.');
-        const readonly = operation === 'getRemotes' || operation === 'getPreferences';
+        const readonly = operation === 'getRemotes' || operation === 'getPreferences' || operation === 'getPullConfiguration';
         let repoPath: string;
         try {
           repoPath = requireActiveRepositoryPath(input.repoPath, gitService.getRepoPath(), IpcChannel.RemoteTransferRequest);
@@ -121,6 +122,9 @@ export function registerRemoteTransferHandlers({
             break;
           case 'getPreferences':
             data = service.getPreferences(repoPath);
+            break;
+          case 'getPullConfiguration':
+            data = await service.getPullConfiguration(repoPath, context.signal);
             break;
           case 'checkConnection':
             data = await service.checkConnection(repoPath, input as RemoteTransferOperations['checkConnection']['input'], context);

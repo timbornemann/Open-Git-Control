@@ -1,6 +1,7 @@
 import { useI18n } from '@/i18n';
-import type { GitRemoteSnapshotDto, RemotePreferences, RemoteSelectionMode, RemoteTransferAction } from '@/types/remoteTransfers';
+import type { GitPullConfigurationDto, GitRemoteSnapshotDto, RemotePreferences, RemoteSelectionMode, RemoteTransferAction } from '@/types/remoteTransfers';
 import { getRemoteTransferDefaults, resolveRemoteTransferSelection } from '@/utils/remoteTransferSelection';
+import { RemotePullStrategy } from './RemotePullStrategy';
 
 type Props = {
   snapshot: GitRemoteSnapshotDto;
@@ -9,9 +10,10 @@ type Props = {
   disabled: boolean;
   selected: string[];
   activeProfileName?: string;
+  pullConfiguration: GitPullConfigurationDto | null;
 };
 
-export function RemoteConfigurationActions({ snapshot, preferences, update, disabled, selected, activeProfileName }: Props) {
+export function RemoteConfigurationActions({ snapshot, preferences, update, disabled, selected, activeProfileName, pullConfiguration }: Props) {
   const { tr } = useI18n();
   const soleRemote = snapshot.remotes.length === 1 ? snapshot.remotes[0] : null;
   const pullDefaults = getRemoteTransferDefaults('pull', snapshot, preferences);
@@ -101,6 +103,12 @@ export function RemoteConfigurationActions({ snapshot, preferences, update, disa
             source('pull')
           )}
           {!soleRemote && mode('pull')}
+          <RemotePullStrategy
+            preferences={preferences}
+            configuration={pullConfiguration?.branch === snapshot.branch ? pullConfiguration : null}
+            update={update}
+            disabled={disabled}
+          />
           {!soleRemote && (
             <small>
               {tr('Aktueller Quellbranch', 'Current source branch')}: {pullDefaults.branch || '—'}

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { repositoryPathKey } from '../../main-process/activeRepositoryAuthorization';
 import { RemotePreferencesStore } from '../RemotePreferencesStore';
 import { rememberRemoteTransferSelection, resolveRemoteTransferSelection } from '../../../src/shared/git/remoteTransferSelection';
-import type { GitRemoteSnapshotDto, RemotePreferences } from '../../../src/types/remoteTransfers';
+import type { GitRemoteSnapshotDto, PullStrategy, RemotePreferences } from '../../../src/types/remoteTransfers';
 
 vi.mock('electron', () => ({ app: { getPath: () => '/unused' } }));
 
@@ -91,5 +91,22 @@ describe('versioned remote preferences', () => {
     expect(fs.existsSync(filePath)).toBe(false);
     expect(() => store.write(repoPath, { selectionModes: { push: 'invalid' as never } })).toThrow('Invalid transfer selection mode');
     expect(fs.existsSync(filePath)).toBe(false);
+  });
+
+  it.each<PullStrategy>(['default', 'rebase', 'merge', 'ff-only'])('persists %s only for the selected repository across restarts', (pullStrategy) => {
+    store.write(repoPath, { pullRemote: 'origin', pullBranches: { main: 'release' }, pullStrategy });
+    const restarted = new RemotePreferencesStore(() => filePath);
+    expect(restarted.read(repoPath)).toEqual({ pullRemote: 'origin', pullBranches: { main: 'release' }, pullStrategy });
+    expect(restarted.read(path.join(directory, 'other')).pullStrategy).toBeUndefined();
+    const contents = fs.readFileSync(filePath, 'utf8');
+    expect(() => store.write(repoPath, { pullStrategy: 'no-ff' as never })).toThrow('Invalid pull strategy');
+    expect(fs.readFileSync(filePath, 'utf8')).toBe(contents);
+  });
+
+  it.each([1, 2])('keeps Git defaults for existing version %s repositories', (version) => {
+    fs.writeFileSync(filePath, JSON.stringify({ version, repositories: { [repositoryPathKey(repoPath)]: { pullRemote: 'origin' } } }));
+    expect(store.read(repoPath)).toEqual({ pullRemote: 'origin' });
+    store.write(repoPath, store.read(repoPath));
+    expect(new RemotePreferencesStore(() => filePath).read(repoPath).pullStrategy).toBeUndefined();
   });
 });
