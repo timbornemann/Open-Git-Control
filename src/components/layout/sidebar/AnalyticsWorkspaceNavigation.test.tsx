@@ -10,6 +10,7 @@ import { SidebarHeaderContainer } from './containers/SidebarHeaderContainer';
 import { SidebarContentRouter } from './containers/SidebarContentRouter';
 import { selectAnalyticsTab, useAnalyticsNavigation } from '@/components/repository-analytics/analyticsNavigationState';
 import { useAnalyticsToolbarState, usePublishAnalyticsToolbar } from '@/components/repository-analytics/analyticsToolbarState';
+import { normalizeRepoPathKey } from '@/utils/repoPath';
 
 vi.mock('./UpdateNotification', () => ({ UpdateNotification: () => null }));
 vi.mock('./RepositoryActivityRail', () => ({ RepositoryActivityRail: () => null }));
@@ -91,7 +92,7 @@ describe('standalone analytics navigation', () => {
     expect(icon?.getAttribute('aria-current')).toBe('page');
     expect(host.querySelector('.sidebar-header')?.textContent).toBe('Statistics & analytics');
     expect(host.querySelector('.analytics-sidebar-repository-path')?.textContent).toBe('C:/Code/alpha');
-    expect(host.querySelectorAll('.analytics-sidebar-nav button')).toHaveLength(7);
+    expect(host.querySelectorAll('.analytics-sidebar-nav button')).toHaveLength(6);
     expect(host.querySelector('.activity-bar [title="Local Repositories"]')?.nextElementSibling).toBe(icon);
     expect(icon?.nextElementSibling?.getAttribute('title')).toBe('Project planning');
     expect(host.querySelector('aside .analytics-filters')).toBeTruthy();
@@ -115,6 +116,12 @@ describe('standalone analytics navigation', () => {
     await render('c:\\Code\\alpha');
     expect(current()).toBe('Change hotspots');
     expect(host.querySelector('.analytics-sidebar-repository-path')?.textContent).toBe('c:\\Code\\alpha');
+  });
+  it('opens Contributions for a former line-attribution selection in the current session', async () => {
+    useAnalyticsNavigation.setState({ sections: { [normalizeRepoPathKey('C:/Code/alpha')]: 'ownership' } });
+    await render();
+    expect(current()).toBe('Contributions');
+    expect([...host.querySelectorAll('.analytics-sidebar-nav button')].map((node) => node.textContent)).not.toContain('Last changed lines');
   });
   it('delegates repository selection to the normal activation workflow and retains the current repository until activation completes', async () => {
     await render();

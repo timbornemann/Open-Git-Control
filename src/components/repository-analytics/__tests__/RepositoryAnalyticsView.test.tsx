@@ -399,7 +399,7 @@ describe('repository analytics dashboard', () => {
     await click('Resume');
     expect(mocks.refresh.mock.calls.length).toBeGreaterThan(before);
   });
-  it('also uses valid proportional CSS widths for last changed lines', async () => {
+  it('includes proportional last-changed-line shares in Contributions without a separate page', async () => {
     const saved = report();
     saved.project.lines = saved.project.blamedLines = 1000;
     saved.project.ownership = [
@@ -408,7 +408,10 @@ describe('repository analytics dashboard', () => {
     ];
     mocks.cache.mockResolvedValue({ success: true, data: saved });
     await render();
-    await click('Last changed lines');
+    expect([...host.querySelectorAll('.analytics-sidebar-nav button')].map((node) => node.textContent)).not.toContain('Last changed lines');
+    await click('Contributions');
+    expect(host.querySelector('.analytics-calendar')).toBeTruthy();
+    expect(host.querySelector('.analytics-contributors')?.textContent).toContain('Last changed lines');
     expect([...host.querySelectorAll<HTMLElement>('.analytics-share > span')].map((node) => node.style.width)).toEqual(['81.5%', '18.5%']);
   });
   it('filters directory analysis without exposing a separate commit history', async () => {
@@ -427,6 +430,17 @@ describe('repository analytics dashboard', () => {
     expect(host.querySelector('.analytics-sidebar-nav [aria-current="page"]')?.textContent).toBe('Change hotspots');
     expect(host.textContent).not.toContain('Commit history');
     expect(mocks.details.mock.calls.every(([request]) => request.kind !== 'commits')).toBe(true);
+  });
+  it('keeps Code Churn active when its labeled period bars filter the report', async () => {
+    mocks.cache.mockImplementation(({ filters }) => Promise.resolve({ success: true, data: { ...report(), filters } }));
+    await render();
+    await click('Code Churn');
+    expect(host.querySelector('.analytics-content--churn')).toBeTruthy();
+    expect(host.querySelector('table')).toBeNull();
+    await act(async () => host.querySelector<HTMLButtonElement>('.analytics-churn-bar')!.click());
+    expect(readAnalyticsFilters('C:/repo')).toMatchObject({ since: '2026-10-08', until: '2026-10-08' });
+    expect(host.querySelector('.analytics-sidebar-nav [aria-current="page"]')?.textContent).toBe('Code Churn');
+    expect(host.querySelector('.analytics-churn')).toBeTruthy();
   });
   it('refreshes from the shared header and opens coverage notes from the current report', async () => {
     const saved = { ...report(), warnings: ['Shallow repository: local commits only'] };

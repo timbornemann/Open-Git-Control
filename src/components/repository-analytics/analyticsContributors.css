@@ -1,0 +1,18 @@
+.analytics-contributors .analytics-table th:nth-child(7),
+.analytics-contributors .analytics-table td:nth-child(7) {
+  border-left: 1px solid var(--border-color);
+  padding-left: 16px;
+}
+.analytics-contributors .analytics-table td:not(:first-child) {
+  white-space: nowrap;
+}
+.analytics-contributors .analytics-table td:first-child {
+  min-width: 150px;
+}
+.analytics-contributors-coverage {
+  margin: 10px 0 0;
+}
+.analytics-contributors .analytics-table-wrap:focus-visible {
+  outline: 1px solid var(--accent-primary);
+  outline-offset: -1px;
+}

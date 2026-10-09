@@ -11,7 +11,6 @@
 }
 .analytics-section-toolbar,
 .analytics-pagination,
-.analytics-legend,
 .analytics-axis {
   display: flex;
   align-items: center;
@@ -54,11 +53,6 @@
   font-size: 0.92rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-}
-.analytics-metrics--secondary {
-  padding-left: 0;
-  background: transparent;
-  border: 0;
 }
 .analytics-content {
   flex: 1;
@@ -290,24 +284,6 @@
 .analytics-period-axis > .is-last > span {
   transform: translateX(-100%);
 }
-.analytics-bars--churn .analytics-bar {
-  justify-content: center;
-  position: relative;
-}
-.analytics-bar-added {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 50%;
-  background: var(--status-success);
-}
-.analytics-bar-deleted {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  background: var(--status-danger);
-}
 .analytics-added {
   color: var(--status-success);
 }
@@ -318,19 +294,6 @@
   font-size: 0.7rem;
   color: var(--text-secondary);
   padding: 6px 0;
-}
-.analytics-legend {
-  justify-content: flex-start;
-  font-size: 0.72rem;
-}
-.analytics-data {
-  margin-top: 8px;
-  font-size: 0.74rem;
-  color: var(--text-secondary);
-}
-.analytics-data > summary {
-  cursor: pointer;
-  padding: 5px 0;
 }
 .analytics-calendar-scroll {
   overflow-x: auto;
@@ -415,9 +378,6 @@
   .analytics-metrics {
     gap: 8px 16px;
     padding: 10px 12px;
-  }
-  .analytics-metrics--secondary dd {
-    font-size: 0.87rem;
   }
   .analytics-section {
     padding: 12px;

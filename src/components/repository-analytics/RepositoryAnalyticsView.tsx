@@ -7,7 +7,8 @@ import { changeAnalyticsFilters, rememberAnalyticsSnapshot, useAnalyticsFilters 
 import { useRepositoryAnalytics } from './useRepositoryAnalytics';
 import { usePublishAnalyticsToolbar } from './analyticsToolbarState';
 import { AnalyticsOverview } from './AnalyticsOverview';
-import { AnalyticsChurn, AnalyticsContributions, AnalyticsOwnership, periodRange } from './AnalyticsActivity';
+import { AnalyticsContributions, periodRange } from './AnalyticsActivity';
+import { AnalyticsChurn } from './AnalyticsChurn';
 import { AnalyticsDetailsView } from './AnalyticsDetails';
 import { AnalyticsEmpty, count } from './AnalyticsCharts';
 import { analyticsSections, selectAnalyticsTab, useAnalyticsTab, type AnalyticsTab } from './analyticsNavigationState';
@@ -70,7 +71,7 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
   return (
     <div className="repository-analytics">
       <div
-        className={`analytics-content${tab === 'overview' ? ' analytics-content--overview' : ''}`}
+        className={`analytics-content${tab === 'overview' ? ' analytics-content--overview' : tab === 'churn' ? ' analytics-content--churn' : ''}`}
         tabIndex={0}
         aria-label={labels.find(({ id }) => id === tab)?.label}
       >
@@ -129,7 +130,6 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
                 }}
               />
             )}
-            {tab === 'ownership' && <AnalyticsOwnership snapshot={snapshot} onPerson={onPerson} />}
             {tab === 'churn' && <AnalyticsChurn snapshot={snapshot} onPeriod={onPeriod} />}
             {tab === 'coupling' && (
               <section className="analytics-section">

@@ -9,11 +9,11 @@ import { PeriodChart } from '../AnalyticsCharts';
 let host: HTMLDivElement, root: Root;
 const onSelect = vi.fn();
 const period = (date: string, commits: number): AnalyticsPeriod => ({ date, commits, merges: 0, additions: commits * 2, deletions: commits });
-const render = (periods: AnalyticsPeriod[], interval: 'day' | 'week' | 'month' = 'day', churn = false) =>
+const render = (periods: AnalyticsPeriod[], interval: 'day' | 'week' | 'month' = 'day') =>
   act(() =>
     root.render(
       <I18nProvider language="en">
-        <PeriodChart periods={periods} interval={interval} churn={churn} onSelect={onSelect} />
+        <PeriodChart periods={periods} interval={interval} onSelect={onSelect} />
       </I18nProvider>,
     ),
   );
@@ -84,15 +84,11 @@ describe('activity chart labels', () => {
     expect(axis.querySelectorAll('[data-date]')).toHaveLength(12);
     expect(host.querySelectorAll('.analytics-bar-value')).toHaveLength(2);
   });
-  it('handles a single period and keeps the separate churn table', () => {
+  it('handles a single period and an empty history without a duplicate table', () => {
     render([period('2026-10-01', 1)]);
     expect(host.querySelectorAll('[data-date]')).toHaveLength(1);
     expect(host.querySelector('[data-date]')?.getAttribute('data-date')).toBe('2026-10-01');
-    render([period('2026-10-01', 1)], 'day', true);
-    expect(host.querySelector('.analytics-data summary')?.textContent).toBe('Chart data as table');
-    expect(host.querySelector('.analytics-bar-value')).toBeNull();
-    expect(host.querySelector('.analytics-bar-added')).toBeTruthy();
-    expect(host.querySelector('.analytics-bar-deleted')).toBeTruthy();
+    expect(host.querySelector('table')).toBeNull();
     render([]);
     expect(host.textContent).toBe('No activity in the selected period.');
   });
