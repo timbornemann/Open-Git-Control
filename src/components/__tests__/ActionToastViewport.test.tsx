@@ -21,6 +21,23 @@ afterEach(() => {
   container.remove();
 });
 describe('Git errors in the central notification viewport', () => {
+  it.each([
+    [16.107931316434996, 16],
+    [101, 100],
+    [-10, 0],
+    [NaN, null],
+  ])('shows concise bounded notification progress for %s', async (value, expected) => {
+    await act(async () =>
+      root.render(
+        <I18nProvider language="en">
+          <ActionToastViewport toasts={[{ id: 1, msg: 'Analyzing', isError: false, kind: 'progress', progress: { value, label: 'Files checked' } }]} />
+        </I18nProvider>,
+      ),
+    );
+    const track = container.querySelector('[role="progressbar"]')!;
+    expect(track.getAttribute('aria-valuenow')).toBe(expected === null ? null : String(expected));
+    expect(container.querySelector('.toast-progress-value')?.textContent ?? null).toBe(expected === null ? null : `${expected}%`);
+  });
   it('shows a short explanation, collapsed full output, and copies the redacted diagnostic', async () => {
     const signIn = vi.fn();
     const raw = 'Command failed: git push\nGit Output: fatal: Authentication failed for https://user:password@example.test/repo.git';

@@ -50,7 +50,9 @@ describe('change hotspot heatmap', () => {
   it('identifies files on hover and opens their captured versions and history', () => {
     render();
     expect(host.querySelector('table')).toBeNull();
-    expect(cells().map((cell) => cell.textContent)).toEqual(['40', '20', '1']);
+    expect(cells().map((cell) => cell.querySelector('span')?.textContent)).toEqual(['40', '20', undefined]);
+    expect([...host.querySelectorAll('.analytics-treemap-group')].map((group) => group.textContent)).toContain('src');
+    expect(cells()[0].style.width).not.toBe(cells()[1].style.width);
     hover(cells()[1]);
     const popup = tooltip()!;
     expect(popup.textContent).toContain('src/theme.css');
@@ -74,16 +76,15 @@ describe('change hotspot heatmap', () => {
     expect(cells()[0].classList.contains('analytics-heatmap-level--1')).toBe(true);
     expect(host.querySelector('.analytics-heatmap-legend')?.getAttribute('aria-label')).toContain('40');
   });
-  it('supports grid keyboard navigation, focus tooltips and Escape dismissal', () => {
-    render([...rows(), change('README.md', 1)]);
-    host.querySelector<HTMLElement>('.analytics-heatmap-grid')!.style.gridTemplateColumns = '54px 54px';
+  it('supports spatial keyboard navigation, focus tooltips and Escape dismissal', () => {
+    render([change('a.ts', 40), change('b.ts', 20), change('c.ts', 10), change('d.ts', 5)]);
     hover(cells()[1]);
     act(() => cells()[0].focus());
-    expect(tooltip()?.textContent).toContain('src/components/Editor.tsx');
-    key(cells()[0], 'ArrowDown');
-    expect(document.activeElement).toBe(cells()[2]);
-    expect(tooltip()?.textContent).toContain('docs/guide.md');
-    key(cells()[2], 'ArrowRight');
+    expect(tooltip()?.textContent).toContain('a.ts');
+    key(cells()[0], 'ArrowRight');
+    expect(document.activeElement).toBe(cells()[1]);
+    expect(tooltip()?.textContent).toContain('b.ts');
+    key(cells()[1], 'ArrowDown');
     expect(document.activeElement).toBe(cells()[3]);
     key(cells()[3], 'Home');
     expect(document.activeElement).toBe(cells()[0]);
@@ -92,7 +93,7 @@ describe('change hotspot heatmap', () => {
     expect(cells()[0].getAttribute('aria-describedby')).toBeNull();
     key(cells()[0], 'End');
     expect(document.activeElement).toBe(cells()[3]);
-    expect(tooltip()?.textContent).toContain('README.md');
+    expect(tooltip()?.textContent).toContain('d.ts');
   });
   it('retains focus and updates the tooltip and captured commit after a background refresh', () => {
     render();

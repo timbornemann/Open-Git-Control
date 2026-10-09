@@ -31,7 +31,10 @@ const render = (saved = snapshot(), kind: 'hotspots' | 'directories' = 'hotspots
       </I18nProvider>,
     ),
   );
-const click = (text: string) => act(async () => [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === text)!.click());
+const click = (text: string) =>
+  act(async () =>
+    [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === text || button.querySelector('span')?.textContent === text)!.click(),
+  );
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -73,9 +76,9 @@ describe('paginated hotspot heatmaps', () => {
     await render({ ...snapshot(), id: 'updated', savedAt: 2000 });
     expect(host.querySelector('.analytics-heatmap-cell')).toBe(cell);
     expect(document.activeElement).toBe(cell);
-    expect(cell.textContent).toBe('101');
+    expect(cell.querySelector('span')?.textContent).toBe('101');
     await act(async () => resolveOld({ success: true, data: { items: [row('wrong.ts', 1)], total: 1, offset: 0 } }));
-    expect(cell.textContent).toBe('101');
+    expect(cell.querySelector('span')?.textContent).toBe('101');
     expect(host.textContent).not.toContain('wrong.ts');
   });
   it('uses the same map for directories and routes their actions to history', async () => {

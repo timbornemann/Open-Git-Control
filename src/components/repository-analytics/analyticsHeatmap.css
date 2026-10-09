@@ -31,19 +31,42 @@
   border-radius: 2px;
 }
 .analytics-heatmap-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
-  gap: 5px;
+  position: relative;
+  height: clamp(260px, 42vh, 470px);
+  isolation: isolate;
+  background: var(--bg-dark);
+  border-radius: 4px;
+}
+.analytics-treemap-group {
+  position: absolute;
+  border: 1px solid var(--border-color);
+  background: var(--bg-panel);
+  border-radius: 3px;
+  pointer-events: none;
+}
+.analytics-treemap-group > span {
+  display: block;
+  overflow: hidden;
+  padding: 3px 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 0.65rem;
+  line-height: 14px;
 }
 .analytics-heatmap-cell {
+  position: absolute;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 46px;
   min-width: 0;
-  padding: 4px;
-  border: 0;
-  border-radius: 4px;
+  min-height: 0;
+  gap: 4px;
+  padding: 0;
+  border: 2px solid var(--bg-darker);
+  border-radius: 3px;
+  overflow: hidden;
   color: var(--text-primary);
   font: inherit;
   font-size: 0.76rem;
@@ -55,6 +78,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.analytics-heatmap-cell > small {
+  max-width: 100%;
+  padding: 0 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.65rem;
+  font-weight: 400;
+}
+.analytics-heatmap-cell:focus-visible {
+  z-index: 1;
 }
 .analytics-heatmap-level--1 {
   background: color-mix(in srgb, var(--accent-secondary) 22%, var(--bg-dark));

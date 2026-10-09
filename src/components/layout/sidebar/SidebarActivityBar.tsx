@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { Settings, FolderOpen, FolderGit2, Globe, ListTodo, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { BarChart3, Settings, FolderOpen, FolderGit2, Globe, ListTodo, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import type { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '@/i18n';
 import { UpdateNotification } from './UpdateNotification';
@@ -12,7 +12,7 @@ type SidebarActivityBarProps = Pick<AppSidebarProps, 'activeTab' | 'setActiveTab
 };
 
 export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({ activeTab, setActiveTab, isSidebarCollapsed, onToggleSidebar }) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   const activateTab = (tab: AppSidebarProps['activeTab']) => {
     if (tab === activeTab) {
       onToggleSidebar();
@@ -39,6 +39,15 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({ activeTa
       </button>
       <button className={`icon-btn ${activeTab === 'planner' ? 'active' : ''}`} onClick={() => activateTab('planner')} title={t('sidebar.planner')}>
         <ListTodo size={22} />
+      </button>
+      <button
+        className={`icon-btn ${activeTab === 'analytics' ? 'active' : ''}`}
+        onClick={() => activateTab('analytics')}
+        title={tr('Statistik & Analyse', 'Statistics & analytics')}
+        aria-label={tr('Statistik & Analyse', 'Statistics & analytics')}
+        aria-current={activeTab === 'analytics' ? 'page' : undefined}
+      >
+        <BarChart3 size={22} />
       </button>
       <button
         className={`icon-btn ${activeTab === 'hosting' || activeTab === 'github' ? 'active' : ''}`}

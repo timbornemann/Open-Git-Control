@@ -133,7 +133,7 @@ describe('useWorkspaceDomain repository canonicalization', () => {
     hook.unmount();
   });
 
-  it('defers tab and repository switches until the working-file guard proceeds', async () => {
+  it.each(['settings', 'analytics'] as const)('defers %s and repository switches until the working-file guard proceeds', async (tab) => {
     vi.spyOn(appClient, 'getStoredRepos').mockResolvedValue({
       repos: [
         { path: 'C:/repo-a', lastOpened: 2, pinned: false, createdAt: 1 },
@@ -149,10 +149,10 @@ describe('useWorkspaceDomain repository canonicalization', () => {
     await flushEffects();
     await vi.waitFor(() => expect(hook.current.activeRepo).toBe('C:/repo-a'));
 
-    act(() => hook.current.setActiveTab('settings'));
+    act(() => hook.current.setActiveTab(tab));
     expect(hook.current.activeTab).toBe('repo');
     act(() => pending.shift()?.());
-    expect(hook.current.activeTab).toBe('settings');
+    expect(hook.current.activeTab).toBe(tab);
 
     let switchPromise!: Promise<void>;
     act(() => {
@@ -164,6 +164,7 @@ describe('useWorkspaceDomain repository canonicalization', () => {
       await switchPromise;
     });
     expect(hook.current.activeRepo).toBe('C:/repo-b');
+    expect(hook.current.activeTab).toBe(tab);
     hook.unmount();
   });
 

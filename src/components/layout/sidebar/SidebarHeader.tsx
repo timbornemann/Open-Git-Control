@@ -6,7 +6,7 @@ import { useI18n } from '@/i18n';
 type SidebarHeaderProps = Pick<AppSidebarProps, 'activeTab' | 'activeRepo' | 'onRefreshRemoteQuick' | 'remoteSync' | 'isGitActionRunning'>;
 
 export const SidebarHeader: React.FC<SidebarHeaderProps> = ({ activeTab, activeRepo, onRefreshRemoteQuick, remoteSync, isGitActionRunning }) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
 
   return (
     <div className="sidebar-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -17,9 +17,11 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({ activeTab, activeR
             ? t('sidebar.currentRepository')
             : activeTab === 'planner'
               ? t('sidebar.planner')
-              : activeTab === 'github' || activeTab === 'hosting'
-                ? 'Hosting'
-                : t('sidebar.settings')}
+              : activeTab === 'analytics'
+                ? tr('Statistik & Analyse', 'Statistics & analytics')
+                : activeTab === 'github' || activeTab === 'hosting'
+                  ? 'Hosting'
+                  : t('sidebar.settings')}
       </span>
       <div className="sidebar-header-actions">
         {activeTab === 'repo' && activeRepo && (

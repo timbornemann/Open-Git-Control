@@ -32,7 +32,6 @@ type RouteParams = {
   showRunConfig?: boolean;
   showSecretScanAllowlist?: boolean;
   showRemoteConfig?: boolean;
-  showRepositoryAnalytics?: boolean;
   showReleaseCreator?: boolean;
   showRepositoryPublication?: boolean;
 };
@@ -50,14 +49,13 @@ export const getMainPrimaryRoute = ({
   showRunConfig,
   showSecretScanAllowlist,
   showRemoteConfig,
-  showRepositoryAnalytics,
   showReleaseCreator,
   showRepositoryPublication,
 }: RouteParams): MainPrimaryRoute => {
   if (activeTab === 'localRepos') return 'localRepos';
   if (activeTab === 'planner') return 'planner';
   if (activeTab === 'settings') return 'settings';
-  if (activeTab === 'repo' && showRepositoryAnalytics) return 'analytics';
+  if (activeTab === 'analytics') return 'analytics';
   if (activeTab === 'repo' && showSecretScanAllowlist) return 'secretScanAllowlist';
   if (activeTab === 'repo' && showRepositoryPublication) return 'repositoryPublication';
   if (activeTab === 'repo' && showReleaseCreator) return 'releaseCreator';
@@ -104,4 +102,4 @@ export const getMainPrimaryTitle = (route: MainPrimaryRoute, t: Translate, tr: (
 };
 
 export const hasMainPrimaryHeader = (route: MainPrimaryRoute): boolean =>
-  route !== 'localRepos' && route !== 'planner' && route !== 'hosting' && route !== 'graph' && route !== 'runConsole';
+  route !== 'localRepos' && route !== 'planner' && route !== 'analytics' && route !== 'hosting' && route !== 'graph' && route !== 'runConsole';

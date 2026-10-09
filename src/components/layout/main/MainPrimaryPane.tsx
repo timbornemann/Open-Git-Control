@@ -27,9 +27,7 @@ const ProjectPlannerView = viewModules.planner.View;
 const HostingWorkspaceView = viewModules.hosting.View;
 const SettingsMainContent = viewModules.settings.View;
 const RepositoryReleaseCreator = viewModules.release.View;
-const RepositoryAnalyticsView = React.lazy(() =>
-  import('@/components/repository-analytics/RepositoryAnalyticsView').then((module) => ({ default: module.RepositoryAnalyticsView })),
-);
+const RepositoryAnalyticsView = viewModules.analytics.View;
 
 type MainPrimaryPaneProps = {
   primaryPaneBasis: string;
@@ -106,7 +104,6 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
     showRunConfig: ui.isRunConfigOpen,
     showSecretScanAllowlist: ui.isSecretScanAllowlistOpen,
     showRemoteConfig: ui.isRemoteConfigOpen,
-    showRepositoryAnalytics: ui.isRepositoryAnalyticsOpen,
     showReleaseCreator: ui.isReleaseCreatorOpen,
     showRepositoryPublication: ui.isRepositoryPublicationOpen,
   });
@@ -163,11 +160,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
       {shouldShowPrimaryPaneHeader && (
         <div className={`pane-header pane-header-main${activeConflictPath ? ' pane-header-main--conflict' : ''}`}>
           <span className="pane-header-main-title">{primaryPaneTitle}</span>
-          {isSettingsView ? null : isAnalyticsView ? (
-            <button className="icon-btn pane-header-nav-btn" onClick={ui.onCloseRepositoryAnalytics}>
-              {tr('Zurück zum Repository', 'Back to repository')}
-            </button>
-          ) : isRepositoryPublicationView ? (
+          {isSettingsView ? null : isRepositoryPublicationView ? (
             <button className="icon-btn pane-header-nav-btn" onClick={ui.onCloseRepositoryPublication}>
               {tr('Zurück', 'Back')}
             </button>
@@ -211,12 +204,9 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
               repoPath={repository.activeRepo}
               refreshTrigger={repository.refreshTrigger}
               busy={workflow.isGitActionRunning}
-              onOpenCommit={(hash) => {
-                ui.onCloseRepositoryAnalytics?.();
-                repository.onNavigateToCommit(hash);
-              }}
+              onOpenCommit={repository.onNavigateToCommit}
               onOpenFile={(path, hash) => {
-                ui.onCloseRepositoryAnalytics?.();
+                repository.onOpenRepoWorkspace();
                 handleOpenDiff({ path, source: 'commit', commitHash: hash });
               }}
             />

@@ -1,5 +1,5 @@
 import React from 'react';
-import { FolderGit2, GitBranch, Globe, PanelRightClose, PanelRightOpen, RefreshCw } from 'lucide-react';
+import { BarChart3, FolderGit2, GitBranch, Globe, PanelRightClose, PanelRightOpen, RefreshCw } from 'lucide-react';
 import { TopbarActions } from '@/components/topbar/TopbarActions';
 import { useGitStore, useUIStore, useWorkflowStore } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
@@ -31,7 +31,6 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
   const onOpenSecretScanAllowlist = useUIStore((state) => state.onOpenSecretScanAllowlist);
   const onOpenRemoteConfig = useUIStore((state) => state.onOpenRemoteConfig);
   const onOpenRepositoryAnalytics = useUIStore((state) => state.onOpenRepositoryAnalytics);
-  const onCloseRepositoryAnalytics = useUIStore((state) => state.onCloseRepositoryAnalytics);
   const onCloseRemoteConfig = useUIStore((state) => state.onCloseRemoteConfig);
   const onOpenReleaseCreator = useUIStore((state) => state.onOpenReleaseCreator);
   const onPublishRepository = useUIStore((state) => state.onOpenRepositoryPublication);
@@ -61,11 +60,12 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
   const onStartRepositoryRun = useWorkflowStore((state) => state.onStartRepositoryRun);
   const onStopRepositoryRun = useWorkflowStore((state) => state.onStopRepositoryRun);
   const onOpenRunConsole = useWorkflowStore((state) => state.onOpenRunConsole);
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   const isPlannerView = activeTab === 'planner';
   const isGithubView = activeTab === 'github' || activeTab === 'hosting';
   const isLocalReposView = activeTab === 'localRepos';
-  const isWorkspaceView = isPlannerView || isGithubView || isLocalReposView;
+  const isAnalyticsView = activeTab === 'analytics';
+  const isWorkspaceView = isPlannerView || isGithubView || isLocalReposView || isAnalyticsView;
   const repositoryRunForActiveRepo = repositoryRun?.repoPath === activeRepo ? repositoryRun : null;
 
   return (
@@ -86,18 +86,28 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
               border: '1px solid var(--accent-primary-border)',
             }}
           >
-            {isGithubView ? <Globe size={14} /> : isLocalReposView ? <FolderGit2 size={14} /> : <GitBranch size={14} />}
+            {isAnalyticsView ? (
+              <BarChart3 size={14} />
+            ) : isGithubView ? (
+              <Globe size={14} />
+            ) : isLocalReposView ? (
+              <FolderGit2 size={14} />
+            ) : (
+              <GitBranch size={14} />
+            )}
           </div>
           <span className="topbar-repo-title">
-            {isGithubView
-              ? 'Hosting'
-              : isLocalReposView
-                ? t('sidebar.localRepos')
-                : isPlannerView
-                  ? t('generated.components.layout.main.maintopbar.project_planning_71556778')
-                  : activeRepo
-                    ? activeRepo.split(/[\\/]/).pop()
-                    : 'Open-Git-Control'}
+            {isAnalyticsView
+              ? tr('Statistik & Analyse', 'Statistics & analytics')
+              : isGithubView
+                ? 'Hosting'
+                : isLocalReposView
+                  ? t('sidebar.localRepos')
+                  : isPlannerView
+                    ? t('generated.components.layout.main.maintopbar.project_planning_71556778')
+                    : activeRepo
+                      ? activeRepo.split(/[\\/]/).pop()
+                      : 'Open-Git-Control'}
           </span>
           {!isWorkspaceView && currentBranch && (
             <span className="topbar-chip topbar-chip-branch">
@@ -147,7 +157,6 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
                 onOpenReleaseCreator();
               }}
               onOpenTimeline={() => {
-                onCloseRepositoryAnalytics?.();
                 if (isRepositoryPublicationOpen) onCloseRepositoryPublication?.();
                 if (isReleaseCreatorOpen) onCloseReleaseCreator();
                 onCloseRunConfig();

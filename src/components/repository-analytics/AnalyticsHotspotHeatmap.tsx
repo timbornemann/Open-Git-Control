@@ -1,10 +1,12 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { File, Folder, History } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import type { AnalyticsChanges } from '@/shared/ipc/repositoryAnalytics';
-import { count, moveChartFocus } from './AnalyticsCharts';
+import { count } from './AnalyticsCharts';
 import { AnalyticsHotspotTooltip } from './AnalyticsHotspotTooltip';
+import { analyticsTreemapLayout, treemapNeighbor, type TreemapRect } from './analyticsTreemapLayout';
+import { useAnalyticsSize } from './useAnalyticsSize';
 import './analyticsHeatmap.css';
 
 type Target = { path: string; anchor: HTMLButtonElement };
@@ -18,6 +20,14 @@ type Props = {
 };
 export function AnalyticsHotspotHeatmap({ rows, maxChanges = 0, directory = false, preview = false, onFile, onPath }: Props) {
   const { tr } = useI18n();
+  const { ref, width, height } = useAnalyticsSize();
+  const { tiles, groups } = useMemo(() => analyticsTreemapLayout(rows, width, height), [rows, width, height]);
+  const position = (rect: TreemapRect) => ({
+    left: `${(rect.x / width) * 100}%`,
+    top: `${(rect.y / height) * 100}%`,
+    width: `${(rect.width / width) * 100}%`,
+    height: `${(rect.height / height) * 100}%`,
+  });
   const tooltipId = useId();
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [hovered, setHovered] = useState<Target | null>(null);
@@ -52,14 +62,19 @@ export function AnalyticsHotspotHeatmap({ rows, maxChanges = 0, directory = fals
     else onFile(row.path, row.hash);
   };
   return (
-    <div className="analytics-heatmap">
+    <div className={`analytics-heatmap${preview ? ' analytics-heatmap--preview' : ''}`}>
       <div className="analytics-heatmap-caption">
-        <span>
+        <span
+          title={tr(
+            'Nach Verzeichnissen gruppiert. Fläche und Farbe zeigen Änderungshäufigkeit.',
+            'Grouped by directory. Area and color show change frequency.',
+          )}
+        >
           {preview
-            ? `${count(rows.length)} ${rows.length === 1 ? tr('meistgeänderte Datei', 'most changed file') : tr('meistgeänderte Dateien', 'most changed files')}`
-            : tr(directory ? 'Eine Kachel pro Verzeichnis' : 'Eine Kachel pro Datei', directory ? 'One tile per directory' : 'One tile per file')}
+            ? `${count(rows.length)} ${rows.length === 1 ? tr('Datei', 'file') : tr('Dateien', 'files')}`
+            : tr('Nach Verzeichnissen gruppiert', 'Grouped by directory')}
           {' · '}
-          {tr('Zahl = Änderungen', 'Number = changes')}
+          {preview ? tr('Änderungen', 'Changes') : tr('Fläche & Farbe = Änderungen', 'Area & color = changes')}
         </span>
         <div
           className="analytics-heatmap-legend"
@@ -74,13 +89,26 @@ export function AnalyticsHotspotHeatmap({ rows, maxChanges = 0, directory = fals
           <span>{count(max)}</span>
         </div>
       </div>
-      <div className="analytics-heatmap-grid" role="group" aria-label={tr('Heatmap der Änderungsschwerpunkte', 'Change hotspots heatmap')}>
-        {rows.map((row) => {
+      <div
+        ref={ref}
+        className="analytics-heatmap-grid analytics-treemap"
+        role="group"
+        aria-label={tr('Baumkarte der Änderungsschwerpunkte', 'Change hotspots treemap')}
+      >
+        {groups.map((group) => (
+          <div key={group.path} className="analytics-treemap-group" data-depth={group.depth} style={position(group)} aria-hidden="true">
+            {group.label && <span>{group.path}</span>}
+          </div>
+        ))}
+        {tiles.map((tile) => {
+          const row = tile.row;
           const level = Math.max(1, Math.min(5, Math.ceil((row.changes / max) * 5)));
           return (
             <button
               key={row.path}
               type="button"
+              data-path={row.path}
+              style={position(tile)}
               className={`analytics-heatmap-cell analytics-heatmap-level--${level}${selected.path === row.path ? ' is-highlighted' : ''}`}
               aria-label={`${pathLabel(row)}: ${changeLabel(row)}`}
               aria-describedby={tooltipVisible && active.path === row.path ? tooltipId : undefined}
@@ -98,12 +126,16 @@ export function AnalyticsHotspotHeatmap({ rows, maxChanges = 0, directory = fals
               }}
               onBlur={() => setFocused(null)}
               onKeyDown={(event) => {
-                const columns = getComputedStyle(event.currentTarget.parentElement!).gridTemplateColumns.split(' ').filter(Boolean).length;
-                moveChartFocus(event, Math.max(1, columns));
+                if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+                event.preventDefault();
+                const path = event.key === 'Home' ? rows[0].path : event.key === 'End' ? rows.at(-1)!.path : treemapNeighbor(tiles, row.path, event.key);
+                const buttons = event.currentTarget.parentElement!.querySelectorAll<HTMLButtonElement>('.analytics-heatmap-cell');
+                [...buttons].find((button) => button.dataset.path === path)?.focus();
               }}
               onClick={() => open(row)}
             >
-              <span aria-hidden="true">{count(row.changes)}</span>
+              {tile.width >= 75 && tile.height >= 42 && <small aria-hidden="true">{row.path.split('/').at(-1)}</small>}
+              {tile.width >= 25 && tile.height >= 23 && <span aria-hidden="true">{count(row.changes)}</span>}
             </button>
           );
         })}

@@ -1,18 +1,19 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Button, SegmentedControl, TextField } from '@/components/ui';
+import { DialogFrame } from '@/components/DialogFrame';
 import { useI18n } from '@/i18n';
 import type { AnalyticsFilters, RepositoryAnalyticsSnapshot } from '@/shared/ipc/repositoryAnalytics';
-import { readAnalyticsFilters, saveAnalyticsFilters } from './analyticsPreferences';
+import { changeAnalyticsFilters, rememberAnalyticsSnapshot, useAnalyticsFilters } from './analyticsWorkspaceState';
 import { useRepositoryAnalytics } from './useRepositoryAnalytics';
-import { AnalyticsFiltersBar } from './AnalyticsFiltersBar';
 import { AnalyticsOverview } from './AnalyticsOverview';
 import { AnalyticsChurn, AnalyticsContributions, AnalyticsOwnership, periodRange } from './AnalyticsActivity';
 import { AnalyticsDetailsView } from './AnalyticsDetails';
 import { AnalyticsEmpty, count } from './AnalyticsCharts';
+import { analyticsSections, selectAnalyticsTab, useAnalyticsTab, type AnalyticsTab } from './analyticsNavigationState';
 import './repositoryAnalytics.css';
+import './analyticsControls.css';
 
-type Tab = 'overview' | 'hotspots' | 'contributions' | 'ownership' | 'churn' | 'coupling' | 'comparison' | 'commits';
 type Props = {
   repoPath: string | null;
   refreshTrigger: number;
@@ -30,17 +31,16 @@ export function RepositoryAnalyticsView(props: Props) {
 }
 function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile, onOpenCommit }: Props & { repoPath: string }) {
   const { tr, locale } = useI18n();
-  const [filters, setFilters] = useState(() => readAnalyticsFilters(repoPath));
-  const [tab, setTab] = useState<Tab>('overview');
+  const filters = useAnalyticsFilters(repoPath);
+  const tab = useAnalyticsTab(repoPath);
+  const setTab = (value: AnalyticsTab) => selectAnalyticsTab(repoPath, value);
   const [hotspotKind, setHotspotKind] = useState<'hotspots' | 'directories'>('hotspots');
-  const onFilters = useCallback(
-    (value: AnalyticsFilters) => {
-      setFilters(value);
-      saveAnalyticsFilters(repoPath, value);
-    },
-    [repoPath],
-  );
+  const [showCoverage, setShowCoverage] = useState(false);
+  const onFilters = useCallback((value: AnalyticsFilters) => changeAnalyticsFilters(repoPath, value), [repoPath]);
   const { snapshot, running, paused, error, reload, cancel } = useRepositoryAnalytics(repoPath, filters, refreshTrigger, busy);
+  useEffect(() => {
+    if (snapshot) rememberAnalyticsSnapshot(snapshot);
+  }, [snapshot]);
   const onPath = (path: string) => {
     onFilters({ ...filters, path });
     setTab('commits');
@@ -53,16 +53,7 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
     if (snapshot) onFilters({ ...filters, ...periodRange(date, snapshot, filters.aggregation) });
     setTab('commits');
   };
-  const labels: [Tab, string][] = [
-    ['overview', tr('Überblick', 'Overview')],
-    ['hotspots', tr('Änderungsschwerpunkte', 'Change hotspots')],
-    ['contributions', tr('Beiträge', 'Contributions')],
-    ['ownership', tr('Zuletzt geänderte Zeilen', 'Last changed lines')],
-    ['churn', 'Code Churn'],
-    ['coupling', tr('Dateikopplung', 'File coupling')],
-    ['comparison', tr('Release-Vergleich', 'Release comparison')],
-    ['commits', 'Commits'],
-  ];
+  const labels = analyticsSections(tr);
   const details = (kind: 'commits' | 'hotspots' | 'directories' | 'coupling' | 'comparison') =>
     snapshot && (
       <AnalyticsDetailsView
@@ -76,36 +67,36 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
     );
   return (
     <div className="repository-analytics">
-      <div className="analytics-header">
-        <AnalyticsFiltersBar filters={filters} snapshot={snapshot} onChange={onFilters}>
-          {snapshot && (
-            <time
-              className="analytics-updated"
-              dateTime={new Date(snapshot.savedAt).toISOString()}
-              title={`${tr('Lokale Auswertung vom', 'Local report from')} ${new Date(snapshot.savedAt).toLocaleString(locale)}`}
-            >
-              {tr('Stand', 'Updated')} {new Date(snapshot.savedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
-            </time>
-          )}
-          {running ? (
-            <Button size="xs" variant="ghost" className="analytics-refresh-action" onClick={cancel}>
-              {tr('Abbrechen', 'Cancel')}
-            </Button>
-          ) : (
-            <Button size="xs" variant="ghost" className="analytics-refresh-action" icon={<RefreshCw size={13} />} onClick={reload}>
-              {paused || error ? tr('Fortsetzen', 'Resume') : tr('Aktualisieren', 'Refresh')}
-            </Button>
-          )}
-        </AnalyticsFiltersBar>
-        <nav className="analytics-tabs" aria-label={tr('Auswertungen', 'Analyses')}>
-          {labels.map(([value, label]) => (
-            <button key={value} className={tab === value ? 'is-active' : ''} aria-current={tab === value ? 'page' : undefined} onClick={() => setTab(value)}>
-              {label}
-            </button>
-          ))}
-        </nav>
+      <div className="analytics-header analytics-report-toolbar">
+        {!!snapshot?.warnings.length && (
+          <Button size="xs" variant="ghost" onClick={() => setShowCoverage(true)}>
+            {tr('Hinweise zur Abdeckung', 'Coverage notes')}
+          </Button>
+        )}
+        {snapshot && (
+          <time
+            className="analytics-updated"
+            dateTime={new Date(snapshot.savedAt).toISOString()}
+            title={`${tr('Lokale Auswertung vom', 'Local report from')} ${new Date(snapshot.savedAt).toLocaleString(locale)}`}
+          >
+            {tr('Stand', 'Updated')} {new Date(snapshot.savedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
+          </time>
+        )}
+        {running ? (
+          <Button size="xs" variant="ghost" className="analytics-refresh-action" onClick={cancel}>
+            {tr('Abbrechen', 'Cancel')}
+          </Button>
+        ) : (
+          <Button size="xs" variant="ghost" className="analytics-refresh-action" icon={<RefreshCw size={13} />} onClick={reload}>
+            {paused || error ? tr('Fortsetzen', 'Resume') : tr('Aktualisieren', 'Refresh')}
+          </Button>
+        )}
       </div>
-      <div className="analytics-content" tabIndex={0} aria-label={labels.find(([value]) => value === tab)?.[1]}>
+      <div
+        className={`analytics-content${tab === 'overview' ? ' analytics-content--overview' : ''}`}
+        tabIndex={0}
+        aria-label={labels.find(({ id }) => id === tab)?.label}
+      >
         {!snapshot ? (
           <AnalyticsEmpty>
             {running || busy
@@ -114,14 +105,6 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
           </AnalyticsEmpty>
         ) : (
           <>
-            {!!snapshot.warnings.length && (
-              <details className="analytics-method analytics-section">
-                <summary>{tr('Hinweise zur Abdeckung', 'Coverage notes')}</summary>
-                {snapshot.warnings.map((warning) => (
-                  <p key={warning}>{translateWarning(warning, tr)}</p>
-                ))}
-              </details>
-            )}
             {tab === 'overview' && (
               <AnalyticsOverview
                 snapshot={snapshot}
@@ -157,29 +140,6 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
                 </p>
                 {details(hotspotKind)}
               </section>
-            )}
-            {['contributions', 'churn'].includes(tab) && (
-              <div className="analytics-section-toolbar analytics-aggregation">
-                <label>
-                  {tr('Zeiträume', 'Periods')}{' '}
-                  <select
-                    className="ui-field"
-                    value={filters.aggregation}
-                    onChange={(event) => onFilters({ ...filters, aggregation: event.target.value as AnalyticsFilters['aggregation'] })}
-                  >
-                    {[
-                      ['auto', tr('Automatisch', 'Automatic')],
-                      ['day', tr('Tage', 'Days')],
-                      ['week', tr('Wochen', 'Weeks')],
-                      ['month', tr('Monate', 'Months')],
-                    ].map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
             )}
             {tab === 'contributions' && (
               <AnalyticsContributions
@@ -223,6 +183,16 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
           </>
         )}
       </div>
+      <DialogFrame
+        open={showCoverage && !!snapshot?.warnings.length}
+        title={tr('Hinweise zur Abdeckung', 'Coverage notes')}
+        onClose={() => setShowCoverage(false)}
+        cancelLabel={tr('Schließen', 'Close')}
+      >
+        {snapshot?.warnings.map((warning) => (
+          <p key={warning}>{translateWarning(warning, tr)}</p>
+        ))}
+      </DialogFrame>
     </div>
   );
 }

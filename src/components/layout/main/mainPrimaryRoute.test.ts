@@ -11,18 +11,22 @@ const base = {
 };
 
 describe('local repository primary route', () => {
-  it('shows analytics as a repository subpage ahead of timeline and file details', () => {
+  it('shows the standalone analytics tab ahead of lingering repository subpages and file details', () => {
     expect(
       getMainPrimaryRoute({
         ...base,
-        activeTab: 'repo',
-        showRepositoryAnalytics: true,
+        activeTab: 'analytics',
+        showRunConfig: true,
+        showRemoteConfig: true,
+        showReleaseCreator: true,
+        showRecoveryCenter: true,
+        activeConflictPath: 'conflict.ts',
         showTimeline: true,
         activeDiffRequest: { source: 'commit', path: 'a.ts' },
       }),
     ).toBe('analytics');
-    expect(hasMainPrimaryHeader('analytics')).toBe(true);
-    expect(getMainPrimaryRoute({ ...base, activeTab: 'settings', showRepositoryAnalytics: true })).toBe('settings');
+    expect(hasMainPrimaryHeader('analytics')).toBe(false);
+    expect(getMainPrimaryRoute({ ...base, activeTab: 'repo' })).toBe('graph');
   });
   it('opens repository publication in the repository subpage ahead of timeline and file details', () => {
     expect(

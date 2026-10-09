@@ -13,6 +13,7 @@ import type { TranslationVariables } from '@/i18n';
 import { buildCherryPickAbortDialog, buildMergeAbortDialog, buildRebaseAbortDialog } from '@/components/staging-area/conflictAbortDialogs';
 import { gitClient } from '@/services/gitClient';
 import { requestRemoteTransfer } from '@/components/hosting/remoteTransferDialogState';
+import { requestWorkingDirectoryNavigation } from '@/components/working-directory/workingDirectoryNavigationGuard';
 
 type AppState = ReturnType<typeof useAppState>;
 type Translate = (key: string, variables?: TranslationVariables) => string;
@@ -89,7 +90,6 @@ const createRepositorySlice = (state: AppState, tr: (deText: string, enText: str
   showSecondaryHistory: state.settings.showSecondaryHistory,
   onMergeBranch: state.handleMergeBranch,
   onOpenRepoWorkspace: () => {
-    state.onCloseRepositoryAnalytics();
     if (state.isRepositoryPublicationOpen) state.onCloseRepositoryPublication();
     state.onCloseRunConfig();
     state.onCloseRemoteConfig();
@@ -198,20 +198,23 @@ const createWorkflowSlice = (state: AppState, t: Translate, tr: (deText: string,
 const createUiSlice = ({ state, resetLayout, uiState }: Pick<CreateAppStateSlicesValueParams, 'state' | 'resetLayout' | 'uiState'>): UIContextValue => ({
   activeTab: state.activeTab,
   setActiveTab: (tab) => {
-    if (tab !== 'repo') {
-      state.onCloseRepositoryAnalytics();
-      state.onCloseRunConfig();
-      state.onCloseRemoteConfig();
-      state.onCloseSecretScanAllowlist();
-      if (state.isReleaseCreatorOpen) state.onCloseReleaseCreator();
-      if (state.isRepositoryPublicationOpen) state.onCloseRepositoryPublication();
+    if (tab === 'analytics') {
+      state.onOpenRepositoryAnalytics();
+      return;
     }
-    state.setActiveTab(tab);
+    requestWorkingDirectoryNavigation({ kind: 'view', label: tab }, () => {
+      if (tab !== 'repo') {
+        state.onCloseRunConfig();
+        state.onCloseRemoteConfig();
+        state.onCloseSecretScanAllowlist();
+        if (state.isReleaseCreatorOpen) state.onCloseReleaseCreator();
+        if (state.isRepositoryPublicationOpen) state.onCloseRepositoryPublication();
+      }
+      state.setActiveTab(tab);
+    });
   },
   isRunConfigOpen: state.isRunConfigOpen,
-  isRepositoryAnalyticsOpen: state.isRepositoryAnalyticsOpen,
   onOpenRepositoryAnalytics: state.onOpenRepositoryAnalytics,
-  onCloseRepositoryAnalytics: state.onCloseRepositoryAnalytics,
   onOpenRunConfig: state.onOpenRunConfig,
   onCloseRunConfig: state.onCloseRunConfig,
   isSecretScanAllowlistOpen: state.isSecretScanAllowlistOpen,

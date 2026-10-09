@@ -23,7 +23,7 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         label: state.settings.language === 'de' ? 'Statistik & Analyse' : 'Statistics & analytics',
         keywords: ['analytics', 'statistics', 'statistik', 'analyse', 'hotspots', 'churn', 'contributions'],
         action: () => {
-          if (state.activeRepo) state.onOpenRepositoryAnalytics();
+          state.onOpenRepositoryAnalytics();
         },
       },
       {

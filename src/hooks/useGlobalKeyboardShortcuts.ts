@@ -27,9 +27,9 @@ export const useGlobalKeyboardShortcuts = ({ setActiveTab, onFetch, onOpenComman
       // outside an editor is still protected by the working-file dirty guard.
       if (isEditableFocused()) return;
 
-      // Keep the established Ctrl+1..4 mapping; the planner is available on Ctrl+5.
+      // Keep existing mappings; statistics is available on Ctrl+6.
       if (!e.shiftKey && !e.altKey) {
-        const tabs: AppTabId[] = ['localRepos', 'repo', 'hosting', 'settings', 'planner'];
+        const tabs: AppTabId[] = ['localRepos', 'repo', 'hosting', 'settings', 'planner', 'analytics'];
         const idx = parseInt(e.key, 10) - 1;
         if (idx >= 0 && idx < tabs.length) {
           e.preventDefault();

@@ -26,9 +26,7 @@ export type BaseUIContextValue = SidebarCoreState & {
   onCloseSecretScanAllowlist: () => void;
   isRemoteConfigOpen: boolean;
   onOpenRemoteConfig: () => void;
-  isRepositoryAnalyticsOpen?: boolean;
   onOpenRepositoryAnalytics?: () => void;
-  onCloseRepositoryAnalytics?: () => void;
   onCloseRemoteConfig: () => void;
   isReleaseCreatorOpen: boolean;
   isRepositoryPublicationOpen?: boolean;

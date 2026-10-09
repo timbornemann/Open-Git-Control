@@ -1,0 +1,162 @@
+.analytics-content.analytics-content--overview {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.analytics-overview {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(125px, 0.7fr) minmax(0, 1.5fr) auto;
+}
+.analytics-overview .analytics-section {
+  min-height: 0;
+  padding: 12px 16px;
+}
+.analytics-overview .analytics-metrics--cards {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  padding: 12px 16px;
+  gap: 8px;
+}
+.analytics-overview .analytics-metrics--cards div {
+  min-height: 68px;
+  padding: 9px 12px;
+  gap: 5px;
+}
+.analytics-overview .analytics-metrics--cards dd {
+  font-size: 1.35rem;
+}
+.analytics-overview-section-heading {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-bottom: 6px;
+}
+.analytics-overview .analytics-overview-section-heading h3,
+.analytics-overview-section-heading .analytics-description {
+  margin: 0;
+}
+.analytics-overview-activity {
+  display: flex;
+  flex-direction: column;
+}
+.analytics-overview-activity .analytics-chart,
+.analytics-overview-activity .analytics-period-plot {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.analytics-overview-activity .analytics-bars {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+.analytics-overview-activity .analytics-period-axis {
+  flex: none;
+  height: 27px;
+}
+.analytics-overview-summaries {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  min-height: 0;
+}
+.analytics-overview-summaries > :first-child {
+  border-right: 1px solid var(--border-color);
+}
+.analytics-overview-hotspots {
+  display: flex;
+  flex-direction: column;
+}
+.analytics-overview .analytics-overview-hotspots h3 {
+  flex: none;
+  margin-bottom: 5px;
+}
+.analytics-overview-hotspots .analytics-overview-hint {
+  flex: none;
+  font-size: 0.69rem;
+  margin: 0 0 3px;
+}
+.analytics-overview-hotspots .analytics-heatmap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.analytics-overview-hotspots .analytics-heatmap-caption {
+  flex: none;
+  margin: 6px 0 8px;
+  font-size: 0.66rem;
+}
+.analytics-overview-hotspots .analytics-treemap {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.analytics-overview-hotspots .analytics-heatmap-selection {
+  flex: none;
+  min-height: 37px;
+  margin-top: 6px;
+  padding-top: 6px;
+}
+.analytics-overview-hotspots .analytics-heatmap-selection .analytics-link {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.analytics-overview-versions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.analytics-overview-versions h3 {
+  margin: 0;
+  flex: none;
+  font-size: 0.76rem;
+}
+.analytics-overview-versions .analytics-versions {
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.74rem;
+}
+.analytics-overview-versions .ui-field {
+  width: auto;
+  min-width: 0;
+  padding-block: 2px;
+  font-size: 0.72rem;
+}
+@container repository-analytics (max-width: 760px) {
+  .analytics-overview .analytics-section,
+  .analytics-overview .analytics-metrics--cards {
+    padding: 9px 12px;
+  }
+  .analytics-overview .analytics-metrics--cards div {
+    min-height: 63px;
+    padding: 7px;
+  }
+  .analytics-overview .analytics-metrics--cards dt {
+    font-size: 0.67rem;
+  }
+  .analytics-overview .analytics-metrics--cards dd {
+    font-size: 1.15rem;
+  }
+}
+@container repository-analytics (max-width: 570px) {
+  .analytics-overview-summaries {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1.1fr);
+  }
+  .analytics-overview-summaries > :first-child {
+    border-right: 0;
+  }
+  .analytics-overview-hint {
+    display: none;
+  }
+  .analytics-overview .analytics-metrics--cards {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

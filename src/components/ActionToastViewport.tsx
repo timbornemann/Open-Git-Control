@@ -58,6 +58,10 @@ export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({ toasts
         const toast = { ...entry, ...explainGitNotification(entry, tr) };
         const kind = toast.kind ?? (toast.isError ? 'error' : 'success');
         const Icon = kind === 'progress' ? Loader2 : kind === 'info' ? Info : kind === 'warning' ? AlertCircle : toast.isError ? X : Check;
+        const progress =
+          typeof toast.progress?.value === 'number' && Number.isFinite(toast.progress.value)
+            ? Math.round(Math.max(0, Math.min(100, toast.progress.value)))
+            : null;
         return (
           <div key={toast.id} className={`action-toast ${kind}`} role={toast.isError ? 'alert' : 'status'}>
             <div className="toast-main">
@@ -72,18 +76,18 @@ export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({ toasts
             {toast.progress && (
               <div className="toast-progress">
                 <div
-                  className={`toast-progress-track${toast.progress.value === null ? ' indeterminate' : ''}`}
+                  className={`toast-progress-track${progress === null ? ' indeterminate' : ''}`}
                   role="progressbar"
                   aria-label={toast.progress.label}
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  aria-valuenow={toast.progress.value === null ? undefined : toast.progress.value}
+                  aria-valuenow={progress ?? undefined}
                 >
-                  <span className="toast-progress-fill" style={toast.progress.value === null ? undefined : { width: `${toast.progress.value}%` }} />
+                  <span className="toast-progress-fill" style={progress === null ? undefined : { width: `${progress}%` }} />
                 </div>
-                {toast.progress.value !== null && (
+                {progress !== null && (
                   <span className="toast-progress-value" aria-hidden="true">
-                    {toast.progress.value}%
+                    {progress}%
                   </span>
                 )}
               </div>

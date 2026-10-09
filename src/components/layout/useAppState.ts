@@ -16,6 +16,7 @@ import { useRepoScopedNavigationState } from '@/app/state/useRepoScopedNavigatio
 import { useSettingsState } from '@/app/state/useSettingsState';
 import { useRepositoryRun } from '@/app/state/useRepositoryRun';
 import type { HostedRepositoryRef } from '@/types/hostingDtos';
+import type { AppTabId } from '@/app/state/contracts';
 import { requestWorkingDirectoryNavigation } from '@/components/working-directory/workingDirectoryNavigationGuard';
 import { prepareGitErrorNotification, type GitErrorEnvironment } from './workflows/gitErrorPresentation';
 import type { NotificationMessage } from '@/types/notifications';
@@ -26,7 +27,6 @@ export const useAppState = () => {
   const [plannerRefreshSignal, setPlannerRefreshSignal] = useState(0);
   const [isRunConfigOpen, setRunConfigOpen] = useState(false);
   const [isRemoteConfigOpen, setRemoteConfigOpen] = useState(false);
-  const [isRepositoryAnalyticsOpen, setRepositoryAnalyticsOpen] = useState(false);
   const [isSecretScanAllowlistOpen, setSecretScanAllowlistOpen] = useState(false);
   const [isReleaseCreatorOpen, setReleaseCreatorOpen] = useState(false);
   const [isRepositoryPublicationOpen, setRepositoryPublicationOpen] = useState(false);
@@ -87,7 +87,6 @@ export const useAppState = () => {
     setSecretScanAllowlistOpen(false);
     setRunConfigOpen(false);
     setRemoteConfigOpen(false);
-    setRepositoryAnalyticsOpen(false);
     setReleaseCreatorOpen(false);
     setRepositoryPublicationOpen(false);
     setReleaseCreatorTarget(null);
@@ -108,7 +107,6 @@ export const useAppState = () => {
   const onOpenSecretScanAllowlist = useCallback(() => {
     requestWorkingDirectoryNavigation({ kind: 'view', label: 'secret-scan allowlist' }, () => {
       setRunConfigOpen(false);
-      setRepositoryAnalyticsOpen(false);
       setRemoteConfigOpen(false);
       setReleaseCreatorOpen(false);
       setRepositoryPublicationOpen(false);
@@ -242,26 +240,32 @@ export const useAppState = () => {
     language: settings.language,
   });
 
+  const closeRunConsole = repositoryRun.closeRunConsole;
+  const onOpenRepositoryAnalytics = useCallback(() => {
+    requestWorkingDirectoryNavigation({ kind: 'view', label: 'repository analytics' }, () => {
+      setRunConfigOpen(false);
+      setRemoteConfigOpen(false);
+      setSecretScanAllowlistOpen(false);
+      setReleaseCreatorOpen(false);
+      setRepositoryPublicationOpen(false);
+      closeRunConsole();
+      setWorkspaceTab('analytics');
+    });
+  }, [setWorkspaceTab, closeRunConsole]);
+  const setActiveTab = useCallback(
+    (tab: AppTabId) => {
+      if (tab === 'analytics') onOpenRepositoryAnalytics();
+      else setWorkspaceTab(tab);
+    },
+    [onOpenRepositoryAnalytics, setWorkspaceTab],
+  );
+
   return {
     activeTab: workspace.activeTab,
-    setActiveTab: workspace.setActiveTab,
+    setActiveTab,
     isRunConfigOpen,
-    isRepositoryAnalyticsOpen,
-    onOpenRepositoryAnalytics: () => {
-      requestWorkingDirectoryNavigation({ kind: 'view', label: 'repository analytics' }, () => {
-        setRunConfigOpen(false);
-        setRemoteConfigOpen(false);
-        setSecretScanAllowlistOpen(false);
-        setReleaseCreatorOpen(false);
-        setRepositoryPublicationOpen(false);
-        repositoryRun.closeRunConsole();
-        workspace.setActiveTab('repo');
-        setRepositoryAnalyticsOpen(true);
-      });
-    },
-    onCloseRepositoryAnalytics: () => setRepositoryAnalyticsOpen(false),
+    onOpenRepositoryAnalytics,
     onOpenRunConfig: () => {
-      setRepositoryAnalyticsOpen(false);
       setRepositoryPublicationOpen(false);
       setSecretScanAllowlistOpen(false);
       setReleaseCreatorOpen(false);
@@ -271,7 +275,6 @@ export const useAppState = () => {
     onCloseRunConfig: () => setRunConfigOpen(false),
     isRemoteConfigOpen,
     onOpenRemoteConfig: () => {
-      setRepositoryAnalyticsOpen(false);
       setRepositoryPublicationOpen(false);
       setSecretScanAllowlistOpen(false);
       setReleaseCreatorOpen(false);
@@ -287,7 +290,6 @@ export const useAppState = () => {
     releaseCreatorTarget,
     onOpenReleaseCreator: (target?: HostedRepositoryRef) => {
       requestWorkingDirectoryNavigation({ kind: 'view', label: 'release' }, () => {
-        setRepositoryAnalyticsOpen(false);
         setSecretScanAllowlistOpen(false);
         setRepositoryPublicationOpen(false);
         setRunConfigOpen(false);
@@ -306,7 +308,6 @@ export const useAppState = () => {
     publicationConnectionId,
     onOpenRepositoryPublication: (connectionId?: string) => {
       requestWorkingDirectoryNavigation({ kind: 'view', label: 'repository publication' }, () => {
-        setRepositoryAnalyticsOpen(false);
         setSecretScanAllowlistOpen(false);
         setRunConfigOpen(false);
         setRemoteConfigOpen(false);

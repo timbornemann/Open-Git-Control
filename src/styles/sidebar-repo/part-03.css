@@ -105,27 +105,3 @@
   padding: 5px 8px;
   font-size: 0.74rem;
 }
-.repo-cockpit-analysis {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 11px 16px;
-  border: 0;
-  border-bottom: 1px solid var(--border-color);
-  background: transparent;
-  color: var(--text-secondary);
-  text-align: left;
-  font: inherit;
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-.repo-cockpit-analysis:hover,
-.repo-cockpit-analysis[aria-current='page'] {
-  color: var(--text-primary);
-  background: var(--bg-hover);
-}
-.repo-cockpit-analysis:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: -2px;
-}

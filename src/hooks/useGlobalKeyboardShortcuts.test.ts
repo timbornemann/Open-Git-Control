@@ -11,7 +11,7 @@ afterEach(() => {
 });
 
 describe('useGlobalKeyboardShortcuts editor focus', () => {
-  it('does not navigate with Ctrl+1..5 while a text editor is focused', () => {
+  it('does not navigate with Ctrl+1..6 while a text editor is focused and preserves existing tab mappings', () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     document.body.innerHTML = '<div id="root"></div><textarea id="editor"></textarea>';
     const setActiveTab = vi.fn();
@@ -26,11 +26,14 @@ describe('useGlobalKeyboardShortcuts editor focus', () => {
     editor.focus();
 
     act(() => window.dispatchEvent(new window.KeyboardEvent('keydown', { key: '4', ctrlKey: true, bubbles: true })));
+    act(() => window.dispatchEvent(new window.KeyboardEvent('keydown', { key: '6', ctrlKey: true, bubbles: true })));
     expect(setActiveTab).not.toHaveBeenCalled();
 
     editor.blur();
     act(() => window.dispatchEvent(new window.KeyboardEvent('keydown', { key: '4', ctrlKey: true, bubbles: true })));
     expect(setActiveTab).toHaveBeenCalledWith('settings');
+    act(() => window.dispatchEvent(new window.KeyboardEvent('keydown', { key: '6', ctrlKey: true, bubbles: true })));
+    expect(setActiveTab).toHaveBeenCalledWith('analytics');
     act(() => root.unmount());
   });
 

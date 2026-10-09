@@ -7,6 +7,10 @@ import { NotificationProvider } from '@/contexts/NotificationContext';
 import { DEFAULT_ANALYTICS_FILTERS, type AnalyticsProgress, type RepositoryAnalyticsSnapshot } from '@/shared/ipc/repositoryAnalytics';
 import { RepositoryAnalyticsView } from '../RepositoryAnalyticsView';
 import { readAnalyticsFilters } from '../analyticsPreferences';
+import { AnalyticsNavigation } from '../AnalyticsNavigation';
+import { RepositoryAnalyticsFilters } from '../AnalyticsFilters';
+import { useAnalyticsNavigation } from '../analyticsNavigationState';
+import { useAnalyticsWorkspace } from '../analyticsWorkspaceState';
 
 const mocks = vi.hoisted(() => ({
   cache: vi.fn(),
@@ -85,6 +89,10 @@ const render = (repoPath = 'C:/repo', busy = false, refreshTrigger = 0) =>
     root.render(
       <I18nProvider language="en">
         <NotificationProvider value={notifications}>
+          <aside key={repoPath}>
+            <AnalyticsNavigation repoPath={repoPath} />
+            <RepositoryAnalyticsFilters repoPath={repoPath} />
+          </aside>
           <RepositoryAnalyticsView repoPath={repoPath} refreshTrigger={refreshTrigger} busy={busy} onOpenFile={openFile} onOpenCommit={openCommit} />
         </NotificationProvider>
       </I18nProvider>,
@@ -105,6 +113,8 @@ const deferred = <T,>() => {
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
+  useAnalyticsNavigation.setState({ sections: {} });
+  useAnalyticsWorkspace.setState({ filters: {}, snapshots: {} });
   const storage = new Map<string, string>();
   vi.stubGlobal('localStorage', { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value) });
   listeners = [];
@@ -161,36 +171,33 @@ describe('repository analytics dashboard', () => {
     expect(readAnalyticsFilters('C:/repo').scope).toBe('HEAD');
     expect(readAnalyticsFilters('C:/another').scope).toBe('all');
   });
-  it('keeps a compact toolbar and moves summary figures into the overview content', async () => {
+  it('keeps all common filters in the sidebar and a fixed overview, while detailed reports can scroll', async () => {
     await render();
     const header = host.querySelector('.analytics-header')!;
-    const panel = host.querySelector<HTMLElement>('.analytics-filter-panel')!;
-    expect(header.querySelector('.analytics-toolbar')).toBeTruthy();
-    expect(header.querySelector('.analytics-tabs')).toBeTruthy();
+    expect(header.querySelector('.analytics-filters')).toBeNull();
+    expect(host.querySelector('aside .analytics-filters')).toBeTruthy();
+    expect(header.querySelector('nav')).toBeNull();
+    expect(host.querySelector('.analytics-sidebar-nav')).toBeTruthy();
     expect(header.querySelector('.analytics-metrics')).toBeNull();
     expect(host.querySelector('.analytics-content .analytics-metrics')).toBeTruthy();
     expect(host.querySelector('.analytics-report-bar')).toBeNull();
-    expect(header.querySelector<HTMLSelectElement>('[aria-label="History scope"]')?.value).toBe('all');
-    expect(panel.hidden).toBe(true);
+    expect(host.querySelector<HTMLSelectElement>('aside .analytics-filters select')?.value).toBe('all');
+    expect(host.querySelector('.analytics-content--overview .analytics-overview')).toBeTruthy();
+    expect(host.querySelectorAll('aside .analytics-filter-panel select')).toHaveLength(3);
     const requests = mocks.refresh.mock.calls.length;
-    await click('Filters');
-    expect(panel.hidden).toBe(false);
-    expect(header.querySelector('.analytics-filter-toggle')?.getAttribute('aria-expanded')).toBe('true');
-    await click('Filters');
-    expect(panel.hidden).toBe(true);
-    expect(mocks.refresh).toHaveBeenCalledTimes(requests);
     await click('Change hotspots');
+    expect(mocks.refresh).toHaveBeenCalledTimes(requests);
+    expect(host.querySelector('.analytics-content--overview')).toBeNull();
     expect(host.querySelector('.analytics-metrics')).toBeNull();
     expect(host.querySelector('.analytics-content h3')?.textContent).toBe('Change hotspots');
   });
-  it('keeps collapsed filters visible in the summary, preserves their values and resets them together', async () => {
+  it('keeps sidebar filters across reports and background refreshes, then resets them together', async () => {
     vi.useFakeTimers();
     mocks.cache.mockImplementation(({ filters }) => Promise.resolve({ success: true, data: { ...report(), filters } }));
     await render();
-    await click('Filters');
     const panel = host.querySelector<HTMLElement>('.analytics-filter-panel')!;
     const dates = panel.querySelectorAll<HTMLInputElement>('input[type="date"]');
-    const person = panel.querySelector<HTMLSelectElement>('select')!;
+    const person = panel.querySelectorAll<HTMLSelectElement>('select')[1];
     const path = panel.querySelector<HTMLInputElement>('input[placeholder="All files"]')!;
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(dates[0], '2026-10-01');
@@ -205,24 +212,39 @@ describe('repository analytics dashboard', () => {
       path.dispatchEvent(new Event('input', { bubbles: true }));
     });
     await act(async () => vi.advanceTimersByTime(400));
-    const toggle = host.querySelector<HTMLButtonElement>('.analytics-filter-toggle')!;
-    expect(toggle.querySelector('.analytics-filter-count')?.textContent).toBe('3');
-    await act(async () => toggle.click());
-    expect(panel.hidden).toBe(true);
-    expect(host.querySelector('.analytics-filter-summary')?.textContent).toBe('2026-10-01 – … · Alice · src/');
+    await click('Contributions');
+    expect(readAnalyticsFilters('C:/repo')).toMatchObject({ since: '2026-10-01', author: 'alice', path: 'src/' });
+    expect(host.querySelector('.analytics-content .analytics-aggregation')).toBeNull();
     const requests = mocks.refresh.mock.calls.length;
     await render('C:/repo', false, 1);
-    expect(panel.hidden).toBe(true);
+    expect(host.querySelector('.analytics-filter-panel')).toBe(panel);
     expect(path.value).toBe('src/');
     expect(person.value).toBe('alice');
-    await act(async () => toggle.click());
     expect(mocks.refresh).toHaveBeenCalledTimes(requests + 1);
     await click('Reset');
     expect(path.value).toBe('');
     expect(dates[0].value).toBe('');
     expect(person.value).toBe('');
-    expect(host.querySelector('.analytics-filter-summary')).toBeNull();
     expect(readAnalyticsFilters('C:/repo')).toEqual(DEFAULT_ANALYTICS_FILTERS);
+  });
+  it('keeps filters independent across repositories and rejects stale sidebar metadata', async () => {
+    await render();
+    const scope = host.querySelector<HTMLSelectElement>('.analytics-filters select')!;
+    await act(async () => {
+      scope.value = 'HEAD';
+      scope.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const another = report('C:/another');
+    another.authors = [{ id: 'bob', name: 'Bob', email: 'bob@test.invalid' }];
+    mocks.cache.mockResolvedValue({ success: true, data: another });
+    await render('C:/another');
+    expect(host.querySelector<HTMLSelectElement>('.analytics-filters select')?.value).toBe('all');
+    expect(host.querySelector('.analytics-filters')?.textContent).toContain('Bob');
+    expect(host.querySelector('.analytics-filters')?.textContent).not.toContain('Alice');
+    mocks.cache.mockResolvedValue({ success: true, data: report() });
+    await render();
+    expect(host.querySelector<HTMLSelectElement>('.analytics-filters select')?.value).toBe('HEAD');
+    expect(mocks.refresh.mock.calls.at(-1)?.[0].filters.scope).toBe('HEAD');
   });
   it('does not let late cached or progress results replace the current repository context', async () => {
     const cache = deferred<{ success: true; data: RepositoryAnalyticsSnapshot }>();
@@ -351,7 +373,7 @@ describe('repository analytics dashboard', () => {
     const updated = { ...report('C:/repo', 4), id: 'new-refs', savedAt: 2000 };
     await act(async () => refresh.resolve({ success: true, data: updated }));
     expect(mocks.details).toHaveBeenLastCalledWith(expect.objectContaining({ snapshotId: 'new-refs', offset: 50 }));
-    expect(host.querySelector('.analytics-tabs [aria-current="page"]')?.textContent).toBe('Commits');
+    expect(host.querySelector('.analytics-sidebar-nav [aria-current="page"]')?.textContent).toBe('Commits');
     expect(host.querySelector('.analytics-table')).toBe(table);
     expect(host.querySelector('.analytics-table tbody tr')).toBe(row);
     expect(host.querySelector('.analytics-pagination')?.textContent).toContain('51–100 / 101');

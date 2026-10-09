@@ -45,13 +45,14 @@ export const viewModules = {
   file: preloadable(async () => ({ default: (await import('@/components/file-viewer/FileViewer')).FileViewer })),
   timeline: preloadable(async () => ({ default: (await import('@/components/FileTimelineView')).FileTimelineView })),
   planner: preloadable(async () => ({ default: (await import('@/components/project-planner')).ProjectPlannerView })),
+  analytics: preloadable(async () => ({ default: (await import('@/components/repository-analytics/RepositoryAnalyticsView')).RepositoryAnalyticsView })),
   hosting: preloadable(async () => ({ default: (await import('@/components/hosting/HostingWorkspace')).HostingWorkspace })),
   release: preloadable(async () => ({ default: (await import('@/components/release-creator/RepositoryReleaseCreator')).RepositoryReleaseCreator })),
   settings: preloadable(async () => ({ default: (await import('@/components/layout/SettingsMainContent')).SettingsMainContent })),
 };
 
 export async function preloadViewModules() {
-  for (const name of ['hosting', 'planner', 'repo', 'settings', 'file', 'editor', 'timeline'] as const) {
+  for (const name of ['hosting', 'planner', 'repo', 'settings', 'analytics', 'file', 'editor', 'timeline'] as const) {
     if (document.visibilityState === 'hidden') return;
     await viewModules[name].preload().catch(() => {});
   }

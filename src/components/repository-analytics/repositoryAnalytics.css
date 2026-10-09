@@ -86,32 +86,6 @@
   line-height: 1.15;
   letter-spacing: -0.02em;
 }
-.analytics-tabs {
-  display: flex;
-  flex: none;
-  overflow-x: auto;
-  background: var(--bg-dark);
-}
-.analytics-tabs button {
-  padding: 8px 12px;
-  flex: none;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.77rem;
-}
-.analytics-tabs button:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-.analytics-tabs button.is-active {
-  border-bottom-color: var(--accent-primary);
-  color: var(--text-primary);
-  background: var(--bg-darker);
-}
 .analytics-content {
   flex: 1;
   min-height: 0;

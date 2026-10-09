@@ -45,7 +45,7 @@ describe('LocalRepositoriesView', () => {
     document.body.appendChild(host);
     root = createRoot(host);
     setActiveTab = vi.fn<UIContextValue['setActiveTab']>();
-    onOpenRepositoryAnalytics = vi.fn(() => setActiveTab('repo'));
+    onOpenRepositoryAnalytics = vi.fn(() => setActiveTab('analytics'));
     onOpenRunConfig = vi.fn();
     onCloseRunConfig = vi.fn();
     onOpenRemoteConfig = vi.fn();
@@ -165,7 +165,7 @@ describe('LocalRepositoriesView', () => {
     expect(setActiveTab).not.toHaveBeenCalled();
     await act(async () => activate(true));
     expect(onOpenRepositoryAnalytics).toHaveBeenCalledOnce();
-    expect(setActiveTab).toHaveBeenCalledWith('repo');
+    expect(setActiveTab).toHaveBeenCalledWith('analytics');
     expect(onOpenRunConfig).not.toHaveBeenCalled();
     expect(onOpenRemoteConfig).not.toHaveBeenCalled();
   });

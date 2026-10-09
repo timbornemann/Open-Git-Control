@@ -3,6 +3,7 @@ import type { RepositoryAnalyticsSnapshot } from '@/shared/ipc/repositoryAnalyti
 import { AnalyticsEmpty, PeriodChart, count, dateLabel, periodInterval } from './AnalyticsCharts';
 import { AnalyticsHotspotHeatmap } from './AnalyticsHotspotHeatmap';
 import { AnalyticsLanguages } from './AnalyticsLanguages';
+import './analyticsOverview.css';
 
 export function AnalyticsMetrics({ snapshot }: { snapshot: RepositoryAnalyticsSnapshot }) {
   const { tr } = useI18n();
@@ -37,41 +38,63 @@ type Props = {
 export function AnalyticsOverview({ snapshot, onPeriod, onPath, onVersion, onFile }: Props) {
   const { tr } = useI18n();
   return (
-    <>
+    <div className="analytics-overview">
       <AnalyticsMetrics snapshot={snapshot} />
-      <section className="analytics-section">
-        <h3>{tr('Aktivität', 'Activity')}</h3>
-        <p className="analytics-description">
-          {dateLabel(snapshot.totals.firstActivity)} → {dateLabel(snapshot.totals.lastActivity)} · {count(snapshot.filteredCommits)}{' '}
-          {tr('Commits im Filter', 'commits in filter')} · {count(snapshot.totals.merges)} {tr('Merge-Commits in der Historie', 'merge commits in history')}
-        </p>
+      <section className="analytics-section analytics-overview-activity">
+        <div className="analytics-overview-section-heading">
+          <h3>{tr('Aktivität', 'Activity')}</h3>
+          <p className="analytics-description">
+            {dateLabel(snapshot.totals.firstActivity)} → {dateLabel(snapshot.totals.lastActivity)} · {count(snapshot.filteredCommits)}{' '}
+            {tr('Commits im Filter', 'commits in filter')} · {count(snapshot.totals.merges)} {tr('Merge-Commits in der Historie', 'merge commits in history')}
+          </p>
+        </div>
         <PeriodChart periods={snapshot.periods} interval={periodInterval(snapshot)} onSelect={onPeriod} />
       </section>
-      <div className="analytics-columns">
-        <AnalyticsLanguages snapshot={snapshot} />
-        <section className="analytics-section">
+      <div className="analytics-overview-summaries">
+        <AnalyticsLanguages snapshot={snapshot} compact />
+        <section className="analytics-section analytics-overview-hotspots">
           <h3>{tr('Änderungsschwerpunkte', 'Change hotspots')}</h3>
-          <p className="analytics-description">
+          <p className="analytics-description analytics-overview-hint">
             {tr('Häufige Änderungen sind keine Messung der Code-Komplexität.', 'Frequent changes do not measure code complexity.')}
           </p>
           <AnalyticsHotspotHeatmap rows={snapshot.hotspots.slice(0, 48)} preview onFile={onFile} onPath={onPath} />
           {!snapshot.hotspots.length && <AnalyticsEmpty>{tr('Keine Einträge für diese Auswahl.', 'No entries for this selection.')}</AnalyticsEmpty>}
         </section>
       </div>
-      <section className="analytics-section">
+      <section className="analytics-section analytics-overview-versions">
         <h3>{tr('Versionen', 'Versions')}</h3>
         <div className="analytics-versions">
           {snapshot.tags
             .filter((tag) => tag.version)
-            .slice(0, 20)
+            .slice(0, 5)
             .map((tag) => (
               <button key={tag.name} className="analytics-link" title={`${tag.name} · ${tag.oid.slice(0, 8)}`} onClick={() => onVersion(tag.name)}>
                 {tag.name}
               </button>
             ))}
+          {snapshot.tags.filter((tag) => tag.version).length > 5 && (
+            <select
+              className="ui-field"
+              aria-label={tr('Weitere Versionen vergleichen', 'Compare other versions')}
+              value=""
+              onChange={(event) => onVersion(event.target.value)}
+            >
+              <option value="">
+                + {count(snapshot.tags.filter((tag) => tag.version).length - 5)} {tr('weitere', 'more')}
+              </option>
+              {snapshot.tags
+                .filter((tag) => tag.version)
+                .slice(5)
+                .map((tag) => (
+                  <option key={tag.name} value={tag.name}>
+                    {tag.name}
+                  </option>
+                ))}
+            </select>
+          )}
           {!snapshot.tags.some((tag) => tag.version) && <span>{tr('Keine lokalen Versionstags vorhanden.', 'No local version tags available.')}</span>}
         </div>
       </section>
-    </>
+    </div>
   );
 }
