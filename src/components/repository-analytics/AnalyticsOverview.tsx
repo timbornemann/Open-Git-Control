@@ -18,7 +18,7 @@ export function AnalyticsMetrics({ snapshot }: { snapshot: RepositoryAnalyticsSn
     [tr('Textzeilen', 'Text lines'), project ? count(snapshot.project.lines) : '…'],
   ];
   return (
-    <dl className="analytics-metrics analytics-metrics--cards">
+    <dl className="analytics-metrics analytics-metrics--segments">
       {rows.map(([label, value]) => (
         <div key={label}>
           <dt>{label}</dt>

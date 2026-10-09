@@ -1,6 +1,4 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import { File, Folder, History } from 'lucide-react';
-import { Button } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import type { AnalyticsChanges } from '@/shared/ipc/repositoryAnalytics';
 import { count } from './AnalyticsCharts';
@@ -29,13 +27,11 @@ export function AnalyticsHotspotHeatmap({ rows, maxChanges = 0, directory = fals
     height: `${(rect.height / height) * 100}%`,
   });
   const tooltipId = useId();
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [hovered, setHovered] = useState<Target | null>(null);
   const [focused, setFocused] = useState<Target | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const target = hovered ?? focused;
   const active = target?.anchor.isConnected ? rows.find((row) => row.path === target.path) : undefined;
-  const selected = active ?? rows.find((row) => row.path === selectedPath) ?? rows[0];
   const max = Math.max(1, maxChanges, ...rows.map((row) => row.changes));
   const tooltipVisible = !!active && !!target && !dismissed;
   useEffect(() => {
@@ -109,19 +105,17 @@ export function AnalyticsHotspotHeatmap({ rows, maxChanges = 0, directory = fals
               type="button"
               data-path={row.path}
               style={position(tile)}
-              className={`analytics-heatmap-cell analytics-heatmap-level--${level}${selected.path === row.path ? ' is-highlighted' : ''}`}
+              className={`analytics-heatmap-cell analytics-heatmap-level--${level}${active?.path === row.path ? ' is-highlighted' : ''}`}
               aria-label={`${pathLabel(row)}: ${changeLabel(row)}`}
               aria-describedby={tooltipVisible && active.path === row.path ? tooltipId : undefined}
               onMouseEnter={(event) => {
                 setHovered({ path: row.path, anchor: event.currentTarget });
-                setSelectedPath(row.path);
                 setDismissed(false);
               }}
               onMouseLeave={() => setHovered(null)}
               onFocus={(event) => {
                 setHovered(null);
                 setFocused({ path: row.path, anchor: event.currentTarget });
-                setSelectedPath(row.path);
                 setDismissed(false);
               }}
               onBlur={() => setFocused(null)}
@@ -139,20 +133,6 @@ export function AnalyticsHotspotHeatmap({ rows, maxChanges = 0, directory = fals
             </button>
           );
         })}
-      </div>
-      <div className="analytics-heatmap-selection">
-        {directory ? <Folder size={14} aria-hidden="true" /> : <File size={14} aria-hidden="true" />}
-        <div>
-          <button className="analytics-link" onClick={() => open(selected)}>
-            {pathLabel(selected)}
-          </button>
-          <span className="analytics-heatmap-selection-meta">
-            {changeLabel(selected)} · {count(selected.authors)} {selected.authors === 1 ? tr('Person', 'person') : tr('Personen', 'people')}
-          </span>
-        </div>
-        <Button size="xs" variant="ghost" icon={<History size={13} />} onClick={() => onPath(selected.path === '.' ? '' : selected.path)}>
-          {tr('Verlauf', 'History')}
-        </Button>
       </div>
       {tooltipVisible && <AnalyticsHotspotTooltip id={tooltipId} anchor={target.anchor} row={active} directory={directory} />}
     </div>

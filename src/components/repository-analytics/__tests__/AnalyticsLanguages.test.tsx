@@ -68,6 +68,7 @@ describe('language and file type distribution', () => {
       },
     );
     const snapshot = report();
+    snapshot.project.binaryFiles = snapshot.project.lfsFiles = 0;
     snapshot.project.languages = Array.from({ length: 8 }, (_, index) => ({ language: `Type ${index}`, files: 1, lines: 120 }));
     snapshot.project.languages.push({ language: '.gitignore', files: 1, lines: 1 });
     render(snapshot, 'en', true);
@@ -104,8 +105,13 @@ describe('language and file type distribution', () => {
       '9.2%',
     ]);
     expect(host.querySelector('.analytics-language-details')?.textContent).toBe('7 Dateien · 815 Zeilen');
-    expect(host.querySelector('.analytics-file-kinds')?.textContent).toContain('Binärdateien18');
-    expect(host.querySelector('.analytics-file-kinds')?.textContent).toContain('LFS1');
+    const files = host.querySelectorAll('.analytics-language-list .analytics-language-item--files');
+    expect([...files].map((node) => node.textContent)).toEqual(['Binärdateien18 Dateien', 'LFS1 Datei']);
+    for (const row of files) {
+      expect(row.querySelector('.analytics-language-details')).toBeNull();
+      expect(row.querySelector('.analytics-language-bar')).toBeNull();
+      expect(row.querySelector('.analytics-language-percent')).toBeNull();
+    }
     render(report(), 'en');
     expect(host.querySelector('.analytics-language-percent')?.textContent).toBe('81.5%');
     expect(host.querySelector<HTMLElement>('.analytics-language-bar > span')?.style.width).toBe('81.5%');
@@ -131,7 +137,13 @@ describe('language and file type distribution', () => {
       { language: 'Empty', files: 2, lines: 0 },
     ];
     render(snapshot, 'en');
-    expect([...host.querySelectorAll('.analytics-language-name')].map((node) => node.textContent)).toEqual(['TypeScript', 'CSS', 'Other']);
+    expect([...host.querySelectorAll('.analytics-language-name')].map((node) => node.textContent)).toEqual([
+      'TypeScript',
+      'CSS',
+      'Other',
+      'Binary files',
+      'LFS',
+    ]);
     expect([...host.querySelectorAll('.analytics-language-details')].map((node) => node.textContent)).toEqual([
       '20 files · 9,971 lines',
       '1 file · 11 lines',
@@ -150,10 +162,24 @@ describe('language and file type distribution', () => {
     expect(host.querySelector<HTMLElement>('.analytics-language-bar > span')?.style.width).toBe('0%');
     snapshot.project.languages = [];
     render(snapshot);
-    expect(host.textContent).toContain('Keine Textdateien im gewählten Projektstand.');
-    expect(host.textContent).toContain('Binärdateien18');
+    expect(host.querySelectorAll('.analytics-language-list .analytics-language-item--files')).toHaveLength(2);
+    expect(host.textContent).toContain('Binärdateien18 Dateien');
     render({ ...snapshot, sections: [] });
     expect(host.textContent).toContain('Sprachen und Dateitypen werden noch ermittelt');
-    expect(host.querySelector('.analytics-file-kinds')).toBeNull();
+    expect(host.querySelector('.analytics-language-item')).toBeNull();
+  });
+  it('reserves room for file counts in the compact list and includes all categories in the full view', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 430, height: 140 } as DOMRect);
+    const snapshot = report();
+    snapshot.project.symlinks = 2;
+    snapshot.project.submodules = 1;
+    render(snapshot, 'en', true);
+    expect(host.querySelectorAll('.analytics-language-item')).toHaveLength(4);
+    expect(host.querySelector('.analytics-language-body')?.textContent).toContain('Binary files18 files');
+    act(() => host.querySelector<HTMLButtonElement>('.analytics-language-body > button')!.click());
+    const full = host.querySelector('.analytics-languages-expanded')!;
+    expect(full.querySelectorAll('.analytics-language-item')).toHaveLength(7);
+    expect(full.textContent).toContain('Symlinks2 files');
+    expect(full.textContent).toContain('Submodules1 file');
   });
 });

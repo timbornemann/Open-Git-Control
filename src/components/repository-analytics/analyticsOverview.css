@@ -13,18 +13,32 @@
   min-height: 0;
   padding: 12px 16px;
 }
-.analytics-overview .analytics-metrics--cards {
+.analytics-overview .analytics-metrics--segments {
+  display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  padding: 12px 16px;
-  gap: 8px;
+  padding: 0;
+  gap: 0;
+  background: var(--bg-dark);
 }
-.analytics-overview .analytics-metrics--cards div {
+.analytics-overview .analytics-metrics--segments > div {
+  min-width: 0;
   min-height: 68px;
-  padding: 9px 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px 16px;
   gap: 5px;
 }
-.analytics-overview .analytics-metrics--cards dd {
+.analytics-overview .analytics-metrics--segments > div + div {
+  border-left: 1px solid var(--border-color);
+}
+.analytics-overview .analytics-metrics--segments dt {
+  line-height: 1.35;
+}
+.analytics-overview .analytics-metrics--segments dd {
+  margin-top: auto;
   font-size: 1.35rem;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
 }
 .analytics-overview-section-heading {
   flex: none;
@@ -95,17 +109,6 @@
   min-height: 0;
   height: auto;
 }
-.analytics-overview-hotspots .analytics-heatmap-selection {
-  flex: none;
-  min-height: 37px;
-  margin-top: 6px;
-  padding-top: 6px;
-}
-.analytics-overview-hotspots .analytics-heatmap-selection .analytics-link {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .analytics-overview-versions {
   display: flex;
   align-items: center;
@@ -130,18 +133,17 @@
   font-size: 0.72rem;
 }
 @container repository-analytics (max-width: 760px) {
-  .analytics-overview .analytics-section,
-  .analytics-overview .analytics-metrics--cards {
+  .analytics-overview .analytics-section {
     padding: 9px 12px;
   }
-  .analytics-overview .analytics-metrics--cards div {
+  .analytics-overview .analytics-metrics--segments > div {
     min-height: 63px;
-    padding: 7px;
+    padding: 9px 10px;
   }
-  .analytics-overview .analytics-metrics--cards dt {
+  .analytics-overview .analytics-metrics--segments dt {
     font-size: 0.67rem;
   }
-  .analytics-overview .analytics-metrics--cards dd {
+  .analytics-overview .analytics-metrics--segments dd {
     font-size: 1.15rem;
   }
 }
@@ -156,7 +158,13 @@
   .analytics-overview-hint {
     display: none;
   }
-  .analytics-overview .analytics-metrics--cards {
+  .analytics-overview .analytics-metrics--segments {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .analytics-overview .analytics-metrics--segments > div:nth-child(4n + 1) {
+    border-left: 0;
+  }
+  .analytics-overview .analytics-metrics--segments > div:nth-child(n + 5) {
+    border-top: 1px solid var(--border-color);
   }
 }

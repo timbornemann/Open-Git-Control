@@ -72,39 +72,14 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.analytics-file-kinds {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-color);
-}
-.analytics-file-kinds h4 {
-  margin: 0 0 10px;
-  color: var(--text-secondary);
-  font-size: 0.73rem;
-  font-weight: 500;
-}
-.analytics-file-kinds dl {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0;
-}
-.analytics-file-kinds dl > div {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 7px 10px;
-  border-radius: 4px;
-  background: var(--bg-dark);
-}
-.analytics-file-kinds dt {
-  color: var(--text-secondary);
-  font-size: 0.73rem;
-}
-.analytics-file-kinds dd {
-  margin: 0;
+.analytics-language-count {
+  grid-column: 2 / -1;
+  grid-row: 1;
+  text-align: right;
+  font-size: 0.76rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 @container analytics-languages (max-width: 480px) {
   .analytics-language-item {
@@ -180,16 +155,10 @@
   grid-row: 1;
   font-size: 0.7rem;
 }
-.analytics-languages--compact .analytics-file-kinds {
-  flex: none;
-  margin-top: 6px;
-  padding-top: 6px;
+.analytics-languages--compact .analytics-language-item--files {
+  min-height: 51px;
 }
-.analytics-languages--compact .analytics-file-kinds h4 {
-  display: none;
-}
-.analytics-languages--compact .analytics-file-kinds dl > div {
-  padding: 4px 7px;
+.analytics-languages--compact .analytics-language-count {
   font-size: 0.7rem;
 }
 .analytics-languages-expanded .analytics-language-list {

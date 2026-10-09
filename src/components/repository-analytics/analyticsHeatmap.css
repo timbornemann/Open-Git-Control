@@ -5,6 +5,25 @@
   flex: none;
   white-space: nowrap;
 }
+.analytics-content > .analytics-hotspots {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.analytics-hotspots .analytics-heatmap {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.analytics-hotspots .analytics-heatmap-caption {
+  flex: none;
+}
+.analytics-hotspots .analytics-heatmap-grid {
+  flex: 1;
+  min-height: 260px;
+  height: auto;
+}
 .analytics-heatmap-caption {
   display: flex;
   flex-wrap: wrap;
@@ -115,38 +134,6 @@
 .analytics-heatmap-cell:focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
-}
-.analytics-heatmap-selection {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 56px;
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line-subtle);
-}
-.analytics-heatmap-selection > svg {
-  flex: none;
-  color: var(--text-secondary);
-}
-.analytics-heatmap-selection > div {
-  flex: 1;
-  min-width: 0;
-}
-.analytics-heatmap-selection .analytics-link {
-  display: block;
-  max-width: 100%;
-  font-size: 0.76rem;
-  line-height: 1.4;
-}
-.analytics-heatmap-selection-meta {
-  display: block;
-  margin-top: 3px;
-  color: var(--text-secondary);
-  font-size: 0.7rem;
-}
-.analytics-heatmap-selection > .ui-button {
-  flex: none;
 }
 .analytics-heatmap-tooltip {
   position: fixed;

@@ -118,7 +118,7 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
               />
             )}
             {tab === 'hotspots' && (
-              <section className="analytics-section">
+              <section className="analytics-section analytics-hotspots">
                 <div className="analytics-section-toolbar">
                   <h3>{tr('Änderungsschwerpunkte', 'Change hotspots')}</h3>
                   <SegmentedControl

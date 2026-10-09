@@ -47,7 +47,7 @@ afterEach(() => {
 });
 
 describe('change hotspot heatmap', () => {
-  it('identifies files on hover and opens their captured versions and history', () => {
+  it('keeps file details in the tooltip and opens captured versions without a duplicate footer', () => {
     render();
     expect(host.querySelector('table')).toBeNull();
     expect(cells().map((cell) => cell.querySelector('span')?.textContent)).toEqual(['40', '20', undefined]);
@@ -61,12 +61,12 @@ describe('change hotspot heatmap', () => {
     expect(popup.textContent).toContain('+123 / −45');
     expect(popup.textContent).toContain('Last change');
     expect(cells()[1].getAttribute('aria-describedby')).toBe(popup.id);
-    expect(host.querySelector('.analytics-heatmap-selection .analytics-link')?.textContent).toBe('src/theme.css');
+    expect(host.querySelector('.analytics-heatmap-selection')).toBeNull();
+    expect([...host.querySelectorAll('button')].some((button) => button.textContent === 'History')).toBe(false);
     act(() => cells()[1].click());
     expect(onFile).toHaveBeenCalledWith('src/theme.css', 'a'.repeat(40));
     expect(tooltip()).toBeNull();
-    act(() => host.querySelector<HTMLButtonElement>('.analytics-heatmap-selection .ui-button')!.click());
-    expect(onPath).toHaveBeenCalledWith('src/theme.css');
+    expect(onPath).not.toHaveBeenCalled();
   });
   it('uses the report scale on later pages instead of making each page equally hot', () => {
     render([change('first.ts', 40), change('second.ts', 20), change('third.ts', 1)], { maxChanges: 40 });

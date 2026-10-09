@@ -160,7 +160,7 @@ describe('repository analytics dashboard', () => {
     expect(host.textContent).toContain('TypeScript');
     expect(host.textContent).not.toContain('How counts are calculated');
     expect(host.querySelector('.analytics-metrics dd')?.textContent).toBe('3');
-    await click('a.ts');
+    await act(async () => host.querySelector<HTMLButtonElement>('.analytics-heatmap-cell[data-path="a.ts"]')!.click());
     expect(openFile).toHaveBeenCalledWith('a.ts', 'b'.repeat(40));
     const scope = host.querySelector('.analytics-filters select')! as HTMLSelectElement;
     await act(async () => {
@@ -387,6 +387,7 @@ describe('repository analytics dashboard', () => {
   it('uses central progress and cancellation and preserves usable results', async () => {
     await render();
     const request = mocks.refresh.mock.calls[0][0];
+    await act(async () => listeners[0]({ repoPath: 'C:/repo', requestId: request.readRequest.requestId, phase: 'history', completed: 0, total: 1 }));
     await act(async () => listeners[0]({ repoPath: 'C:/repo', requestId: request.readRequest.requestId, phase: 'blame', completed: 2, total: 4 }));
     expect(mocks.update).toHaveBeenLastCalledWith(1, expect.objectContaining({ kind: 'progress', progress: { value: 50, label: '2 / 4' } }));
     expect(host.querySelector('details.analytics-data')).toBeNull();
