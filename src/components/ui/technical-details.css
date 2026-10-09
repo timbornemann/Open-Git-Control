@@ -1,0 +1,32 @@
+.technical-details {
+  margin-top: 6px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 400;
+  white-space: normal;
+}
+
+.technical-details summary {
+  cursor: pointer;
+  padding: 3px 0;
+  color: var(--text-primary);
+}
+
+.technical-details summary:focus-visible {
+  outline: 2px solid var(--accent-primary-border);
+  outline-offset: 2px;
+}
+
+.technical-details pre {
+  margin: 6px 0 0;
+  padding: 8px;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 0.72rem/1.5 var(--font-mono, monospace);
+  background: var(--bg-dark);
+  border-left: 2px solid var(--border-color);
+  user-select: text;
+}

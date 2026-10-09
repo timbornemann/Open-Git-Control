@@ -3,6 +3,7 @@ import type { NotificationController } from '@/types/notifications';
 
 const NotificationContext = createContext<NotificationController | null>(null);
 export const NotificationProvider = NotificationContext.Provider;
+export const useOptionalNotifications = () => useContext(NotificationContext);
 
 /** Uses the app's existing toast queue; it does not create a separate viewport. */
 export function useNotifications(): NotificationController {

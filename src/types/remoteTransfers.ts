@@ -87,6 +87,7 @@ export interface GitPushBatchDto {
   targets: GitPushTargetResultDto[];
 }
 export interface RemoteTransferOperations {
+  checkConnection: { input: { repoPath: string; remote: string; url: string; connectionId?: string | null }; output: true };
   getRemotes: { input: { repoPath: string }; output: GitRemoteSnapshotDto };
   editRemote: { input: { repoPath: string; mutation: RemoteMutation }; output: GitRemoteSnapshotDto };
   getPreferences: { input: { repoPath: string }; output: RemotePreferences };

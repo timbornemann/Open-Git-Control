@@ -171,6 +171,31 @@ export class RemoteTransferService {
     return { output: redactGitSensitiveText(output) };
   }
 
+  /** Recheck the failed endpoint without fetching objects, altering refs or publishing. */
+  async checkConnection(repoPath: string, input: RemoteTransferOperations['checkConnection']['input'], context: RemoteTransferContext): Promise<true> {
+    const remote = await this.selectedRemote(repoPath, input.remote);
+    const url = remoteUrl(input.url);
+    if (![...remote.fetchUrls, ...remote.pushUrls].includes(url)) throw new Error('Remote endpoint changed. Review its configuration before retrying.');
+    const connectionId = this.connectionId(repoPath, input.remote, url);
+    if (input.connectionId !== undefined && input.connectionId !== connectionId)
+      throw new Error('Remote account binding changed. Review its configuration before retrying.');
+    const fingerprint = await this.fingerprint(repoPath);
+    const signal = AbortSignal.any([AbortSignal.timeout(20_000), ...(context.signal ? [context.signal] : [])]);
+    await this.withCredentials(
+      repoPath,
+      input.remote,
+      url,
+      { ...context, signal },
+      {},
+      (envOverrides, scopedSignal) => this.git.run(repoPath, ['ls-remote', '--refs', '--', url, 'HEAD'], { envOverrides, signal: scopedSignal }),
+      connectionId,
+      connectionId ? this.getCredentialGeneration?.(connectionId) : undefined,
+    );
+    context.ensureActive();
+    if (fingerprint !== (await this.fingerprint(repoPath))) throw new Error('Remote configuration changed while verifying the connection.');
+    return true;
+  }
+
   async pull(repoPath: string, input: RemoteTransferOperations['pull']['input'], context: RemoteTransferContext): Promise<{ output: string }> {
     const remote = await this.selectedRemote(repoPath, input.remote);
     await this.git.run(repoPath, ['check-ref-format', `refs/heads/${refName(input.branch)}`]);

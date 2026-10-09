@@ -64,7 +64,10 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
     (failureMessage: unknown) => {
       const repoPath = activeRepoRef.current;
       if (!repoPath) return;
-      setGitActionToast({ msg: compactGitError(failureMessage) || 'Configure a remote and select its hosting account.', isError: true });
+      setGitActionToast({
+        msg: String(failureMessage instanceof Error ? failureMessage.message : failureMessage || 'Configure a remote and select its hosting account.'),
+        isError: true,
+      });
       workspace.setActiveTab('repo');
       requestRemoteTransfer({ repoPath, mode: 'remotes' });
     },

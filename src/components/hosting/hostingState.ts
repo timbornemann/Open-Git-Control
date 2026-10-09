@@ -16,6 +16,8 @@ interface HostingState {
   section: HostingSection;
   connectionFilter: string;
   revision: number;
+  connectionEditorRequest: string | null;
+  requestConnectionEditor: (id: string | null) => void;
   setConnections: (connections: HostingConnection[]) => void;
   select: (repository: HostedRepository | null) => void;
   navigate: (section: HostingSection) => void;
@@ -28,6 +30,8 @@ export const useHostingState = create<HostingState>((set) => ({
   section: 'repositories',
   connectionFilter: '',
   revision: 0,
+  connectionEditorRequest: null,
+  requestConnectionEditor: (connectionEditorRequest) => set({ connectionEditorRequest }),
   setConnections: (connections) =>
     set((state) =>
       JSON.stringify(state.connections) === JSON.stringify(connections)

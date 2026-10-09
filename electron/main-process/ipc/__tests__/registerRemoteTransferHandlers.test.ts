@@ -9,6 +9,7 @@ const mocked = vi.hoisted(() => ({
   handlers: new Map<string, (...args: any[]) => Promise<any>>(),
   getRemotes: vi.fn(),
   getPreferences: vi.fn(),
+  checkConnection: vi.fn(),
   editRemote: vi.fn(),
   executePush: vi.fn(),
 }));
@@ -20,6 +21,7 @@ vi.mock('../../../git/RemoteTransferService', () => ({
   RemoteTransferService: class {
     getRemotes = mocked.getRemotes;
     getPreferences = mocked.getPreferences;
+    checkConnection = mocked.checkConnection;
     editRemote = mocked.editRemote;
     executePush = mocked.executePush;
   },
@@ -42,6 +44,7 @@ describe('repository authority for structured remote transfers', () => {
     };
     mocked.getRemotes.mockResolvedValue({ remotes: [] });
     mocked.getPreferences.mockReturnValue({});
+    mocked.checkConnection.mockResolvedValue(true);
     mocked.editRemote.mockResolvedValue({ remotes: [] });
     registerRemoteTransferHandlers({
       gitService: { getRepoPath: () => activeRepo, runner: {} } as GitService,
@@ -84,6 +87,14 @@ describe('repository authority for structured remote transfers', () => {
       error: 'Secret-scan allowlist changed.',
     });
     expect(pushed).toEqual(['origin']);
+  });
+  it('requires the active repository for endpoint checks and never authorizes a push', async () => {
+    const input = { repoPath: activeRepo, remote: 'origin', url: 'https://forge.test/repo', connectionId: 'chosen-account' };
+    await expect(invoke('checkConnection', input)).resolves.toMatchObject({ success: true, data: true });
+    expect(mocked.checkConnection).toHaveBeenCalledWith(activeRepo, input, expect.objectContaining({ ensureActive: expect.any(Function) }));
+    await expect(invoke('checkConnection', { ...input, repoPath: 'C:/repos/saved' })).resolves.toMatchObject({ success: false });
+    expect(mocked.checkConnection).toHaveBeenCalledTimes(1);
+    expect(pushGuard.requirePushSecretScanApproval).not.toHaveBeenCalled();
   });
   it('rejects a policy edit during push authorization before publishing any endpoint', async () => {
     const verify = vi.fn();

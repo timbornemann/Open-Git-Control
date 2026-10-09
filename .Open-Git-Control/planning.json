@@ -125,12 +125,12 @@
       "id": "a2e2a3e1-2cfe-4d15-ab32-83912311496d",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Git-Fehler verständlich aufbereiten",
-      "description": "Einige Fehler erscheinen weitgehend als technische Git-Ausgabe. Eine kurze Erklärung mit Folgeaktion ergänzen: „Anmelden“, „Git installieren“, „Verbindung erneut prüfen“ oder „Konflikt öffnen“. Technische Details bleiben aufklappbar.",
+      "description": "Git-Fehler verständlich aufbereiten: Einige Fehler erscheinen weitgehend als technische Git-Ausgabe. Eine kurze Erklärung mit Folgeaktion ergänzen: „Anmelden“, „Git installieren“, „Verbindung erneut prüfen“ oder „Konflikt öffnen“. Technische Details bleiben aufklappbar.",
       "priority": "medium",
       "status": "planned",
       "tags": [],
       "createdAt": 1791462773059,
-      "updatedAt": 1791462773059
+      "updatedAt": 1791501411998
     },
     {
       "id": "20722a1d-0f20-4a43-98c6-cec1542d792a",

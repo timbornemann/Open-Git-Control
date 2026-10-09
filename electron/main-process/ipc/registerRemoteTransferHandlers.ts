@@ -24,6 +24,7 @@ type Dependencies = {
 };
 const operations = new Set<RemoteTransferOperation>([
   'getRemotes',
+  'checkConnection',
   'editRemote',
   'getPreferences',
   'setPreferences',
@@ -120,6 +121,9 @@ export function registerRemoteTransferHandlers({
             break;
           case 'getPreferences':
             data = service.getPreferences(repoPath);
+            break;
+          case 'checkConnection':
+            data = await service.checkConnection(repoPath, input as RemoteTransferOperations['checkConnection']['input'], context);
             break;
           case 'setPreferences':
             data = await service.setPreferences(repoPath, (input as RemoteTransferOperations['setPreferences']['input']).preferences, context);

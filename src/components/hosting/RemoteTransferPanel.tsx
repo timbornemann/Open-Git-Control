@@ -5,6 +5,8 @@ import { RemoteTransferSelectionForm } from './RemoteTransferSelectionForm';
 import { PushTransferReview } from './PushTransferReview';
 import { PushTransferResults } from './PushTransferResults';
 import { PullTransferRecovery } from './PullTransferRecovery';
+import { GitFailureMessage } from '@/components/ui/GitFailureMessage';
+import { transferFailureContext } from './transferFailureContext';
 
 export type TransferMode = 'remotes' | 'push' | 'pull' | 'fetch';
 export function RemoteTransferPanel({
@@ -53,16 +55,19 @@ export function RemoteTransferPanel({
         />
       )}
       {state.phase === 'result' && state.batch && (
-        <PushTransferResults batch={state.batch} busy={state.busy} canRetry={Boolean(state.plan)} reviewRetry={retryPush} scan={state.scan} />
+        <PushTransferResults
+          batch={state.batch}
+          busy={state.busy}
+          canRetry={Boolean(state.plan)}
+          reviewRetry={retryPush}
+          scan={state.scan}
+          preferences={state.preferences}
+        />
       )}
       {state.phase === 'result' && state.failedPull && (
         <PullTransferRecovery failedPull={state.failedPull} busy={state.busy} retry={retryPull} openWorkspace={openWorkspace} />
       )}
-      {state.error && (
-        <p className="hosting-error" role="alert">
-          {state.error}
-        </p>
-      )}
+      {state.error && <GitFailureMessage message={state.error} context={transferFailureContext(state)} />}
       <button onClick={openConfiguration}>{tr('Remote-Konfiguration öffnen', 'Open remote configuration')}</button>
     </section>
   );

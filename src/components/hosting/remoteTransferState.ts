@@ -49,3 +49,9 @@ export const initialRemoteTransferState = (): RemoteTransferState => ({
   resultVisible: true,
 });
 export const useRemoteTransferState = create<RemoteTransferState>(() => initialRemoteTransferState());
+
+/** Keep outcomes for review while navigation opens a remedy behind the dialog. */
+export function hideRemoteTransferResult() {
+  const state = useRemoteTransferState.getState();
+  if (!state.busy && state.phase === 'result') useRemoteTransferState.setState({ resultVisible: false });
+}

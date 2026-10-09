@@ -1,6 +1,7 @@
 import { createRepoUnavailableErrorMessage, isRepoUnavailableError } from '../../src/shared/git/errors';
 import { readGitProcessErrorText } from './GitProcessTypes';
 import { redactHostingSecrets } from '../hosting/hostingRedaction';
+import { redactGitCredentials } from '../../src/shared/git/redaction';
 
 export const EXPECTED_NON_FATAL_GIT_ERROR_NAME = 'ExpectedNonFatalGitError';
 
@@ -9,21 +10,7 @@ export const isMissingOriginGitError = (error: unknown): boolean =>
 
 /** Redacts credentials before a Git failure reaches logs or the renderer. */
 export const redactGitSensitiveText = (value: unknown): string => {
-  let text = redactHostingSecrets(String(value ?? ''));
-
-  // Strip every HTTP(S) user-info component. User names are not useful in an
-  // error message, and retaining them risks retaining a token-only credential.
-  text = text.replace(/([a-z][a-z0-9+.-]*:\/\/)[^/\s@]+@/gi, '$1[REDACTED]@');
-  // SCP-style Git remotes have no scheme and may use a token as their user.
-  text = text.replace(/(^|[\s'"(])[^\s/@:]+@([a-z0-9.-]+):([^\s'"),]+)/gi, '$1[REDACTED]@$2:$3');
-  text = text.replace(
-    /([?&](?:[a-z0-9_-]*(?:token|secret|password|passwd|credential|signature)|api[_-]?key|key|auth(?:orization)?|code|ticket|sig|sas)=)[^&#\s'"]+/gi,
-    '$1[REDACTED]',
-  );
-  text = text.replace(/\b(?:github_pat_[a-z0-9_-]+|gh[a-z]+_[a-z0-9_-]+|glpat-[a-z0-9_-]+|sk-[a-z0-9_-]+)\b/gi, '[REDACTED]');
-  text = text.replace(/\b(bearer|token|basic)\s+[a-z0-9._~+\/=:-]{8,}\b/gi, '$1 [REDACTED]');
-
-  return redactHostingSecrets(text);
+  return redactHostingSecrets(redactGitCredentials(redactHostingSecrets(String(value ?? ''))));
 };
 
 export class GitErrorFormatter {

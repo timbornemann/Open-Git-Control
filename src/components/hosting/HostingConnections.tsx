@@ -23,6 +23,13 @@ export function HostingConnections({ headingId }: { headingId?: string } = {}) {
   useEffect(() => {
     void run(reload, setConnections);
   }, [run, reload, setConnections]);
+  const editorRequest = useHostingState((state) => state.connectionEditorRequest);
+  useEffect(() => {
+    const connection = connections.find((candidate) => candidate.id === editorRequest);
+    if (!connection) return;
+    setEditor({ connection });
+    useHostingState.getState().requestConnectionEditor(null);
+  }, [connections, editorRequest]);
   return (
     <section className="hosting-connections">
       <div className="hosting-section-heading">

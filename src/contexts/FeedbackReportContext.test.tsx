@@ -45,14 +45,14 @@ describe('FeedbackReportProvider', () => {
     document.body.innerHTML = '';
   });
 
-  const renderError = async () => {
+  const renderError = async (technicalDetails?: string) => {
     root = createRoot(document.getElementById('root')!);
     await act(async () => {
       root?.render(
         createElement(I18nProvider, {
           language: 'en',
           children: createElement(FeedbackReportProvider, {
-            children: createElement(ActionToastViewport, { toasts: [{ id: 11, msg: 'Repository failed', isError: true }] }),
+            children: createElement(ActionToastViewport, { toasts: [{ id: 11, msg: 'Repository failed', isError: true, technicalDetails }] }),
           }),
         }),
       );
@@ -73,6 +73,17 @@ describe('FeedbackReportProvider', () => {
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Feedback & issue report');
     expect(document.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('');
     expect(Array.from(document.querySelectorAll('textarea'))[2]?.value).toBe('Repository failed');
+    expect(appClientMock.submitFeedbackReport).not.toHaveBeenCalled();
+  });
+  it('includes the original redacted Git diagnostic in a manually opened report', async () => {
+    await renderError('fatal: Authentication failed for https://sample-user:sample-password@forge.test/repo.git');
+    const report = Array.from(document.querySelectorAll('button')).find((button) => button.textContent === 'Quick report');
+    await act(async () => report?.click());
+    const error = Array.from(document.querySelectorAll('textarea'))[2]?.value;
+    expect(error).toContain('fatal: Authentication failed');
+    expect(error).toContain('[REDACTED]');
+    expect(error).not.toContain('sample-user');
+    expect(error).not.toContain('sample-password');
     expect(appClientMock.submitFeedbackReport).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 import { useRepositorySecretScanAllowlist } from '@/app/state/useRepositorySecretScanAllowlist';
-import { useCallback, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useToastQueue } from '@/hooks/useToastQueue';
 import { useDialogControllers } from './hooks/useDialogControllers';
 import { useWorkspaceDomain } from './hooks/useWorkspaceDomain';
@@ -17,6 +17,10 @@ import { useSettingsState } from '@/app/state/useSettingsState';
 import { useRepositoryRun } from '@/app/state/useRepositoryRun';
 import type { HostedRepositoryRef } from '@/types/hostingDtos';
 import { requestWorkingDirectoryNavigation } from '@/components/working-directory/workingDirectoryNavigationGuard';
+import { prepareGitErrorNotification, type GitErrorEnvironment } from './workflows/gitErrorPresentation';
+import type { NotificationMessage } from '@/types/notifications';
+import { useHostingState } from '@/components/hosting/hostingState';
+import { hideRemoteTransferResult } from '@/components/hosting/remoteTransferState';
 
 export const useAppState = () => {
   const [plannerRefreshSignal, setPlannerRefreshSignal] = useState(0);
@@ -29,6 +33,8 @@ export const useAppState = () => {
   const [publicationReturnTab, setPublicationReturnTab] = useState<'repo' | 'hosting'>('repo');
   const [releaseCreatorTarget, setReleaseCreatorTarget] = useState<HostedRepositoryRef | null>(null);
   const [releaseReturnTab, setReleaseReturnTab] = useState<'repo' | 'hosting'>('repo');
+  const errorEnvironment = useRef<GitErrorEnvironment | null>(null);
+  const prepareNotification = useCallback((message: NotificationMessage) => prepareGitErrorNotification(message, () => errorEnvironment.current), []);
 
   const {
     toast: gitActionToast,
@@ -39,6 +45,7 @@ export const useAppState = () => {
   } = useToastQueue({
     autoHideMs: 3000,
     errorAutoHideMs: null,
+    prepareMessage: prepareNotification,
   });
 
   const {
@@ -171,6 +178,45 @@ export const useAppState = () => {
     language: settings.language,
     onNavigateToCommit: navigateToCommit,
   });
+
+  useLayoutEffect(() => {
+    const openWorkspace = () =>
+      requestWorkingDirectoryNavigation({ kind: 'view', label: 'repository workspace' }, () => {
+        hideRemoteTransferResult();
+        resetRepositoryView();
+        workspace.setActiveTab('repo');
+      });
+    errorEnvironment.current = {
+      repoPath: workspace.activeRepo,
+      tr,
+      notify: notifications.publish,
+      openWorkspace,
+      openRepositories: () =>
+        requestWorkingDirectoryNavigation({ kind: 'view', label: 'repository list' }, () => {
+          hideRemoteTransferResult();
+          workspace.setActiveTab('localRepos');
+        }),
+      openAccounts: (connectionId) =>
+        requestWorkingDirectoryNavigation({ kind: 'view', label: 'hosting accounts' }, () => {
+          hideRemoteTransferResult();
+          useHostingState.getState().navigate('connections');
+          if (connectionId) useHostingState.getState().requestConnectionEditor(connectionId);
+          workspace.setActiveTab('hosting');
+        }),
+      openRemoteConfiguration: () =>
+        requestWorkingDirectoryNavigation({ kind: 'view', label: 'remote configuration' }, () => {
+          hideRemoteTransferResult();
+          resetRepositoryView();
+          setRemoteConfigOpen(true);
+          workspace.setActiveTab('repo');
+        }),
+      openConflict: (path) =>
+        requestWorkingDirectoryNavigation({ kind: 'view', label: 'conflict resolver' }, () => {
+          hideRemoteTransferResult();
+          openConflictResolverForPath(path);
+        }),
+    };
+  }, [workspace, tr, notifications, resetRepositoryView, openConflictResolverForPath]);
 
   const clone = useRepositoryCloneWorkflow({
     onRepoCloned: workspace.addOpenRepo,

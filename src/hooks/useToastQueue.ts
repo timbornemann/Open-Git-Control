@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { NotificationEntry, NotificationMessage } from '@/types/notifications';
 
 type UseToastQueueOptions = {
   autoHideMs?: number;
   errorAutoHideMs?: number | null;
+  prepareMessage?: (message: NotificationMessage) => NotificationMessage;
 };
 
 let nextId = 0;
@@ -16,6 +17,11 @@ export const useToastQueue = (config: number | UseToastQueueOptions = 3000) => {
   const [toasts, setToasts] = useState<NotificationEntry[]>([]);
   const timersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const latestToastsRef = useRef<NotificationEntry[]>([]);
+  const prepareRef = useRef(options.prepareMessage);
+  useLayoutEffect(() => {
+    prepareRef.current = options.prepareMessage;
+  }, [options.prepareMessage]);
+  const prepare = useCallback((message: NotificationMessage) => prepareRef.current?.(message) ?? message, []);
 
   const commit = useCallback((entries: NotificationEntry[]) => {
     latestToastsRef.current = entries;
@@ -50,7 +56,8 @@ export const useToastQueue = (config: number | UseToastQueueOptions = 3000) => {
   );
 
   const publish = useCallback(
-    (message: NotificationMessage) => {
+    (input: NotificationMessage) => {
+      const message = prepare(input);
       const id = ++nextId;
       const entries = [...latestToastsRef.current, { ...message, id }];
       // Keep active operations visible when ordinary notifications fill the queue.
@@ -64,17 +71,18 @@ export const useToastQueue = (config: number | UseToastQueueOptions = 3000) => {
       schedule(id, message);
       return id;
     },
-    [clearTimer, commit, schedule],
+    [clearTimer, commit, schedule, prepare],
   );
 
   const update = useCallback(
-    (id: number, message: NotificationMessage) => {
+    (id: number, input: NotificationMessage) => {
       if (!latestToastsRef.current.some((entry) => entry.id === id)) return false;
+      const message = prepare(input);
       commit(latestToastsRef.current.map((entry) => (entry.id === id ? { ...message, id } : entry)));
       schedule(id, message);
       return true;
     },
-    [commit, schedule],
+    [commit, schedule, prepare],
   );
 
   const setToast = useCallback(
@@ -86,14 +94,22 @@ export const useToastQueue = (config: number | UseToastQueueOptions = 3000) => {
         return;
       }
 
+      const message = prepare(msg);
       const lastToast = latestToastsRef.current[latestToastsRef.current.length - 1];
-      if (lastToast && lastToast.msg === msg.msg && lastToast.isError === msg.isError && lastToast.kind === msg.kind) {
+      if (
+        lastToast &&
+        lastToast.msg === message.msg &&
+        lastToast.isError === message.isError &&
+        lastToast.kind === message.kind &&
+        lastToast.technicalDetails === message.technicalDetails &&
+        JSON.stringify(lastToast.gitContext) === JSON.stringify(message.gitContext)
+      ) {
         return;
       }
 
-      publish(msg);
+      publish(message);
     },
-    [commit, publish],
+    [commit, publish, prepare],
   );
 
   useEffect(() => {
@@ -111,6 +127,6 @@ export const useToastQueue = (config: number | UseToastQueueOptions = 3000) => {
   // Backward-compat: expose last toast as `toast`
   const toast = toasts.length > 0 ? toasts[toasts.length - 1] : null;
 
-  const notifications = useMemo(() => ({ publish, update, dismiss }), [publish, update, dismiss]);
+  const notifications = useMemo(() => ({ publish, update, dismiss, prepare }), [publish, update, dismiss, prepare]);
   return { toast, toasts, setToast, pushSuccess, pushError, clearToast, dismiss, notifications };
 };

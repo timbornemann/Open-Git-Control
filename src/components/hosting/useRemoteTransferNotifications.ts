@@ -6,6 +6,7 @@ import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { useRemoteTransferState, type RemoteTransferState } from './remoteTransferState';
 import type { RemoteTransferCoordinator } from './remoteTransferCoordinator';
 import { secretScanNotification, secretScanFallbackDetail } from './secretScanNotification';
+import { pushFailureDetails, transferFailureContext } from './transferFailureContext';
 
 const pushOperations = new Set(['git:executePush', 'git:retryPush', 'git:planPush']);
 const notificationTitle = (current: RemoteTransferState) =>
@@ -44,11 +45,20 @@ export function useRemoteTransferNotifications(coordinator: RemoteTransferCoordi
       const cancelled = batch?.state === 'cancelled' || (!isError && Boolean(current.error));
       const completed = batch?.targets.filter((target) => ['success', 'up-to-date'].includes(target.status)).length ?? 0;
       const canOpen = Boolean(batch || current.failedPull);
+      const failedTargets = current.error ? [] : (batch?.targets.filter((target) => ['failed', 'rejected', 'unknown'].includes(target.status)) ?? []);
       const notification: NotificationMessage = {
         title: notificationTitle(current),
         msg: message,
         isError,
         kind: cancelled ? (completed ? 'warning' : 'info') : batch?.state === 'partial' ? 'warning' : isError ? 'error' : 'success',
+        ...(isError && !cancelled
+          ? {
+              gitContext: transferFailureContext(current, failedTargets.length === 1 ? failedTargets[0] : undefined),
+              technicalDetails: failedTargets.length
+                ? failedTargets.map((target) => `${target.remoteName} (${target.url})\n${pushFailureDetails(target)}`).join('\n\n')
+                : current.error || undefined,
+            }
+          : {}),
         detail:
           [
             batch && batch.targets.length

@@ -1,6 +1,8 @@
 import { useI18n } from '@/i18n';
-import type { GitPushBatchDto } from '@/types/remoteTransfers';
+import type { GitPushBatchDto, RemotePreferences } from '@/types/remoteTransfers';
 import type { SecretScanResultDto } from '@/types/gitDtos';
+import { GitFailureMessage } from '@/components/ui/GitFailureMessage';
+import { pushFailureDetails } from './transferFailureContext';
 
 export function PushTransferResults({
   batch,
@@ -8,12 +10,14 @@ export function PushTransferResults({
   canRetry,
   reviewRetry,
   scan,
+  preferences,
 }: {
   batch: GitPushBatchDto;
   busy: boolean;
   canRetry: boolean;
   reviewRetry: () => void;
   scan?: SecretScanResultDto | null;
+  preferences?: RemotePreferences;
 }) {
   const { tr } = useI18n();
   return (
@@ -29,20 +33,37 @@ export function PushTransferResults({
           ))}
         </details>
       ) : null}
-      {batch.targets.map((target) => (
-        <div key={target.id}>
-          <p>
-            {target.remoteName}: {target.status}
-          </p>
-          <small>{target.url}</small>
-          <small>{target.message}</small>
-          {target.refResults?.map((ref) => (
-            <small key={ref.destinationRef}>
-              {ref.destinationRef}: {ref.status} · {ref.message}
-            </small>
-          ))}
-        </div>
-      ))}
+      {batch.targets.map((target) => {
+        const failed = ['failed', 'rejected', 'unknown'].includes(target.status);
+        const binding = preferences?.bindings?.find((item) => item.remoteName === target.remoteName && item.url === target.url);
+        return (
+          <div key={target.id}>
+            <p>
+              {target.remoteName}: {target.status}
+            </p>
+            <small>{target.url}</small>
+            {failed ? (
+              <GitFailureMessage
+                message={pushFailureDetails(target)}
+                context={{
+                  repoPath: batch.repoPath,
+                  remote: target.remoteName,
+                  url: target.url,
+                  connectionId: binding?.credentialMode === 'system' ? null : (binding?.repository?.connectionId ?? null),
+                }}
+              />
+            ) : (
+              <small>{target.message}</small>
+            )}
+            {!failed &&
+              target.refResults?.map((ref) => (
+                <small key={ref.destinationRef}>
+                  {ref.destinationRef}: {ref.status} · {ref.message}
+                </small>
+              ))}
+          </div>
+        );
+      })}
       {batch.targets.some((target) => target.grouped && !['success', 'up-to-date'].includes(target.status)) && (
         <p>
           {tr(

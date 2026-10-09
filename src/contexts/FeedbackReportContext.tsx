@@ -4,8 +4,9 @@ import { useUIStore } from '@/contexts/AppStateContext';
 import { useHostingState } from '@/components/hosting/hostingState';
 import { appClient } from '@/services/appClient';
 import type { FeedbackReportAreaDto, FeedbackReportCapabilityDto, FeedbackReportCategoryDto } from '@/types/feedbackDtos';
+import { notificationCopyText } from '@/utils/gitFailure';
 
-export type FeedbackToast = { id: number; msg: string; isError: boolean };
+export type FeedbackToast = { id: number; msg: string; isError: boolean; detail?: string; technicalDetails?: string };
 export type FeedbackToastStatus = { state: 'idle' | 'reported'; issueNumber?: number; htmlUrl?: string };
 
 type FeedbackReportContextValue = {
@@ -68,7 +69,7 @@ export const FeedbackReportProvider = ({ children }: { children: React.ReactNode
         void appClient.openExternalUrl(status.htmlUrl);
         return;
       }
-      openManualReport('bug', { source: 'error-toast', errorMessage: toast.msg, toastId: toast.id, area: areaForTab(activeTab) });
+      openManualReport('bug', { source: 'error-toast', errorMessage: notificationCopyText(toast), toastId: toast.id, area: areaForTab(activeTab) });
     },
     [activeTab, openManualReport, toastStatuses],
   );

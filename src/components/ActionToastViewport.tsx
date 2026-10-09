@@ -4,6 +4,8 @@ import { useOptionalFeedbackReport } from '@/contexts/FeedbackReportContext';
 import { AlertCircle, Check, Info, Loader2, X } from 'lucide-react';
 import type { NotificationEntry } from '@/types/notifications';
 import '@/styles/action-toast.css';
+import { TechnicalDetails } from '@/components/ui/TechnicalDetails';
+import { explainGitNotification, notificationCopyText } from '@/utils/gitFailure';
 
 export type ActionToastItem = NotificationEntry;
 
@@ -42,7 +44,7 @@ const copyMessage = async (message: string) => {
 };
 
 export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({ toasts, onDismiss }) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   const feedback = useOptionalFeedbackReport();
   const handleCopy = useCallback((message: string) => {
     void copyMessage(message);
@@ -52,7 +54,8 @@ export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({ toasts
 
   return (
     <div className="toast-container" aria-live="polite" aria-atomic="false">
-      {toasts.map((toast) => {
+      {toasts.map((entry) => {
+        const toast = { ...entry, ...explainGitNotification(entry, tr) };
         const kind = toast.kind ?? (toast.isError ? 'error' : 'success');
         const Icon = kind === 'progress' ? Loader2 : kind === 'info' ? Info : kind === 'warning' ? AlertCircle : toast.isError ? X : Check;
         return (
@@ -63,6 +66,7 @@ export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({ toasts
                 {toast.title && <strong className="toast-title">{toast.title}</strong>}
                 <span>{toast.msg}</span>
                 {toast.detail && <span className="toast-detail">{toast.detail}</span>}
+                <TechnicalDetails>{toast.technicalDetails}</TechnicalDetails>
               </div>
             </div>
             {toast.progress && (
@@ -90,7 +94,7 @@ export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({ toasts
                   <button
                     type="button"
                     className="toast-action-btn"
-                    onClick={() => handleCopy(toast.msg)}
+                    onClick={() => handleCopy(notificationCopyText(toast))}
                     title={t('generated.components.actiontoastviewport.copy_error_message_6863792c')}
                   >
                     {t('generated.components.actiontoastviewport.copy_5c2a9afe')}

@@ -3,11 +3,12 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { useToastQueue } from './useToastQueue';
+import { explainGitNotification } from '@/utils/gitFailure';
 
 let root: Root;
 let queue: ReturnType<typeof useToastQueue>;
 function Harness() {
-  queue = useToastQueue({ autoHideMs: 3000, errorAutoHideMs: null });
+  queue = useToastQueue({ autoHideMs: 3000, errorAutoHideMs: null, prepareMessage: (message) => explainGitNotification(message, (_de, en) => en) });
   return null;
 }
 beforeEach(() => {
@@ -23,6 +24,26 @@ afterEach(() => {
 const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
 
 describe('central notification lifecycle', () => {
+  it('prepares both legacy errors and completed progress without losing distinct diagnostics', () => {
+    act(() => {
+      queue.pushError('fatal: unable to access server: HTTP 502');
+      queue.pushError('fatal: unable to access server: HTTP 503');
+      queue.pushError('fatal: unable to access server: HTTP 503');
+    });
+    expect(queue.toasts).toHaveLength(2);
+    expect(queue.toasts[0].msg).toBe(queue.toasts[1].msg);
+    expect(queue.toasts[0].technicalDetails).toContain('502');
+    expect(queue.toasts[1].technicalDetails).toContain('503');
+    let id!: number;
+    act(() => {
+      id = queue.notifications.publish({ msg: 'Pushing', isError: false, kind: 'progress', autoHideMs: null });
+    });
+    act(() => {
+      queue.notifications.update(id, { msg: 'fatal: Authentication failed', isError: true });
+    });
+    expect(queue.toast).toMatchObject({ id, technicalDetails: 'fatal: Authentication failed', errorExplained: true });
+    expect(queue.toast?.msg).toContain('permissions');
+  });
   it('keeps progress alive then expires cancellation in the same entry', () => {
     let id!: number;
     act(() => {
