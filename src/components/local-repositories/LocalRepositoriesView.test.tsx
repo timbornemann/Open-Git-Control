@@ -22,7 +22,8 @@ describe('LocalRepositoriesView', () => {
   let host: HTMLDivElement;
   let root: Root;
   let repository: RepositoryContextValue;
-  let setActiveTab: ReturnType<typeof vi.fn>;
+  let setActiveTab: ReturnType<typeof vi.fn<UIContextValue['setActiveTab']>>;
+  let onOpenRepositoryAnalytics: ReturnType<typeof vi.fn>;
   let onOpenRunConfig: ReturnType<typeof vi.fn>;
   let onCloseRunConfig: ReturnType<typeof vi.fn>;
   let onOpenRemoteConfig: ReturnType<typeof vi.fn>;
@@ -43,7 +44,8 @@ describe('LocalRepositoriesView', () => {
     host = document.createElement('div');
     document.body.appendChild(host);
     root = createRoot(host);
-    setActiveTab = vi.fn();
+    setActiveTab = vi.fn<UIContextValue['setActiveTab']>();
+    onOpenRepositoryAnalytics = vi.fn(() => setActiveTab('repo'));
     onOpenRunConfig = vi.fn();
     onCloseRunConfig = vi.fn();
     onOpenRemoteConfig = vi.fn();
@@ -68,6 +70,7 @@ describe('LocalRepositoriesView', () => {
     vi.mocked(useRepositoryContext).mockReturnValue(repository);
     vi.mocked(useUIContext).mockReturnValue({
       setActiveTab,
+      onOpenRepositoryAnalytics,
       onOpenRunConfig,
       onCloseRunConfig,
       onOpenRemoteConfig,
@@ -130,6 +133,41 @@ describe('LocalRepositoriesView', () => {
     await openRunConfig();
     expect(setActiveTab).toHaveBeenCalledWith('repo');
     expect(onOpenRunConfig).toHaveBeenCalledOnce();
+  });
+
+  it.each([first, second])('opens analytics from the context menu after activation succeeds for %s', async (path) => {
+    let activate!: (success: boolean) => void;
+    vi.mocked(repository.onSwitchRepo)
+      .mockResolvedValueOnce(false)
+      .mockImplementationOnce(
+        () =>
+          new Promise<boolean>((resolve) => {
+            activate = resolve;
+          }),
+      );
+    await render();
+    const row = host.querySelectorAll('.local-repositories-view__row')[path === first ? 0 : 1];
+    const openAnalytics = async () => {
+      const switchCalls = vi.mocked(repository.onSwitchRepo).mock.calls.length;
+      await act(async () => row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 60 })));
+      expect(repository.onSwitchRepo).toHaveBeenCalledTimes(switchCalls);
+      await click(
+        Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).find((item) => item.textContent?.includes('Statistik & Analyse')) ?? null,
+      );
+      expect(document.querySelector('.local-repository-context-menu')).toBeNull();
+    };
+    await openAnalytics();
+    expect(repository.onSwitchRepo).toHaveBeenCalledWith(path);
+    expect(onOpenRepositoryAnalytics).not.toHaveBeenCalled();
+    expect(setActiveTab).not.toHaveBeenCalled();
+    await openAnalytics();
+    expect(onOpenRepositoryAnalytics).not.toHaveBeenCalled();
+    expect(setActiveTab).not.toHaveBeenCalled();
+    await act(async () => activate(true));
+    expect(onOpenRepositoryAnalytics).toHaveBeenCalledOnce();
+    expect(setActiveTab).toHaveBeenCalledWith('repo');
+    expect(onOpenRunConfig).not.toHaveBeenCalled();
+    expect(onOpenRemoteConfig).not.toHaveBeenCalled();
   });
 
   it('filters by path and pin, keeps sort persistence, and isolates row controls', async () => {

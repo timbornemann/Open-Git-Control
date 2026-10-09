@@ -1,6 +1,6 @@
 import { useI18n } from '@/i18n';
 import type { AnalyticsFilters, RepositoryAnalyticsSnapshot } from '@/shared/ipc/repositoryAnalytics';
-import { AnalyticsEmpty, AnalyticsTable, ActivityCalendar, PeriodChart, count, percent, periodInterval } from './AnalyticsCharts';
+import { AnalyticsEmpty, AnalyticsTable, ActivityCalendar, PeriodChart, count, percent, percentWidth, periodInterval } from './AnalyticsCharts';
 
 type Props = { snapshot: RepositoryAnalyticsSnapshot; onPerson: (id: string) => void; onPeriod: (date: string) => void; onDay?: (date: string) => void };
 export function AnalyticsContributions({ snapshot, onPerson, onPeriod, onDay = onPeriod }: Props) {
@@ -74,7 +74,7 @@ export function AnalyticsOwnership({ snapshot, onPerson }: Pick<Props, 'snapshot
             <td>{count(person.lines)}</td>
             <td>
               <span className="analytics-share">
-                <span style={{ width: percent(project.blamedLines ? person.lines / project.blamedLines : 0) }} />
+                <span style={{ width: percentWidth(project.blamedLines ? person.lines / project.blamedLines : 0) }} />
               </span>
               {percent(project.blamedLines ? person.lines / project.blamedLines : 0)}
             </td>

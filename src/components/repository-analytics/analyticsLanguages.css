@@ -1,0 +1,122 @@
+.analytics-languages {
+  container: analytics-languages / inline-size;
+}
+.analytics-language-distribution {
+  display: flex;
+  height: 12px;
+  margin: 18px 0 10px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--bg-panel);
+}
+.analytics-language-distribution > span {
+  flex: none;
+  height: 100%;
+}
+.analytics-language-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.analytics-language-item {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(100px, 1.15fr) 50px;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line-subtle);
+}
+.analytics-language-item:last-child {
+  border-bottom: 0;
+}
+.analytics-language-info {
+  min-width: 0;
+}
+.analytics-language-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.analytics-language-swatch {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--analytics-language-color);
+}
+.analytics-language-details {
+  display: block;
+  margin: 4px 0 0 16px;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+.analytics-language-bar {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--bg-panel);
+}
+.analytics-language-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--analytics-language-color);
+}
+.analytics-language-percent {
+  text-align: right;
+  font-size: 0.76rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.analytics-file-kinds {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+.analytics-file-kinds h4 {
+  margin: 0 0 10px;
+  color: var(--text-secondary);
+  font-size: 0.73rem;
+  font-weight: 500;
+}
+.analytics-file-kinds dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+.analytics-file-kinds dl > div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 4px;
+  background: var(--bg-dark);
+}
+.analytics-file-kinds dt {
+  color: var(--text-secondary);
+  font-size: 0.73rem;
+}
+.analytics-file-kinds dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+@container analytics-languages (max-width: 480px) {
+  .analytics-language-item {
+    grid-template-columns: minmax(0, 1fr) 50px;
+    gap: 8px 12px;
+  }
+  .analytics-language-percent {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .analytics-language-bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

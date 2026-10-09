@@ -136,7 +136,7 @@ describe('repository analytics dashboard', () => {
     saved.periods.push({ date: '2026-10-11', commits: 1, merges: 0, additions: 1, deletions: 0 });
     mocks.cache.mockResolvedValue({ success: true, data: saved });
     await render();
-    expect(host.querySelector('.analytics-period-gap')?.getAttribute('style')).toContain('flex: 2');
+    expect(host.querySelector('.analytics-period-gap')?.getAttribute('style')).toContain('grid-column: 2 / span 2');
     const bars = host.querySelectorAll<HTMLButtonElement>('.analytics-bar');
     bars[0].focus();
     await act(async () => bars[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
@@ -161,6 +161,69 @@ describe('repository analytics dashboard', () => {
     expect(readAnalyticsFilters('C:/repo').scope).toBe('HEAD');
     expect(readAnalyticsFilters('C:/another').scope).toBe('all');
   });
+  it('keeps a compact toolbar and moves summary figures into the overview content', async () => {
+    await render();
+    const header = host.querySelector('.analytics-header')!;
+    const panel = host.querySelector<HTMLElement>('.analytics-filter-panel')!;
+    expect(header.querySelector('.analytics-toolbar')).toBeTruthy();
+    expect(header.querySelector('.analytics-tabs')).toBeTruthy();
+    expect(header.querySelector('.analytics-metrics')).toBeNull();
+    expect(host.querySelector('.analytics-content .analytics-metrics')).toBeTruthy();
+    expect(host.querySelector('.analytics-report-bar')).toBeNull();
+    expect(header.querySelector<HTMLSelectElement>('[aria-label="History scope"]')?.value).toBe('all');
+    expect(panel.hidden).toBe(true);
+    const requests = mocks.refresh.mock.calls.length;
+    await click('Filters');
+    expect(panel.hidden).toBe(false);
+    expect(header.querySelector('.analytics-filter-toggle')?.getAttribute('aria-expanded')).toBe('true');
+    await click('Filters');
+    expect(panel.hidden).toBe(true);
+    expect(mocks.refresh).toHaveBeenCalledTimes(requests);
+    await click('Change hotspots');
+    expect(host.querySelector('.analytics-metrics')).toBeNull();
+    expect(host.querySelector('.analytics-content h3')?.textContent).toBe('Change hotspots');
+  });
+  it('keeps collapsed filters visible in the summary, preserves their values and resets them together', async () => {
+    vi.useFakeTimers();
+    mocks.cache.mockImplementation(({ filters }) => Promise.resolve({ success: true, data: { ...report(), filters } }));
+    await render();
+    await click('Filters');
+    const panel = host.querySelector<HTMLElement>('.analytics-filter-panel')!;
+    const dates = panel.querySelectorAll<HTMLInputElement>('input[type="date"]');
+    const person = panel.querySelector<HTMLSelectElement>('select')!;
+    const path = panel.querySelector<HTMLInputElement>('input[placeholder="All files"]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(dates[0], '2026-10-01');
+      dates[0].dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => {
+      person.value = 'alice';
+      person.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(path, 'src/');
+      path.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => vi.advanceTimersByTime(400));
+    const toggle = host.querySelector<HTMLButtonElement>('.analytics-filter-toggle')!;
+    expect(toggle.querySelector('.analytics-filter-count')?.textContent).toBe('3');
+    await act(async () => toggle.click());
+    expect(panel.hidden).toBe(true);
+    expect(host.querySelector('.analytics-filter-summary')?.textContent).toBe('2026-10-01 – … · Alice · src/');
+    const requests = mocks.refresh.mock.calls.length;
+    await render('C:/repo', false, 1);
+    expect(panel.hidden).toBe(true);
+    expect(path.value).toBe('src/');
+    expect(person.value).toBe('alice');
+    await act(async () => toggle.click());
+    expect(mocks.refresh).toHaveBeenCalledTimes(requests + 1);
+    await click('Reset');
+    expect(path.value).toBe('');
+    expect(dates[0].value).toBe('');
+    expect(person.value).toBe('');
+    expect(host.querySelector('.analytics-filter-summary')).toBeNull();
+    expect(readAnalyticsFilters('C:/repo')).toEqual(DEFAULT_ANALYTICS_FILTERS);
+  });
   it('does not let late cached or progress results replace the current repository context', async () => {
     const cache = deferred<{ success: true; data: RepositoryAnalyticsSnapshot }>();
     mocks.cache.mockReturnValueOnce(cache.promise);
@@ -178,10 +241,13 @@ describe('repository analytics dashboard', () => {
   it.each(['missing', 'failed', 'partial'] as const)('keeps the displayed report stable during a background refresh with a %s cache', async (cacheState) => {
     await render();
     const content = host.querySelector<HTMLDivElement>('.analytics-content')!;
-    const languages = [...host.querySelectorAll('tr')].find((row) => row.textContent?.includes('TypeScript'));
-    const chartData = host.querySelector<HTMLDetailsElement>('details.analytics-data')!;
+    const languages = host.querySelector('.analytics-language-item');
+    expect(languages).toBeTruthy();
+    const chart = host.querySelector<HTMLDivElement>('.analytics-chart')!;
+    const bar = chart.querySelector<HTMLButtonElement>('.analytics-bar')!;
     content.scrollTop = 120;
-    chartData.open = true;
+    chart.scrollLeft = 40;
+    bar.focus();
     const refreshed = report('C:/repo', 4);
     refreshed.id = 'new-refs';
     refreshed.savedAt = 2000;
@@ -205,15 +271,21 @@ describe('repository analytics dashboard', () => {
     await act(async () => listeners[0]({ repoPath: 'C:/repo', requestId, phase: 'project', completed: 1, total: 1, snapshot: project }));
     expect([...host.querySelectorAll('.analytics-metrics dd')].map((node) => node.textContent)).toEqual(['3', '1', '1', '0', '1', '1', '3']);
     expect(host.querySelector('.analytics-content')).toBe(content);
-    expect([...host.querySelectorAll('tr')].find((row) => row.textContent?.includes('TypeScript'))).toBe(languages);
+    expect(host.querySelector('.analytics-language-item')).toBe(languages);
     expect(content.scrollTop).toBe(120);
-    expect(chartData.open).toBe(true);
+    expect(host.querySelector('.analytics-bar')).toBe(bar);
+    expect(document.activeElement).toBe(bar);
+    expect(chart.scrollLeft).toBe(40);
+    expect(bar.querySelector('.analytics-bar-value')?.textContent).toBe('3');
     await act(async () => refresh.resolve({ success: true, data: refreshed }));
     expect(host.querySelector('.analytics-metrics dd')?.textContent).toBe('4');
     expect(host.querySelectorAll('.analytics-metrics dd')[6].textContent).toBe('8');
     expect(content.scrollTop).toBe(120);
-    expect(chartData.open).toBe(true);
-    expect([...host.querySelectorAll('tr')].find((row) => row.textContent?.includes('TypeScript'))).toBe(languages);
+    expect(host.querySelector('.analytics-bar')).toBe(bar);
+    expect(document.activeElement).toBe(bar);
+    expect(chart.scrollLeft).toBe(40);
+    expect(bar.querySelector('.analytics-bar-value')?.textContent).toBe('4');
+    expect(host.querySelector('.analytics-language-item')).toBe(languages);
   });
   it('still shows progressively available sections when no previous report exists', async () => {
     mocks.cache.mockResolvedValue({ success: true, data: null });
@@ -290,12 +362,13 @@ describe('repository analytics dashboard', () => {
     expect(host.querySelector('.analytics-pagination')?.textContent).toContain('51–100 / 102');
     expect(content.scrollTop).toBe(80);
   });
-  it('uses central progress and cancellation, preserves usable results and provides chart tables', async () => {
+  it('uses central progress and cancellation and preserves usable results', async () => {
     await render();
     const request = mocks.refresh.mock.calls[0][0];
     await act(async () => listeners[0]({ repoPath: 'C:/repo', requestId: request.readRequest.requestId, phase: 'blame', completed: 2, total: 4 }));
     expect(mocks.update).toHaveBeenLastCalledWith(1, expect.objectContaining({ kind: 'progress', progress: { value: 50, label: '2 / 4' } }));
-    expect(host.querySelector('details.analytics-data summary')?.textContent).toBe('Chart data as table');
+    expect(host.querySelector('details.analytics-data')).toBeNull();
+    expect(host.querySelector('.analytics-bar-value')?.textContent).toBe('3');
     await click('Cancel');
     expect(mocks.cancel).toHaveBeenCalled();
     expect(host.textContent).toContain('TypeScript');
@@ -303,6 +376,18 @@ describe('repository analytics dashboard', () => {
     const before = mocks.refresh.mock.calls.length;
     await click('Resume');
     expect(mocks.refresh.mock.calls.length).toBeGreaterThan(before);
+  });
+  it('also uses valid proportional CSS widths for last changed lines', async () => {
+    const saved = report();
+    saved.project.lines = saved.project.blamedLines = 1000;
+    saved.project.ownership = [
+      { id: 'alice', name: 'Alice', email: 'alice@test.invalid', lines: 815 },
+      { id: 'bob', name: 'Bob', email: 'bob@test.invalid', lines: 185 },
+    ];
+    mocks.cache.mockResolvedValue({ success: true, data: saved });
+    await render();
+    await click('Last changed lines');
+    expect([...host.querySelectorAll<HTMLElement>('.analytics-share > span')].map((node) => node.style.width)).toEqual(['81.5%', '18.5%']);
   });
   it('pages commit details and opens the existing commit workflow without a checkout', async () => {
     mocks.details.mockResolvedValue({

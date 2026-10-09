@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUpRight, Copy, FolderGit2, FolderOpen, Image, Pin, PinOff, Settings2, X } from 'lucide-react';
+import { ArrowUpRight, BarChart3, Copy, FolderGit2, FolderOpen, Image, Pin, PinOff, Settings2, X } from 'lucide-react';
 import { useAppToast } from '@/hooks/useAppToast';
 import { useI18n } from '@/i18n';
 import { appClient } from '@/services/appClient';
@@ -17,6 +17,7 @@ type Props = {
   pinned: boolean;
   onClose: () => void;
   onOpenRepoTab: (path: string) => void;
+  onOpenRepositoryAnalytics?: (path: string) => void;
   onOpenRunConfig: (path: string) => void;
   onOpenSecretScanAllowlist?: (path: string) => void;
   onOpenRemoteConfig: (path: string) => void;
@@ -33,6 +34,7 @@ export const LocalRepositoryContextMenu: React.FC<Props> = ({
   pinned,
   onClose,
   onOpenRepoTab,
+  onOpenRepositoryAnalytics,
   onOpenRunConfig,
   onOpenSecretScanAllowlist,
   onOpenRemoteConfig,
@@ -121,6 +123,11 @@ export const LocalRepositoryContextMenu: React.FC<Props> = ({
         <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onOpenRepoTab(menu.path))}>
           <FolderGit2 size={14} /> {tr('Repo-Tab öffnen', 'Open repository tab')}
         </button>
+        {onOpenRepositoryAnalytics && (
+          <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onOpenRepositoryAnalytics(menu.path))}>
+            <BarChart3 size={14} /> {tr('Statistik & Analyse', 'Statistics & analytics')}
+          </button>
+        )}
         <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onOpenRunConfig(menu.path))}>
           <Settings2 size={14} /> {tr('Run-Konfiguration', 'Run configuration')}
         </button>

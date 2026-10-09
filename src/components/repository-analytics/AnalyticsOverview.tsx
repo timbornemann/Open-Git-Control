@@ -1,6 +1,8 @@
 import { useI18n } from '@/i18n';
 import type { RepositoryAnalyticsSnapshot } from '@/shared/ipc/repositoryAnalytics';
-import { AnalyticsTable, PeriodChart, count, dateLabel, percent, periodInterval } from './AnalyticsCharts';
+import { AnalyticsEmpty, PeriodChart, count, dateLabel, periodInterval } from './AnalyticsCharts';
+import { AnalyticsHotspotHeatmap } from './AnalyticsHotspotHeatmap';
+import { AnalyticsLanguages } from './AnalyticsLanguages';
 
 export function AnalyticsMetrics({ snapshot }: { snapshot: RepositoryAnalyticsSnapshot }) {
   const { tr } = useI18n();
@@ -15,7 +17,7 @@ export function AnalyticsMetrics({ snapshot }: { snapshot: RepositoryAnalyticsSn
     [tr('Textzeilen', 'Text lines'), project ? count(snapshot.project.lines) : '…'],
   ];
   return (
-    <dl className="analytics-metrics">
+    <dl className="analytics-metrics analytics-metrics--cards">
       {rows.map(([label, value]) => (
         <div key={label}>
           <dt>{label}</dt>
@@ -34,9 +36,9 @@ type Props = {
 };
 export function AnalyticsOverview({ snapshot, onPeriod, onPath, onVersion, onFile }: Props) {
   const { tr } = useI18n();
-  const project = snapshot.project;
   return (
     <>
+      <AnalyticsMetrics snapshot={snapshot} />
       <section className="analytics-section">
         <h3>{tr('Aktivität', 'Activity')}</h3>
         <p className="analytics-description">
@@ -46,67 +48,14 @@ export function AnalyticsOverview({ snapshot, onPeriod, onPath, onVersion, onFil
         <PeriodChart periods={snapshot.periods} interval={periodInterval(snapshot)} onSelect={onPeriod} />
       </section>
       <div className="analytics-columns">
-        <section className="analytics-section">
-          <h3>{tr('Sprachen & Dateitypen', 'Languages & file types')}</h3>
-          <p className="analytics-description">
-            {tr(
-              'Versionierte Dateien des Projektstands; Textzeilen einschließlich Leerzeilen und Kommentaren.',
-              'Committed files of the project tree; text lines include blank lines and comments.',
-            )}
-          </p>
-          <AnalyticsTable headings={[tr('Sprache / Typ', 'Language / type'), tr('Dateien', 'Files'), tr('Zeilen', 'Lines'), tr('Anteil', 'Share')]}>
-            {project.languages.map((language) => (
-              <tr key={language.language}>
-                <td>{language.language}</td>
-                <td>{count(language.files)}</td>
-                <td>{count(language.lines)}</td>
-                <td>
-                  <span className="analytics-share">
-                    <span style={{ width: percent(project.lines ? language.lines / project.lines : 0) }} />
-                  </span>
-                  {percent(project.lines ? language.lines / project.lines : 0)}
-                </td>
-              </tr>
-            ))}
-            {[
-              [tr('Binärdateien', 'Binary files'), project.binaryFiles],
-              ['LFS', project.lfsFiles],
-              [tr('Symlinks', 'Symlinks'), project.symlinks],
-              [tr('Submodule', 'Submodules'), project.submodules],
-            ]
-              .filter(([, value]) => value)
-              .map(([label, value]) => (
-                <tr key={label}>
-                  <td>{label}</td>
-                  <td>{value}</td>
-                  <td>—</td>
-                  <td>—</td>
-                </tr>
-              ))}
-          </AnalyticsTable>
-        </section>
+        <AnalyticsLanguages snapshot={snapshot} />
         <section className="analytics-section">
           <h3>{tr('Änderungsschwerpunkte', 'Change hotspots')}</h3>
           <p className="analytics-description">
             {tr('Häufige Änderungen sind keine Messung der Code-Komplexität.', 'Frequent changes do not measure code complexity.')}
           </p>
-          <AnalyticsTable headings={[tr('Datei', 'File'), tr('Änderungen', 'Changes'), tr('Aktionen', 'Actions')]}>
-            {snapshot.hotspots.slice(0, 8).map((row) => (
-              <tr key={row.path}>
-                <td title={row.path}>
-                  <button className="analytics-link" onClick={() => onFile(row.path, row.hash)}>
-                    {row.path}
-                  </button>
-                </td>
-                <td>{count(row.changes)}</td>
-                <td>
-                  <button className="analytics-link" onClick={() => onPath(row.path)}>
-                    {tr('Verlauf', 'History')}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </AnalyticsTable>
+          <AnalyticsHotspotHeatmap rows={snapshot.hotspots.slice(0, 48)} preview onFile={onFile} onPath={onPath} />
+          {!snapshot.hotspots.length && <AnalyticsEmpty>{tr('Keine Einträge für diese Auswahl.', 'No entries for this selection.')}</AnalyticsEmpty>}
         </section>
       </div>
       <section className="analytics-section">

@@ -1,12 +1,12 @@
 import { useCallback, useState } from 'react';
-import { RefreshCw, TableProperties } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { Button, SegmentedControl, TextField } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import type { AnalyticsFilters, RepositoryAnalyticsSnapshot } from '@/shared/ipc/repositoryAnalytics';
 import { readAnalyticsFilters, saveAnalyticsFilters } from './analyticsPreferences';
 import { useRepositoryAnalytics } from './useRepositoryAnalytics';
 import { AnalyticsFiltersBar } from './AnalyticsFiltersBar';
-import { AnalyticsMetrics, AnalyticsOverview } from './AnalyticsOverview';
+import { AnalyticsOverview } from './AnalyticsOverview';
 import { AnalyticsChurn, AnalyticsContributions, AnalyticsOwnership, periodRange } from './AnalyticsActivity';
 import { AnalyticsDetailsView } from './AnalyticsDetails';
 import { AnalyticsEmpty, count } from './AnalyticsCharts';
@@ -29,7 +29,7 @@ export function RepositoryAnalyticsView(props: Props) {
   return <AnalyticsDashboard key={props.repoPath} {...props} repoPath={props.repoPath} />;
 }
 function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile, onOpenCommit }: Props & { repoPath: string }) {
-  const { tr } = useI18n();
+  const { tr, locale } = useI18n();
   const [filters, setFilters] = useState(() => readAnalyticsFilters(repoPath));
   const [tab, setTab] = useState<Tab>('overview');
   const [hotspotKind, setHotspotKind] = useState<'hotspots' | 'directories'>('hotspots');
@@ -76,30 +76,35 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
     );
   return (
     <div className="repository-analytics">
-      <div className="analytics-report-bar">
-        <span>
-          <TableProperties size={14} /> {tr('Lokale Git-Daten', 'Local Git data')} ·{' '}
-          {snapshot ? new Date(snapshot.savedAt).toLocaleString() : tr('Noch kein Bericht', 'No report yet')}
-        </span>
-        {running ? (
-          <Button size="xs" onClick={cancel}>
-            {tr('Abbrechen', 'Cancel')}
-          </Button>
-        ) : (
-          <Button size="xs" icon={<RefreshCw size={13} />} onClick={reload}>
-            {paused || error ? tr('Fortsetzen', 'Resume') : tr('Aktualisieren', 'Refresh')}
-          </Button>
-        )}
+      <div className="analytics-header">
+        <AnalyticsFiltersBar filters={filters} snapshot={snapshot} onChange={onFilters}>
+          {snapshot && (
+            <time
+              className="analytics-updated"
+              dateTime={new Date(snapshot.savedAt).toISOString()}
+              title={`${tr('Lokale Auswertung vom', 'Local report from')} ${new Date(snapshot.savedAt).toLocaleString(locale)}`}
+            >
+              {tr('Stand', 'Updated')} {new Date(snapshot.savedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
+            </time>
+          )}
+          {running ? (
+            <Button size="xs" variant="ghost" className="analytics-refresh-action" onClick={cancel}>
+              {tr('Abbrechen', 'Cancel')}
+            </Button>
+          ) : (
+            <Button size="xs" variant="ghost" className="analytics-refresh-action" icon={<RefreshCw size={13} />} onClick={reload}>
+              {paused || error ? tr('Fortsetzen', 'Resume') : tr('Aktualisieren', 'Refresh')}
+            </Button>
+          )}
+        </AnalyticsFiltersBar>
+        <nav className="analytics-tabs" aria-label={tr('Auswertungen', 'Analyses')}>
+          {labels.map(([value, label]) => (
+            <button key={value} className={tab === value ? 'is-active' : ''} aria-current={tab === value ? 'page' : undefined} onClick={() => setTab(value)}>
+              {label}
+            </button>
+          ))}
+        </nav>
       </div>
-      <AnalyticsFiltersBar filters={filters} snapshot={snapshot} onChange={onFilters} />
-      {snapshot && <AnalyticsMetrics snapshot={snapshot} />}
-      <nav className="analytics-tabs" aria-label={tr('Auswertungen', 'Analyses')}>
-        {labels.map(([value, label]) => (
-          <button key={value} className={tab === value ? 'is-active' : ''} aria-current={tab === value ? 'page' : undefined} onClick={() => setTab(value)}>
-            {label}
-          </button>
-        ))}
-      </nav>
       <div className="analytics-content" tabIndex={0} aria-label={labels.find(([value]) => value === tab)?.[1]}>
         {!snapshot ? (
           <AnalyticsEmpty>
@@ -134,6 +139,7 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
                 <div className="analytics-section-toolbar">
                   <h3>{tr('Änderungsschwerpunkte', 'Change hotspots')}</h3>
                   <SegmentedControl
+                    className="analytics-hotspot-grouping"
                     ariaLabel={tr('Gruppierung', 'Grouping')}
                     value={hotspotKind}
                     onChange={setHotspotKind}

@@ -142,6 +142,28 @@
       "tags": [],
       "createdAt": 1791504660702,
       "updatedAt": 1791504660702
+    },
+    {
+      "id": "d8deea2d-2665-42d9-929c-4bf857d94799",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Timeline window",
+      "description": "Timeline window: hier wird aktuell immer noch der satging beriech angezeigt das kann wie bei allen anderen unterseiten dann auch ausgeblendet werden",
+      "priority": "medium",
+      "status": "bug",
+      "tags": [],
+      "createdAt": 1791568154859,
+      "updatedAt": 1791568154859
+    },
+    {
+      "id": "efdf4dcc-de53-4ba0-b61f-46458b3cde1e",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Run console",
+      "description": "in der console werden viele zeichenfehler angezeigt und nicht richrig dargetsellt das sollte nicht sein",
+      "priority": "medium",
+      "status": "bug",
+      "tags": [],
+      "createdAt": 1791568186445,
+      "updatedAt": 1791568186445
     }
   ]
 }

@@ -1,0 +1,131 @@
+.analytics-header {
+  flex: none;
+  background: var(--bg-dark);
+  border-bottom: 1px solid var(--border-color);
+}
+.analytics-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  font-size: 0.75rem;
+}
+.analytics-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-secondary);
+}
+.analytics-toolbar label > span {
+  white-space: nowrap;
+}
+.analytics-toolbar .ui-field {
+  min-width: 0;
+}
+.analytics-scope-filter .ui-field {
+  width: 180px;
+}
+.analytics-project-filter {
+  padding-left: 12px;
+  border-left: 1px solid var(--border-color);
+}
+.analytics-project-filter .ui-field {
+  width: 110px;
+}
+.analytics-filter-toggle .ui-button__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.analytics-filter-toggle.is-active,
+.analytics-filter-count {
+  color: var(--accent-primary);
+}
+.analytics-filter-toggle .is-expanded {
+  transform: rotate(180deg);
+}
+.analytics-filter-summary {
+  flex: 1 1 100px;
+  max-width: 340px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+.analytics-toolbar-end {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.analytics-updated {
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.7rem;
+}
+.analytics-refresh-action {
+  min-width: 104px;
+}
+.analytics-filter-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(130px, 0.7fr)) minmax(180px, 1fr) minmax(180px, 1.4fr) auto;
+  align-items: end;
+  gap: 10px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-color);
+}
+.analytics-filter-panel[hidden] {
+  display: none;
+}
+.analytics-filter-panel label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: 0.73rem;
+}
+.analytics-filter-panel .ui-field {
+  width: 100%;
+  min-width: 0;
+}
+@container repository-analytics (max-width: 840px) {
+  .analytics-filter-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .analytics-filter-panel > button {
+    justify-self: start;
+  }
+}
+@container repository-analytics (max-width: 600px) {
+  .analytics-toolbar {
+    gap: 8px;
+  }
+  .analytics-scope-filter {
+    flex: 1 1 200px;
+  }
+  .analytics-scope-filter .ui-field {
+    flex: 1;
+    width: 145px;
+  }
+  .analytics-project-filter {
+    flex: 1 1 165px;
+    border-left: 0;
+    padding-left: 0;
+  }
+  .analytics-project-filter .ui-field {
+    flex: 1;
+    width: 85px;
+  }
+  .analytics-toolbar-end {
+    gap: 4px;
+  }
+  .analytics-filter-summary {
+    flex-basis: 80px;
+  }
+}

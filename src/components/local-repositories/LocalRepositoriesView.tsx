@@ -33,12 +33,14 @@ export const LocalRepositoriesView: React.FC = () => {
     { value: 'createdAtAsc', label: t('generated.components.sidebar.repolist.created_old_new_2f916185') },
   ];
 
-  const openRepoTab = async (path: string, config?: 'run' | 'remote' | 'allowlist' | 'publish') => {
+  const openRepoTab = async (path: string, config?: 'run' | 'remote' | 'allowlist' | 'publish' | 'analytics') => {
     if (switchingPath) return;
     setSwitchingPath(path);
     try {
       const activated = await repository.onSwitchRepo(path);
-      if (activated) {
+      if (activated && config === 'analytics') {
+        ui.onOpenRepositoryAnalytics?.();
+      } else if (activated) {
         ui.setActiveTab('repo');
         if (config === 'run') ui.onOpenRunConfig();
         else if (config === 'remote') ui.onOpenRemoteConfig();
@@ -204,6 +206,7 @@ export const LocalRepositoriesView: React.FC = () => {
           pinned={Boolean(repository.repoMeta[menuPath]?.pinned)}
           onClose={closeMenu}
           onOpenRepoTab={(path) => void openRepoTab(path)}
+          onOpenRepositoryAnalytics={ui.onOpenRepositoryAnalytics ? (path) => void openRepoTab(path, 'analytics') : undefined}
           onOpenRunConfig={(path) => void openRepoTab(path, 'run')}
           onOpenSecretScanAllowlist={(path) => void openRepoTab(path, 'allowlist')}
           onOpenRemoteConfig={(path) => void openRepoTab(path, 'remote')}

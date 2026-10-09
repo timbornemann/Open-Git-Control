@@ -1,6 +1,14 @@
 # Repository statistics and analytics
 
-Open **Statistics & analytics** from the local repository sidebar, repository actions or command palette. The dashboard runs offline from existing Git objects. The header and filters stay fixed; only report contents scroll. A saved report appears immediately on reopening, followed by a background refresh. Progress and cancellation use the app's notifications.
+Open **Statistics & analytics** from the local repository sidebar, a repository's context menu, repository actions or command palette. The dashboard runs offline from existing Git objects. The header and filters stay fixed; only report contents scroll. A saved report appears immediately on reopening, followed by a background refresh. Progress and cancellation use the app's notifications.
+
+The compact toolbar selects history scope and project tree. **Filters** expands date, person and path options; active filters remain visible in its summary when collapsed. Summary figures appear as compact metric cards in **Overview**, while tabs open detailed reports. The cards wrap into multiple rows in narrower windows. The report timestamp and refresh action share the toolbar. Background refreshes retain the displayed report, selected tab, detail page and scroll position until updated results are ready.
+
+Activity charts show commit counts above each bar and localized dates along the time axis, including inactive gaps. Date labels adapt to the chart width. Dense charts scroll horizontally to keep counts legible. Bars remain keyboard accessible and open the corresponding commit period; activity has no additional chart-data table.
+
+Change hotspots use a heatmap in both Overview and the detailed report, including directory grouping. Each equal-sized tile represents one path; its number and color show change frequency, from cool low activity to warm high activity. The scale is relative to the most frequently changed path in the filtered report and stays consistent across detail pages. Hover or keyboard focus shows the full path, change count, contributors, line changes and last change. Clicking a file opens its captured historical version; **History** opens the path's commit history. Arrow keys navigate the map and Escape dismisses its tooltip. Overview previews the 48 most changed files; the detailed report keeps pagination. Frequency does not measure code complexity.
+
+Languages and file types use a combined distribution strip and individual proportional bars, with file counts, line counts and localized percentages. Shares refer to text lines; binary files, LFS, symlinks and submodules appear separately as file counts. CSS bar widths use unformatted numeric ratios regardless of the display locale.
 
 ## Scope and definitions
 

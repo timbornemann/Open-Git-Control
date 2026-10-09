@@ -11,6 +11,7 @@ import type {
   RepositoryAnalyticsSnapshot,
 } from '@/shared/ipc/repositoryAnalytics';
 import { AnalyticsEmpty, AnalyticsTable, count, dateLabel, percent } from './AnalyticsCharts';
+import { AnalyticsHotspotHeatmap } from './AnalyticsHotspotHeatmap';
 
 type Kind = AnalyticsDetailRequest['kind'];
 type Props = {
@@ -59,6 +60,7 @@ export function AnalyticsDetailsView({ snapshot, kind, onFile, onPath, onCommit 
   }, [snapshot.id, snapshot.savedAt, snapshot.repoPath, kind, page, retry]);
   const rows = data?.items ?? fallbackRows(snapshot, kind).slice(page * 50, (page + 1) * 50);
   const total = data?.total ?? fallbackRows(snapshot, kind).length;
+  const heatmap = kind === 'hotspots' || kind === 'directories';
   const headings =
     kind === 'commits'
       ? ['Commit', tr('Person', 'Person'), tr('Datum', 'Date'), tr('Dateien', 'Files'), '+ / −']
@@ -74,13 +76,23 @@ export function AnalyticsDetailsView({ snapshot, kind, onFile, onPath, onCommit 
           ];
   return (
     <>
-      <AnalyticsTable headings={headings}>
-        {rows.map((row) => {
-          if ('subject' in row) return <CommitRow key={row.hash} row={row} onCommit={onCommit} />;
-          if ('first' in row) return <CouplingRow key={`${row.first}\0${row.second}`} row={row} onPath={onPath} />;
-          return <ChangeRow key={row.path} row={row} directory={kind === 'directories'} onFile={onFile} onPath={onPath} />;
-        })}
-      </AnalyticsTable>
+      {heatmap ? (
+        <AnalyticsHotspotHeatmap
+          rows={rows.filter((row): row is AnalyticsChanges => 'changes' in row)}
+          maxChanges={Math.max(0, ...(kind === 'directories' ? snapshot.directories : snapshot.hotspots).map((row) => row.changes))}
+          directory={kind === 'directories'}
+          onFile={onFile}
+          onPath={onPath}
+        />
+      ) : (
+        <AnalyticsTable headings={headings}>
+          {rows.map((row) => {
+            if ('subject' in row) return <CommitRow key={row.hash} row={row} onCommit={onCommit} />;
+            if ('first' in row) return <CouplingRow key={`${row.first}\0${row.second}`} row={row} onPath={onPath} />;
+            return <ChangeRow key={row.path} row={row} directory={false} onFile={onFile} onPath={onPath} />;
+          })}
+        </AnalyticsTable>
+      )}
       {!rows.length && (
         <AnalyticsEmpty>
           {pending ? tr('Details werden geladen…', 'Loading details…') : tr('Keine Einträge für diese Auswahl.', 'No entries for this selection.')}
