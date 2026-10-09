@@ -41,27 +41,34 @@ export function RemotePullStrategy({
           onChange={(event) => update({ ...preferences, pullStrategy: event.target.value as PullStrategy })}
         >
           <option value="default">{tr('Git-Standard verwenden', 'Use Git default')}</option>
-          <option value="rebase">Rebase</option>
-          <option value="merge">Merge</option>
-          <option value="ff-only">{tr('Nur Fast-forward', 'Fast-forward only')}</option>
+          <option value="rebase">{tr('Rebase — lokale Commits neu anwenden', 'Rebase — replay local commits')}</option>
+          <option value="merge">{tr('Merge — Historien zusammenführen', 'Merge — combine histories')}</option>
+          <option value="ff-only">{tr('Nur Fast-forward — ohne neue Merge-Commits', 'Fast-forward only — without new merge commits')}</option>
         </select>
       </label>
       {(preferences.pullStrategy ?? 'default') === 'default' && configuration && (
-        <small className="remote-configuration__pull-behavior">
-          {tr('Wirksame Git-Konfiguration', 'Effective Git configuration')}: {configuredBehavior(configuration, tr)}
-          {[configuration.rebase, configuration.fastForward]
-            .filter((entry) => entry !== null)
-            .map((entry) => (
-              <code key={entry.key}>
-                {entry.key} = {entry.value}
-              </code>
-            ))}
-          {configuration.mergeOptions && (
-            <code>
-              branch.{configuration.branch}.mergeOptions = {configuration.mergeOptions}
-            </code>
+        <div className="remote-configuration__pull-behavior">
+          <small>
+            {tr('Wirksame Git-Konfiguration', 'Effective Git configuration')}: {configuredBehavior(configuration, tr)}
+          </small>
+          {(configuration.rebase || configuration.fastForward || configuration.mergeOptions) && (
+            <details className="remote-configuration__git-details">
+              <summary>{tr('Git-Konfigurationswerte anzeigen', 'Show Git configuration values')}</summary>
+              {[configuration.rebase, configuration.fastForward]
+                .filter((entry) => entry !== null)
+                .map((entry) => (
+                  <code key={entry.key}>
+                    {entry.key} = {entry.value}
+                  </code>
+                ))}
+              {configuration.mergeOptions && (
+                <code>
+                  branch.{configuration.branch}.mergeOptions = {configuration.mergeOptions}
+                </code>
+              )}
+            </details>
           )}
-        </small>
+        </div>
       )}
       {(preferences.pullStrategy ?? 'default') === 'default' && !configuration && (
         <small>{tr('Die wirksame Git-Konfiguration ist derzeit nicht verfügbar.', 'The effective Git configuration is currently unavailable.')}</small>

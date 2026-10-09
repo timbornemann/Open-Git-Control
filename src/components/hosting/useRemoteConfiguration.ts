@@ -28,7 +28,6 @@ export function useRemoteConfiguration(repoPath: string | null) {
   const [preferences, setPreferences] = useState<RemotePreferences>({});
   const [persisted, setPersisted] = useState<RemotePreferences>({});
   const [connections, setConnections] = useState<HostingConnection[]>([]);
-  const [bindingConnection, setBindingConnection] = useState('');
   const [message, setMessage] = useState('');
   const lifecycle = useRef(0);
   const currentPreferences = useRef(preferences);
@@ -41,7 +40,6 @@ export function useRemoteConfiguration(repoPath: string | null) {
     setPreferences({});
     setPersisted({});
     setMessage('');
-    setBindingConnection('');
     return () => {
       activeLifecycle.current++;
     };
@@ -118,15 +116,14 @@ export function useRemoteConfiguration(repoPath: string | null) {
   const edit = (action: 'remove' | 'rename' | 'set-url', name: string, value?: string) =>
     void task.run(async () => {
       if (!repoPath) return;
-      if (action === 'remove' && !window.confirm(tr(`Remote „${name}“ entfernen?`, `Remove remote "${name}"?`))) return;
       await request('editRemote', { repoPath, mutation: { action, name, ...(action === 'rename' ? { newName: value } : { url: value }) } });
       await reload();
     });
-  const bind = (name: string, endpointUrl: string, resolutionUrl = endpointUrl) =>
+  const bind = (name: string, endpointUrl: string, connectionId: string, resolutionUrl = endpointUrl) =>
     void task.run(
       async () => {
-        if (!bindingConnection) throw new Error(tr('Ein Konto auswählen.', 'Select an account.'));
-        const repository = await scoped(() => hostingClient.request('resolveRepository', { connectionId: bindingConnection, url: resolutionUrl }));
+        if (!connectionId) throw new Error(tr('Ein Konto auswählen.', 'Select an account.'));
+        const repository = await scoped(() => hostingClient.request('resolveRepository', { connectionId, url: resolutionUrl }));
         if (!repository) throw new Error(tr('Die URL gehört nicht zu diesem Konto und Server.', 'The URL does not belong to this account and server.'));
         return {
           ...currentPreferences.current,
@@ -195,8 +192,6 @@ export function useRemoteConfiguration(repoPath: string | null) {
     pullConfiguration,
     preferences,
     connections,
-    bindingConnection,
-    setBindingConnection,
     task,
     request,
     reload,

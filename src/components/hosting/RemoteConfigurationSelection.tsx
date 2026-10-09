@@ -2,8 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { ActionRequirement } from '@/components/ui/ActionRequirement';
 import { useI18n } from '@/i18n';
 import type { GitPullConfigurationDto, GitRemoteSnapshotDto, RemotePreferences } from '@/types/remoteTransfers';
-import { getRemoteTransferDefaults, resolveRemoteTransferSelection } from '@/utils/remoteTransferSelection';
+import { getRemoteTransferDefaults } from '@/utils/remoteTransferSelection';
 import { RemoteConfigurationActions } from './RemoteConfigurationActions';
+import { RemoteBranchTracking } from './RemoteBranchTracking';
+import { Button } from '@/components/ui/Button';
+import { remoteConfigurationPushTargets } from './remoteConfigurationValidation';
 
 type Props = {
   snapshot: GitRemoteSnapshotDto;
@@ -13,12 +16,6 @@ type Props = {
   disabled: boolean;
   setUpstream: (remote: string, branch: string) => void;
 };
-function upstreamRequirement(remote: string | null | undefined, branch: string, tr: (de: string, en: string) => string) {
-  if (!remote) return tr('Wähle zuerst eine Pull-Quelle.', 'Choose a pull source first.');
-  if (!branch)
-    return tr('Wechsle zuerst auf einen lokalen Branch; Detached HEAD hat keinen Upstream.', 'Switch to a local branch first; detached HEAD has no upstream.');
-  return null;
-}
 function profileRequirement(selected: string[], name: string, tr: (de: string, en: string) => string) {
   if (!selected.length) return tr('Wähle mindestens ein Push-Ziel für das Profil.', 'Choose at least one push target for the profile.');
   if (!name.trim()) return tr('Gib dem Push-Profil einen Namen.', 'Enter a name for the push profile.');
@@ -34,8 +31,7 @@ export function RemoteConfigurationSelection({ snapshot, preferences, pullConfig
   const [mappingBranch, setMappingBranch] = useState(snapshot.branch);
   const profileField = useRef<HTMLInputElement>(null);
   const pullDefaults = getRemoteTransferDefaults('pull', snapshot, preferences);
-  const pushDefaults = resolveRemoteTransferSelection('push', snapshot, preferences);
-  const selected = preferences.pushRemotes ?? pushDefaults.selectedRemoteNames;
+  const selected = remoteConfigurationPushTargets(snapshot, preferences);
   const pullBranch = preferences.pullBranches?.[mappingBranch] ?? '';
   const pushBranches = preferences.pushBranches?.[mappingBranch] ?? {};
   const upstreamBranch = pullDefaults.branch || snapshot.branch;
@@ -50,41 +46,33 @@ export function RemoteConfigurationSelection({ snapshot, preferences, pullConfig
         selected={selected}
         activeProfileName={activeProfile?.name}
       />
+      <h2>{tr('Erweiterte Einstellungen', 'Advanced settings')}</h2>
+      <p>
+        {tr(
+          'Für andere Branchnamen, Backup-Profile oder ein neues Branch-Tracking. Für normale Transfers sind diese Einstellungen nicht erforderlich.',
+          'For different branch names, backup profiles or new branch tracking. These settings are not required for normal transfers.',
+        )}
+      </p>
       <details className="remote-configuration__advanced">
-        <summary>{tr('Andere Zielbranches und Upstream', 'Different destination branches and upstream')}</summary>
+        <summary>{tr('Branch-Zuordnungen und Tracking', 'Branch mappings and tracking')}</summary>
         <p>
           {tr(
             'Optional: Nur ändern, wenn ein Remote einen anderen Branchnamen verwenden soll.',
             'Optional: change these only when a remote should use a different branch name.',
           )}
         </p>
-        <div className="hosting-actions">
-          <ActionRequirement reason={disabled ? null : upstreamRequirement(pullDefaults.remote, snapshot.branch, tr)}>
-            <button
-              type="button"
-              disabled={disabled || !pullDefaults.remote || !snapshot.branch}
-              onClick={() => pullDefaults.remote && setUpstream(pullDefaults.remote, upstreamBranch)}
-            >
-              {tr('Als Upstream setzen', 'Set as upstream')}
-            </button>
-          </ActionRequirement>
-          {pullDefaults.remote && (
-            <small>
-              {snapshot.branch} → {pullDefaults.remote}/{upstreamBranch}
-            </small>
-          )}
-        </div>
         <p>{tr('Beim Wechsel der Pull-Quelle werden deren Branch-Zuordnungen zurückgesetzt.', 'Changing the pull source clears its branch mappings.')}</p>
         <p>
           {tr(
-            'Ohne Zuordnung verwendet Pull den Upstream-Branch und Push den Namen des lokalen Branches.',
-            'Without a mapping, pull uses the upstream branch and push uses the local branch name.',
+            'Leere Felder verwenden den Git-Standard: Pull nutzt den Tracking-Branch der gewählten Quelle, sonst den lokalen Branchnamen. Push nutzt den lokalen Branchnamen. Deine Zuordnungen gelten nach „Speichern“.',
+            'Empty fields use Git defaults: pull uses the tracking branch for the selected source, otherwise the local branch name. Push uses the local branch name. Mappings apply after Save.',
           )}
         </p>
-        <div className="hosting-form">
+        <div className="remote-configuration__fields">
           <label>
             {tr('Lokaler Branch', 'Local branch')}
             <input
+              className="ui-field ui-field--sm"
               aria-label={tr('Lokaler Branch', 'Local branch')}
               value={mappingBranch}
               disabled={disabled}
@@ -102,6 +90,7 @@ export function RemoteConfigurationSelection({ snapshot, preferences, pullConfig
           <label>
             {tr('Pull-Branch auf der gewählten Quelle', 'Pull branch on the selected source')}
             <input
+              className="ui-field ui-field--sm"
               disabled={disabled || !mappingBranch}
               value={pullBranch}
               placeholder={mappingBranch === snapshot.branch ? pullDefaults.branch : mappingBranch}
@@ -117,6 +106,7 @@ export function RemoteConfigurationSelection({ snapshot, preferences, pullConfig
             <label key={name}>
               {tr(`Push-Branch auf ${name}`, `Push branch on ${name}`)}
               <input
+                className="ui-field ui-field--sm"
                 disabled={disabled || !mappingBranch}
                 value={pushBranches[name] ?? ''}
                 placeholder={mappingBranch}
@@ -130,6 +120,7 @@ export function RemoteConfigurationSelection({ snapshot, preferences, pullConfig
             </label>
           ))}
         </div>
+        <RemoteBranchTracking snapshot={snapshot} remote={pullDefaults.remote} targetBranch={upstreamBranch} disabled={disabled} setUpstream={setUpstream} />
       </details>
       <details className="remote-configuration__advanced">
         <summary>
@@ -140,6 +131,12 @@ export function RemoteConfigurationSelection({ snapshot, preferences, pullConfig
           {tr(
             'Profile speichern Ziele und Branch-Zuordnungen. Tags und Force-Push werden pro Übertragung ausgewählt.',
             'Profiles save targets and branch mappings. Tags and force push are selected for each transfer.',
+          )}
+        </p>
+        <p>
+          {tr(
+            'Beispiel: „Hauptserver & Backup“ lädt auf zwei Remotes. Wähle das Profil hier und nutze für Push „Diese Auswahl direkt verwenden“, um es bei normalen Pushes wiederzuverwenden.',
+            'Example: “Main server & backup” uploads to two remotes. Select the profile here and choose Use this selection directly for push to reuse it for normal pushes.',
           )}
         </p>
         <label>
@@ -176,6 +173,7 @@ export function RemoteConfigurationSelection({ snapshot, preferences, pullConfig
         </label>
         <div className="hosting-actions">
           <input
+            className="ui-field ui-field--sm"
             ref={profileField}
             aria-label={tr('Profilname', 'Profile name')}
             placeholder={tr('Profilname', 'Profile name')}
@@ -187,7 +185,7 @@ export function RemoteConfigurationSelection({ snapshot, preferences, pullConfig
             reason={disabled ? null : profileRequirement(selected, profileName, tr)}
             remedy={!profileName.trim() ? { label: tr('Profil benennen', 'Name profile'), onClick: () => profileField.current?.focus() } : undefined}
           >
-            <button
+            <Button
               type="button"
               disabled={disabled || !profileName.trim() || !selected.length}
               onClick={() => {
@@ -202,9 +200,9 @@ export function RemoteConfigurationSelection({ snapshot, preferences, pullConfig
               }}
             >
               {tr('Auswahl als Profil hinzufügen', 'Add selection as profile')}
-            </button>
+            </Button>
           </ActionRequirement>
-          <button
+          <Button
             type="button"
             disabled={disabled || !preferences.activeProfileId || !profileName.trim() || !selected.length}
             onClick={() =>
@@ -224,8 +222,8 @@ export function RemoteConfigurationSelection({ snapshot, preferences, pullConfig
             }
           >
             {tr('Profil aktualisieren', 'Update profile')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             disabled={disabled || !preferences.activeProfileId}
             onClick={() =>
@@ -237,7 +235,7 @@ export function RemoteConfigurationSelection({ snapshot, preferences, pullConfig
             }
           >
             {tr('Profil entfernen', 'Remove profile')}
-          </button>
+          </Button>
         </div>
       </details>
     </section>

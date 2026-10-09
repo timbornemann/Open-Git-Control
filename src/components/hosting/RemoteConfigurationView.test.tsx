@@ -273,6 +273,7 @@ it('keeps binding and credential-mode changes in the draft until Save', async ()
     ],
   };
   await render();
+  await click('Connections & accounts');
   const authentication = [...host.querySelectorAll<HTMLSelectElement>('select')].find(
     (element) => element.parentElement?.textContent?.includes('Git authentication for this endpoint') && !element.disabled,
   )!;
@@ -307,6 +308,7 @@ const resolvedRepository: HostedRepository = {
   fork: false,
 };
 const chooseAccount = async () => {
+  await click('Connections & accounts');
   const element = [...host.querySelectorAll<HTMLSelectElement>('select')].find((candidate) =>
     candidate.parentElement?.textContent?.includes('Bind hosting account'),
   )!;
@@ -315,8 +317,14 @@ const chooseAccount = async () => {
     element.dispatchEvent(new Event('change', { bubbles: true }));
   });
 };
+const setRepositoryUrl = async (value: string) => {
+  const input = host.querySelector<HTMLInputElement>('.remote-configuration__endpoint-account input')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+};
 it('resolves an SSH alias through the explicit repository web URL and saves its separate endpoint binding', async () => {
-  vi.spyOn(window, 'prompt').mockReturnValue('https://forgejo.example/team/repo');
   vi.mocked(hostingClient.request).mockImplementation(async (operation) => (operation === 'connections' ? [account] : resolvedRepository));
   vi.mocked(transferClient.request).mockImplementation(async (operation, input) => {
     const args = input as { repoPath: string; preferences?: RemotePreferences };
@@ -335,6 +343,7 @@ it('resolves an SSH alias through the explicit repository web URL and saves its 
   });
   await render();
   await chooseAccount();
+  await setRepositoryUrl('https://forgejo.example/team/repo');
   await click('Bind account to this endpoint');
   expect(hostingClient.request).toHaveBeenCalledWith('resolveRepository', { connectionId: 'account', url: 'https://forgejo.example/team/repo' });
   expect(persisted['C:/repo']).toBeUndefined();
@@ -346,7 +355,6 @@ it('resolves an SSH alias through the explicit repository web URL and saves its 
 
 it('ignores a repository-resolution result after switching to another repository', async () => {
   let resolve!: (value: HostedRepository) => void;
-  vi.spyOn(window, 'prompt').mockReturnValue('https://forgejo.example/team/repo');
   vi.mocked(hostingClient.request).mockImplementation(async (operation) =>
     operation === 'connections'
       ? [account]
@@ -421,12 +429,51 @@ it('renames and updates an existing push profile in the draft without replacing 
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'New profile');
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  const backup = [...host.querySelectorAll<HTMLInputElement>('fieldset input[type="checkbox"]')].find(
-    (element) => element.parentElement?.textContent === 'backup',
-  )!;
+  const backup = host.querySelector<HTMLInputElement>('input[aria-label="Push target backup"]')!;
   await act(async () => backup.click());
   await click('Update profile');
   expect(persisted['C:/repo'].profiles?.[0].name).toBe('Old profile');
   await click('Save');
   expect(persisted['C:/repo'].profiles).toMatchObject([{ id: 'profile', name: 'New profile', remoteNames: ['private', 'backup'] }]);
+});
+
+it('keeps transfer drafts across section navigation and shows the chosen branch direction without starting any transfer', async () => {
+  await render();
+  await select('Pull source', 'private');
+  await select('pull selection mode', 'remember');
+  const transfers = host.querySelector('#remote-pull-title')!.closest('.remote-configuration__section')!;
+  const connections = host.querySelector('.remote-configuration__remote-list')!.closest('.remote-configuration__section')!;
+  expect(transfers.closest('[hidden]')).toBeNull();
+  expect(connections.closest('[hidden]')).not.toBeNull();
+  expect(transfers.textContent).toContain('private/main → main');
+  await click('Connections & accounts');
+  expect(transfers.closest('[hidden]')).not.toBeNull();
+  expect(connections.closest('[hidden]')).toBeNull();
+  await click('Transfers');
+  expect(host.querySelector<HTMLSelectElement>('select[aria-label="Pull source"]')?.value).toBe('private');
+  expect(host.querySelector<HTMLSelectElement>('select[aria-label="pull selection mode"]')?.value).toBe('remember');
+  expect(persisted['C:/repo']).toBeUndefined();
+  await click('Save');
+  expect(persisted['C:/repo']).toMatchObject({ pullRemote: 'private', selectionModes: { pull: 'remember' } });
+  expect(
+    vi.mocked(transferClient.request).mock.calls.some(([operation]) => ['fetch', 'pull', 'planPush', 'executePush', 'setUpstream'].includes(operation)),
+  ).toBe(false);
+});
+
+it('requires explicit inline confirmation before removing a remote and lets the user cancel without writing Git configuration', async () => {
+  const original = vi.mocked(transferClient.request).getMockImplementation()!;
+  vi.mocked(transferClient.request).mockImplementation(async (operation, input) =>
+    operation === 'editRemote' ? snapshot(input.repoPath) : original(operation, input),
+  );
+  await render();
+  await click('Connections & accounts');
+  await click('Remove connection');
+  expect(host.querySelector('[aria-label="Confirm removal"]')).not.toBeNull();
+  expect(vi.mocked(transferClient.request).mock.calls.some(([operation]) => operation === 'editRemote')).toBe(false);
+  await click('Cancel');
+  expect(host.querySelector('[aria-label="Confirm removal"]')).toBeNull();
+  await click('Remove connection');
+  await click('Remove remote now');
+  expect(transferClient.request).toHaveBeenCalledWith('editRemote', { repoPath: 'C:/repo', mutation: { action: 'remove', name: 'private' } });
+  expect(vi.mocked(transferClient.request).mock.calls.filter(([operation]) => operation === 'editRemote')).toHaveLength(1);
 });

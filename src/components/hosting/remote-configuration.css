@@ -1,151 +1,421 @@
-.remote-configuration {
-  max-width: none;
-  box-sizing: border-box;
-  padding: 20px;
+.remote-configuration.hosting-workspace {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
 }
 .remote-configuration__heading {
+  flex: none;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
+  gap: 20px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-dark);
+}
+.remote-configuration__heading > div:first-child {
+  min-width: 0;
 }
 .remote-configuration__heading h1 {
-  margin: 0 0 8px;
-  font-size: 1.25rem;
+  margin: 0 0 3px;
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
 }
 .remote-configuration__heading p {
   margin: 0;
   color: var(--text-secondary);
-  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.remote-configuration__notice {
+.remote-configuration__context {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px 18px;
+  flex: none;
   color: var(--text-secondary);
-  max-width: 90ch;
+  font-size: 0.74rem;
+}
+.remote-configuration__context span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.remote-configuration__navigation {
+  flex: none;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-dark);
+}
+.remote-configuration__navigation .ui-segmented-control {
+  width: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.remote-configuration__navigation .ui-segmented-control__item {
+  flex: none;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  min-height: 38px;
+  padding: 7px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  text-transform: none;
+}
+.remote-configuration__navigation .ui-segmented-control__item.is-active {
+  background: transparent;
+  border-bottom-color: var(--accent-primary);
+  color: var(--text-accent);
+}
+.remote-configuration__content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 .remote-configuration__section {
-  margin: 20px 0;
-  padding: 20px;
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  background: var(--bg-panel);
+  padding: 18px 20px;
+  margin: 0;
+  border-bottom: 1px solid var(--border-color);
 }
 .remote-configuration__section h2 {
-  margin: 0 0 10px;
-  font-size: 1rem;
+  margin: 0 0 5px;
+  font-size: 0.88rem;
 }
 .remote-configuration__section p {
-  max-width: 100ch;
+  margin: 5px 0 12px;
+  max-width: 95ch;
   color: var(--text-secondary);
+  font-size: 0.77rem;
+  line-height: 1.6;
+}
+.remote-configuration__section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 12px;
+}
+.remote-configuration__section-heading > div {
+  min-width: 0;
+}
+.remote-configuration__section-heading > .ui-button {
+  flex: none;
 }
 .remote-configuration__rules {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 14px;
-}
-.remote-configuration__rules p {
-  margin-top: 0;
-  min-height: 2.5em;
-  font-size: 0.85rem;
-  line-height: 1.5;
-}
-.remote-configuration__rules small {
-  display: block;
-  color: var(--text-secondary);
-  font-size: 0.78rem;
-  line-height: 1.5;
-}
-.remote-configuration__destination {
-  overflow-wrap: anywhere;
-}
-.remote-configuration__destination strong {
-  color: var(--text-primary);
-}
-.remote-configuration__destination small {
-  margin-top: 6px;
-  white-space: pre-line;
-}
-.remote-configuration__advanced {
   margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border-color);
 }
-.remote-configuration__pull-behavior {
-  margin-bottom: 8px;
-  overflow-wrap: anywhere;
+.remote-configuration__rule {
+  display: grid;
+  max-width: 1120px;
+  grid-template-columns: minmax(180px, 0.42fr) minmax(0, 1fr);
+  gap: 28px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line-subtle);
 }
-.remote-configuration__pull-behavior code {
-  display: block;
+.remote-configuration__rule-description h3,
+.remote-configuration__remote-heading h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.84rem;
 }
-.remote-configuration__advanced summary {
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-primary);
+.remote-configuration__rule-description h3 > svg,
+.remote-configuration__remote-heading h3 > svg {
+  color: var(--text-accent);
+  flex: none;
 }
-.remote-configuration__advanced[open] > summary {
-  margin-bottom: 16px;
+.remote-configuration__rule-description h3 > span {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-secondary);
 }
-.remote-configuration__advanced summary:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 4px;
-}
-.remote-configuration .hosting-actions .remote-configuration__save {
-  background: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: var(--on-accent);
+.remote-configuration__rule-description p {
+  max-width: 38ch;
 }
 .remote-configuration fieldset {
   min-width: 0;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 .remote-configuration label {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  min-width: 0;
+  gap: 5px;
   margin-bottom: 12px;
-  font-size: 0.82rem;
+  font-size: 0.75rem;
 }
 .remote-configuration label.hosting-checkbox {
   flex-direction: row;
   align-items: center;
 }
-.remote-configuration legend {
-  padding: 0 5px;
-  font-weight: 600;
-}
-.remote-configuration input:not([type='checkbox']),
 .remote-configuration select,
-.remote-configuration textarea {
-  max-width: 100%;
-  padding: 8px;
-  border-radius: 5px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-darker);
-  color: var(--text-primary);
+.remote-configuration .ui-field {
+  width: 100%;
+}
+.remote-configuration select {
   box-sizing: border-box;
+  font-size: 0.76rem;
 }
-.remote-configuration .hosting-actions button {
-  display: inline-flex;
-  gap: 7px;
-  align-items: center;
+.remote-configuration__fields {
+  display: grid;
+  width: 100%;
+  max-width: 960px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
-.remote-configuration .hosting-card small {
+.remote-configuration small {
   display: block;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  line-height: 1.6;
   overflow-wrap: anywhere;
 }
-@media (max-width: 760px) {
-  .remote-configuration__rules {
+.remote-configuration__destination {
+  overflow-wrap: anywhere;
+}
+.remote-configuration__section .remote-configuration__effect {
+  margin: 12px 0 6px;
+  padding-left: 10px;
+  border-left: 2px solid var(--accent-primary-border);
+  overflow-wrap: anywhere;
+}
+.remote-configuration__effect strong,
+.remote-configuration__destination strong {
+  color: var(--text-primary);
+  font-size: 0.75rem;
+}
+.remote-configuration__destination small {
+  white-space: pre-line;
+}
+.remote-configuration__targets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+  gap: 4px 16px;
+  margin-bottom: 10px;
+}
+.remote-configuration label.remote-configuration__target {
+  padding: 6px 0;
+  margin: 0;
+  gap: 9px;
+}
+.remote-configuration__target > span {
+  min-width: 0;
+}
+.remote-configuration__target small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.remote-configuration__advanced {
+  padding: 12px 0;
+  border-top: 1px solid var(--line-subtle);
+}
+.remote-configuration__advanced > summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  list-style: none;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.remote-configuration__advanced > summary::-webkit-details-marker {
+  display: none;
+}
+.remote-configuration__advanced > summary::before {
+  content: '›';
+  width: 10px;
+  font-size: 1rem;
+  transform-origin: center;
+}
+.remote-configuration__advanced[open] > summary::before {
+  transform: rotate(90deg);
+}
+.remote-configuration__advanced[open] > summary {
+  margin-bottom: 12px;
+}
+.remote-configuration summary:focus-visible {
+  outline: 1px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+.remote-configuration__pull-behavior {
+  margin-bottom: 8px;
+}
+.remote-configuration__pull-behavior code {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  overflow-wrap: anywhere;
+}
+.remote-configuration__git-details {
+  margin-top: 5px;
+}
+.remote-configuration__git-details summary {
+  font-size: 0.7rem;
+  font-weight: 400;
+}
+.remote-configuration__remote-list {
+  max-width: 1200px;
+  margin-top: 18px;
+}
+.remote-configuration__remote {
+  border-top: 1px solid var(--border-color);
+  padding: 14px 0 0;
+}
+.remote-configuration__remote-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.remote-configuration__urls {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+.remote-configuration__urls > div {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 12px;
+  padding: 3px 0;
+}
+.remote-configuration__urls dt {
+  font-weight: 600;
+}
+.remote-configuration__urls dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+.remote-configuration__form {
+  display: flex;
+  max-width: 960px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  margin: 10px 0;
+  min-width: 0;
+}
+.remote-configuration__form > .ui-button {
+  align-self: flex-start;
+}
+.remote-configuration .hosting-actions {
+  margin: 8px 0;
+}
+.remote-configuration .hosting-actions > .ui-field {
+  flex: 1;
+  min-width: min(180px, 100%);
+}
+.remote-configuration__endpoint-account {
+  border-top: 1px solid var(--line-subtle);
+  padding: 12px 0;
+}
+.remote-configuration__endpoint-url {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 0.73rem;
+}
+.remote-configuration__endpoint-account > small {
+  margin-bottom: 10px;
+}
+.remote-configuration__upstream {
+  border-left: 2px solid var(--border-color);
+  padding-left: 12px;
+  margin: 16px 0 0;
+}
+.remote-configuration__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  flex: none;
+  gap: 8px 20px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-dark);
+}
+.remote-configuration__save-status {
+  flex: 1;
+  min-width: min(240px, 100%);
+  font-size: 0.74rem;
+}
+.remote-configuration__footer .hosting-actions {
+  margin: 0;
+}
+.remote-configuration__error {
+  flex-basis: 100%;
+  color: var(--danger-color, #f08e8e);
+  font-size: 0.75rem;
+}
+.remote-configuration__error p {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.remote-configuration__empty,
+.remote-configuration__loading {
+  padding: 28px 20px;
+}
+.remote-configuration__empty > svg {
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+@container hosting (max-width: 780px) {
+  .remote-configuration__rule {
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .remote-configuration__rule-description p {
+    max-width: none;
   }
 }
-@media (max-width: 600px) {
-  .remote-configuration__section {
-    padding: 12px;
+@container hosting (max-width: 540px) {
+  .remote-configuration__heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
   }
-  .remote-configuration {
-    padding: 12px;
+  .remote-configuration__heading > div:first-child {
+    max-width: 100%;
+  }
+  .remote-configuration__heading,
+  .remote-configuration__section,
+  .remote-configuration__footer {
+    padding-inline: 12px;
+  }
+  .remote-configuration__navigation {
+    padding: 0;
+  }
+  .remote-configuration__navigation .ui-segmented-control__item {
+    font-size: 0.73rem;
+    padding-inline: 10px;
+  }
+  .remote-configuration__fields {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .remote-configuration__section-heading,
+  .remote-configuration__remote-heading {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .remote-configuration__urls > div {
+    grid-template-columns: 1fr;
+    gap: 1px;
   }
 }

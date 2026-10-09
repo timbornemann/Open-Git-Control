@@ -13,11 +13,8 @@ export function RemoteConfigurationHosting({ preferences, connections, update, d
       binding.repository?.fullPath === preferences.hostingRepository?.fullPath,
   );
   return (
-    <details className="remote-configuration__section remote-configuration__advanced">
-      <summary>
-        {tr('Hosting für PRs, CI und Releases (optional)', 'Hosting for PRs, CI and releases (optional)')}
-        {preferences.hostingRemote ? ` · ${preferences.hostingRemote}` : ''}
-      </summary>
+    <section className="remote-configuration__section">
+      <h2>{tr('Repository für PRs, CI und Releases', 'Repository for PRs, CI and releases')}</h2>
       <p>
         {tr(
           'Dieses Ziel bestimmt, welches Konto und Repository für Change Requests, CI und Releases verwendet wird. Übertragungsziele bleiben unabhängig davon.',
@@ -55,11 +52,17 @@ export function RemoteConfigurationHosting({ preferences, connections, update, d
       {!bindings.length && (
         <p>
           {tr(
-            'Für diese Funktionen kannst du unter „Verbundene Remotes“ ein Hosting-Konto zuordnen. Für normale Git-Übertragungen ist das nicht nötig.',
-            'For these features, bind a hosting account under Connected remotes. Normal Git transfers do not require this.',
+            'Öffne oben bei einer Verbindung „Anmeldung und Hosting-Konto“, ordne ein Konto zu und wähle das Repository hier aus. Normale Git-Übertragungen benötigen diese Zuordnung nicht.',
+            'Open Authentication and hosting account on a connection above, bind an account and select its repository here. Normal Git transfers do not need this binding.',
           )}
         </p>
       )}
-    </details>
+      <small>
+        {tr(
+          'Diese Auswahl wird mit „Speichern“ übernommen. Der Release-Creator nutzt dieses Repository als Vorauswahl; Push-Ziele bleiben unabhängig.',
+          'Save applies this selection. The release creator uses this repository as its default; push targets remain independent.',
+        )}
+      </small>
+    </section>
   );
 }

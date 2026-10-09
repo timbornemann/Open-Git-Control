@@ -81,7 +81,7 @@ export const TopbarActions: React.FC<Props> = ({
   onPublishRepository,
 }) => {
   const intent = usePreloadIntent();
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   const normalizedAction = (activeActionLabel || '').toLowerCase();
   const isPullRunning = isGitActionRunning && normalizedAction.includes('pull');
   const isPushRunning = isGitActionRunning && normalizedAction.includes('push');
@@ -250,6 +250,23 @@ export const TopbarActions: React.FC<Props> = ({
     </>
   );
 
+  const remoteConfigurationItem = onOpenRemoteConfig && (
+    <>
+      <div className="topbar-dropdown-sep" />
+      <button
+        type="button"
+        className="topbar-dropdown-item"
+        disabled={!activeRepo}
+        onClick={() => {
+          setOpenMenu(null);
+          onOpenRemoteConfig();
+        }}
+      >
+        <span className="topbar-dropdown-item-label">{tr('Remote-Konfiguration', 'Remote configuration')}</span>
+      </button>
+    </>
+  );
+
   const moreMenuView: TopbarMoreMenuView | null = openMenu === 'more' || openMenu === 'moreMerge' || openMenu === 'moreRun' ? openMenu : null;
 
   return (
@@ -324,6 +341,7 @@ export const TopbarActions: React.FC<Props> = ({
                 <span className="topbar-dropdown-item-hint">{option.hint}</span>
               </button>
             ))}
+            {remoteConfigurationItem}
           </div>
         )}
       </div>
@@ -363,6 +381,7 @@ export const TopbarActions: React.FC<Props> = ({
                 <span className="topbar-dropdown-item-hint">{option.hint}</span>
               </button>
             ))}
+            {remoteConfigurationItem}
           </div>
         )}
       </div>
