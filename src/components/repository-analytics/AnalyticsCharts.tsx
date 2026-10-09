@@ -28,11 +28,11 @@ export function AnalyticsTable({ headings, children, caption }: { headings: stri
 export function AnalyticsEmpty({ children }: { children: React.ReactNode }) {
   return <p className="analytics-empty">{children}</p>;
 }
-export function moveChartFocus(event: React.KeyboardEvent<HTMLButtonElement>, verticalStride = 1) {
+export function moveChartFocus(event: React.KeyboardEvent<HTMLButtonElement>, verticalStride = 1, horizontalStride = 1) {
   if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
   const buttons = [...event.currentTarget.parentElement!.querySelectorAll<HTMLButtonElement>('button')];
   const index = buttons.indexOf(event.currentTarget);
-  const stride = ['ArrowUp', 'ArrowDown'].includes(event.key) ? verticalStride : 1;
+  const stride = ['ArrowUp', 'ArrowDown'].includes(event.key) ? verticalStride : horizontalStride;
   const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : index + (['ArrowLeft', 'ArrowUp'].includes(event.key) ? -stride : stride);
   buttons[Math.max(0, Math.min(buttons.length - 1, next))]?.focus();
   event.preventDefault();
@@ -203,7 +203,7 @@ export function PeriodChart({
 }
 const localDay = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 export function ActivityCalendar({ periods, onSelect }: { periods: AnalyticsPeriod[]; onSelect: (date: string) => void }) {
-  const { tr } = useI18n();
+  const { tr, locale } = useI18n();
   const years = [...new Set(periods.map((period) => Number(period.date.slice(0, 4))))].sort((a, b) => b - a);
   const [selected, setSelected] = useState(0);
   const year = years.includes(selected) ? selected : (years[0] ?? new Date().getFullYear());
@@ -215,6 +215,11 @@ export function ActivityCalendar({ periods, onSelect }: { periods: AnalyticsPeri
     return rows;
   }, [periods, year]);
   const max = Math.max(1, ...days.map((day) => day.commits));
+  const startOffset = (new Date(year, 0, 1).getDay() + 6) % 7;
+  const weeks = Math.ceil((startOffset + days.length) / 7);
+  const columns = { gridTemplateColumns: `repeat(${weeks}, minmax(0, 1fr))` };
+  const monthFormat = new Intl.DateTimeFormat(locale, { month: 'short' });
+  const weekdayFormat = new Intl.DateTimeFormat(locale, { weekday: 'short' });
   return (
     <>
       <div className="analytics-section-toolbar">
@@ -228,38 +233,45 @@ export function ActivityCalendar({ periods, onSelect }: { periods: AnalyticsPeri
           </select>
         </label>
       </div>
-      <div className="analytics-calendar" aria-label={`${tr('Aktivität', 'Activity')} ${year}`}>
-        {days.map((day, index) => (
-          <button
-            key={day.date}
-            className={`analytics-day analytics-day--${day.commits ? Math.max(1, Math.ceil((day.commits / max) * 4)) : 0}`}
-            style={index === 0 ? { gridRow: ((new Date(year, 0, 1).getDay() + 6) % 7) + 1 } : undefined}
-            onKeyDown={moveChartFocus}
-            onClick={() => onSelect(day.date)}
-            title={`${day.date}: ${count(day.commits)} commits`}
-            aria-label={`${day.date}: ${count(day.commits)} commits`}
-          />
-        ))}
+      <div className="analytics-calendar-scroll">
+        <div className="analytics-calendar-plot" style={{ minWidth: `${weeks * 11 + (weeks - 1) * 3 + 34}px` }}>
+          <div className="analytics-calendar-months" style={columns} aria-hidden="true">
+            {Array.from({ length: 12 }, (_, month) => {
+              const date = new Date(year, month, 1);
+              const index = days.findIndex((day) => day.date === localDay(date));
+              return (
+                <span key={month} style={{ gridColumn: Math.floor((startOffset + index) / 7) + 1 }}>
+                  {monthFormat.format(date)}
+                </span>
+              );
+            })}
+          </div>
+          <div className="analytics-calendar-body">
+            <div className="analytics-calendar-weekdays" aria-hidden="true">
+              {Array.from({ length: 7 }, (_, day) => (
+                <span key={day}>{day % 2 === 0 && day < 6 ? weekdayFormat.format(new Date(year, 0, 1 - startOffset + day)) : ''}</span>
+              ))}
+            </div>
+            <div className="analytics-calendar" style={columns} aria-label={`${tr('Aktivität', 'Activity')} ${year}`}>
+              {days.map((day, index) => (
+                <button
+                  key={day.date}
+                  className={`analytics-day analytics-day--${day.commits ? Math.max(1, Math.ceil((day.commits / max) * 4)) : 0}`}
+                  style={{ gridRow: ((startOffset + index) % 7) + 1, gridColumn: Math.floor((startOffset + index) / 7) + 1 }}
+                  onKeyDown={(event) => moveChartFocus(event, 1, 7)}
+                  onClick={() => onSelect(day.date)}
+                  title={`${day.date}: ${count(day.commits)} commits`}
+                  aria-label={`${day.date}: ${count(day.commits)} commits`}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="analytics-axis analytics-calendar-axis">
+            <span>{new Date(year, 0, 1).toLocaleDateString(locale)}</span>
+            <span>{new Date(year, 11, 31).toLocaleDateString(locale)}</span>
+          </div>
+        </div>
       </div>
-      <div className="analytics-axis">
-        <span>{`01.01.${year}`}</span>
-        <span>{`31.12.${year}`}</span>
-      </div>
-      <details className="analytics-data">
-        <summary>{tr('Kalenderdaten als Tabelle', 'Calendar data as table')}</summary>
-        <AnalyticsTable headings={[tr('Tag', 'Day'), 'Commits']}>
-          {days.map((day) => (
-            <tr key={day.date}>
-              <td>
-                <button className="analytics-link" onClick={() => onSelect(day.date)}>
-                  {day.date}
-                </button>
-              </td>
-              <td>{count(day.commits)}</td>
-            </tr>
-          ))}
-        </AnalyticsTable>
-      </details>
     </>
   );
 }

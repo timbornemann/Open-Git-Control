@@ -61,7 +61,7 @@ export function AnalyticsHotspotTooltip({ id, anchor, row, directory }: { id: st
       </dl>
       <span className="analytics-heatmap-tooltip-hint">
         {directory
-          ? tr('Klicken, um den Verlauf zu öffnen', 'Click to open history')
+          ? tr('Klicken, um das Verzeichnis auszuwerten', 'Click to analyze directory')
           : tr('Klicken, um die Dateiversion zu öffnen', 'Click to open file version')}
       </span>
     </div>,

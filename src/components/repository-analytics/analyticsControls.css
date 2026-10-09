@@ -1,24 +1,3 @@
-.analytics-header {
-  flex: none;
-  background: var(--bg-dark);
-  border-bottom: 1px solid var(--border-color);
-}
-.analytics-report-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  min-height: 34px;
-  padding: 4px 12px;
-}
-.analytics-updated {
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.7rem;
-}
-.analytics-refresh-action {
-  min-width: 104px;
-}
 .analytics-filters {
   padding: 10px 12px 14px;
   border-top: 1px solid var(--border-color);

@@ -204,7 +204,6 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
               repoPath={repository.activeRepo}
               refreshTrigger={repository.refreshTrigger}
               busy={workflow.isGitActionRunning}
-              onOpenCommit={repository.onNavigateToCommit}
               onOpenFile={(path, hash) => {
                 repository.onOpenRepoWorkspace();
                 handleOpenDiff({ path, source: 'commit', commitHash: hash });

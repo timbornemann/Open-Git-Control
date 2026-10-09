@@ -27,7 +27,7 @@ const render = (saved = snapshot(), kind: 'hotspots' | 'directories' = 'hotspots
   act(async () =>
     root.render(
       <I18nProvider language="en">
-        <AnalyticsDetailsView snapshot={saved} kind={kind} onFile={onFile} onPath={onPath} onCommit={vi.fn()} />
+        <AnalyticsDetailsView snapshot={saved} kind={kind} onFile={onFile} onPath={onPath} />
       </I18nProvider>,
     ),
   );
@@ -81,7 +81,7 @@ describe('paginated hotspot heatmaps', () => {
     expect(cell.querySelector('span')?.textContent).toBe('101');
     expect(host.textContent).not.toContain('wrong.ts');
   });
-  it('uses the same map for directories and routes their actions to history', async () => {
+  it('uses the same map for directories and routes their actions to path analysis', async () => {
     getDetails.mockResolvedValue({ success: true, data: { items: [row('.', 100), row('src/components', 40)], total: 2, offset: 0 } });
     await render(snapshot(), 'directories');
     expect(host.querySelector('table')).toBeNull();

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { gitClient } from '@/services/gitClient';
 import { cancellableRead } from '@/data/ipcRead';
 import { useOptionalNotifications } from '@/contexts/NotificationContext';
@@ -20,6 +20,11 @@ export function useRepositoryAnalytics(repoPath: string, filters: AnalyticsFilte
   const reportRef = useRef(report);
   const refreshRef = useRef(refresh);
   const cancelRef = useRef<() => void>(() => {});
+  const cancel = useCallback(() => cancelRef.current(), []);
+  const reload = useCallback(() => {
+    setPaused(false);
+    setRefresh((value) => value + 1);
+  }, []);
   const notifications = useOptionalNotifications();
   const { tr } = useI18n();
   useEffect(() => {
@@ -191,10 +196,7 @@ export function useRepositoryAnalytics(repoPath: string, filters: AnalyticsFilte
     paused,
     progress,
     error,
-    cancel: () => cancelRef.current(),
-    reload: () => {
-      setPaused(false);
-      setRefresh((value) => value + 1);
-    },
+    cancel,
+    reload,
   };
 }

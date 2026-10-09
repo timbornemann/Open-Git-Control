@@ -1,0 +1,23 @@
+.topbar.topbar--analytics {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.topbar--analytics .topbar-repo-title {
+  max-width: none;
+}
+.topbar--analytics .topbar-right {
+  width: auto;
+}
+.analytics-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.analytics-updated {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.7rem;
+}
+.analytics-refresh-action {
+  min-width: 104px;
+}

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
-import { Button, SegmentedControl, TextField } from '@/components/ui';
+import { SegmentedControl, TextField } from '@/components/ui';
 import { DialogFrame } from '@/components/DialogFrame';
 import { useI18n } from '@/i18n';
 import type { AnalyticsFilters, RepositoryAnalyticsSnapshot } from '@/shared/ipc/repositoryAnalytics';
 import { changeAnalyticsFilters, rememberAnalyticsSnapshot, useAnalyticsFilters } from './analyticsWorkspaceState';
 import { useRepositoryAnalytics } from './useRepositoryAnalytics';
+import { usePublishAnalyticsToolbar } from './analyticsToolbarState';
 import { AnalyticsOverview } from './AnalyticsOverview';
 import { AnalyticsChurn, AnalyticsContributions, AnalyticsOwnership, periodRange } from './AnalyticsActivity';
 import { AnalyticsDetailsView } from './AnalyticsDetails';
@@ -19,7 +19,6 @@ type Props = {
   refreshTrigger: number;
   busy?: boolean;
   onOpenFile: (path: string, hash: string) => void;
-  onOpenCommit: (hash: string) => void;
 };
 export function RepositoryAnalyticsView(props: Props) {
   const { tr } = useI18n();
@@ -29,8 +28,8 @@ export function RepositoryAnalyticsView(props: Props) {
     );
   return <AnalyticsDashboard key={props.repoPath} {...props} repoPath={props.repoPath} />;
 }
-function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile, onOpenCommit }: Props & { repoPath: string }) {
-  const { tr, locale } = useI18n();
+function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile }: Props & { repoPath: string }) {
+  const { tr } = useI18n();
   const filters = useAnalyticsFilters(repoPath);
   const tab = useAnalyticsTab(repoPath);
   const setTab = (value: AnalyticsTab) => selectAnalyticsTab(repoPath, value);
@@ -38,12 +37,24 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
   const [showCoverage, setShowCoverage] = useState(false);
   const onFilters = useCallback((value: AnalyticsFilters) => changeAnalyticsFilters(repoPath, value), [repoPath]);
   const { snapshot, running, paused, error, reload, cancel } = useRepositoryAnalytics(repoPath, filters, refreshTrigger, busy);
+  const openCoverage = useCallback(() => setShowCoverage(true), []);
+  usePublishAnalyticsToolbar({
+    repoPath,
+    savedAt: snapshot?.savedAt,
+    running,
+    paused,
+    failed: !!error,
+    hasWarnings: !!snapshot?.warnings.length,
+    reload,
+    cancel,
+    showCoverage: openCoverage,
+  });
   useEffect(() => {
     if (snapshot) rememberAnalyticsSnapshot(snapshot);
   }, [snapshot]);
   const onPath = (path: string) => {
     onFilters({ ...filters, path });
-    setTab('commits');
+    setTab('hotspots');
   };
   const onPerson = (author: string) => {
     onFilters({ ...filters, author });
@@ -51,47 +62,13 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
   };
   const onPeriod = (date: string) => {
     if (snapshot) onFilters({ ...filters, ...periodRange(date, snapshot, filters.aggregation) });
-    setTab('commits');
+    if (tab !== 'churn') setTab('contributions');
   };
   const labels = analyticsSections(tr);
-  const details = (kind: 'commits' | 'hotspots' | 'directories' | 'coupling' | 'comparison') =>
-    snapshot && (
-      <AnalyticsDetailsView
-        key={JSON.stringify([repoPath, filters, kind])}
-        snapshot={snapshot}
-        kind={kind}
-        onPath={onPath}
-        onFile={onOpenFile}
-        onCommit={onOpenCommit}
-      />
-    );
+  const details = (kind: 'hotspots' | 'directories' | 'coupling' | 'comparison') =>
+    snapshot && <AnalyticsDetailsView key={JSON.stringify([repoPath, filters, kind])} snapshot={snapshot} kind={kind} onPath={onPath} onFile={onOpenFile} />;
   return (
     <div className="repository-analytics">
-      <div className="analytics-header analytics-report-toolbar">
-        {!!snapshot?.warnings.length && (
-          <Button size="xs" variant="ghost" onClick={() => setShowCoverage(true)}>
-            {tr('Hinweise zur Abdeckung', 'Coverage notes')}
-          </Button>
-        )}
-        {snapshot && (
-          <time
-            className="analytics-updated"
-            dateTime={new Date(snapshot.savedAt).toISOString()}
-            title={`${tr('Lokale Auswertung vom', 'Local report from')} ${new Date(snapshot.savedAt).toLocaleString(locale)}`}
-          >
-            {tr('Stand', 'Updated')} {new Date(snapshot.savedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
-          </time>
-        )}
-        {running ? (
-          <Button size="xs" variant="ghost" className="analytics-refresh-action" onClick={cancel}>
-            {tr('Abbrechen', 'Cancel')}
-          </Button>
-        ) : (
-          <Button size="xs" variant="ghost" className="analytics-refresh-action" icon={<RefreshCw size={13} />} onClick={reload}>
-            {paused || error ? tr('Fortsetzen', 'Resume') : tr('Aktualisieren', 'Refresh')}
-          </Button>
-        )}
-      </div>
       <div
         className={`analytics-content${tab === 'overview' ? ' analytics-content--overview' : ''}`}
         tabIndex={0}
@@ -148,7 +125,7 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
                 onPeriod={onPeriod}
                 onDay={(date) => {
                   onFilters({ ...filters, since: date, until: date });
-                  setTab('commits');
+                  setTab('contributions');
                 }}
               />
             )}
@@ -173,12 +150,6 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
                 <ComparisonHeader snapshot={snapshot} filters={filters} onChange={onFilters} />
                 {details('comparison')}
               </>
-            )}
-            {tab === 'commits' && (
-              <section className="analytics-section">
-                <h3>{tr('Commit-Verlauf', 'Commit history')}</h3>
-                {details('commits')}
-              </section>
             )}
           </>
         )}

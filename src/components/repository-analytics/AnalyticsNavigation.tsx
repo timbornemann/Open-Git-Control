@@ -1,4 +1,4 @@
-import { Activity, Flame, GitCommitHorizontal, GitCompare, LayoutDashboard, Link2, TextSelect, Users, type LucideIcon } from 'lucide-react';
+import { Activity, Flame, GitCompare, LayoutDashboard, Link2, TextSelect, Users, type LucideIcon } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { analyticsSections, selectAnalyticsTab, useAnalyticsTab, type AnalyticsTab } from './analyticsNavigationState';
 import './analyticsSidebar.css';
@@ -11,7 +11,6 @@ const icons: Record<AnalyticsTab, LucideIcon> = {
   churn: Activity,
   coupling: Link2,
   comparison: GitCompare,
-  commits: GitCommitHorizontal,
 };
 
 export function AnalyticsNavigation({ repoPath }: { repoPath: string | null }) {

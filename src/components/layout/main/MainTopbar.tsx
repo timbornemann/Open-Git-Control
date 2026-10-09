@@ -6,6 +6,7 @@ import { useI18n } from '@/i18n';
 import { RemoteTransferHost } from '@/components/hosting/RemoteTransferHost';
 import { requestRemoteTransfer, type RemoteTransferDialog } from '@/components/hosting/remoteTransferDialogState';
 import { useRemoteTransferState } from '@/components/hosting/remoteTransferState';
+import { RepositoryAnalyticsToolbar } from '@/components/repository-analytics/RepositoryAnalyticsToolbar';
 
 type MainTopbarProps = {
   canShowInspectorPane: boolean;
@@ -70,7 +71,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
 
   return (
     <>
-      <div className="topbar">
+      <div className={`topbar${isAnalyticsView ? ' topbar--analytics' : ''}`}>
         <div className="topbar-left">
           <div
             aria-hidden="true"
@@ -130,6 +131,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
         </div>
 
         <div className="topbar-right">
+          {isAnalyticsView && <RepositoryAnalyticsToolbar repoPath={activeRepo} />}
           {!isWorkspaceView && (
             <TopbarActions
               activeRepo={activeRepo}

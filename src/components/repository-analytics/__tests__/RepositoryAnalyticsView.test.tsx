@@ -6,6 +6,7 @@ import { I18nProvider } from '@/i18n';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { DEFAULT_ANALYTICS_FILTERS, type AnalyticsProgress, type RepositoryAnalyticsSnapshot } from '@/shared/ipc/repositoryAnalytics';
 import { RepositoryAnalyticsView } from '../RepositoryAnalyticsView';
+import { RepositoryAnalyticsToolbar } from '../RepositoryAnalyticsToolbar';
 import { readAnalyticsFilters } from '../analyticsPreferences';
 import { AnalyticsNavigation } from '../AnalyticsNavigation';
 import { RepositoryAnalyticsFilters } from '../AnalyticsFilters';
@@ -39,8 +40,7 @@ vi.mock('@/data/ipcRead', () => ({
 let serial = 0;
 let host: HTMLDivElement, root: Root;
 let listeners: ((event: AnalyticsProgress) => void)[];
-const openFile = vi.fn(),
-  openCommit = vi.fn();
+const openFile = vi.fn();
 function report(repoPath = 'C:/repo', commits = 3): RepositoryAnalyticsSnapshot {
   return {
     id: repoPath,
@@ -89,11 +89,15 @@ const render = (repoPath = 'C:/repo', busy = false, refreshTrigger = 0) =>
     root.render(
       <I18nProvider language="en">
         <NotificationProvider value={notifications}>
+          <header>
+            <span>Statistics &amp; analytics</span>
+            <RepositoryAnalyticsToolbar repoPath={repoPath} />
+          </header>
           <aside key={repoPath}>
             <AnalyticsNavigation repoPath={repoPath} />
             <RepositoryAnalyticsFilters repoPath={repoPath} />
           </aside>
-          <RepositoryAnalyticsView repoPath={repoPath} refreshTrigger={refreshTrigger} busy={busy} onOpenFile={openFile} onOpenCommit={openCommit} />
+          <RepositoryAnalyticsView repoPath={repoPath} refreshTrigger={refreshTrigger} busy={busy} onOpenFile={openFile} />
         </NotificationProvider>
       </I18nProvider>,
     ),
@@ -141,7 +145,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe('repository analytics dashboard', () => {
-  it('preserves gaps in the time axis and lets the keyboard select a period for commit details', async () => {
+  it('preserves gaps in the time axis and lets the keyboard filter contributions by period', async () => {
     const saved = report();
     saved.periods.push({ date: '2026-10-11', commits: 1, merges: 0, additions: 1, deletions: 0 });
     mocks.cache.mockResolvedValue({ success: true, data: saved });
@@ -153,7 +157,8 @@ describe('repository analytics dashboard', () => {
     expect(document.activeElement).toBe(bars[1]);
     await act(async () => bars[1].click());
     expect(mocks.refresh.mock.calls.at(-1)?.[0].filters).toMatchObject({ since: '2026-10-11', until: '2026-10-11' });
-    expect(host.textContent).toContain('Commit history');
+    expect(host.querySelector('.analytics-sidebar-nav [aria-current="page"]')?.textContent).toBe('Contributions');
+    expect(host.textContent).not.toContain('Commit history');
   });
   it('shows the saved report immediately, keeps independent project/history filters and opens captured file versions', async () => {
     await render();
@@ -173,7 +178,10 @@ describe('repository analytics dashboard', () => {
   });
   it('keeps all common filters in the sidebar and a fixed overview, while detailed reports can scroll', async () => {
     await render();
-    const header = host.querySelector('.analytics-header')!;
+    const header = host.querySelector('header')!;
+    expect(host.querySelector('.analytics-header')).toBeNull();
+    expect(host.querySelector('.repository-analytics .analytics-topbar-actions')).toBeNull();
+    expect(header.querySelector('.analytics-updated')).toBeTruthy();
     expect(header.querySelector('.analytics-filters')).toBeNull();
     expect(host.querySelector('aside .analytics-filters')).toBeTruthy();
     expect(header.querySelector('nav')).toBeNull();
@@ -347,40 +355,31 @@ describe('repository analytics dashboard', () => {
     expect(host.querySelector('.analytics-metrics dd')?.textContent).toBe('2');
   });
   it('keeps the selected detail page and rows while an updated snapshot loads their replacement', async () => {
-    const commit = {
-      hash: 'c'.repeat(40),
-      parents: [],
-      author: { id: 'alice', name: 'Alice', email: 'alice@test.invalid' },
-      date: 1000,
-      subject: 'Page two',
-      files: 1,
-      additions: 3,
-      deletions: 0,
-    };
-    mocks.details.mockImplementation(({ offset }) => Promise.resolve({ success: true, data: { items: [commit], total: 101, offset } }));
+    const pair = { first: 'a.ts', second: 'b.ts', commits: 3, share: 0.5 };
+    mocks.details.mockImplementation(({ offset }) => Promise.resolve({ success: true, data: { items: [pair], total: 101, offset } }));
     await render();
-    await click('Commits');
+    await click('File coupling');
     await click('Next');
     const content = host.querySelector<HTMLDivElement>('.analytics-content')!;
     const table = host.querySelector('.analytics-table');
     const row = host.querySelector('.analytics-table tbody tr');
     content.scrollTop = 80;
     const refresh = deferred<{ success: true; data: RepositoryAnalyticsSnapshot }>();
-    const details = deferred<{ success: true; data: { items: (typeof commit)[]; total: number; offset: number } }>();
+    const details = deferred<{ success: true; data: { items: (typeof pair)[]; total: number; offset: number } }>();
     mocks.refresh.mockReturnValueOnce(refresh.promise);
     mocks.details.mockReturnValueOnce(details.promise);
     await render('C:/repo', false, 1);
     const updated = { ...report('C:/repo', 4), id: 'new-refs', savedAt: 2000 };
     await act(async () => refresh.resolve({ success: true, data: updated }));
     expect(mocks.details).toHaveBeenLastCalledWith(expect.objectContaining({ snapshotId: 'new-refs', offset: 50 }));
-    expect(host.querySelector('.analytics-sidebar-nav [aria-current="page"]')?.textContent).toBe('Commits');
+    expect(host.querySelector('.analytics-sidebar-nav [aria-current="page"]')?.textContent).toBe('File coupling');
     expect(host.querySelector('.analytics-table')).toBe(table);
     expect(host.querySelector('.analytics-table tbody tr')).toBe(row);
     expect(host.querySelector('.analytics-pagination')?.textContent).toContain('51–100 / 101');
     expect(content.scrollTop).toBe(80);
-    await act(async () => details.resolve({ success: true, data: { items: [{ ...commit, subject: 'Updated page two' }], total: 102, offset: 50 } }));
+    await act(async () => details.resolve({ success: true, data: { items: [{ ...pair, commits: 4 }], total: 102, offset: 50 } }));
     expect(host.querySelector('.analytics-table tbody tr')).toBe(row);
-    expect(host.textContent).toContain('Updated page two');
+    expect(row?.querySelectorAll('td')[2].textContent).toBe('4');
     expect(host.querySelector('.analytics-pagination')?.textContent).toContain('51–100 / 102');
     expect(content.scrollTop).toBe(80);
   });
@@ -412,31 +411,35 @@ describe('repository analytics dashboard', () => {
     await click('Last changed lines');
     expect([...host.querySelectorAll<HTMLElement>('.analytics-share > span')].map((node) => node.style.width)).toEqual(['81.5%', '18.5%']);
   });
-  it('pages commit details and opens the existing commit workflow without a checkout', async () => {
-    mocks.details.mockResolvedValue({
-      success: true,
-      data: {
-        total: 51,
-        offset: 0,
-        items: [
-          {
-            hash: 'c'.repeat(40),
-            parents: [],
-            author: { name: 'Alice', email: 'alice@test.invalid' },
-            date: 1000,
-            subject: 'Initial',
-            files: 1,
-            additions: 3,
-            deletions: 0,
-          },
-        ],
-      },
-    });
+  it('filters directory analysis without exposing a separate commit history', async () => {
+    const saved = report();
+    saved.directories = [{ ...saved.hotspots[0], path: 'src/' }];
+    mocks.cache.mockImplementation(({ filters }) => Promise.resolve({ success: true, data: { ...saved, filters } }));
+    mocks.details.mockImplementation(({ kind }) =>
+      Promise.resolve({ success: true, data: { items: kind === 'directories' ? saved.directories : saved.hotspots, total: 1 } }),
+    );
     await render();
-    await click('Commits');
-    await click('cccccccc Initial');
-    expect(openCommit).toHaveBeenCalledWith('c'.repeat(40));
-    await click('Next');
-    expect(mocks.details).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 50, limit: 50 }));
+    expect([...host.querySelectorAll('.analytics-sidebar-nav button')].map((button) => button.textContent)).not.toContain('Commits');
+    await click('Change hotspots');
+    await click('Directories');
+    await act(async () => host.querySelector<HTMLButtonElement>('.analytics-heatmap-cell')!.click());
+    expect(readAnalyticsFilters('C:/repo').path).toBe('src/');
+    expect(host.querySelector('.analytics-sidebar-nav [aria-current="page"]')?.textContent).toBe('Change hotspots');
+    expect(host.textContent).not.toContain('Commit history');
+    expect(mocks.details.mock.calls.every(([request]) => request.kind !== 'commits')).toBe(true);
+  });
+  it('refreshes from the shared header and opens coverage notes from the current report', async () => {
+    const saved = { ...report(), warnings: ['Shallow repository: local commits only'] };
+    mocks.cache.mockResolvedValue({ success: true, data: saved });
+    mocks.refresh.mockResolvedValue({ success: true, data: saved });
+    await render();
+    const header = host.querySelector('header')!;
+    expect(header.querySelector('.analytics-refresh-action')?.textContent).toBe('Refresh');
+    const requests = mocks.refresh.mock.calls.length;
+    await click('Refresh');
+    expect(mocks.refresh).toHaveBeenCalledTimes(requests + 1);
+    expect(header.querySelector('time')?.dateTime).toBe(new Date(saved.savedAt).toISOString());
+    await click('Coverage notes');
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Shallow repository');
   });
 });
