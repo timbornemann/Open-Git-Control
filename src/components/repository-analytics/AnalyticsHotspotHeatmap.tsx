@@ -3,7 +3,7 @@ import { useI18n } from '@/i18n';
 import type { AnalyticsChanges } from '@/shared/ipc/repositoryAnalytics';
 import { count } from './AnalyticsCharts';
 import { AnalyticsHotspotTooltip } from './AnalyticsHotspotTooltip';
-import { analyticsTreemapLayout, treemapNeighbor, type TreemapRect } from './analyticsTreemapLayout';
+import { analyticsTreemapLayout, treemapHeadingHeight, treemapNeighbor, type TreemapRect } from './analyticsTreemapLayout';
 import { useAnalyticsSize } from './useAnalyticsSize';
 import './analyticsHeatmap.css';
 
@@ -16,16 +16,30 @@ type Props = {
   onFile: (path: string, hash: string) => void;
   onPath: (path: string) => void;
 };
+
+function alignedSpan(start: number, size: number) {
+  const first = Math.round(start),
+    last = Math.round(start + size);
+  // Preserve tiny files rather than rounding both edges to the same pixel.
+  return last > first ? [first, last - first] : [start, size];
+}
+
 export function AnalyticsHotspotHeatmap({ rows, maxChanges = 0, directory = false, preview = false, onFile, onPath }: Props) {
   const { tr } = useI18n();
   const { ref, width, height } = useAnalyticsSize();
   const { tiles, groups } = useMemo(() => analyticsTreemapLayout(rows, width, height), [rows, width, height]);
-  const position = (rect: TreemapRect) => ({
-    left: `${(rect.x / width) * 100}%`,
-    top: `${(rect.y / height) * 100}%`,
-    width: `${(rect.width / width) * 100}%`,
-    height: `${(rect.height / height) * 100}%`,
-  });
+  const position = (rect: TreemapRect, gutter = false) => {
+    const [x, w] = alignedSpan(rect.x, rect.width),
+      [y, h] = alignedSpan(rect.y, rect.height);
+    const insetX = gutter ? Math.min(1, w / 4) : 0,
+      insetY = gutter ? Math.min(1, h / 4) : 0;
+    return {
+      left: x + insetX,
+      top: y + insetY,
+      width: w - insetX * 2,
+      height: h - insetY * 2,
+    };
+  };
   const tooltipId = useId();
   const [hovered, setHovered] = useState<Target | null>(null);
   const [focused, setFocused] = useState<Target | null>(null);
@@ -93,7 +107,7 @@ export function AnalyticsHotspotHeatmap({ rows, maxChanges = 0, directory = fals
       >
         {groups.map((group) => (
           <div key={group.path} className="analytics-treemap-group" data-depth={group.depth} style={position(group)} aria-hidden="true">
-            {group.label && <span>{group.path}</span>}
+            {group.label && <span style={{ height: treemapHeadingHeight }}>{group.path}</span>}
           </div>
         ))}
         {tiles.map((tile) => {
@@ -104,7 +118,7 @@ export function AnalyticsHotspotHeatmap({ rows, maxChanges = 0, directory = fals
               key={row.path}
               type="button"
               data-path={row.path}
-              style={position(tile)}
+              style={position(tile, true)}
               className={`analytics-heatmap-cell analytics-heatmap-level--${level}${active?.path === row.path ? ' is-highlighted' : ''}`}
               aria-label={`${pathLabel(row)}: ${changeLabel(row)}`}
               aria-describedby={tooltipVisible && active.path === row.path ? tooltipId : undefined}

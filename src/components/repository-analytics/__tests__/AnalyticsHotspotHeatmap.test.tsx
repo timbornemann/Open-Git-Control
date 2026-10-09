@@ -132,4 +132,16 @@ describe('change hotspot heatmap', () => {
     expect(host.querySelector('.analytics-heatmap')).toBeNull();
     expect(tooltip()).toBeNull();
   });
+  it('keeps files with subpixel areas accessible after aligning the treemap edges', () => {
+    render([change('src/main.ts', 1000000), change('deep/nested/tiny.ts', 1), change('tiny.txt', 1)]);
+    expect(cells().map((cell) => cell.dataset.path)).toEqual(['src/main.ts', 'deep/nested/tiny.ts', 'tiny.txt']);
+    for (const cell of cells()) {
+      expect(Number.parseFloat(cell.style.width)).toBeGreaterThan(0);
+      expect(Number.parseFloat(cell.style.height)).toBeGreaterThan(0);
+    }
+    act(() => cells()[1].focus());
+    expect(tooltip()?.textContent).toContain('deep/nested/tiny.ts');
+    act(() => cells()[1].click());
+    expect(onFile).toHaveBeenCalledWith('deep/nested/tiny.ts', 'a'.repeat(40));
+  });
 });

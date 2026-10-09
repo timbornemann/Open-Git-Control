@@ -354,15 +354,21 @@ describe('repository analytics dashboard', () => {
     await act(async () => cache.resolve({ success: true, data: filtered }));
     expect(host.querySelector('.analytics-metrics dd')?.textContent).toBe('2');
   });
-  it('keeps the selected detail page and rows while an updated snapshot loads their replacement', async () => {
+  it('keeps the whole coupling network, selection and viewport while an updated snapshot loads its replacement', async () => {
     const pair = { first: 'a.ts', second: 'b.ts', commits: 3, share: 0.5 };
-    mocks.details.mockImplementation(({ offset }) => Promise.resolve({ success: true, data: { items: [pair], total: 101, offset } }));
+    mocks.details.mockImplementation(({ offset }) => Promise.resolve({ success: true, data: { items: [pair], total: 1, offset } }));
     await render();
     await click('File coupling');
-    await click('Next');
     const content = host.querySelector<HTMLDivElement>('.analytics-content')!;
-    const table = host.querySelector('.analytics-table');
-    const row = host.querySelector('.analytics-table tbody tr');
+    const network = host.querySelector('.analytics-coupling-network');
+    const node = host.querySelector<HTMLButtonElement>('.analytics-coupling-node')!;
+    const connection = host.querySelector('.analytics-coupling-connection');
+    act(() => {
+      node.click();
+      node.focus();
+    });
+    act(() => host.querySelector<HTMLButtonElement>('[aria-label="Zoom in"]')!.click());
+    const transform = host.querySelector<HTMLElement>('.analytics-coupling-scene')!.style.transform;
     content.scrollTop = 80;
     const refresh = deferred<{ success: true; data: RepositoryAnalyticsSnapshot }>();
     const details = deferred<{ success: true; data: { items: (typeof pair)[]; total: number; offset: number } }>();
@@ -371,16 +377,24 @@ describe('repository analytics dashboard', () => {
     await render('C:/repo', false, 1);
     const updated = { ...report('C:/repo', 4), id: 'new-refs', savedAt: 2000 };
     await act(async () => refresh.resolve({ success: true, data: updated }));
-    expect(mocks.details).toHaveBeenLastCalledWith(expect.objectContaining({ snapshotId: 'new-refs', offset: 50 }));
+    expect(mocks.details).toHaveBeenLastCalledWith(expect.objectContaining({ snapshotId: 'new-refs', offset: 0, limit: 200 }));
     expect(host.querySelector('.analytics-sidebar-nav [aria-current="page"]')?.textContent).toBe('File coupling');
-    expect(host.querySelector('.analytics-table')).toBe(table);
-    expect(host.querySelector('.analytics-table tbody tr')).toBe(row);
-    expect(host.querySelector('.analytics-pagination')?.textContent).toContain('51–100 / 101');
+    expect(host.querySelector('.analytics-coupling-network')).toBe(network);
+    expect(host.querySelector('.analytics-coupling-node')).toBe(node);
+    expect(host.querySelector('.analytics-coupling-connection')).toBe(connection);
+    expect(document.activeElement).toBe(node);
+    expect(node.getAttribute('aria-pressed')).toBe('true');
+    expect(host.querySelector('.analytics-pagination')).toBeNull();
+    expect(host.querySelector<HTMLElement>('.analytics-coupling-scene')!.style.transform).toBe(transform);
     expect(content.scrollTop).toBe(80);
-    await act(async () => details.resolve({ success: true, data: { items: [{ ...pair, commits: 4 }], total: 102, offset: 50 } }));
-    expect(host.querySelector('.analytics-table tbody tr')).toBe(row);
-    expect(row?.querySelectorAll('td')[2].textContent).toBe('4');
-    expect(host.querySelector('.analytics-pagination')?.textContent).toContain('51–100 / 102');
+    await act(async () => details.resolve({ success: true, data: { items: [{ ...pair, commits: 4 }], total: 1, offset: 0 } }));
+    expect(host.querySelector('.analytics-coupling-network')).toBe(network);
+    expect(host.querySelector('.analytics-coupling-node')).toBe(node);
+    expect(document.activeElement).toBe(node);
+    expect(host.querySelector('.analytics-coupling-connection')).toBe(connection);
+    expect(host.querySelector('.analytics-coupling-count')?.textContent).toBe('4');
+    expect(host.querySelector('.analytics-pagination')).toBeNull();
+    expect(host.querySelector<HTMLElement>('.analytics-coupling-scene')!.style.transform).toBe(transform);
     expect(content.scrollTop).toBe(80);
   });
   it('uses central progress and cancellation and preserves usable results', async () => {

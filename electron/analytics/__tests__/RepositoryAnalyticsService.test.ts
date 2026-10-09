@@ -47,6 +47,26 @@ describe('offline repository analytics with real Git', () => {
     expect(history[0][4]!.toString().trim().split('\n')).toHaveLength(1);
     expect(spy.mock.calls.filter((call) => call[1].includes('blame')).map((call) => call[1].at(-1))).toEqual(['a.ts']);
   }, 90000);
+  it('keeps all filtered coupling pairs beyond the 100-row preview and 200-row transfer batch', async () => {
+    const f = await fixture(false);
+    for (let revision = 1; revision <= 3; revision++) {
+      for (let index = 0; index < 22; index++) f.write(`coupled/file-${String(index).padStart(2, '0')}.txt`, `${revision}\n`);
+      await f.git('add', '.');
+      await f.git('commit', '-m', `Change all coupled files ${revision}`);
+    }
+    const value = await f.refresh({ ...DEFAULT_ANALYTICS_FILTERS, path: 'coupled/' });
+    expect(value.coupling).toHaveLength(100);
+    const first = f.service.details({ repoPath: f.repo, snapshotId: value.id, kind: 'coupling', offset: 0, limit: 200 });
+    const remaining = f.service.details({ repoPath: f.repo, snapshotId: value.id, kind: 'coupling', offset: 200, limit: 200 });
+    expect(first.total).toBe(231);
+    expect(first.items).toHaveLength(200);
+    expect(remaining.items).toHaveLength(31);
+    const all = [...first.items, ...remaining.items];
+    expect(new Set(all.map((pair) => ('first' in pair ? `${pair.first}\0${pair.second}` : ''))).size).toBe(231);
+    expect(
+      all.every((pair) => 'first' in pair && pair.commits === 3 && pair.share === 1 && pair.first.startsWith('coupled/') && pair.second.startsWith('coupled/')),
+    ).toBe(true);
+  }, 90000);
   it('deduplicates branches and remote refs, excludes internal refs and corrects deleted branch membership', async () => {
     const f = await fixture();
     await f.git('checkout', '-b', 'feature', 'v1.0.0');

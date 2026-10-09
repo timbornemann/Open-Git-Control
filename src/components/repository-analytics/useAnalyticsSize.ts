@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 export function useAnalyticsSize(defaultWidth = 700, defaultHeight = 320) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: defaultWidth, height: defaultHeight });
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
     const measure = () => {

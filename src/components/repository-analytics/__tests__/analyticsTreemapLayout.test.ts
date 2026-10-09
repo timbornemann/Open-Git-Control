@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AnalyticsChanges } from '@/shared/ipc/repositoryAnalytics';
-import { analyticsTreemapLayout } from '../analyticsTreemapLayout';
+import { analyticsTreemapLayout, treemapHeadingHeight } from '../analyticsTreemapLayout';
 
 const row = (path: string, changes: number): AnalyticsChanges => ({
   path,
@@ -46,5 +46,29 @@ describe('path-based change treemap', () => {
     const { tiles } = analyticsTreemapLayout(rows, 150, 100);
     expect(tiles.map((tile) => tile.path)).toEqual(rows.map((row) => row.path));
     expect(tiles.every((tile) => Number.isFinite(tile.width) && tile.width > 0 && tile.height > 0)).toBe(true);
+  });
+  it('preserves shared outer edges through deep directory chains without cumulative insets or repeated headings', () => {
+    const { tiles, groups } = analyticsTreemapLayout([row('src/components/editor/theme/colors.ts', 5)], 531.5, 217.25);
+    expect(groups).toHaveLength(4);
+    expect(groups.every((group) => !group.label)).toBe(true);
+    for (const rect of [...groups, ...tiles]) {
+      expect({ x: rect.x, y: rect.y, width: rect.width, height: rect.height }).toEqual({ x: 0, y: 0, width: 531.5, height: 217.25 });
+    }
+  });
+  it('reserves only the visible directory heading and lets children fill the remaining shared bounds', () => {
+    const rows = [row('src/ui/Editor.tsx', 5), row('src/ui/Colors.ts', 3)];
+    const { tiles, groups } = analyticsTreemapLayout(rows, 320, 180);
+    expect(groups.map((group) => ({ path: group.path, label: group.label }))).toEqual([
+      { path: 'src', label: false },
+      { path: 'src/ui', label: true },
+    ]);
+    expect(Math.min(...tiles.map((tile) => tile.x))).toBe(0);
+    expect(Math.min(...tiles.map((tile) => tile.y))).toBe(treemapHeadingHeight);
+    expect(Math.max(...tiles.map((tile) => tile.x + tile.width))).toBe(320);
+    expect(Math.max(...tiles.map((tile) => tile.y + tile.height))).toBe(180);
+    expect(tiles.reduce((sum, tile) => sum + tile.width * tile.height, 0)).toBeCloseTo(320 * (180 - treemapHeadingHeight));
+    const compact = analyticsTreemapLayout(rows, 80, 40);
+    expect(compact.groups.every((group) => !group.label)).toBe(true);
+    expect(compact.tiles.reduce((sum, tile) => sum + tile.width * tile.height, 0)).toBeCloseTo(80 * 40);
   });
 });

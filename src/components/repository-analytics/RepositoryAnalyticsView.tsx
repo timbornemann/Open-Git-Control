@@ -71,7 +71,7 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
   return (
     <div className="repository-analytics">
       <div
-        className={`analytics-content${tab === 'overview' ? ' analytics-content--overview' : tab === 'churn' ? ' analytics-content--churn' : ''}`}
+        className={`analytics-content${tab === 'overview' ? ' analytics-content--overview' : tab === 'churn' ? ' analytics-content--churn' : tab === 'coupling' ? ' analytics-content--coupling' : ''}`}
         tabIndex={0}
         aria-label={labels.find(({ id }) => id === tab)?.label}
       >
@@ -132,15 +132,20 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
             )}
             {tab === 'churn' && <AnalyticsChurn snapshot={snapshot} onPeriod={onPeriod} />}
             {tab === 'coupling' && (
-              <section className="analytics-section">
+              <section className="analytics-section analytics-coupling-section">
                 <h3>{tr('Dateikopplung', 'File coupling')}</h3>
                 <p className="analytics-description">
                   {tr(
-                    'Paare ab drei gemeinsamen Commits. Der Anteil bezieht sich auf Commits, die mindestens eine der beiden Dateien ändern.',
-                    'Pairs with at least three shared commits. The share refers to commits that change at least one of the two files.',
-                  )}{' '}
-                  {count(snapshot.excludedCouplingCommits)}{' '}
-                  {tr('Commits mit mehr als 50 Dateien wurden ausschließlich hier ausgeschlossen.', 'commits with more than 50 files were excluded only here.')}
+                    'Welche Dateien ändern sich häufig zusammen? Verbindungen erscheinen ab drei gemeinsamen Commits.',
+                    'Which files often change together? Connections appear from three shared commits.',
+                  )}
+                  {snapshot.excludedCouplingCommits > 0 && (
+                    <>
+                      {' '}
+                      · {count(snapshot.excludedCouplingCommits)}{' '}
+                      {tr('Commits mit über 50 Dateien sind hier ausgeschlossen.', 'commits with over 50 files are excluded here.')}
+                    </>
+                  )}
                 </p>
                 {details('coupling')}
               </section>

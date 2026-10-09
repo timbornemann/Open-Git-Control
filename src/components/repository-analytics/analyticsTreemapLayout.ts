@@ -4,6 +4,7 @@ type Node = { path: string; weight: number; row?: AnalyticsChanges; children: Ma
 export type TreemapRect = { x: number; y: number; width: number; height: number };
 export type TreemapTile = TreemapRect & { path: string; row: AnalyticsChanges };
 export type TreemapGroup = TreemapRect & { path: string; depth: number; label: boolean };
+export const treemapHeadingHeight = 20;
 
 // Nested directories stay together. Each split follows the longest side and balances
 // total change counts, so area represents frequency rather than an arbitrary grid.
@@ -33,15 +34,12 @@ export function analyticsTreemapLayout(rows: AnalyticsChanges[], width: number, 
     }
     let bounds = rect;
     if (node.path) {
-      const label = rect.width >= 90 && rect.height >= 65 && depth <= 2;
+      const child = node.children.size === 1 ? [...node.children.values()][0] : undefined;
+      const label = rect.width >= 90 && rect.height >= 65 && depth <= 2 && (!child || !!child.row);
       groups.push({ ...rect, path: node.path, depth, label });
-      const padding = Math.min(3, rect.width / 12, rect.height / 12);
-      bounds = {
-        x: rect.x + padding,
-        y: rect.y + padding + (label ? 19 : 0),
-        width: rect.width - padding * 2,
-        height: rect.height - padding * 2 - (label ? 19 : 0),
-      };
+      // Directories share their children's edges. Only a visible heading takes space;
+      // nested paths never accumulate frame padding or repeat a single-child heading.
+      if (label) bounds = { ...rect, y: rect.y + treemapHeadingHeight, height: rect.height - treemapHeadingHeight };
     }
     split(
       [...node.children.values()].sort((a, b) => b.weight - a.weight || a.path.localeCompare(b.path)),
