@@ -153,6 +153,39 @@
       "tags": [],
       "createdAt": 1791464207426,
       "updatedAt": 1791464207426
+    },
+    {
+      "id": "7833490f-b7d6-4c20-836b-64d2ba36e7d9",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Remote config",
+      "description": "Remote configuration gefürher und erklärter machen damit es jeder gut verstehen kann",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1791504517058,
+      "updatedAt": 1791504517058
+    },
+    {
+      "id": "f8cd90bd-fcb3-4639-a76e-1e82b9a210bd",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Readme aktualisieren",
+      "description": "Readme aktualisieren: mittlerweile sind extrem viele Funktionen hinzu gekommen und ich bin mir nicht sicher welche alle in de readme übernommen wurden, prüfe anhand des git verlaufes welche funktionen alles hinzu kamen und was es alles git und ergänze die readme passend mit relevanten informationen",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1791504660702,
+      "updatedAt": 1791504660702
+    },
+    {
+      "id": "303ad02e-e99e-4c83-8ccb-280c4d367478",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Add conection",
+      "description": "standard sol github in der auswahl sien nicht forgejo",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1791504782119,
+      "updatedAt": 1791504782119
     }
   ]
 }

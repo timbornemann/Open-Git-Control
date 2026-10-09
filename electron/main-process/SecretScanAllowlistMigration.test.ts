@@ -50,6 +50,35 @@ describe('legacy allowlist assignment', () => {
     expect(service.read(repoA).text).toContain('path:sample.env\npath:deleted/sample.env');
     expect(service.read(repoB).text).toBe('path:deleted/sample.env\n');
   });
+  it.each([true, false])('assigns absolute rules through a repository-root alias (saved alias: %s)', async (savedAlias) => {
+    const alias = path.join(root, 'repo-alias');
+    fs.symlinkSync(repoA, alias, 'junction');
+    const canonical = fs.realpathSync(repoA);
+    fs.writeFileSync(path.join(repoA, 'sample.env'), 'dummy');
+    indexPaths.mockImplementation(async (repo) => (repo === canonical ? ['deleted/sample.env'] : []));
+    migration.capture(`path:${path.join(alias, 'sample.env')}\npath:${path.join(alias, 'deleted/sample.env')}`, [savedAlias ? alias : canonical, repoB]);
+
+    await migration.prepare(savedAlias ? canonical : alias);
+    await migration.prepare(repoB);
+
+    expect(service.read(repoA).text).toBe('path:sample.env\npath:deleted/sample.env\n');
+    expect(service.read(repoB).exists).toBe(false);
+    expect(migration.consumeReport(canonical)).toMatchObject({ importedRules: 2, discardedRules: 0 });
+  });
+  it('still rejects inner symlinks and outside paths when the repository root has an alias', async () => {
+    const alias = path.join(root, 'repo-alias');
+    fs.symlinkSync(repoA, alias, 'junction');
+    fs.mkdirSync(path.join(repoB, 'fixtures'));
+    fs.writeFileSync(path.join(repoB, 'fixtures', 'sample.env'), 'dummy');
+    fs.symlinkSync(path.join(repoB, 'fixtures'), path.join(repoA, 'fixtures'), 'junction');
+    indexPaths.mockResolvedValue(['fixtures/sample.env']);
+    migration.capture(`path:${path.join(alias, 'fixtures/sample.env')}\npath:${path.join(repoB, 'fixtures/sample.env')}`, [alias]);
+
+    await migration.prepare(fs.realpathSync(repoA));
+
+    expect(service.read(repoA).exists).toBe(false);
+    expect(migration.consumeReport(repoA)).toMatchObject({ importedRules: 0, discardedRules: 2 });
+  });
   it('preserves existing policy, including invalid policy the user must repair', async () => {
     fs.writeFileSync(path.join(repoA, 'sample.env'), 'dummy');
     fs.mkdirSync(path.dirname(path.join(repoA, SECRET_SCAN_ALLOWLIST_PATH)));

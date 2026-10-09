@@ -4,6 +4,7 @@ import { StringDecoder } from 'string_decoder';
 import type { DiffPreviewResult, GitBufferRunOptions, GitCloneProgressResult, GitTransferOptions } from './GitProcessTypes';
 import { createAbortError } from './GitProcessTypes';
 import { redactGitSensitiveText } from './GitErrorFormatter';
+import { gitProcessTree } from './GitProcessTree';
 
 const MAX_STREAM_LINE_BYTES = 1024 * 1024;
 const MAX_STREAM_OUTPUT_BYTES = 8 * 1024 * 1024;
@@ -251,6 +252,7 @@ export class GitSpawnOperations {
         cwd: repoPath,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
+        detached: process.platform !== 'win32',
         env: toolEnvironment(envOverrides),
       });
       const stdoutPending = { value: '' };
@@ -259,16 +261,17 @@ export class GitSpawnOperations {
       let stderr = '';
       let outputBytes = 0;
       let settled = false;
-      const abort = () => proc.kill();
+      const { stop: abort, waitForStop } = gitProcessTree(proc);
       signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) abort();
 
       const cleanup = () => signal.removeEventListener('abort', abort);
       const fail = (error: Error) => {
         if (settled) return;
         settled = true;
         cleanup();
-        proc.kill();
-        reject(error);
+        abort();
+        void waitForStop().then(() => reject(error));
       };
       const consume = (chunk: Buffer, pending: { value: string }, capture: (text: string) => void) => {
         if (settled) return;
@@ -293,10 +296,11 @@ export class GitSpawnOperations {
         });
       });
       proc.on('error', (error) => fail(error));
-      proc.on('close', (code, closeSignal) => {
+      proc.on('close', async (code, closeSignal) => {
         if (settled) return;
         settled = true;
         cleanup();
+        await waitForStop();
         if (signal.aborted || closeSignal) {
           reject(createAbortError('Git stream was aborted.'));
           return;
@@ -340,16 +344,19 @@ export class GitSpawnOperations {
       const proc = spawn(toolExecutable('git'), ['clone', '--progress', '--', cloneUrl, repoPath], {
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
+        detached: process.platform !== 'win32',
         env: toolEnvironment(options.envOverrides),
       });
-      const abort = () => proc.kill();
+      const { stop: abort, waitForStop } = gitProcessTree(proc);
       options.signal?.addEventListener('abort', abort, { once: true });
       if (options.signal?.aborted) abort();
       const failForOversizedProgress = () => {
         if (settled) return;
         settled = true;
-        proc.kill();
-        resolve({ success: false, error: `Git clone progress line exceeded the ${MAX_STREAM_LINE_BYTES / 1024 / 1024} MB limit.` });
+        abort();
+        void waitForStop().then(() =>
+          resolve({ success: false, error: `Git clone progress line exceeded the ${MAX_STREAM_LINE_BYTES / 1024 / 1024} MB limit.` }),
+        );
       };
       const stdoutProgress = createProgressCollector(emitProgress, MAX_STREAM_LINE_BYTES, failForOversizedProgress);
       const stderrProgress = createProgressCollector(emitProgress, MAX_STREAM_LINE_BYTES, failForOversizedProgress);
@@ -357,12 +364,13 @@ export class GitSpawnOperations {
       proc.stderr.on('data', (data: Buffer) => stderrProgress.write(data));
       proc.stdout.on('data', (data: Buffer) => stdoutProgress.write(data));
 
-      proc.on('close', (code) => {
+      proc.on('close', async (code) => {
         options.signal?.removeEventListener('abort', abort);
         if (settled) return;
         settled = true;
         stderrProgress.end();
         stdoutProgress.end();
+        await waitForStop();
         if (options.signal?.aborted) {
           resolve({ success: false, error: 'Git clone was aborted.' });
           return;

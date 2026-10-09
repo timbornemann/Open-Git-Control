@@ -1,6 +1,7 @@
 import { toolExecutable, toolEnvironment } from '../system-tools/toolRuntime';
 import { spawn } from 'node:child_process';
 import { redactGitSensitiveText } from './GitErrorFormatter';
+import { gitProcessTree } from './GitProcessTree';
 
 /** Wait for the owned process tree to exit before cleaning an isolated worktree. */
 export function runCommitEditProcess(cwd: string, args: string[], signal?: AbortSignal, envOverrides?: NodeJS.ProcessEnv): Promise<string> {
@@ -17,36 +18,7 @@ export function runCommitEditProcess(cwd: string, args: string[], signal?: Abort
     const stderr: Buffer[] = [];
     let size = 0;
     let failure: Error | undefined;
-    let stopping: Promise<void> | undefined;
-    const stop = () => {
-      if (stopping || !child.pid) return;
-      const pid = child.pid;
-      stopping = new Promise<void>((done) => {
-        if (process.platform === 'win32') {
-          const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
-          killer.once('error', () => {
-            child.kill();
-            done();
-          });
-          killer.once('close', (code) => {
-            // Git for Windows/MSYS can leave inherited pipe handles open after
-            // the confirmed tree termination. They must not block cancellation.
-            if (code === 0) {
-              child.stdout.destroy();
-              child.stderr.destroy();
-            }
-            done();
-          });
-        } else {
-          try {
-            process.kill(-pid, 'SIGKILL');
-          } catch {
-            child.kill('SIGKILL');
-          }
-          done();
-        }
-      });
-    };
+    const { stop, waitForStop } = gitProcessTree(child);
     const collect = (target: Buffer[]) => (data: Buffer) => {
       size += data.length;
       if (size > 20 * 1024 * 1024) {
@@ -63,7 +35,7 @@ export function runCommitEditProcess(cwd: string, args: string[], signal?: Abort
     if (signal?.aborted) stop();
     child.once('close', (code) => {
       signal?.removeEventListener('abort', stop);
-      void (stopping ?? Promise.resolve()).then(() => {
+      void waitForStop().then(() => {
         if (signal?.aborted) {
           const error = new Error('Git operation was aborted.');
           error.name = 'AbortError';

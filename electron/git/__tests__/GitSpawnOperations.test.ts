@@ -5,16 +5,19 @@ import { GitSpawnOperations } from '../GitSpawnOperations';
 const { execFileMock, spawnMock } = vi.hoisted(() => ({ execFileMock: vi.fn(), spawnMock: vi.fn() }));
 
 vi.mock('child_process', () => ({ execFile: execFileMock, spawn: spawnMock }));
+vi.mock('node:child_process', () => ({ execFile: execFileMock, spawn: spawnMock }));
+const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')!;
 
 class FakeGitProcess extends EventEmitter {
-  stdout = new EventEmitter();
-  stderr = new EventEmitter();
+  stdout = Object.assign(new EventEmitter(), { destroy: vi.fn() });
+  stderr = Object.assign(new EventEmitter(), { destroy: vi.fn() });
   kill = vi.fn(() => true);
 }
 
 describe('GitSpawnOperations stream limits', () => {
   afterEach(() => {
     spawnMock.mockReset();
+    Object.defineProperty(process, 'platform', originalPlatform);
   });
 
   it.each([
@@ -143,5 +146,41 @@ describe('GitSpawnOperations stream limits', () => {
       new GitSpawnOperations().cloneWithProgress('https://example.test/repo.git', '/target', vi.fn(), { signal: controller.signal }),
     ).resolves.toEqual({ success: false, error: 'Git clone was aborted.' });
     expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['clone', 'pull'] as const)('waits for Windows child processes to stop before completing an aborted %s', async (kind) => {
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' });
+    const git = Object.assign(new FakeGitProcess(), { pid: 4321 });
+    const killer = new FakeGitProcess();
+    spawnMock.mockReturnValueOnce(git).mockReturnValueOnce(killer);
+    const controller = new AbortController();
+    const operations = new GitSpawnOperations();
+    const operation =
+      kind === 'clone'
+        ? operations.cloneWithProgress('https://example.test/repo.git', '/target', vi.fn(), { signal: controller.signal })
+        : operations.streamOutput('/repo', ['pull', 'origin'], vi.fn(), controller.signal);
+    const finished = vi.fn();
+    const outcome = operation.then(
+      (value) => {
+        finished();
+        return value;
+      },
+      (error) => {
+        finished();
+        return error;
+      },
+    );
+    controller.abort();
+    expect(spawnMock.mock.calls[1].slice(0, 2)).toEqual(['taskkill', ['/PID', '4321', '/T', '/F']]);
+    git.emit('close', null);
+    await Promise.resolve();
+    expect(finished).not.toHaveBeenCalled();
+
+    killer.emit('close', 0);
+
+    if (kind === 'clone') expect(await outcome).toEqual({ success: false, error: 'Git clone was aborted.' });
+    else expect(await outcome).toMatchObject({ name: 'AbortError' });
+    expect(git.stdout.destroy).toHaveBeenCalledOnce();
+    expect(git.stderr.destroy).toHaveBeenCalledOnce();
   });
 });

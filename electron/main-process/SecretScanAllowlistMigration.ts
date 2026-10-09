@@ -87,7 +87,7 @@ export class SecretScanAllowlistMigration {
     if (!current.exists) {
       const indexPaths = await this.readIndexPaths(current.repoPath);
       for (const rule of journal.rules) {
-        const relativePath = this.match(rule, current.repoPath, indexPaths);
+        const relativePath = this.match(rule, current.repoPath, indexPaths, [repoPath, entry.path]);
         if (relativePath && !matching.includes(relativePath)) matching.push(relativePath);
       }
       // A crash after publication is safe: the next run preserves the file.
@@ -109,11 +109,23 @@ export class SecretScanAllowlistMigration {
     this.write(latest);
   }
 
-  private match(rule: string, repoPath: string, indexPaths: string[]): string | null {
+  private match(rule: string, repoPath: string, indexPaths: string[], aliases: string[]): string | null {
     const normalized = rule.replace(/\\/g, '/');
-    const relativePath = path.isAbsolute(normalized) ? path.relative(repoPath, normalized).replace(/\\/g, '/') : normalized;
+    // The policy service returns a physical root, but legacy absolute rules may
+    // use a saved alias such as macOS /var instead of /private/var. Resolve only
+    // the repository root: resolving the entire rule would follow inner
+    // symlinks, or fail for deleted files that still belong to the index.
+    const candidates = path.isAbsolute(normalized)
+      ? [...new Set([repoPath, ...aliases])]
+          .filter((alias) => this.key(alias) === this.key(repoPath))
+          .map((alias) => path.relative(alias, normalized).replace(/\\/g, '/'))
+      : [normalized];
+    const relativePath = candidates.find(
+      (candidate) =>
+        candidate && !candidate.startsWith('/') && !/^[a-z]:/i.test(candidate) && !candidate.split('/').some((part) => part === '..' || part === '.'),
+    );
+    if (!relativePath) return null;
     const parts = relativePath.split('/');
-    if (!relativePath || relativePath.startsWith('/') || /^[a-z]:/i.test(relativePath) || parts.some((part) => part === '..' || part === '.')) return null;
     const destination = path.join(repoPath, relativePath);
     try {
       // Reject symlinks at every component rather than assigning rules to a
