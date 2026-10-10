@@ -71,6 +71,47 @@ afterEach(() => {
 });
 
 describe('RepositoryRunService', () => {
+  it('captures split Unicode and terminal controls as safe readable output and configures PowerShell UTF-8', async () => {
+    setPlatform('win32');
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));
+    directories.push(repoPath);
+    prepareConfig(repoPath, [0]);
+    const child = createHangingChild();
+    spawnMock.mockReturnValue(child);
+    const service = new RepositoryRunService(new RepositoryRunConfigService());
+    await service.start(repoPath, 'test');
+    const bytes = Buffer.from('\u001b[33m[WARN]\u001b[0m Grüße 🚀 日本語 A^3\r\n\u001b]0;private title\u0007Info ready\n');
+    for (const byte of bytes) child.stderr.emit('data', Buffer.from([byte]));
+    child.emit('close', 0);
+    const state = await waitForCompletion(service);
+    expect(state.output.filter((line) => line.stream === 'stderr').map((line) => line.text)).toEqual(['[WARN] Grüße 🚀 日本語 A^3', 'Info ready']);
+    expect(spawnMock.mock.calls[0][1].at(-1)).toContain('[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)');
+    expect(spawnMock.mock.calls[0][1].at(-1)).toContain('$OutputEncoding = [Console]::OutputEncoding; echo 0');
+    expect(state).not.toHaveProperty('streamSanitizers');
+  });
+  it('retains control parsing across long-line bounds, keeps streams separate and resets it between steps', async () => {
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));
+    directories.push(repoPath);
+    prepareConfig(repoPath, [0, 0]);
+    spawnMock.mockImplementation(() => {
+      const child = createHangingChild();
+      const first = spawnMock.mock.calls.length === 1;
+      queueMicrotask(() => {
+        child.stdout.emit('data', Buffer.from(first ? `${'x'.repeat(64 * 1024 - 2)}\u001b[31müber\u001b[0m\n\u001b]0;unterminated` : 'normal next step\n'));
+        if (first) child.stderr.emit('data', Buffer.from('stderr remains visible\n'));
+        child.emit('close', 0);
+      });
+      return child;
+    });
+    const service = new RepositoryRunService(new RepositoryRunConfigService());
+    await service.start(repoPath, 'test');
+    const state = await waitForCompletion(service);
+    const stdout = state.output.filter((line) => line.stream === 'stdout');
+    expect(stdout.map((line) => line.text).join('')).toBe(`${'x'.repeat(64 * 1024 - 2)}übernormal next step`);
+    expect(state.output.some((line) => line.text === 'stderr remains visible')).toBe(true);
+    expect(stdout.at(-1)?.stepIndex).toBe(1);
+    expect(state.output.every((line) => !line.text.includes('\u001b') && !line.text.includes('�'))).toBe(true);
+  });
   it('runs workflow steps in order and captures streamed output', async () => {
     const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));
     directories.push(repoPath);

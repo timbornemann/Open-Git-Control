@@ -106,13 +106,13 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.repository-run-console__line--stderr {
+.repository-run-console__line--error {
   color: var(--status-danger);
 }
 .repository-run-console__line--system {
   color: var(--status-info);
 }
-.repository-run-console__line--stdout {
+.repository-run-console__line--message {
   color: var(--text-primary);
 }
 .repository-run-console__problems,
@@ -126,7 +126,7 @@
   gap: 9px;
   padding: 9px;
   margin-bottom: 7px;
-  border: 1px solid var(--line-subtle);
+  border-left: 3px solid var(--line-subtle);
   background: var(--bg-panel);
   font-size: 0.8rem;
 }
@@ -135,4 +135,262 @@
 }
 .repository-run-console__problem.warning {
   border-color: var(--status-warning);
+}
+
+.repository-run-console__tab-panel {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.repository-run-console__failure {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line-subtle);
+  border-left: 3px solid var(--status-danger);
+  background: var(--bg-panel);
+  font-size: 0.8rem;
+}
+.repository-run-console__failure > svg {
+  color: var(--status-danger);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.repository-run-console__failure > div {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.repository-run-console__hint {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  margin: 4px 0 0;
+}
+.repository-run-console__counts {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+  padding-bottom: 7px;
+  font-size: 0.72rem;
+}
+.repository-run-console__counts .is-error {
+  color: var(--status-danger);
+}
+.repository-run-console__counts .is-warning,
+.repository-run-console__line--warning {
+  color: var(--status-warning);
+}
+.repository-run-console__line--success {
+  color: var(--status-success);
+}
+.repository-run-console__line--command {
+  color: var(--text-accent);
+}
+.repository-run-console__line--info,
+.repository-run-console__line--watch,
+.repository-run-console__line--progress,
+.repository-run-console__line--detail,
+.repository-run-console__line--cascade {
+  color: var(--text-secondary);
+}
+.repository-run-console__output-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line-subtle);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+.repository-run-console__view-switch {
+  display: flex;
+  background: var(--bg-panel);
+}
+.repository-run-console__view-switch button {
+  color: var(--text-secondary);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 5px 8px;
+  font: inherit;
+}
+.repository-run-console__view-switch button[aria-pressed='true'] {
+  color: var(--text-accent);
+  border-bottom-color: var(--text-accent);
+}
+.repository-run-console__filter,
+.repository-run-console__wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.repository-run-console__filter .ui-field {
+  width: auto;
+  font-size: inherit;
+  padding: 4px 7px;
+}
+.repository-run-console__follow {
+  margin-left: auto;
+}
+.repository-run-console__follow[aria-pressed='true'] {
+  color: var(--text-accent);
+}
+.repository-run-console__output {
+  white-space: normal;
+  overflow-wrap: normal;
+  tab-size: 4;
+}
+.repository-run-console__transcript {
+  margin: 0;
+  font: inherit;
+  white-space: pre;
+}
+.repository-run-console__transcript .is-target {
+  background: var(--bg-panel);
+  border-left: 2px solid var(--text-accent);
+  padding-left: 5px;
+}
+.repository-run-console__entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 100%;
+  width: max-content;
+  padding: 4px 0;
+}
+.repository-run-console__entry-icon {
+  width: 14px;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.repository-run-console__entry-content {
+  flex: 1;
+  min-width: 0;
+}
+.repository-run-console__entry-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.repository-run-console__entry-line code {
+  white-space: pre;
+  font: inherit;
+}
+.repository-run-console__tool,
+.repository-run-console__repeat {
+  font: 0.65rem var(--font-mono);
+  flex-shrink: 0;
+  color: var(--text-muted);
+  border: 1px solid var(--line-subtle);
+  padding: 0 4px;
+}
+.repository-run-console__repeat {
+  border: 0;
+  color: inherit;
+}
+.repository-run-console__entry.repository-run-console__line--system {
+  padding: 7px 0;
+  margin: 7px 0;
+  border-bottom: 1px solid var(--line-subtle);
+}
+.repository-run-console__entry details,
+.repository-run-console__problem details {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+.repository-run-console__entry summary,
+.repository-run-console__problem summary {
+  cursor: pointer;
+}
+.repository-run-console__entry details pre,
+.repository-run-console__problem details pre {
+  margin: 7px 0;
+  padding: 8px 10px;
+  border-left: 2px solid var(--line-subtle);
+  color: var(--text-secondary);
+  font: 0.73rem/1.5 var(--font-mono);
+  white-space: pre;
+}
+.repository-run-console__output.is-wrapped .repository-run-console__entry {
+  width: auto;
+}
+.repository-run-console__output.is-wrapped code,
+.repository-run-console__output.is-wrapped pre,
+.repository-run-console__problem pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.repository-run-console__problem > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.repository-run-console__problem > div {
+  min-width: 0;
+  flex: 1;
+}
+.repository-run-console__problem-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 5px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+.repository-run-console__problem-message {
+  font: 0.78rem/1.5 var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.repository-run-console__problem button {
+  margin-top: 9px;
+}
+.repository-run-console__problem.warning > svg {
+  color: var(--status-warning);
+}
+.repository-run-console__problem.error > svg {
+  color: var(--status-danger);
+}
+.repository-run-console__summary dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 0 0 18px;
+}
+.repository-run-console__summary dt {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+.repository-run-console__summary dd {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+}
+.repository-run-console__summary .repository-run-console__problems {
+  padding: 0;
+  overflow: visible;
+}
+.repository-run-console__empty {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  padding: 10px 16px;
+}
+@media (max-width: 850px) {
+  .repository-run-console__header {
+    flex-wrap: wrap;
+  }
+  .repository-run-console__meta {
+    max-width: calc(100vw - 80px);
+  }
+  .repository-run-console__failure {
+    flex-wrap: wrap;
+  }
+  .repository-run-console__failure > div {
+    flex-basis: calc(100% - 40px);
+  }
+  .repository-run-console__entry-line {
+    flex-wrap: wrap;
+    gap: 3px 8px;
+  }
 }

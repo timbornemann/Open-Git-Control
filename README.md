@@ -804,6 +804,8 @@ The **Run** menu in the top bar can run repository-specific **Run**, **Test**, *
 
 Use **Settings -> Run** to edit the five fixed actions, select recognised templates, and configure ordered workflows. Templates cover npm, pnpm, Yarn, Bun, Python, Rust, Go, .NET, Maven, Gradle, Flutter, and CMake projects. Each step can use PowerShell or CMD on Windows, zsh on macOS, and bash on Linux.
 
+The **Run console** defaults to a structured transcript: terminal colour/cursor controls and OSC sequences are removed, repeated warnings and watcher/progress messages are grouped, and stack traces and package-manager follow-up failures expand as details. Message severity comes from the content, so ordinary stderr information is not shown as an error. **Plain text** and **Copy output** retain the complete captured, cleaned transcript (within the existing 4,000-line/2 MiB capture limits). Filters, line wrapping and automatic following remain available; scrolling up pauses following. Known npm/pnpm, Node.js, Vite and Cargo problems are detected even without a custom parser. Port conflicts, unsupported Node.js versions, missing commands and missing dependencies include suggested next steps. PowerShell runs explicitly use UTF-8 output; no project command is changed or restarted automatically.
+
 Only one workflow runs at a time. It can continue in the background, be reopened from the Run menu, and be stopped from the app. The console keeps a bounded raw-output buffer, a parsed Problems tab, a Summary tab, and copy actions for both output and problems. An unread successful result turns the Run button green; an unread failed result turns it red until opened.
 
 ## Development

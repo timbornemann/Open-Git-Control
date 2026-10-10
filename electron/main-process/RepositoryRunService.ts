@@ -14,6 +14,7 @@ import type {
 } from '../../src/types/repositoryRun';
 import type { RepositoryRunConfigService } from './RepositoryRunConfigService';
 import { IpcChannel } from '../../src/types/ipcContract';
+import { normalizeTerminalText, TerminalTextSanitizer } from '../../src/shared/terminalText';
 
 const MAX_OUTPUT_LINES = 4_000;
 const MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
@@ -31,6 +32,7 @@ type ActiveRun = RepositoryRunStateDto & {
   streamRemainders: Record<'stdout' | 'stderr', Buffer>;
   streamLineOpen: Record<'stdout' | 'stderr', boolean>;
   streamLastWasCarriageReturn: Record<'stdout' | 'stderr', boolean>;
+  streamSanitizers: Record<'stdout' | 'stderr', TerminalTextSanitizer>;
   stopTimer: NodeJS.Timeout | null;
   forceStopTimer: NodeJS.Timeout | null;
   hardKillRequested: boolean;
@@ -41,7 +43,13 @@ const getShellInvocation = (shell: RepositoryRunShell, command: string): { execu
   if (shell === 'powershell')
     return {
       executable: process.env.SystemRoot ? path.join(process.env.SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe') : 'powershell.exe',
-      args: ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', command],
+      args: [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $OutputEncoding = [Console]::OutputEncoding; ${command}`,
+      ],
     };
   if (shell === 'cmd') return { executable: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', command] };
   if (shell === 'zsh') return { executable: '/bin/zsh', args: ['-lc', command] };
@@ -91,6 +99,7 @@ export class RepositoryRunService {
       streamRemainders: { stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) },
       streamLineOpen: { stdout: false, stderr: false },
       streamLastWasCarriageReturn: { stdout: false, stderr: false },
+      streamSanitizers: { stdout: new TerminalTextSanitizer(), stderr: new TerminalTextSanitizer() },
       stopTimer: null,
       forceStopTimer: null,
       hardKillRequested: false,
@@ -346,6 +355,7 @@ export class RepositoryRunService {
     }
     run.streamRemainders[stream] = Buffer.alloc(0);
     run.streamLineOpen[stream] = false;
+    run.streamSanitizers[stream].write('\n');
   }
 
   private flushRemainders(run: ActiveRun, stepIndex = run.activeStepIndex): void {
@@ -355,10 +365,14 @@ export class RepositoryRunService {
       run.streamRemainders[stream] = Buffer.alloc(0);
       run.streamLineOpen[stream] = false;
       run.streamLastWasCarriageReturn[stream] = false;
+      run.streamSanitizers[stream] = new TerminalTextSanitizer();
     }
   }
 
   private appendLine(run: ActiveRun, stream: RepositoryRunOutputLineDto['stream'], text: string, stepIndex: number): void {
+    const original = text;
+    text = normalizeTerminalText(stream === 'system' ? text : run.streamSanitizers[stream].write(text));
+    if (original && !text) return;
     const line: RepositoryRunOutputLineDto = { sequence: ++run.sequence, stream, text, timestamp: Date.now(), stepIndex };
     const lineBytes = Buffer.byteLength(text, 'utf8');
     while (run.output.length >= MAX_OUTPUT_LINES || run.outputBytes + lineBytes > MAX_OUTPUT_BYTES) {
@@ -381,6 +395,7 @@ export class RepositoryRunService {
       streamRemainders: _streamRemainders,
       streamLineOpen: _streamLineOpen,
       streamLastWasCarriageReturn: _streamLastWasCarriageReturn,
+      streamSanitizers: _streamSanitizers,
       stopTimer: _stopTimer,
       forceStopTimer: _forceStopTimer,
       hardKillRequested: _hardKillRequested,
