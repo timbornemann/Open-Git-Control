@@ -15,6 +15,7 @@ import type { PlanningApiServerHandle } from './main-process/planningApiServer';
 import { startPlanningApiServer } from './main-process/planningApiServer';
 import { enforceProductionCommandLineSecurity, installAppSecurity, isDevelopmentRuntime } from './main-process/security';
 import { acquireSingleInstanceLock } from './main-process/singleInstance';
+import { installIpcSenderValidation } from './main-process/ipcSecurity';
 import { systemToolsService } from './system-tools/SystemToolsService';
 import { registerSystemToolsHandlers } from './system-tools/registerSystemToolsHandlers';
 import { IpcChannel } from '../src/types/ipcContract';
@@ -37,6 +38,7 @@ const openMainWindowIfReady = () => {
 const isPrimaryInstance = acquireSingleInstanceLock(app, BrowserWindow, openMainWindowIfReady);
 
 if (isPrimaryInstance) {
+  installIpcSenderValidation({ isDev, mainProcessDir: __dirname });
   const updaterManager = new UpdaterManager(isDev);
   let planningApiServer: PlanningApiServerHandle | null = null;
   let planningApiError: string | null = null;
