@@ -1,12 +1,14 @@
 import { GitRunner } from '../GitRunner';
 import { runCommitEditProcess } from '../CommitEditProcess';
-import type { GitJobKind } from '../../GitScheduler';
+import { GitScheduler, type GitJobKind } from '../../GitScheduler';
 import type { GitCloneProgressResult, GitTransferOptions } from '../GitProcessTypes';
 
 /** Own all fixture work, including the test continuation after a Vitest timeout. */
 export class GitIntegrationLifecycle {
   private readonly controller = new AbortController();
   private readonly pending = new Set<Promise<unknown>>();
+  /** GitService accepts a scheduler rather than an injectable GitRunner. */
+  readonly scheduler = new OwnedGitScheduler(this);
   readonly runner = new OwnedGitRunner(this);
 
   get signal(): AbortSignal {
@@ -32,7 +34,7 @@ export class GitIntegrationLifecycle {
   }
 }
 
-class OwnedGitRunner extends GitRunner {
+class OwnedGitScheduler extends GitScheduler {
   constructor(private readonly lifecycle: GitIntegrationLifecycle) {
     super();
   }
@@ -46,6 +48,12 @@ class OwnedGitRunner extends GitRunner {
   ): Promise<T> {
     const signal = options.signal ? AbortSignal.any([this.lifecycle.signal, options.signal]) : this.lifecycle.signal;
     return this.lifecycle.track(super.schedule(repoPath, kind, command, run, { ...options, signal }));
+  }
+}
+
+class OwnedGitRunner extends GitRunner {
+  constructor(private readonly lifecycle: GitIntegrationLifecycle) {
+    super(undefined, lifecycle.scheduler);
   }
 
   override cloneWithProgress(

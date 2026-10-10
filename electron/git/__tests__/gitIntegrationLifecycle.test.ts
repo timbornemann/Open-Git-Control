@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GitIntegrationLifecycle } from './gitIntegrationLifecycle';
+import { GitService } from '../../GitService';
 
 // Exercise real process ownership without running a network transfer or
 // relying on the installed Git's hook shell. Node acts as Git and its filter.
@@ -23,6 +24,39 @@ afterEach(async () => {
 });
 
 describe('Git integration fixture teardown', () => {
+  it('cancels GitService work and queued writes and waits for their callers before cleanup', async () => {
+    let ready!: () => void;
+    const started = new Promise<void>((resolve) => {
+      ready = resolve;
+    });
+    const execute = vi.fn(async (_file, _args, { signal }) => {
+      return new Promise<{ stdout: string; stderr: string }>((_resolve, reject) => {
+        signal!.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })), { once: true });
+        ready();
+      });
+    });
+    const service = new GitService(execute, lifecycle.scheduler);
+    let unwound = false;
+    const read = lifecycle.track(
+      service.runCommandAtPath(root, ['status', '--porcelain']).finally(async () => {
+        await Promise.resolve();
+        unwound = true;
+      }),
+    );
+    const readOutcome = read.catch((error: Error) => error);
+    await started;
+    const queuedWrite = service.runCommandAtPath(root, ['commit', '-m', 'must not run']).catch((error: Error) => error);
+
+    await lifecycle.close();
+
+    expect(await readOutcome).toMatchObject({ name: 'AbortError' });
+    expect(await queuedWrite).toMatchObject({ name: 'AbortError' });
+    expect(unwound).toBe(true);
+    expect(execute).toHaveBeenCalledTimes(1);
+    await expect(service.runCommandAtPath(root, ['status'])).rejects.toMatchObject({ name: 'AbortError' });
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
   it('aborts a running process and its filter and drains the test continuation before cleanup', async () => {
     const filter = "process.stdout.write('filter ready\\n'); setInterval(() => {}, 1000);";
     const script = `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(filter)}], { cwd: process.cwd(), stdio: ['ignore', 'inherit', 'inherit'] }); setInterval(() => {}, 1000);`;

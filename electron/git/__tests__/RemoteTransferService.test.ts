@@ -1,66 +1,34 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { execFileSync } from 'child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { GitRunner } from '../GitRunner';
-import { RemoteTransferService, type RemoteTransferContext } from '../RemoteTransferService';
-import { RemotePreferencesStore } from '../RemotePreferencesStore';
+import { GitIntegrationLifecycle } from './gitIntegrationLifecycle';
+import { RemoteTransferService } from '../RemoteTransferService';
+import { fixture, git, olderGitService, cleanupTransferFixtures } from './remoteTransferFixture';
 
 vi.mock('electron', () => ({ app: { getPath: () => os.tmpdir() } }));
 
-const directories: string[] = [];
-afterEach(() => {
-  for (const directory of directories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
-});
-const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', windowsHide: true }).trim();
-
-function fixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-transfers-'));
-  directories.push(root);
-  const repo = path.join(root, 'working');
-  fs.mkdirSync(repo);
-  git(repo, 'init', '-b', 'main');
-  git(repo, 'config', 'user.name', 'Transfer Test');
-  git(repo, 'config', 'user.email', 'transfer@example.invalid');
-  git(repo, 'config', 'commit.gpgsign', 'false');
-  const commit = (content: string) => {
-    fs.writeFileSync(path.join(repo, 'file.txt'), content);
-    git(repo, 'add', 'file.txt');
-    git(repo, 'commit', '-m', content);
-    return git(repo, 'rev-parse', 'HEAD');
-  };
-  const initial = commit('initial');
-  const bare = (name: string) => {
-    const target = path.join(root, `${name}.git`);
-    fs.mkdirSync(target);
-    git(target, 'init', '--bare');
-    return target;
-  };
-  const store = new RemotePreferencesStore(() => path.join(root, 'preferences.json'));
-  const service = new RemoteTransferService(new GitRunner(), store);
-  const context: RemoteTransferContext = { ownerId: 1, generation: 0, ensureActive: vi.fn(), authorizePush: vi.fn(async () => {}) };
-  const ref = (target: string, name = 'refs/heads/main') => git(repo, `--git-dir=${target}`, 'rev-parse', '--verify', name);
-  return { root, repo, initial, commit, bare, store, service, context, ref };
-}
-
-function olderGitService(f: ReturnType<typeof fixture>) {
-  const runner = new GitRunner();
-  const runResult = runner.runResult.bind(runner);
-  const pushCommands: string[][] = [];
-  vi.spyOn(runner, 'runResult').mockImplementation((repo, args, options) => {
-    // Emulate a Git installation that does not reset multi-valued pushurl config.
-    if (args[0] === 'remote' && options?.envOverrides?.GIT_CONFIG_VALUE_3 === 'https://ogc.invalid/probe-second.git')
-      return Promise.resolve({ exitCode: 0, stdout: 'https://ogc.invalid/probe-first.git\nhttps://ogc.invalid/probe-second.git', stderr: '' });
-    if (args[0] === 'push') pushCommands.push(args);
-    return runResult(repo, args, options);
-  });
-  return { service: new RemoteTransferService(runner, f.store), pushCommands };
-}
+const lifecycles: GitIntegrationLifecycle[] = [];
+// Push planning/verification launches many Git processes on shared CI hosts.
+const integrationTest = (name: string, work: (lifecycle: GitIntegrationLifecycle) => Promise<void>) =>
+  it(
+    name,
+    () => {
+      const lifecycle = new GitIntegrationLifecycle();
+      lifecycles.push(lifecycle);
+      return lifecycle.track(Promise.resolve().then(() => work(lifecycle)));
+    },
+    60_000,
+  );
+afterEach(async () => {
+  await Promise.all(lifecycles.splice(0).map((lifecycle) => lifecycle.close()));
+  vi.restoreAllMocks();
+  await cleanupTransferFixtures();
+}, 60_000);
 
 describe('RemoteTransferService with real Git', () => {
-  it('publishes a different release branch only to its selected endpoint without checkout, backup push or upstream changes', async () => {
-    const f = fixture();
+  integrationTest('publishes a different release branch only to its selected endpoint without checkout, backup push or upstream changes', async (lifecycle) => {
+    const f = fixture(lifecycle);
     const selected = f.bare('release-source');
     const backup = f.bare('release-backup');
     git(f.repo, 'remote', 'add', 'origin', selected);
@@ -84,10 +52,10 @@ describe('RemoteTransferService with real Git', () => {
     expect(git(f.repo, 'rev-parse', 'HEAD')).toBe(f.initial);
     expect(git(f.repo, 'config', '--get', 'branch.main.merge')).toBe('refs/heads/main');
     expect(f.context.authorizePush).toHaveBeenCalledWith(plan.secretScanArgs);
-  }, 20_000);
+  });
 
-  it('rejects a changed explicitly selected source branch before a release push', async () => {
-    const f = fixture();
+  integrationTest('rejects a changed explicitly selected source branch before a release push', async (lifecycle) => {
+    const f = fixture(lifecycle);
     const target = f.bare('changed-release-source');
     git(f.repo, 'remote', 'add', 'origin', target);
     git(f.repo, 'branch', 'release');
@@ -98,8 +66,8 @@ describe('RemoteTransferService with real Git', () => {
     expect(f.context.authorizePush).not.toHaveBeenCalled();
   });
 
-  it('keeps mixed remote URL lists and branch.pushRemote precedence', async () => {
-    const f = fixture();
+  integrationTest('keeps mixed remote URL lists and branch.pushRemote precedence', async (lifecycle) => {
+    const f = fixture(lifecycle);
     git(f.repo, 'remote', 'add', 'forgejo', 'https://forge.example.invalid/team/private.git');
     git(f.repo, 'remote', 'add', 'github', 'git@github.com:team/backup.git');
     git(f.repo, 'config', '--add', 'remote.forgejo.pushurl', 'https://forge.example.invalid/team/private.git');
@@ -115,8 +83,8 @@ describe('RemoteTransferService with real Git', () => {
     expect(snapshot.remotes.find((remote) => remote.name === 'github')?.fetchUrls).toEqual(['git@github.com:team/backup.git']);
   });
 
-  it('publishes captured commit and selected tag to isolated URLs while preserving named hooks', async () => {
-    const f = fixture();
+  integrationTest('publishes captured commit and selected tag to isolated URLs while preserving named hooks', async (lifecycle) => {
+    const f = fixture(lifecycle);
     const a = f.bare('forgejo');
     const b = f.bare('github');
     git(f.repo, 'remote', 'add', 'origin', a);
@@ -145,10 +113,10 @@ describe('RemoteTransferService with real Git', () => {
     expect(git(f.repo, 'config', '--get-all', 'remote.origin.pushurl').split(/\r?\n/)).toEqual([a, b]);
     expect(f.context.authorizePush).toHaveBeenCalledWith(plan.secretScanArgs);
     expect(plan.secretScanArgs[0]).toContain(plan.id);
-  }, 20_000);
+  });
 
-  it('publishes an explicit hosting endpoint without touching another native push URL or Git configuration', async () => {
-    const f = fixture();
+  integrationTest('publishes an explicit hosting endpoint without touching another native push URL or Git configuration', async (lifecycle) => {
+    const f = fixture(lifecycle);
     const selected = f.bare('selected-release');
     const backup = f.bare('unselected-backup');
     git(f.repo, 'remote', 'add', 'origin', selected);
@@ -161,10 +129,10 @@ describe('RemoteTransferService with real Git', () => {
     expect(f.ref(selected)).toBe(f.initial);
     expect(git(f.repo, `--git-dir=${backup}`, 'for-each-ref', '--format=%(refname)', 'refs/heads')).toBe('');
     expect(git(f.repo, 'config', '--get-all', 'remote.origin.pushurl').split(/\r?\n/)).toEqual([selected, backup]);
-  }, 20_000);
+  });
 
-  it('rejects foreign, empty and unselected remote URL constraints before publishing', async () => {
-    const f = fixture();
+  integrationTest('rejects foreign, empty and unselected remote URL constraints before publishing', async (lifecycle) => {
+    const f = fixture(lifecycle);
     const selected = f.bare('registered');
     const other = f.bare('foreign');
     git(f.repo, 'remote', 'add', 'origin', selected);
@@ -175,8 +143,8 @@ describe('RemoteTransferService with real Git', () => {
     expect(f.context.authorizePush).not.toHaveBeenCalled();
   });
 
-  it('requires separate remotes for explicit endpoint subsets when native Git cannot isolate push URLs', async () => {
-    const f = fixture();
+  integrationTest('requires separate remotes for explicit endpoint subsets when native Git cannot isolate push URLs', async (lifecycle) => {
+    const f = fixture(lifecycle);
     const selected = f.bare('older-selected');
     const backup = f.bare('older-backup');
     git(f.repo, 'remote', 'add', 'origin', selected);
@@ -192,8 +160,8 @@ describe('RemoteTransferService with real Git', () => {
     expect(complete.targets.every((target) => target.grouped)).toBe(true);
   });
 
-  it('rejects a branch switch before execution even when the source commit has not moved', async () => {
-    const f = fixture();
+  integrationTest('rejects a branch switch before execution even when the source commit has not moved', async (lifecycle) => {
+    const f = fixture(lifecycle);
     const destination = f.bare('branch-guard');
     git(f.repo, 'remote', 'add', 'origin', destination);
     const plan = await f.service.planPush(f.repo, { repoPath: f.repo, remoteNames: ['origin'] }, f.context);
@@ -204,8 +172,8 @@ describe('RemoteTransferService with real Git', () => {
     expect(git(f.repo, `--git-dir=${destination}`, 'for-each-ref', '--format=%(refname)', 'refs/heads')).toBe('');
   });
 
-  it('preserves the completed endpoint and stops remaining targets after a branch switch during a batch', async () => {
-    const f = fixture();
+  integrationTest('preserves the completed endpoint and stops remaining targets after a branch switch during a batch', async (lifecycle) => {
+    const f = fixture(lifecycle);
     const first = f.bare('branch-first');
     const remaining = f.bare('branch-remaining');
     git(f.repo, 'remote', 'add', 'origin', first);
@@ -224,10 +192,10 @@ describe('RemoteTransferService with real Git', () => {
     expect(result.targets[1].message).toContain('current branch changed');
     expect(f.ref(first)).toBe(f.initial);
     expect(git(f.repo, `--git-dir=${remaining}`, 'for-each-ref', '--format=%(refname)', 'refs/heads')).toBe('');
-  }, 20_000);
+  });
 
-  it('reports partial success and retries only the failed endpoint with the original snapshot', async () => {
-    const f = fixture();
+  integrationTest('reports partial success and retries only the failed endpoint with the original snapshot', async (lifecycle) => {
+    const f = fixture(lifecycle);
     const a = f.bare('available');
     const b = path.join(f.root, 'offline.git');
     git(f.repo, 'remote', 'add', 'primary', a);
@@ -245,10 +213,10 @@ describe('RemoteTransferService with real Git', () => {
     expect(f.ref(a)).toBe(f.initial);
     expect(f.ref(b)).toBe(f.initial);
     expect(retry.targets[0]).toEqual(batch.targets[0]);
-  }, 20_000);
+  });
 
-  it('captures distinct force leases for each push URL and rejects a later endpoint change', async () => {
-    const f = fixture();
+  integrationTest('captures distinct force leases for each push URL and rejects a later endpoint change', async (lifecycle) => {
+    const f = fixture(lifecycle);
     const a = f.bare('a');
     const b = f.bare('b');
     const oldA = f.commit('old a');
@@ -270,10 +238,10 @@ describe('RemoteTransferService with real Git', () => {
     const retry = await f.service.retryPush(f.repo, result.id, undefined, f.context);
     expect(retry.targets[1].message).toContain('Create a new plan');
     expect(f.ref(b)).toBe(oldA);
-  }, 20_000);
+  });
 
-  it('binds plans to sender, repository generation, and exact remote configuration', async () => {
-    const f = fixture();
+  integrationTest('binds plans to sender, repository generation, and exact remote configuration', async (lifecycle) => {
+    const f = fixture(lifecycle);
     const a = f.bare('a');
     git(f.repo, 'remote', 'add', 'origin', a);
     const plan = await f.service.planPush(f.repo, { repoPath: f.repo, remoteNames: ['origin'] }, f.context);
@@ -284,8 +252,8 @@ describe('RemoteTransferService with real Git', () => {
     expect(f.context.authorizePush).not.toHaveBeenCalled();
   });
 
-  it('blocks credentials in remote URLs and preserves a corrupt preference file', async () => {
-    const f = fixture();
+  integrationTest('blocks credentials in remote URLs and preserves a corrupt preference file', async (lifecycle) => {
+    const f = fixture(lifecycle);
     await expect(f.service.editRemote(f.repo, { action: 'add', name: 'origin', url: 'https://secret@host.invalid/repo.git' }, f.context)).rejects.toThrow(
       'credential-free',
     );
@@ -294,8 +262,8 @@ describe('RemoteTransferService with real Git', () => {
     expect(fs.readFileSync(path.join(f.root, 'preferences.json'), 'utf8')).toBe('broken');
   });
 
-  it('uses per-remote destination branches and pulls the chosen source without changing the upstream', async () => {
-    const f = fixture();
+  integrationTest('uses per-remote destination branches and pulls the chosen source without changing the upstream', async (lifecycle) => {
+    const f = fixture(lifecycle);
     const a = f.bare('private');
     const b = f.bare('backup');
     git(f.repo, 'remote', 'add', 'forgejo', a);
@@ -318,10 +286,10 @@ describe('RemoteTransferService with real Git', () => {
     expect(git(f.repo, 'rev-parse', 'HEAD')).toBe(advanced);
     expect(git(f.repo, 'config', '--get', 'branch.main.remote')).toBe('forgejo');
     expect(git(f.repo, 'config', '--get', 'branch.main.merge')).toBe('refs/heads/private-main');
-  }, 20_000);
+  });
 
-  it('binds each endpoint to its selected account and rejects authentication changes after review', async () => {
-    const f = fixture();
+  integrationTest('binds each endpoint to its selected account and rejects authentication changes after review', async (lifecycle) => {
+    const f = fixture(lifecycle);
     const a = f.bare('account-a');
     const b = f.bare('account-b');
     git(f.repo, 'remote', 'add', 'forgejo', a);
@@ -340,7 +308,7 @@ describe('RemoteTransferService with real Git', () => {
         dispose,
       }),
     );
-    const service = new RemoteTransferService(new GitRunner(), f.store, credentials, (id) => generations[id]);
+    const service = new RemoteTransferService(lifecycle.runner, f.store, credentials, (id) => generations[id]);
     const invalid = await service.planPush(f.repo, { repoPath: f.repo, remoteNames: ['forgejo', 'github'] }, f.context);
     generations['github-account']++;
     await expect(service.executePush(f.repo, invalid.id, f.context)).rejects.toThrow('Hosting authentication changed');
@@ -376,10 +344,10 @@ describe('RemoteTransferService with real Git', () => {
     expect((await service.executePush(f.repo, nativePlan.id, f.context)).state).toBe('success');
     expect(credentials).toHaveBeenCalledWith(expect.objectContaining({ connectionId: null, urls: [b], expectedGeneration: undefined }));
     expect(f.store.read(f.repo).bindings![1].repository?.connectionId).toBe('github-account');
-  }, 30_000);
+  });
 
-  it('reports partial publication within one endpoint and retries only the missing selected ref', async () => {
-    const f = fixture();
+  integrationTest('reports partial publication within one endpoint and retries only the missing selected ref', async (lifecycle) => {
+    const f = fixture(lifecycle);
     const target = f.bare('tag-conflict');
     git(f.repo, 'remote', 'add', 'forgejo', target);
     git(f.repo, 'tag', 'selected');
@@ -404,10 +372,10 @@ describe('RemoteTransferService with real Git', () => {
     expect(retry.targets[0].refResults?.[0].destinationRef).toBe('refs/tags/selected');
     expect(f.ref(target)).toBe(captured);
     expect(f.ref(target, 'refs/tags/selected')).toBe(captured);
-  }, 20_000);
+  });
 
-  it('keeps normal grouped pushes available without URL isolation and preserves immutable sources', async () => {
-    const f = fixture();
+  integrationTest('keeps normal grouped pushes available without URL isolation and preserves immutable sources', async (lifecycle) => {
+    const f = fixture(lifecycle);
     const a = f.bare('group-a');
     const b = f.bare('group-b');
     git(f.repo, 'remote', 'add', 'both', a);
@@ -429,10 +397,10 @@ describe('RemoteTransferService with real Git', () => {
       expect(f.ref(target, 'refs/tags/selected')).toBe(capturedTag);
     }
     expect(git(f.repo, 'config', '--get-all', 'remote.both.pushurl').split(/\r?\n/)).toEqual([a, b]);
-  }, 20_000);
+  });
 
-  it('reconciles partial grouped pushes but refuses per-URL force and targeted retries', async () => {
-    const f = fixture();
+  integrationTest('reconciles partial grouped pushes but refuses per-URL force and targeted retries', async (lifecycle) => {
+    const f = fixture(lifecycle);
     const a = f.bare('group-available');
     const b = path.join(f.root, 'group-offline.git');
     git(f.repo, 'remote', 'add', 'both', a);
@@ -453,10 +421,10 @@ describe('RemoteTransferService with real Git', () => {
       ],
     });
     await expect(service.planPush(f.repo, { repoPath: f.repo, remoteNames: ['both'] }, f.context)).rejects.toThrow('different hosting accounts');
-  }, 20_000);
+  });
 
-  it('fetches branches and remote tag tracking separately without moving an existing local tag', async () => {
-    const f = fixture();
+  integrationTest('fetches branches and remote tag tracking separately without moving an existing local tag', async (lifecycle) => {
+    const f = fixture(lifecycle);
     const target = f.bare('tag-tracking');
     git(f.repo, 'remote', 'add', 'forgejo', target);
     git(f.repo, 'tag', 'release');
@@ -472,5 +440,5 @@ describe('RemoteTransferService with real Git', () => {
     expect(git(f.repo, 'rev-parse', 'refs/ogc/remote-tags/forgejo/remote-only')).toBe(advanced);
     expect(git(f.repo, 'tag', '--list')).toBe('release');
     expect(git(f.repo, 'rev-parse', 'refs/tags/release')).toBe(f.initial);
-  }, 20_000);
+  });
 });

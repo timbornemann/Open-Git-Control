@@ -7,14 +7,31 @@ import { GitService } from '../GitService';
 import { AiAutoCommitIndexTransaction } from '../ai/AiAutoCommitIndexTransaction';
 import { parseStatusPorcelain } from '../ai/gitStatusSnapshot';
 import { baseSettings, okJsonResponse } from './helpers/aiServiceTestUtils';
+import { GitIntegrationLifecycle } from '../git/__tests__/gitIntegrationLifecycle';
 
 const tempRoots: string[] = [];
+const lifecycles: GitIntegrationLifecycle[] = [];
+// A full workflow starts dozens of real Git processes before calling the AI.
+// Keep its deadline bounded, but allow for shared Windows CI process startup.
+const integrationTest = (name: string, work: (lifecycle: GitIntegrationLifecycle) => Promise<void>) =>
+  it(
+    name,
+    () => {
+      const lifecycle = new GitIntegrationLifecycle();
+      lifecycles.push(lifecycle);
+      return lifecycle.track(Promise.resolve().then(() => work(lifecycle)));
+    },
+    60_000,
+  );
 
-const createRepository = async (): Promise<{ git: GitService; repoPath: string; filePath: string }> => {
+const createRepository = async (lifecycle: GitIntegrationLifecycle): Promise<{ git: GitService; repoPath: string; filePath: string }> => {
   const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-ai-index-test-'));
   tempRoots.push(repoPath);
-  const git = new GitService();
+  const git = new GitService(undefined, lifecycle.scheduler);
   await git.runCommandAtPath(repoPath, ['init']);
+  await git.runCommandAtPath(repoPath, ['config', 'maintenance.auto', 'false']);
+  await git.runCommandAtPath(repoPath, ['config', 'gc.auto', '0']);
+  await git.runCommandAtPath(repoPath, ['config', 'commit.gpgsign', 'false']);
   await git.runCommandAtPath(repoPath, ['config', 'user.name', 'AI Transaction Test']);
   await git.runCommandAtPath(repoPath, ['config', 'user.email', 'ai-transaction@example.test']);
   const filePath = path.join(repoPath, 'example.txt');
@@ -55,19 +72,22 @@ const writeHook = (repoPath: string, name: string, script: string): void => {
   });
 };
 
-describe('AI auto-commit isolated index transaction', { timeout: 20000 }, () => {
-  afterEach(() => {
+describe('AI auto-commit isolated index transaction', () => {
+  afterEach(async () => {
+    await Promise.all(lifecycles.splice(0).map((lifecycle) => lifecycle.close()));
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     for (const root of tempRoots.splice(0)) {
-      // Windows can briefly hold a handle to a just-exited git subprocess's
-      // directory under parallel load; retry the removal instead of failing.
-      fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+      const resolved = path.resolve(root);
+      if (path.dirname(resolved) !== path.resolve(os.tmpdir()) || !/^ogc-ai-(?:unborn-)?index-test-/.test(path.basename(resolved))) {
+        throw new Error('Unsafe AI index test cleanup');
+      }
+      await fs.promises.rm(resolved, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
-  });
+  }, 60_000);
 
-  it('leaves the exact partially staged tree unchanged when cancellation happens during AI generation', async () => {
-    const { git, repoPath, filePath } = await createRepository();
+  integrationTest('leaves the exact partially staged tree unchanged when cancellation happens during AI generation', async (lifecycle) => {
+    const { git, repoPath, filePath } = await createRepository(lifecycle);
     await createPartiallyStagedChange(git, repoPath, filePath);
     const stagedBefore = await git.runCommandAtPath(repoPath, ['show', ':example.txt']);
     const stagedTreeBefore = await git.runCommandAtPath(repoPath, ['write-tree']);
@@ -82,6 +102,9 @@ describe('AI auto-commit isolated index transaction', { timeout: 20000 }, () => 
             error.name = 'AbortError';
             reject(error);
           });
+          // Cancel at the event this test is about, without a short polling
+          // deadline that also includes all snapshot/context Git work.
+          cancelRequested = true;
         }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -91,23 +114,22 @@ describe('AI auto-commit isolated index transaction', { timeout: 20000 }, () => 
       { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' },
       () => '',
       undefined,
-      () => cancelRequested,
+      () => cancelRequested || lifecycle.signal.aborted,
     );
 
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled(), { timeout: 5_000 });
-    cancelRequested = true;
     await expect(run).resolves.toMatchObject({ outcome: 'cancelled', commits: [] });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
     expect(await git.runCommandAtPath(repoPath, ['show', ':example.txt'])).toBe(stagedBefore);
     expect(await git.runCommandAtPath(repoPath, ['write-tree'])).toBe(stagedTreeBefore);
     expect(await git.runCommandAtPath(repoPath, ['rev-list', '--count', 'HEAD'])).toBe('1');
   });
 
-  it('reports an exclusively dirty submodule without retrying an empty parent commit', async () => {
-    const { git, repoPath } = await createRepository();
+  integrationTest('reports an exclusively dirty submodule without retrying an empty parent commit', async (lifecycle) => {
+    const { git, repoPath } = await createRepository(lifecycle);
     const submodulePath = path.join(repoPath, 'nested-module');
     fs.mkdirSync(submodulePath);
-    const nestedGit = new GitService();
+    const nestedGit = new GitService(undefined, lifecycle.scheduler);
     await nestedGit.runCommandAtPath(submodulePath, ['init']);
     await nestedGit.runCommandAtPath(submodulePath, ['config', 'user.name', 'Nested Test']);
     await nestedGit.runCommandAtPath(submodulePath, ['config', 'user.email', 'nested@example.test']);
@@ -142,10 +164,62 @@ describe('AI auto-commit isolated index transaction', { timeout: 20000 }, () => 
     } finally {
       transaction.dispose();
     }
-  }, 20_000);
+  });
 
-  it('commits immutable snapshot blobs and leaves later working-tree edits unstaged', async () => {
-    const { git, repoPath, filePath } = await createRepository();
+  integrationTest('drains a pending AI request before fixture cleanup while preserving the exact partial index', async (testLifecycle) => {
+    // Closing the operation's scope emulates teardown after a failed assertion
+    // or deadline. The test itself lives outside that scope so it can inspect it.
+    const operationLifecycle = new GitIntegrationLifecycle();
+    lifecycles.push(operationLifecycle);
+    const { git, repoPath, filePath } = await createRepository(operationLifecycle);
+    await createPartiallyStagedChange(git, repoPath, filePath);
+    const indexPath = await realIndexPath(git, repoPath);
+    const indexBefore = fs.readFileSync(indexPath);
+    let requestStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      requestStarted = resolve;
+    });
+    let requestSignal: AbortSignal | null | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async (_url: string, init: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            requestSignal = init.signal;
+            requestSignal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })), { once: true });
+            requestStarted();
+          }),
+      ),
+    );
+    const run = operationLifecycle.track(
+      new AiService(git).runAutoCommit(
+        repoPath,
+        { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' },
+        () => '',
+        undefined,
+        () => operationLifecycle.signal.aborted,
+      ),
+    );
+    await Promise.race([
+      started,
+      run.then(() => {
+        throw new Error('AI workflow finished before requesting its message');
+      }),
+    ]);
+
+    await operationLifecycle.close();
+
+    await expect(run).resolves.toMatchObject({ outcome: 'cancelled', commits: [] });
+    expect(requestSignal?.aborted).toBe(true);
+    expect(fs.readFileSync(indexPath)).toEqual(indexBefore);
+    expect(fs.existsSync(`${indexPath}.lock`)).toBe(false);
+    const inspect = new GitService(undefined, testLifecycle.scheduler);
+    expect(await inspect.runCommandAtPath(repoPath, ['rev-list', '--count', 'HEAD'])).toBe('1');
+    await expect(git.runCommandAtPath(repoPath, ['status'])).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  integrationTest('commits immutable snapshot blobs and leaves later working-tree edits unstaged', async (lifecycle) => {
+    const { git, repoPath, filePath } = await createRepository(lifecycle);
     await createPartiallyStagedChange(git, repoPath, filePath);
     const entries = parseStatusPorcelain(await git.getStatusPorcelainZAtPath(repoPath));
     const transaction = new AiAutoCommitIndexTransaction(git, repoPath);
@@ -180,43 +254,68 @@ describe('AI auto-commit isolated index transaction', { timeout: 20000 }, () => 
     expect(await git.runCommandAtPath(repoPath, ['diff', '--cached', '--name-only'])).toBe('');
   });
 
-  it('keeps the full AI workflow pinned to the snapshot while its message request is pending', async () => {
-    const { git, repoPath, filePath } = await createRepository();
+  integrationTest('keeps the full AI workflow pinned to the snapshot while its message request is pending', async (lifecycle) => {
+    const { git, repoPath, filePath } = await createRepository(lifecycle);
     await createPartiallyStagedChange(git, repoPath, filePath);
     let resolveMessage: ((value: ReturnType<typeof okJsonResponse>) => void) | undefined;
+    let messageStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      messageStarted = resolve;
+    });
+    let cancelRequested = false;
     const fetchMock = vi.fn(
-      async () =>
-        new Promise<ReturnType<typeof okJsonResponse>>((resolve) => {
+      async (_url: string, init: RequestInit) =>
+        new Promise<ReturnType<typeof okJsonResponse>>((resolve, reject) => {
           resolveMessage = resolve;
+          init.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+          messageStarted();
         }),
     );
     vi.stubGlobal('fetch', fetchMock);
     const service = new AiService(git);
-    const run = service.runAutoCommit(repoPath, { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' }, () => '');
-
-    await vi.waitFor(() => expect(resolveMessage).toBeTypeOf('function'), { timeout: 5_000 });
-    fs.writeFileSync(filePath, 'edited-after-snapshot\nstill-uncommitted\n', 'utf8');
-    resolveMessage?.(
-      okJsonResponse({
-        message: {
-          content: JSON.stringify({
-            groups: [
-              { changeIds: ['s1'], title: 'test: staged snapshot', description: '', rationale: 'Original index' },
-              { changeIds: ['w1'], title: 'test: snapshot commit', description: '', rationale: 'Remaining worktree changes' },
-            ],
-          }),
-        },
-      }),
+    const run = lifecycle.track(
+      service.runAutoCommit(
+        repoPath,
+        { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' },
+        () => '',
+        undefined,
+        () => cancelRequested || lifecycle.signal.aborted,
+      ),
     );
-    await expect(run).resolves.toMatchObject({ commits: [{ subject: 'test: staged snapshot' }, { subject: 'test: snapshot commit' }] });
+
+    try {
+      await Promise.race([
+        started,
+        run.then(() => {
+          throw new Error('AI workflow finished before requesting its message');
+        }),
+      ]);
+      fs.writeFileSync(filePath, 'edited-after-snapshot\nstill-uncommitted\n', 'utf8');
+      resolveMessage?.(
+        okJsonResponse({
+          message: {
+            content: JSON.stringify({
+              groups: [
+                { changeIds: ['s1'], title: 'test: staged snapshot', description: '', rationale: 'Original index' },
+                { changeIds: ['w1'], title: 'test: snapshot commit', description: '', rationale: 'Remaining worktree changes' },
+              ],
+            }),
+          },
+        }),
+      );
+      await expect(run).resolves.toMatchObject({ commits: [{ subject: 'test: staged snapshot' }, { subject: 'test: snapshot commit' }] });
+    } finally {
+      cancelRequested = true;
+      await Promise.allSettled([run]);
+    }
 
     expect(await git.runCommandAtPath(repoPath, ['show', 'HEAD:example.txt'])).toBe('staged-one\nsnapshot-two');
     expect(await git.runCommandAtPath(repoPath, ['show', ':example.txt'])).toBe('staged-one\nsnapshot-two');
     expect(fs.readFileSync(filePath, 'utf8')).toBe('edited-after-snapshot\nstill-uncommitted\n');
   });
 
-  it('surfaces hook failures and restores the exact pre-run index without a commit', async () => {
-    const { git, repoPath, filePath } = await createRepository();
+  integrationTest('surfaces hook failures and restores the exact pre-run index without a commit', async (lifecycle) => {
+    const { git, repoPath, filePath } = await createRepository(lifecycle);
     await createPartiallyStagedChange(git, repoPath, filePath);
     const entries = parseStatusPorcelain(await git.getStatusPorcelainZAtPath(repoPath));
     const indexPath = await realIndexPath(git, repoPath);
@@ -258,8 +357,8 @@ describe('AI auto-commit isolated index transaction', { timeout: 20000 }, () => 
     expect(fs.existsSync(`${indexPath}.lock`)).toBe(false);
   });
 
-  it('rolls back the complete nonce-owned chain when a post-commit hook creates another commit', async () => {
-    const { git, repoPath, filePath } = await createRepository();
+  integrationTest('rolls back the complete nonce-owned chain when a post-commit hook creates another commit', async (lifecycle) => {
+    const { git, repoPath, filePath } = await createRepository(lifecycle);
     await createPartiallyStagedChange(git, repoPath, filePath);
     const entries = parseStatusPorcelain(await git.getStatusPorcelainZAtPath(repoPath));
     const stagedTreeBefore = await git.runCommandAtPath(repoPath, ['write-tree']);
@@ -288,8 +387,8 @@ fi`,
     expect(await git.runCommandAtPath(repoPath, ['write-tree'])).toBe(stagedTreeBefore);
   });
 
-  it('rolls back commits created by a hook before that hook rejects the outer commit', async () => {
-    const { git, repoPath, filePath } = await createRepository();
+  integrationTest('rolls back commits created by a hook before that hook rejects the outer commit', async (lifecycle) => {
+    const { git, repoPath, filePath } = await createRepository(lifecycle);
     await createPartiallyStagedChange(git, repoPath, filePath);
     const entries = parseStatusPorcelain(await git.getStatusPorcelainZAtPath(repoPath));
     const stagedTreeBefore = await git.runCommandAtPath(repoPath, ['write-tree']);
@@ -322,8 +421,8 @@ exit 1`,
     expect(await git.runCommandAtPath(repoPath, ['write-tree'])).toBe(stagedTreeBefore);
   });
 
-  it('rolls back an amended hook tree instead of committing unsnapshotted working-tree content', async () => {
-    const { git, repoPath, filePath } = await createRepository();
+  integrationTest('rolls back an amended hook tree instead of committing unsnapshotted working-tree content', async (lifecycle) => {
+    const { git, repoPath, filePath } = await createRepository(lifecycle);
     await createPartiallyStagedChange(git, repoPath, filePath);
     const entries = parseStatusPorcelain(await git.getStatusPorcelainZAtPath(repoPath));
     const stagedTreeBefore = await git.runCommandAtPath(repoPath, ['write-tree']);
@@ -354,8 +453,8 @@ fi`,
     expect(fs.readFileSync(filePath, 'utf8')).toBe('hook-mutated-content\n');
   });
 
-  it('does not delete an unowned commit that lands after the AI commit', async () => {
-    const { git, repoPath, filePath } = await createRepository();
+  integrationTest('does not delete an unowned commit that lands after the AI commit', async (lifecycle) => {
+    const { git, repoPath, filePath } = await createRepository(lifecycle);
     await createPartiallyStagedChange(git, repoPath, filePath);
     const entries = parseStatusPorcelain(await git.getStatusPorcelainZAtPath(repoPath));
     const stagedTreeBefore = await git.runCommandAtPath(repoPath, ['write-tree']);
@@ -383,10 +482,10 @@ fi`,
     expect(await git.runCommandAtPath(repoPath, ['show', '-s', '--format=%s', 'HEAD^'])).toBe('test: AI parent');
     expect(Number(await git.runCommandAtPath(repoPath, ['rev-list', '--count', 'HEAD']))).toBe(countBefore + 2);
     expect(await git.runCommandAtPath(repoPath, ['write-tree'])).toBe(stagedTreeBefore);
-  }, 15_000);
+  });
 
-  it('rolls back only the original branch when a hook attaches HEAD elsewhere', async () => {
-    const { git, repoPath, filePath } = await createRepository();
+  integrationTest('rolls back only the original branch when a hook attaches HEAD elsewhere', async (lifecycle) => {
+    const { git, repoPath, filePath } = await createRepository(lifecycle);
     const originalBranch = (await git.runCommandAtPath(repoPath, ['symbolic-ref', '--short', 'HEAD'])).trim();
     const headBefore = await git.runCommandAtPath(repoPath, ['rev-parse', 'HEAD']);
     await git.runCommandAtPath(repoPath, ['branch', 'side']);
@@ -409,8 +508,8 @@ fi`,
     expect(await git.runCommandAtPath(repoPath, ['write-tree'])).toBe(stagedTreeBefore);
   });
 
-  it('keeps the exact index and HEAD when deterministic commit signing fails', async () => {
-    const { git, repoPath, filePath } = await createRepository();
+  integrationTest('keeps the exact index and HEAD when deterministic commit signing fails', async (lifecycle) => {
+    const { git, repoPath, filePath } = await createRepository(lifecycle);
     await createPartiallyStagedChange(git, repoPath, filePath);
     const entries = parseStatusPorcelain(await git.getStatusPorcelainZAtPath(repoPath));
     const stagedTreeBefore = await git.runCommandAtPath(repoPath, ['write-tree']);
@@ -432,8 +531,8 @@ fi`,
     expect(await git.runCommandAtPath(repoPath, ['write-tree'])).toBe(stagedTreeBefore);
   });
 
-  it('keeps the exact index and HEAD when the repository has no usable author identity', async () => {
-    const { git, repoPath, filePath } = await createRepository();
+  integrationTest('keeps the exact index and HEAD when the repository has no usable author identity', async (lifecycle) => {
+    const { git, repoPath, filePath } = await createRepository(lifecycle);
     await createPartiallyStagedChange(git, repoPath, filePath);
     const entries = parseStatusPorcelain(await git.getStatusPorcelainZAtPath(repoPath));
     const indexPath = await realIndexPath(git, repoPath);
@@ -454,8 +553,8 @@ fi`,
     expect(fs.readFileSync(indexPath)).toEqual(indexBefore);
   });
 
-  it('aborts on an externally changed index while preserving that exact external index', async () => {
-    const { git, repoPath, filePath } = await createRepository();
+  integrationTest('aborts on an externally changed index while preserving that exact external index', async (lifecycle) => {
+    const { git, repoPath, filePath } = await createRepository(lifecycle);
     await createPartiallyStagedChange(git, repoPath, filePath);
     const entries = parseStatusPorcelain(await git.getStatusPorcelainZAtPath(repoPath));
     const headBefore = await git.runCommandAtPath(repoPath, ['rev-parse', 'HEAD']);
@@ -476,8 +575,8 @@ fi`,
     expect(await git.runCommandAtPath(repoPath, ['rev-parse', 'HEAD'])).toBe(headBefore);
   });
 
-  it('aborts before committing when the branch moved and preserves the foreign commit plus partial index', async () => {
-    const { git, repoPath, filePath } = await createRepository();
+  integrationTest('aborts before committing when the branch moved and preserves the foreign commit plus partial index', async (lifecycle) => {
+    const { git, repoPath, filePath } = await createRepository(lifecycle);
     await createPartiallyStagedChange(git, repoPath, filePath);
     const entries = parseStatusPorcelain(await git.getStatusPorcelainZAtPath(repoPath));
     const stagedTreeBefore = await git.runCommandAtPath(repoPath, ['write-tree']);
@@ -497,11 +596,14 @@ fi`,
     }
   });
 
-  it('deletes a failed unborn AI ref after a nested post-commit hook and restores the initial index byte-for-byte', async () => {
+  integrationTest('deletes a failed unborn AI ref after a nested post-commit hook and restores the initial index byte-for-byte', async (lifecycle) => {
     const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-ai-unborn-index-test-'));
     tempRoots.push(repoPath);
-    const git = new GitService();
+    const git = new GitService(undefined, lifecycle.scheduler);
     await git.runCommandAtPath(repoPath, ['init']);
+    await git.runCommandAtPath(repoPath, ['config', 'maintenance.auto', 'false']);
+    await git.runCommandAtPath(repoPath, ['config', 'gc.auto', '0']);
+    await git.runCommandAtPath(repoPath, ['config', 'commit.gpgsign', 'false']);
     await git.runCommandAtPath(repoPath, ['config', 'user.name', 'AI Transaction Test']);
     await git.runCommandAtPath(repoPath, ['config', 'user.email', 'ai-transaction@example.test']);
     const filePath = path.join(repoPath, 'example.txt');
@@ -535,8 +637,8 @@ fi`,
     expect(await git.runCommandAtPath(repoPath, ['show', ':example.txt'])).toBe('initial-staged');
   });
 
-  it('commits both sides of a NUL-delimited rename', async () => {
-    const { git, repoPath, filePath } = await createRepository();
+  integrationTest('commits both sides of a NUL-delimited rename', async (lifecycle) => {
+    const { git, repoPath, filePath } = await createRepository(lifecycle);
     // `>` is not a legal Windows filename character; the parser unit test
     // covers a literal arrow independently on platforms where it is legal.
     const renamedName = process.platform === 'win32' ? 'renamed example.txt' : 'renamed -> example.txt';
