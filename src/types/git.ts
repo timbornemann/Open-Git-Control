@@ -1,4 +1,5 @@
 export type GitMergeMode = 'default' | 'noFf' | 'squash' | 'ffOnly';
+export type GitMergeDirection = 'intoCurrent' | 'intoSelected';
 
 export type BranchInfo = {
   name: string;

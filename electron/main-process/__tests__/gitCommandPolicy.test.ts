@@ -2,6 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { assertAllowedGitCommand, normalizeArgs, normalizeCommandArgs, validateCommandArgs } from '../gitCommandPolicy';
 
 describe('gitCommandPolicy', () => {
+  it('bounds cross-branch merges to two named branches, a known mode and full commit IDs', () => {
+    const args = ['feature', 'main', 'default', 'a'.repeat(40), 'b'.repeat(40)];
+    expect(normalizeCommandArgs('mergeIntoBranch', args)).toEqual(args);
+    expect(() => normalizeCommandArgs('mergeIntoBranch', args.slice(0, 4))).toThrow('Invalid merge request');
+    expect(() => normalizeCommandArgs('mergeIntoBranch', ['--force', ...args.slice(1)])).toThrow('Invalid source branch');
+    expect(() => normalizeCommandArgs('mergeIntoBranch', [...args.slice(0, 2), '--strategy=ours', ...args.slice(3)])).toThrow('Invalid merge request');
+    expect(() => normalizeCommandArgs('mergeIntoBranch', [...args.slice(0, 3), 'HEAD', args[4]])).toThrow('Full branch commit IDs');
+    expect(() => normalizeCommandArgs('mergeIntoBranch', [...args, '--force'])).toThrow('Too many args');
+  });
   it('allows explicit merge pulls and no-fast-forward without rebase', () => {
     expect(() => validateCommandArgs('pull', ['--no-rebase'])).not.toThrow();
     expect(() => validateCommandArgs('pull', ['--no-rebase', '--no-ff'])).not.toThrow();

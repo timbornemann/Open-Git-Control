@@ -18,6 +18,8 @@ import { awaitPullTransfer, pullIntentFromArguments } from '@/components/hosting
 
 type Toast = { msg: string; isError: boolean };
 
+const needsCommitIdentity = (args: string[]) => args[0] === 'commit' || (args[0] === 'mergeIntoBranch' && ['default', 'noFf'].includes(args[3]));
+
 type WorkspaceBridge = {
   activeRepo: string | null;
   addOpenRepo: (repoPath: string) => Promise<boolean | void>;
@@ -355,7 +357,7 @@ export const useGitCommandWorkflow = ({
       setActiveGitActionLabel(actionLabel || tr(`Git ${command} wird ausgeführt...`, `Running git ${command}...`));
 
       try {
-        if (command === 'commit' && (!(await gitClient.ensureCommitIdentity(repoAtStart)) || !isStillActiveRepo())) return false;
+        if (needsCommitIdentity(args) && (!(await gitClient.ensureCommitIdentity(repoAtStart)) || !isStillActiveRepo())) return false;
         const r = await gitClient.runGitCommandForRepo(repoAtStart, command, ...args.slice(1));
         if (!isStillActiveRepo()) return false;
         if (r.success) {

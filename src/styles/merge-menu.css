@@ -1,0 +1,125 @@
+.topbar-merge-dropdown,
+.topbar-more-dropdown:has(.merge-branch-menu) {
+  width: min(392px, calc(100vw - var(--activity-bar-width, 48px) - 24px));
+  min-width: 0;
+  max-height: calc(100dvh - 116px);
+  overflow: auto;
+}
+
+.merge-branch-menu {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.merge-branch-heading {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.merge-direction {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.merge-direction legend,
+.merge-menu-field > span {
+  margin-bottom: 6px;
+  font-size: 0.73rem;
+  color: var(--text-secondary);
+}
+
+.merge-direction-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.merge-direction-options button {
+  min-width: 0;
+  padding: 8px;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+}
+
+.merge-direction-options button + button {
+  border-left: 0;
+}
+
+.merge-direction-options button[aria-pressed='true'] {
+  background: var(--accent-primary-soft);
+  color: var(--text-accent);
+  box-shadow: inset 0 -2px var(--accent-primary);
+}
+
+.merge-direction-options button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.merge-direction p,
+.merge-menu-explanation,
+.merge-menu-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.merge-direction p {
+  margin-top: 8px;
+}
+
+.merge-menu-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.merge-menu-field select {
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  background: var(--bg-panel);
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.merge-flow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-block: 1px solid var(--border-color);
+  font-size: 0.78rem;
+}
+
+.merge-flow strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-accent);
+}
+
+.merge-flow svg {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.merge-menu-note {
+  font-size: 0.7rem;
+}
+
+.merge-menu-continue {
+  width: 100%;
+}

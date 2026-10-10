@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDownCircle, ArrowUpCircle, ChevronDown, GitCommitHorizontal, GitMerge, MoreHorizontal, RefreshCw, Rocket } from 'lucide-react';
-import type { BranchInfo, GitMergeMode } from '@/types/git';
+import type { BranchInfo, GitMergeMode, GitMergeDirection } from '@/types/git';
 import type { RepositoryRunActionId, RepositoryRunConfigStateDto, RepositoryRunStateDto } from '@/types/repositoryRun';
-import { normalizeBranchRefForMerge } from '@/utils/gitParsing';
 import { useI18n } from '@/i18n';
 import { RepositoryRunMenu } from './RepositoryRunMenu';
 import { TopbarMoreMenu, type TopbarMoreMenuView } from './TopbarMoreMenu';
+import { MergeBranchMenu } from './MergeBranchMenu';
 
 type Props = {
   activeRepo: string | null;
@@ -23,7 +23,7 @@ type Props = {
   onPushForceWithLease: () => void;
   onPushTags: () => void;
   onPushSetUpstream: () => void;
-  onMergeBranch: (branchName: string, mode: GitMergeMode) => void;
+  onMergeBranch: (branchName: string, mode: GitMergeMode, direction?: GitMergeDirection) => void;
   onStageCommit: () => void;
   onOpenReleaseCreator: () => void;
   repositoryRun: RepositoryRunStateDto | null;
@@ -81,7 +81,6 @@ export const TopbarActions: React.FC<Props> = ({
   const isPullRunning = isGitActionRunning && normalizedAction.includes('pull');
   const isPushRunning = isGitActionRunning && normalizedAction.includes('push');
   const [openMenu, setOpenMenu] = useState<'pull' | 'push' | 'merge' | 'run' | 'more' | 'moreMerge' | 'moreRun' | null>(null);
-  const [mergeQuery, setMergeQuery] = useState('');
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const pullOptions = useMemo<SplitOption[]>(
@@ -103,48 +102,6 @@ export const TopbarActions: React.FC<Props> = ({
       },
     ],
     [onPullFfOnly, onPullNoFf, onPullRebase, t],
-  );
-
-  const mergeCandidates = useMemo(() => {
-    const q = mergeQuery.trim().toLowerCase();
-    return branches
-      .filter((b) => {
-        if (b.scope === 'local' && b.name === currentBranch) return false;
-        return true;
-      })
-      .map((b) => ({
-        rawName: b.name,
-        label: normalizeBranchRefForMerge(b.name),
-        scope: b.scope,
-      }))
-      .filter((row) => !q || row.label.toLowerCase().includes(q) || row.rawName.toLowerCase().includes(q))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [branches, currentBranch, mergeQuery]);
-
-  const mergeModeOptions = useMemo(
-    () => [
-      {
-        mode: 'default' as const,
-        label: t('generated.components.topbar.topbaractions.standard_merge_2335544a'),
-        hint: t('generated.components.topbar.topbaractions.git_merge_branch_66dc3c45'),
-      },
-      {
-        mode: 'noFf' as const,
-        label: t('generated.components.topbar.topbaractions.no_fast_forward_d42c0eb4'),
-        hint: t('generated.components.topbar.topbaractions.always_create_a_merge_commit_3982fc7e'),
-      },
-      {
-        mode: 'squash' as const,
-        label: t('generated.components.layout.sidebar.repogithubactionscontent.squash_52bce1bb'),
-        hint: t('generated.components.topbar.topbaractions.squash_changes_into_one_commit_a985f7d8'),
-      },
-      {
-        mode: 'ffOnly' as const,
-        label: t('generated.components.topbar.topbaractions.fast_forward_only_b9d481fe'),
-        hint: t('generated.components.topbar.topbaractions.abort_if_not_fast_forward_c6074964'),
-      },
-    ],
-    [t],
   );
 
   const pushOptions = useMemo<SplitOption[]>(
@@ -178,7 +135,6 @@ export const TopbarActions: React.FC<Props> = ({
     const onEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setOpenMenu(null);
-        setMergeQuery('');
       }
     };
 
@@ -190,59 +146,18 @@ export const TopbarActions: React.FC<Props> = ({
     };
   }, []);
 
+  useEffect(() => setOpenMenu(null), [activeRepo, currentBranch, isGitActionRunning]);
+
   const renderMergePicker = () => (
-    <>
-      <div className="topbar-dropdown-header">{t('generated.components.topbar.topbaractions.merge_branch_6e35b341')}</div>
-      <div style={{ padding: '6px 8px' }}>
-        <input
-          type="search"
-          value={mergeQuery}
-          onChange={(e) => setMergeQuery(e.target.value)}
-          placeholder={t('generated.components.topbar.topbaractions.filter_branches_4b26bb47')}
-          className="repo-filter-input"
-          style={{ width: '100%', boxSizing: 'border-box', fontSize: '0.78rem', padding: '6px 8px' }}
-          autoFocus
-        />
-      </div>
-      <div className="topbar-dropdown-sep" />
-      <div style={{ overflowY: 'auto', maxHeight: '200px' }}>
-        {mergeCandidates.length === 0 ? (
-          <div className="topbar-dropdown-item" style={{ cursor: 'default' }}>
-            <span className="topbar-dropdown-item-hint">{t('generated.components.topbar.topbaractions.no_matching_branches_00eeed32')}</span>
-          </div>
-        ) : (
-          mergeCandidates.map((row) => (
-            <div key={row.rawName} style={{ borderBottom: '1px solid var(--line-subtle)' }}>
-              <div style={{ padding: '6px 10px 2px', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                {row.label}
-                <span style={{ marginLeft: '6px', opacity: 0.75 }}>
-                  {row.scope === 'remote'
-                    ? t('generated.components.topbar.topbaractions.remote_c8b64c96')
-                    : t('generated.components.topbar.topbaractions.local_25e634a6')}
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', padding: '4px 8px 8px' }}>
-                {mergeModeOptions.map((opt) => (
-                  <button
-                    key={opt.mode}
-                    type="button"
-                    className="staging-tool-btn"
-                    style={{ fontSize: '0.7rem', padding: '3px 7px' }}
-                    onClick={() => {
-                      setOpenMenu(null);
-                      setMergeQuery('');
-                      onMergeBranch(row.rawName, opt.mode);
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </>
+    <MergeBranchMenu
+      key={`${activeRepo}:${currentBranch}`}
+      branches={branches}
+      currentBranch={currentBranch}
+      onMerge={(branch, mode, direction) => {
+        setOpenMenu(null);
+        onMergeBranch(branch, mode, direction);
+      }}
+    />
   );
 
   const remoteConfigurationItem = onOpenRemoteConfig && (
@@ -280,7 +195,7 @@ export const TopbarActions: React.FC<Props> = ({
           className="icon-btn topbar-action-btn topbar-action-btn-sync topbar-split-main"
           onClick={() => setOpenMenu((prev) => (prev === 'merge' ? null : 'merge'))}
           disabled={!activeRepo || isGitActionRunning || branches.length === 0}
-          title={t('generated.components.topbar.topbaractions.merge_a_branch_into_the_current_branch_77f4b971')}
+          title={tr('Branches zusammenführen: Quelle und Ziel auswählen', 'Merge branches: choose source and target')}
         >
           <GitMerge size={16} />
           <span className="topbar-action-label">{t('generated.components.layout.main.mainprimarypane.merge_83b759bf')}</span>
@@ -294,11 +209,7 @@ export const TopbarActions: React.FC<Props> = ({
         >
           <ChevronDown size={14} />
         </button>
-        {openMenu === 'merge' && (
-          <div className="topbar-dropdown" style={{ minWidth: 'min(320px, 92vw)', maxHeight: 'min(380px, 70vh)' }}>
-            {renderMergePicker()}
-          </div>
-        )}
+        {openMenu === 'merge' && <div className="topbar-dropdown topbar-merge-dropdown">{renderMergePicker()}</div>}
       </div>
       <div className="topbar-split-wrap">
         <button
@@ -420,7 +331,6 @@ export const TopbarActions: React.FC<Props> = ({
             pullOptions={pullOptions}
             pushOptions={pushOptions}
             renderMergePicker={renderMergePicker}
-            onClearMergeQuery={() => setMergeQuery('')}
             onStageCommit={onStageCommit}
             onOpenReleaseCreator={onOpenReleaseCreator}
             activeRunConfig={activeRunConfig}

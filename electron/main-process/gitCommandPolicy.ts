@@ -1,5 +1,6 @@
 import { isGitCommandName, MAX_ARGS_BY_GIT_COMMAND, type GitCommandName } from '../../src/shared/ipc/gitCommands';
 import { normalizeRepositoryRelativePath, toLiteralPathspec } from '../git/RepositoryPathSafety';
+import { parseMergeIntoBranchArgs } from './gitMergeCommandPolicy';
 
 export type { GitCommandName };
 
@@ -473,6 +474,8 @@ const validateCommandSpecificArgs = (commandName: GitCommandName, args: string[]
       return validateRevertArgs(args);
     case 'merge':
       return validateMergeArgs(args);
+    case 'mergeIntoBranch':
+      return void parseMergeIntoBranchArgs(args);
     case 'reflog':
       return validateReflogArgs(args);
     case 'forensicHistory':

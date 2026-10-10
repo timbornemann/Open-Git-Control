@@ -1,15 +1,15 @@
 import { useCachedResult } from '@/data/resourceHooks';
 import { resourceKey, withReadPriority } from '@/data/clientCache';
 import type { IpcResult } from '@/types/ipc';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import type { BranchInfo, GitMergeMode } from '@/types/git';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import type { BranchInfo } from '@/types/git';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
-import { normalizeBranchRefForMerge } from '@/utils/gitParsing';
 import { validateBranchName } from '@/utils/gitRefValidation';
 import { compactGitError, isNotFullyMergedBranchDeleteError } from '@/utils/gitPushRecovery';
 import { gitClient } from '@/services/gitClient';
 import type { BranchContextMenuState, ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
-import { buildDeleteBranchDialog, buildForceDeleteBranchDialog, buildMergeBranchDialog, buildRenameBranchDialog } from './repositoryDomainDialogs';
+import { buildDeleteBranchDialog, buildForceDeleteBranchDialog, buildRenameBranchDialog } from './repositoryDomainDialogs';
+import { useRepositoryMergeActions } from './useRepositoryMergeActions';
 import type { GitActionToast } from './repositoryDomainTypes';
 import type { RunGitCommandOptions } from '@/app/state/contracts';
 import { transferClient } from '@/services/hostingClient';
@@ -25,13 +25,6 @@ type Params = {
   triggerRefresh: () => void;
   setConfirmDialog: Dispatch<SetStateAction<ConfirmDialogState | null>>;
   setInputDialog: Dispatch<SetStateAction<InputDialogState | null>>;
-};
-
-const mergeModeArgs = (mode: GitMergeMode): string[] => {
-  if (mode === 'noFf') return ['--no-ff'];
-  if (mode === 'squash') return ['--squash'];
-  if (mode === 'ffOnly') return ['--ff-only'];
-  return [];
 };
 
 export const useRepositoryBranches = ({
@@ -55,7 +48,7 @@ export const useRepositoryBranches = ({
             .split('\n')
             .filter((line) => line.trim() && !line.includes(' -> '))
             .map((line) => {
-              const name = line.replace('*', '').trim();
+              const name = line.replace(/^[*+]\s*/, '').trim();
               return { name, isHead: line.startsWith('*'), scope: name.startsWith('remotes/') ? 'remote' : 'local' };
             })
         : loadedBranches,
@@ -67,15 +60,7 @@ export const useRepositoryBranches = ({
   const [branchContextMenu, setBranchContextMenu] = useState<BranchContextMenuState>(null);
   const { t, tr } = useLanguageTranslations(language);
 
-  const mergeModeLabel = useCallback(
-    (mode: GitMergeMode): string => {
-      if (mode === 'noFf') return t('generated.components.layout.hooks.userepositorydomain.no_fast_forward_no_ff_d4cc36d1');
-      if (mode === 'squash') return t('generated.components.layout.hooks.userepositorydomain.squash_merge_squash_853a2803');
-      if (mode === 'ffOnly') return t('generated.components.layout.branchcontextmenu.fast_forward_only_ff_only_247cf7fb');
-      return t('generated.components.layout.hooks.userepositorydomain.default_921d6fef');
-    },
-    [t],
-  );
+  const handleMergeBranch = useRepositoryMergeActions({ activeRepo, currentBranch, branches, runGitCommand, setConfirmDialog, setGitActionToast, tr });
 
   useLayoutEffect(() => {
     activeRepoRef.current = activeRepo;
@@ -104,7 +89,7 @@ export const useRepositoryBranches = ({
           .filter((line: string) => line.trim().length > 0)
           .map((line: string): BranchInfo | null => {
             const isHead = line.startsWith('*');
-            const name = line.replace('*', '').trim();
+            const name = line.replace(/^[*+]\s*/, '').trim();
             if (name.includes(' -> ')) return null;
 
             const scope: BranchInfo['scope'] = name.startsWith('remotes/') ? 'remote' : 'local';
@@ -230,36 +215,6 @@ export const useRepositoryBranches = ({
             msg: compactGitError(result.error) || tr(`Branch "${branchName}" konnte nicht gelöscht werden.`, `Could not delete branch "${branchName}".`),
             isError: true,
           });
-        },
-      }),
-    );
-  };
-
-  const handleMergeBranch = async (branchName: string, mode: GitMergeMode = 'default') => {
-    const repoAtStart = activeRepo;
-    if (!repoAtStart) return;
-    const mergeTarget = normalizeBranchRefForMerge(branchName);
-    const flags = mergeModeArgs(mode);
-    const mergeArgs = gitClient.buildMergeBranchArgs(mergeTarget, flags);
-    const commandPreview = mergeArgs.join(' ');
-    setConfirmDialog(
-      buildMergeBranchDialog({
-        branchName,
-        currentBranch,
-        mergeTarget,
-        mergeModeLabel: mergeModeLabel(mode),
-        commandPreview,
-        t,
-        tr,
-        onMerge: async () => {
-          const successMsg =
-            mode === 'squash'
-              ? tr(
-                  `Squash-Merge von "${mergeTarget}" vorbereitet. Aenderungen sind gestaged — bitte committen.`,
-                  `Squash merge of "${mergeTarget}" prepared. Changes are staged — please commit.`,
-                )
-              : tr(`Branch "${mergeTarget}" gemergt.`, `Merged branch "${mergeTarget}".`);
-          await runGitCommand(mergeArgs, successMsg, undefined, { expectedRepoPath: repoAtStart });
         },
       }),
     );

@@ -1,6 +1,8 @@
 import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
 import { validateBranchName } from '@/utils/gitRefValidation';
 import type { RepositoryTranslator } from './repositoryDomainTypes';
+import type { GitMergeMode } from '@/types/git';
+import { mergeModePresentation } from '@/utils/mergePresentation';
 
 type BranchDialogContext = RepositoryTranslator & {
   currentBranch: string;
@@ -54,36 +56,52 @@ export const buildForceDeleteBranchDialog = ({
 });
 
 export const buildMergeBranchDialog = ({
-  branchName,
-  currentBranch,
-  mergeTarget,
-  mergeModeLabel,
-  commandPreview,
-  t,
+  sourceBranch,
+  targetBranch,
+  mode,
+  switchTarget = false,
+  tr,
   onMerge,
-}: BranchDialogContext & {
-  branchName: string;
-  mergeTarget: string;
-  mergeModeLabel: string;
-  commandPreview: string;
+}: Pick<RepositoryTranslator, 'tr'> & {
+  sourceBranch: string;
+  targetBranch: string;
+  mode: GitMergeMode;
+  switchTarget?: boolean;
   onMerge: () => Promise<void>;
 }): ConfirmDialogState => ({
   variant: 'confirm',
-  title: t('generated.components.layout.hooks.userepositorydomain.merge_branch_86c1a5e0'),
-  message: t('generated.components.layout.hooks.userepositorydomain.the_selected_branch_will_be_merged_into_the_current_bran_db9e5318'),
+  title: tr('Branches zusammenführen?', 'Merge branches?'),
+  message: switchTarget
+    ? tr(
+        `Die App wechselt zu „${targetBranch}“ und übernimmt dort die Änderungen aus „${sourceBranch}“.`,
+        `The app switches to "${targetBranch}" and takes the changes from "${sourceBranch}" there.`,
+      )
+    : tr(
+        `Die Änderungen aus „${sourceBranch}“ werden in „${targetBranch}“ übernommen. Du bleibst auf dem aktuellen Branch.`,
+        `Take the changes from "${sourceBranch}" into "${targetBranch}". You stay on the current branch.`,
+      ),
   contextItems: [
-    { label: t('generated.components.layout.hooks.userepositorydomain.source_08fe450e'), value: branchName },
-    { label: t('generated.components.layout.hooks.userepositorydomain.merge_ref_e72f373b'), value: mergeTarget },
-    { label: t('generated.components.staging_area.stagingcommitpanel.mode_56610d60'), value: mergeModeLabel },
-    {
-      label: t('generated.components.layout.hooks.userepositorydomain.target_branch_8b94f3a7'),
-      value: currentBranch || unknownLabel(t),
-    },
-    { label: t('generated.components.commit_graph.commitgraph.command_26cfbea8'), value: `git ${commandPreview}` },
+    { label: tr('Von (bleibt unverändert)', 'From (unchanged)'), value: sourceBranch },
+    { label: tr('Nach (erhält die Änderungen)', 'Into (receives changes)'), value: targetBranch },
+    { label: tr('Zusammenführung', 'Merge behavior'), value: mergeModePresentation(mode, tr).label },
   ],
   irreversible: false,
-  consequences: t('generated.components.layout.hooks.userepositorydomain.conflicts_may_occur_on_success_a_new_merge_commit_may_be_927ecc69'),
-  confirmLabel: t('generated.components.commit_graph.commitgraph.start_merge_516b5e37'),
+  consequences: [
+    mergeModePresentation(mode, tr).description,
+    switchTarget
+      ? tr(
+          `Offene Änderungen müssen vorher committed oder gestasht werden. „${targetBranch}“ bleibt danach aktiv, auch bei Konflikten.`,
+          `Commit or stash open changes first. "${targetBranch}" stays active afterwards, including when there are conflicts.`,
+        )
+      : tr('Bei Konflikten öffnet sich die Konfliktlösung.', 'If there are conflicts, the conflict resolver opens.'),
+    tr('Es wird nichts hochgeladen. Der Quellbranch bleibt erhalten.', 'Nothing is uploaded. The source branch is kept.'),
+  ].join(' '),
+  confirmLabel:
+    mode === 'squash'
+      ? tr('Änderungen vorbereiten', 'Prepare changes')
+      : switchTarget
+        ? tr('Wechseln und zusammenführen', 'Switch and merge')
+        : tr('Zusammenführen', 'Merge'),
   onConfirm: onMerge,
 });
 

@@ -10,7 +10,7 @@ import type {
   SidebarCoreState,
   WorkflowStateContract,
 } from '@/app/state/contracts';
-import type { GitMergeMode } from '@/types/git';
+import type { GitMergeDirection, GitMergeMode } from '@/types/git';
 import type { RepositoryRunActionId } from '@/types/repositoryRun';
 import type { HostedRepositoryRef } from '@/types/hostingDtos';
 
@@ -52,7 +52,7 @@ export type RepositoryContextValue = RepositoryStateContract & {
   triggerCommitRefresh: () => void;
   onToast: (message: string, isError: boolean) => void;
   showSecondaryHistory: boolean;
-  onMergeBranch: (branchName: string, mode: GitMergeMode) => void;
+  onMergeBranch: (branchName: string, mode: GitMergeMode, direction?: GitMergeDirection) => void;
   onOpenRepoWorkspace: () => void;
 };
 

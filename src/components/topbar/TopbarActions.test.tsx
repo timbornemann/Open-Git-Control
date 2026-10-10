@@ -5,17 +5,20 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '@/i18n';
 import { TopbarActions } from './TopbarActions';
+import type { BranchInfo } from '@/types/git';
 
 describe('TopbarActions', () => {
   let root: Root | null = null;
   const onStartRepositoryRun = vi.fn<() => Promise<boolean>>();
   const onOpenRemoteConfig = vi.fn();
+  const onMergeBranch = vi.fn();
 
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     document.body.innerHTML = '<div id="root"></div>';
     onStartRepositoryRun.mockReset().mockResolvedValue(true);
     onOpenRemoteConfig.mockReset();
+    onMergeBranch.mockReset();
   });
 
   afterEach(() => {
@@ -24,7 +27,7 @@ describe('TopbarActions', () => {
     document.body.innerHTML = '';
   });
 
-  const renderActions = async () => {
+  const renderActions = async (branches: BranchInfo[] = []) => {
     root = createRoot(document.getElementById('root')!);
     await act(async () => {
       root?.render(
@@ -32,7 +35,7 @@ describe('TopbarActions', () => {
           language: 'en',
           children: createElement(TopbarActions, {
             activeRepo: 'C:/repo',
-            branches: [],
+            branches,
             currentBranch: 'main',
             isGitActionRunning: false,
             isFetching: false,
@@ -46,7 +49,7 @@ describe('TopbarActions', () => {
             onPushForceWithLease: vi.fn(),
             onPushTags: vi.fn(),
             onPushSetUpstream: vi.fn(),
-            onMergeBranch: vi.fn(),
+            onMergeBranch,
             onStageCommit: vi.fn(),
             onOpenReleaseCreator: vi.fn(),
             repositoryRun: null,
@@ -100,6 +103,32 @@ describe('TopbarActions', () => {
     await act(async () => defaultRun?.click());
 
     expect(onStartRepositoryRun).toHaveBeenCalledWith('run');
+    expect(document.querySelector('.topbar-more-dropdown')).toBeNull();
+  });
+
+  it('uses the same guided merge menu in the topbar and the compact More menu', async () => {
+    await renderActions([
+      { name: 'main', isHead: true, scope: 'local' },
+      { name: 'feature', isHead: false, scope: 'local' },
+    ]);
+    await act(async () => document.querySelector<HTMLButtonElement>('[aria-label="Choose branch to merge"]')?.click());
+    expect(document.querySelectorAll('.merge-branch-menu')).toHaveLength(1);
+    expect(document.body.textContent).toContain('Your current branch stays active');
+    await act(async () => document.querySelector<HTMLButtonElement>('.topbar-more-toggle')?.click());
+    const item = [...document.querySelectorAll<HTMLButtonElement>('.topbar-dropdown-item')].find((button) =>
+      button.textContent?.includes('Choose source, target and behavior'),
+    )!;
+    await act(async () => item.click());
+    expect(document.querySelectorAll('.merge-branch-menu')).toHaveLength(1);
+    const outward = [...document.querySelectorAll('button')].find((button) => button.textContent === 'Current into another')!;
+    await act(async () => outward.click());
+    await act(async () => {
+      const select = document.querySelector<HTMLSelectElement>('.merge-branch-menu select')!;
+      select.value = 'feature';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => document.querySelector<HTMLButtonElement>('.merge-menu-continue')?.click());
+    expect(onMergeBranch).toHaveBeenCalledWith('feature', 'default', 'intoSelected');
     expect(document.querySelector('.topbar-more-dropdown')).toBeNull();
   });
 });

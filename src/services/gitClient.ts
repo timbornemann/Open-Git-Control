@@ -12,6 +12,7 @@ import { repositoryFileClient } from './repositoryFileClient';
 import { repositoryAnalyticsClient } from './repositoryAnalyticsClient';
 import { isSystemToolAvailable } from './systemToolsAvailability';
 import { ensureCommitIdentity } from '@/app/state/gitIdentityStore';
+import { mergeCommands } from './mergeCommands';
 
 export type GitCommandArgs = [GitCommandName, ...string[]];
 
@@ -36,6 +37,7 @@ const sanitizeBranchSuffix = (value: string): string => value.replace(/[^a-zA-Z0
 
 const command = <TCommand extends GitCommandName>(commandName: TCommand, ...args: string[]): [TCommand, ...string[]] => [commandName, ...args];
 export const gitClient = cachedClient('git', {
+  ...mergeCommands,
   ...commitMessageEdits,
   ...repositoryAnalyticsClient,
   ensureCommitIdentity,
@@ -141,10 +143,6 @@ export const gitClient = cachedClient('git', {
 
   buildRenameBranchArgs(oldName: string, newName: string): GitCommandArgs {
     return command('branch', '-m', oldName, newName);
-  },
-
-  buildMergeBranchArgs(mergeTarget: string, flags: string[] = []): GitCommandArgs {
-    return command('merge', ...flags, mergeTarget);
   },
 
   buildCherryPickCommitArgs(commitHash: string): GitCommandArgs {

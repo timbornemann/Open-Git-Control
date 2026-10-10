@@ -20,7 +20,6 @@ type Props = {
   pullOptions: MoreOption[];
   pushOptions: MoreOption[];
   renderMergePicker: () => React.ReactNode;
-  onClearMergeQuery: () => void;
   onStageCommit: () => void;
   onOpenReleaseCreator: () => void;
   activeRunConfig: RepositoryRunConfigStateDto | null;
@@ -44,7 +43,6 @@ export const TopbarMoreMenu: React.FC<Props> = ({
   pullOptions,
   pushOptions,
   renderMergePicker,
-  onClearMergeQuery,
   onStageCommit,
   onOpenReleaseCreator,
   activeRunConfig,
@@ -67,7 +65,6 @@ export const TopbarMoreMenu: React.FC<Props> = ({
           type="button"
           className="topbar-dropdown-item topbar-more-back"
           onClick={() => {
-            onClearMergeQuery();
             setView('more');
           }}
         >
@@ -144,7 +141,7 @@ export const TopbarMoreMenu: React.FC<Props> = ({
       </button>
       <button className="topbar-dropdown-item" onClick={() => setView('moreMerge')} disabled={!activeRepo || isGitActionRunning || branchCount === 0}>
         <span className="topbar-dropdown-item-label">{t('generated.components.topbar.topbaractions.merge_branch_8c3efbb0')}</span>
-        <span className="topbar-dropdown-item-hint">{t('generated.components.topbar.topbaractions.choose_branch_and_merge_mode_9fea8d11')}</span>
+        <span className="topbar-dropdown-item-hint">{tr('Quelle, Ziel und Wirkung auswählen', 'Choose source, target and behavior')}</span>
       </button>
       <button className="topbar-dropdown-item" data-topbar-more-run onClick={() => setView('moreRun')} disabled={!activeRepo}>
         <span className="topbar-dropdown-item-label">Run</span>

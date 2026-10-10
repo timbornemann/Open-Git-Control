@@ -3,6 +3,9 @@ import { assertAllowedGitCommand, createJobId, normalizeCommandArgs, type GitCom
 import { emitJobEvent } from './jobEvents';
 import { normalizeRepositoryRelativePath, toLiteralPathspec } from '../../git/RepositoryPathSafety';
 import { hasUnresolvedConflictMarkers, parseConflictMarkerSize } from '../../git/MergeConflictService';
+import { mergeIntoBranch } from '../../git/MergeIntoBranch';
+import { parseMergeIntoBranchArgs } from '../gitMergeCommandPolicy';
+import { requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
 
 type GitCommandRouterEvent = {
   sender: any;
@@ -166,6 +169,12 @@ const executeSequencerCommand = (context: GitCommandExecutionContext, args: stri
     : context.gitService.runCommandAtPathWithEnv(context.gitService.requireActiveRepoPath(), args, envOverrides);
 
 const COMMAND_EXECUTORS: Partial<Record<GitCommandName, GitCommandExecutor>> = {
+  mergeIntoBranch: ({ gitService, args, repoPath }) => {
+    const selectedRepo = repoPath || gitService.requireActiveRepoPath();
+    return mergeIntoBranch(gitService.runner, selectedRepo, parseMergeIntoBranchArgs(args), () => {
+      requireActiveRepositoryPath(selectedRepo, gitService.getRepoPath(), 'mergeIntoBranch');
+    });
+  },
   status: async ({ gitService, args, repoPath }) =>
     repoPath && gitService.isBareRepositoryAtPath?.(repoPath)
       ? ''
