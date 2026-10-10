@@ -60,6 +60,20 @@ afterEach(() => {
 });
 
 describe('useMainViewInspector working-directory viewer binding', () => {
+  it('preserves requested editor positions through guarded navigation and removes them on repository change', () => {
+    const hook = renderInspector('C:/repositories/a');
+    let proceed: (() => void) | undefined;
+    act(() => hook.current.setWorkingDirectoryNavigationGuard((_target, next) => (proceed = next)));
+    act(() => hook.current.handleOpenWorkingDirectoryFile('src/index.ts', { line: 17, column: 4 }));
+    expect(hook.current.workingDirectoryFilePath).toBeNull();
+    expect(hook.current.workingDirectoryFilePosition).toBeUndefined();
+    act(() => proceed?.());
+    expect(hook.current.workingDirectoryFilePath).toBe('src/index.ts');
+    expect(hook.current.workingDirectoryFilePosition).toEqual({ line: 17, column: 4 });
+    hook.rerender('C:/repositories/b');
+    expect(hook.current.workingDirectoryFilePosition).toBeUndefined();
+    hook.unmount();
+  });
   it('hides a working-directory file immediately when it belongs to another repository', () => {
     expect(getActiveWorkingDirectoryFilePath({ path: 'src/index.ts', repoPath: 'C:/repositories/a' }, 'C:/repositories/b')).toBeNull();
   });

@@ -106,6 +106,33 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.repository-run-console__file-link {
+  display: inline;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-align: inherit;
+  white-space: inherit;
+  overflow-wrap: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--accent-primary);
+  text-underline-offset: 3px;
+}
+
+.repository-run-console__file-link:hover {
+  color: var(--accent-primary);
+}
+
+.repository-run-console__file-link:focus-visible {
+  outline: 1px solid var(--accent-primary);
+  outline-offset: 2px;
+}
 .repository-run-console__line--error {
   color: var(--status-danger);
 }

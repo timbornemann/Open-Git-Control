@@ -5,16 +5,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '@/i18n';
 import { sampleRun } from '@/utils/__tests__/repositoryRunFixture';
 import { RepositoryRunConsole } from './RepositoryRunConsole';
+import type { RepositoryRunFileLinkProps } from './RepositoryRunLinkedText';
 
-const mocks = vi.hoisted(() => ({ copy: vi.fn(), toast: vi.fn(), stop: vi.fn(), back: vi.fn() }));
+const mocks = vi.hoisted(() => ({ copy: vi.fn(), toast: vi.fn(), stop: vi.fn(), back: vi.fn(), openFile: vi.fn() }));
 vi.mock('@/utils/clipboard', () => ({ copyTextToClipboard: mocks.copy }));
 vi.mock('@/contexts/AppStateContext', () => ({ useRepositoryContext: () => ({ onToast: mocks.toast }) }));
 let host: HTMLDivElement, root: Root;
-const render = (run = sampleRun()) =>
+const render = (run = sampleRun(), onOpenFile?: RepositoryRunFileLinkProps['onOpenFile']) =>
   act(async () =>
     root.render(
       <I18nProvider language="en">
-        <RepositoryRunConsole run={run} onStop={mocks.stop} onBack={mocks.back} />
+        <RepositoryRunConsole run={run} onStop={mocks.stop} onBack={mocks.back} onOpenFile={onOpenFile} />
       </I18nProvider>,
     ),
   );
@@ -38,6 +39,42 @@ afterEach(() => {
 });
 
 describe('repository run console presentation', () => {
+  it('opens working files from structured output, plain output, diagnostic locations and technical details', async () => {
+    const run = sampleRun();
+    run.steps[0].parser = 'typescript';
+    run.output = [
+      { ...run.output[0], stream: 'stderr', text: 'src/main.ts(7,3): error TS2322: Invalid type' },
+      { ...run.output[0], stream: 'stderr', sequence: 2, text: '    at render (file:///D:/Projects/Software/A%5E3/src/view.ts:11:2)' },
+    ];
+    await render(run, mocks.openFile);
+    await click('src/main.ts(7,3)');
+    expect(mocks.openFile).toHaveBeenLastCalledWith({ path: 'src/main.ts', line: 7, column: 3 });
+    await click('file:///D:/Projects/Software/A%5E3/src/view.ts:11:2');
+    expect(mocks.openFile).toHaveBeenLastCalledWith({ path: 'src/view.ts', line: 11, column: 2 });
+    await click('Plain text');
+    await click('src/main.ts(7,3)');
+    expect(mocks.openFile).toHaveBeenLastCalledWith({ path: 'src/main.ts', line: 7, column: 3 });
+    await click('Problems (1)');
+    await click('src/main.ts:7:3');
+    expect(mocks.openFile).toHaveBeenLastCalledWith({ path: 'src/main.ts', line: 7, column: 3 });
+    expect(host.querySelector('.repository-run-console__file-link')?.getAttribute('title')).toContain('Open in app editor');
+    expect(mocks.stop).not.toHaveBeenCalled();
+    expect(mocks.back).not.toHaveBeenCalled();
+  });
+
+  it('keeps external and out-of-repository paths as plain text and copies the original diagnostic', async () => {
+    const run = sampleRun();
+    run.steps[0].parser = 'typescript';
+    const text = 'C:/Other/repo/main.ts:4:2: error TS2322: Read https://example.com/main.ts:1:2';
+    run.output = [{ ...run.output[0], stream: 'stderr', text }];
+    await render(run, mocks.openFile);
+    expect(host.querySelector('.repository-run-console__file-link')).toBeNull();
+    await click('Problems (1)');
+    expect(host.querySelector('.repository-run-console__file-link')).toBeNull();
+    await click('Copy problems');
+    expect(mocks.copy).toHaveBeenCalledWith(expect.stringContaining('C:/Other/repo/main.ts:4:2'));
+    expect(mocks.openFile).not.toHaveBeenCalled();
+  });
   it('shows the reported root cause and folded readable tool output instead of control characters or red stderr information', async () => {
     await render();
     expect(host.textContent).not.toContain('\u001b');

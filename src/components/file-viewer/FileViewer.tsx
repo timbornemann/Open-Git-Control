@@ -72,6 +72,9 @@ export function FileViewer({
     setShowWhitespace(false);
     setSelection({ from: 0, to: 0 });
   }, [identity, activeRequest.startView]);
+  useLayoutEffect(() => {
+    if (activeRequest.position) setTab('text');
+  }, [activeRequest.position]);
   const openStagedDiff = () => {
     const next: FileViewerRequest = { repoPath, path, source: 'staged', startView: 'diff' };
     navigation.protectNavigation(() => {
@@ -196,6 +199,7 @@ export function FileViewer({
         document={document}
         refreshTrigger={refreshTrigger + localRefresh}
         showWhitespace={showWhitespace}
+        position={activeRequest.position}
         onSelectionChange={setSelection}
         onRepoChanged={refreshed}
         onOpenStagedDiff={openStagedDiff}

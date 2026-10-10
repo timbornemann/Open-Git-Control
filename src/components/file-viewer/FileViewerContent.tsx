@@ -13,6 +13,7 @@ import { CsvTableEditor } from '@/components/working-directory/CsvTableEditor';
 import { FileHistoryPanel } from '@/components/file-details/FileHistoryPanel';
 import { BlamePanel } from '@/components/file-details/BlamePanel';
 import type { RepositoryFileContextDto } from '@/shared/ipc/repositoryFiles';
+import type { EditorPosition } from '@/types/editor';
 import type { TextSelection } from '@/components/working-directory/textContentTransforms';
 import { useFileHistory } from './useFileHistory';
 import { useFileBlame } from './useFileBlame';
@@ -26,6 +27,7 @@ type Props = {
   document: ReturnType<typeof useFileDocument>;
   refreshTrigger: number;
   showWhitespace: boolean;
+  position?: EditorPosition;
   onSelectionChange: (selection: TextSelection) => void;
   onRepoChanged?: () => void;
   onNavigateToCommit?: (hash: string) => void;
@@ -37,6 +39,7 @@ export function FileViewerContent({
   document,
   refreshTrigger,
   showWhitespace,
+  position,
   onSelectionChange,
   onRepoChanged,
   onNavigateToCommit,
@@ -141,6 +144,7 @@ export function FileViewerContent({
         onSave={() => void save()}
         readOnly={!preview.editable}
         showWhitespace={showWhitespace}
+        position={position}
         onSelectionChange={onSelectionChange}
       />
     </React.Suspense>

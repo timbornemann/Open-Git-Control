@@ -5,20 +5,27 @@ import { gitClient } from '@/services/gitClient';
 import { I18nProvider } from '@/i18n';
 import { FileViewer, type FileViewerProps } from '../FileViewer';
 import type { FileViewerRequest } from '../fileViewerRequest';
+import type { EditorPosition } from '@/types/editor';
 import { resetWorkingDirectoryNavigationGuardForTests } from '@/components/working-directory/workingDirectoryNavigationGuard';
 
 const dialogs = vi.hoisted(() => ({ confirm: vi.fn(), input: vi.fn(), toast: vi.fn() }));
-const editor = vi.hoisted(() => ({ value: '', readOnly: false, change: null as ((value: string) => void) | null }));
+const editor = vi.hoisted(() => ({
+  value: '',
+  readOnly: false,
+  change: null as ((value: string) => void) | null,
+  position: undefined as EditorPosition | undefined,
+}));
 export { dialogs, editor };
 vi.mock('@/contexts/AppStateContext', () => ({
   useUIContext: () => ({ setConfirmDialog: dialogs.confirm, setInputDialog: dialogs.input }),
   useOptionalRepositoryContext: () => ({ onToast: dialogs.toast }),
 }));
 vi.mock('@/components/working-directory/WorkingDirectoryCodeEditor', () => ({
-  WorkingDirectoryCodeEditor: (props: { value: string; readOnly: boolean; onChange: (value: string) => void }) => {
+  WorkingDirectoryCodeEditor: (props: { value: string; readOnly: boolean; onChange: (value: string) => void; position?: EditorPosition }) => {
     editor.value = props.value;
     editor.readOnly = props.readOnly;
     editor.change = props.onChange;
+    editor.position = props.position;
     return createElement('pre', { 'data-testid': 'editor' }, props.value);
   },
 }));
@@ -57,6 +64,7 @@ export function resetViewerMocks() {
   dialogs.toast.mockReset();
   editor.value = '';
   editor.change = null;
+  editor.position = undefined;
 }
 export function viewerRequest(source: FileViewerRequest['source'] = 'unstaged', path = 'file.txt'): FileViewerRequest {
   return {

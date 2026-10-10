@@ -4,8 +4,9 @@ import { useI18n } from '@/i18n';
 import type { RepositoryRunOutputLineDto } from '@/types/repositoryRun';
 import { classifyRunMessage } from '@/utils/repositoryRunMessages';
 import type { RunConsoleEntry } from '@/utils/repositoryRunPresentation';
+import { RepositoryRunLinkedText, type RepositoryRunFileLinkProps } from './RepositoryRunLinkedText';
 
-type Props = { lines: RepositoryRunOutputLineDto[]; entries: RunConsoleEntry[]; focusSequence?: number };
+type Props = { lines: RepositoryRunOutputLineDto[]; entries: RunConsoleEntry[]; focusSequence?: number } & RepositoryRunFileLinkProps;
 const EntryIcon = ({ kind }: { kind: RunConsoleEntry['kind'] }) =>
   kind === 'error' || kind === 'cascade' ? (
     <AlertCircle size={13} />
@@ -21,7 +22,7 @@ const EntryIcon = ({ kind }: { kind: RunConsoleEntry['kind'] }) =>
     <span />
   );
 
-export function RepositoryRunOutputPane({ lines, entries, focusSequence }: Props) {
+export function RepositoryRunOutputPane({ lines, entries, focusSequence, repoPath, onOpenFile }: Props) {
   const { tr } = useI18n();
   const [mode, setMode] = useState<'structured' | 'plain'>('structured');
   const [filter, setFilter] = useState<'all' | 'warning' | 'error'>('all');
@@ -114,7 +115,7 @@ export function RepositoryRunOutputPane({ lines, entries, focusSequence }: Props
                 key={line.sequence}
                 className={`repository-run-console__line repository-run-console__line--${classifyRunMessage(line).kind}${line.sequence === focusSequence ? ' is-target' : ''}`}
               >
-                {line.text || ' '}
+                <RepositoryRunLinkedText text={line.text || ' '} repoPath={repoPath} onOpenFile={onOpenFile} />
                 {'\n'}
               </code>
             ))}
@@ -129,9 +130,11 @@ export function RepositoryRunOutputPane({ lines, entries, focusSequence }: Props
                 <div className="repository-run-console__entry-line">
                   {entry.tool && <span className="repository-run-console__tool">{entry.tool}</span>}
                   <code>
-                    {entry.group === 'watch'
-                      ? tr(`${entry.count} Pfade werden auf Änderungen überwacht`, `Watching ${entry.count} paths for changes`)
-                      : entry.text}
+                    {entry.group === 'watch' ? (
+                      tr(`${entry.count} Pfade werden auf Änderungen überwacht`, `Watching ${entry.count} paths for changes`)
+                    ) : (
+                      <RepositoryRunLinkedText text={entry.text} repoPath={repoPath} onOpenFile={onOpenFile} />
+                    )}
                   </code>
                   {entry.count > 1 && entry.group !== 'watch' && <span className="repository-run-console__repeat">×{entry.count}</span>}
                 </div>
@@ -145,7 +148,9 @@ export function RepositoryRunOutputPane({ lines, entries, focusSequence }: Props
                           : tr('Details', 'Details')}{' '}
                       ({entry.details.length})
                     </summary>
-                    <pre>{entry.details.join('\n')}</pre>
+                    <pre>
+                      <RepositoryRunLinkedText text={entry.details.join('\n')} repoPath={repoPath} onOpenFile={onOpenFile} />
+                    </pre>
                   </details>
                 )}
               </div>

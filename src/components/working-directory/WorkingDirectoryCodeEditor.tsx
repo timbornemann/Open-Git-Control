@@ -5,6 +5,7 @@ import { Compartment, EditorState, type Extension } from '@codemirror/state';
 import { EditorView, highlightTrailingWhitespace, highlightWhitespace, keymap } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 import { basicSetup } from 'codemirror';
+import type { EditorPosition } from '@/types/editor';
 
 type Props = {
   path: string;
@@ -14,6 +15,7 @@ type Props = {
   showWhitespace?: boolean;
   readOnly?: boolean;
   onSelectionChange?: (selection: { from: number; to: number }) => void;
+  position?: EditorPosition;
 };
 
 type LanguageDefinition = { label: string; load: () => Promise<Extension> };
@@ -121,7 +123,16 @@ const languageDefinitionForPath = (path: string): LanguageDefinition | null => L
 
 export const getLanguageLabelForPath = (path: string): string | null => languageDefinitionForPath(path)?.label || null;
 
-export const WorkingDirectoryCodeEditor: React.FC<Props> = ({ path, value, onChange, onSave, showWhitespace = false, readOnly = false, onSelectionChange }) => {
+export const WorkingDirectoryCodeEditor: React.FC<Props> = ({
+  path,
+  value,
+  onChange,
+  onSave,
+  showWhitespace = false,
+  readOnly = false,
+  onSelectionChange,
+  position,
+}) => {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const languageCompartmentRef = useRef(new Compartment());
@@ -183,6 +194,17 @@ export const WorkingDirectoryCodeEditor: React.FC<Props> = ({ path, value, onCha
     if (!view || view.state.doc.toString() === value) return;
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } });
   }, [value]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !position) return;
+    const lineNumber = Number.isSafeInteger(position.line) ? Math.max(1, Math.min(position.line, view.state.doc.lines)) : 1;
+    const line = view.state.doc.line(lineNumber);
+    const column = Number.isSafeInteger(position.column) ? Math.max(0, Math.min(position.column! - 1, line.length)) : 0;
+    const anchor = line.from + column;
+    view.dispatch({ selection: { anchor }, effects: EditorView.scrollIntoView(anchor, { y: 'center' }) });
+    view.focus();
+  }, [path, position]);
 
   useEffect(() => {
     const view = viewRef.current;

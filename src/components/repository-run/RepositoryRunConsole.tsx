@@ -9,12 +9,13 @@ import { useI18n } from '@/i18n';
 import { useRepositoryContext } from '@/contexts/AppStateContext';
 import { RepositoryRunOutputPane } from './RepositoryRunOutputPane';
 import { RepositoryRunProblemHint, RepositoryRunProblems } from './RepositoryRunProblems';
+import { RepositoryRunLinkedText, type RepositoryRunFileLinkProps } from './RepositoryRunLinkedText';
 import '@/styles/repository-run.css';
 
-type Props = { run: RepositoryRunStateDto; onStop: () => void; onBack: () => void };
+type Props = { run: RepositoryRunStateDto; onStop: () => void; onBack: () => void; onOpenFile?: RepositoryRunFileLinkProps['onOpenFile'] };
 type ConsoleTab = 'output' | 'problems' | 'summary';
 
-export const RepositoryRunConsole: React.FC<Props> = ({ run, onStop, onBack }) => {
+export const RepositoryRunConsole: React.FC<Props> = ({ run, onStop, onBack, onOpenFile }) => {
   const { tr, locale } = useI18n();
   const { onToast } = useRepositoryContext();
   const tabId = useId();
@@ -106,7 +107,9 @@ export const RepositoryRunConsole: React.FC<Props> = ({ run, onStop, onBack }) =
         <div className="repository-run-console__failure">
           <AlertCircle size={16} />
           <div>
-            <strong>{cause.message}</strong>
+            <strong>
+              <RepositoryRunLinkedText text={cause.message} repoPath={run.repoPath} onOpenFile={onOpenFile} />
+            </strong>
             <RepositoryRunProblemHint problem={cause} />
           </div>
           <button className="staging-tool-btn" onClick={() => setTab('problems')}>
@@ -147,8 +150,17 @@ export const RepositoryRunConsole: React.FC<Props> = ({ run, onStop, onBack }) =
         </span>
       </div>
       <div className="repository-run-console__tab-panel" id={`${tabId}-panel`} role="tabpanel" aria-labelledby={`${tabId}-${tab}`}>
-        {tab === 'output' && <RepositoryRunOutputPane key={run.runId} lines={lines} entries={entries} focusSequence={focusSequence} />}
-        {tab === 'problems' && <RepositoryRunProblems problems={problems} onShowOutput={showOutput} />}
+        {tab === 'output' && (
+          <RepositoryRunOutputPane
+            key={run.runId}
+            lines={lines}
+            entries={entries}
+            focusSequence={focusSequence}
+            repoPath={run.repoPath}
+            onOpenFile={onOpenFile}
+          />
+        )}
+        {tab === 'problems' && <RepositoryRunProblems problems={problems} onShowOutput={showOutput} repoPath={run.repoPath} onOpenFile={onOpenFile} />}
         {tab === 'summary' && (
           <div className="repository-run-console__summary">
             <dl>
@@ -183,7 +195,7 @@ export const RepositoryRunConsole: React.FC<Props> = ({ run, onStop, onBack }) =
             </dl>
             {run.message && <p>{run.message}</p>}
             <h3>{tr('Erkannte Probleme', 'Detected problems')}</h3>
-            <RepositoryRunProblems problems={problems} onShowOutput={showOutput} />
+            <RepositoryRunProblems problems={problems} onShowOutput={showOutput} repoPath={run.repoPath} onOpenFile={onOpenFile} />
           </div>
         )}
       </div>

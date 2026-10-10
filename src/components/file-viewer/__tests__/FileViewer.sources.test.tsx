@@ -7,6 +7,19 @@ import { button, click, deferred, dialogs, edit, editor, initializeViewerMocks, 
 beforeEach(initializeViewerMocks);
 afterEach(resetViewerMocks);
 describe('shared file viewer sources', () => {
+  it('forwards run locations after loading and moves within a working-file draft without reloading it', async () => {
+    const request = { ...viewerRequest(), position: { line: 17, column: 4 } };
+    const view = await renderViewer(request);
+    await vi.waitFor(() => expect(editor.position).toEqual({ line: 17, column: 4 }));
+    await edit('unsaved working draft');
+    const reads = vi.mocked(gitClient.getRepositoryFilePreview).mock.calls.length;
+    await view.rerender({ ...request, position: { line: 3, column: 2 } });
+    expect(editor.position).toEqual({ line: 3, column: 2 });
+    expect(editor.value).toBe('unsaved working draft');
+    expect(gitClient.getRepositoryFilePreview).toHaveBeenCalledTimes(reads);
+    expect(dialogs.confirm).not.toHaveBeenCalled();
+    view.unmount();
+  });
   it.each(['unstaged', 'staged', 'commit'] as const)('opens %s with the requested initial view and selected content', async (source) => {
     const view = await renderViewer(viewerRequest(source));
     expect(document.querySelector('.file-viewer')?.getAttribute('data-source')).toBe(source);

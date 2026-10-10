@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
+import type { EditorPosition } from '@/types/editor';
 import { extractGitObjectId } from '@/utils/gitObjectId';
 import { fileViewerIdentity, fileViewerRequestFromDiff, fileViewerRequestFromWorkingFile } from '@/components/file-viewer/fileViewerRequest';
 import {
@@ -16,6 +17,7 @@ type WorkingTreeSelection = {
 export type WorkingDirectoryFileSelection = {
   path: string;
   repoPath: string;
+  position?: EditorPosition;
 };
 
 export type { WorkingDirectoryNavigationGuard } from '@/components/working-directory/workingDirectoryNavigationGuard';
@@ -93,6 +95,7 @@ export const useMainViewInspector = ({
   // mounting a viewer against a newly active repository, even before the
   // repository-switch cleanup above has run.
   const workingDirectoryFilePath = getActiveWorkingDirectoryFilePath(workingDirectoryFile, activeRepo);
+  const workingDirectoryFilePosition = workingDirectoryFile?.repoPath === activeRepo ? workingDirectoryFile?.position : undefined;
 
   useLayoutEffect(() => {
     const request = commitNavigationRequest;
@@ -214,7 +217,7 @@ export const useMainViewInspector = ({
   );
 
   const handleOpenWorkingDirectoryFile = useCallback(
-    (path: string) => {
+    (path: string, position?: EditorPosition) => {
       if (!activeRepo) return;
       const proceed = () => {
         setActiveDiffRequest(null);
@@ -223,7 +226,7 @@ export const useMainViewInspector = ({
         setWorkingTreeSelection(null);
         setIsCommitInspectorOpen(false);
         setSelectedCommit(null);
-        setWorkingDirectoryFile({ path, repoPath: activeRepo });
+        setWorkingDirectoryFile({ path, repoPath: activeRepo, position });
       };
       const guard = workingDirectoryNavigationGuardRef.current;
       if (guard) guard({ kind: 'file', path, identity: fileViewerIdentity(fileViewerRequestFromWorkingFile(activeRepo, path)), view: 'text' }, proceed);
@@ -309,6 +312,7 @@ export const useMainViewInspector = ({
     commitHistoryStack,
     workingTreeSelection,
     workingDirectoryFilePath,
+    workingDirectoryFilePosition,
     isCommitInspectorOpen,
     handleToggleRecoveryCenter,
     handleOpenDiff,

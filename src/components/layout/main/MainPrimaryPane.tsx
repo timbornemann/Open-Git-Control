@@ -7,6 +7,7 @@ import { StagingArea } from '@/components/staging-area';
 import { useRepositoryContext, useSettingsContext, useUIContext, useWorkflowContext } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
 import type { DiffRequest } from '@/types/diff';
+import type { EditorPosition } from '@/types/editor';
 import type { WorkingDirectoryNavigationGuard } from '@/components/layout/hooks/useMainViewInspector';
 import type { WorkingTreeState } from '@/hooks/useWorkingTreeSnapshot';
 import { PRIMARY_PANE_MIN_WIDTH } from '@/components/layout/hooks/useMainViewPaneResizer';
@@ -33,6 +34,8 @@ type MainPrimaryPaneProps = {
   workingTree: WorkingTreeState;
   activeDiffRequest: DiffRequest | null;
   workingDirectoryFilePath: string | null;
+  workingDirectoryFilePosition?: EditorPosition;
+  onOpenWorkingDirectoryFile: (path: string, position?: EditorPosition) => void;
   activeConflictPath: string | null;
   showRecoveryCenter: boolean;
   setActiveConflictPath: (path: string | null) => void;
@@ -50,6 +53,8 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   workingTree,
   activeDiffRequest,
   workingDirectoryFilePath,
+  workingDirectoryFilePosition,
+  onOpenWorkingDirectoryFile,
   activeConflictPath,
   showRecoveryCenter,
   setActiveConflictPath,
@@ -76,9 +81,9 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
       (activeDiffRequest
         ? fileViewerRequestFromDiff(repository.activeRepo, activeDiffRequest)
         : workingDirectoryFilePath
-          ? fileViewerRequestFromWorkingFile(repository.activeRepo, workingDirectoryFilePath)
+          ? fileViewerRequestFromWorkingFile(repository.activeRepo, workingDirectoryFilePath, workingDirectoryFilePosition)
           : null),
-    [repository.activeRepo, activeDiffRequest, workingDirectoryFilePath],
+    [repository.activeRepo, activeDiffRequest, workingDirectoryFilePath, workingDirectoryFilePosition],
   );
   const closeFileViewer = () => {
     if (workingDirectoryCloseRequest) workingDirectoryCloseRequest();
@@ -229,7 +234,16 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
             />
           </React.Suspense>
         ) : isRunConsoleView && workflow.repositoryRun ? (
-          <RepositoryRunConsole run={workflow.repositoryRun} onStop={() => void workflow.onStopRepositoryRun()} onBack={workflow.onCloseRunConsole} />
+          <RepositoryRunConsole
+            run={workflow.repositoryRun}
+            onStop={() => void workflow.onStopRepositoryRun()}
+            onBack={workflow.onCloseRunConsole}
+            onOpenFile={({ path, line, column }) => {
+              if (workflow.repositoryRun?.repoPath !== repository.activeRepo) return;
+              workflow.onCloseRunConsole();
+              onOpenWorkingDirectoryFile(path, { line: line ?? 1, column });
+            }}
+          />
         ) : activeConflictPath ? (
           <StagingArea
             repoPath={repository.activeRepo}
