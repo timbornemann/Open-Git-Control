@@ -1,3 +1,4 @@
+import * as vm from 'vm';
 import type { GitService } from './GitService';
 import { scanLfsSecrets } from './git/GitLfsSecretScanner';
 import { SecretScanProgress } from './git/SecretScanProgress';
@@ -21,7 +22,31 @@ type PatternDefinition = {
   validateMatch?: (match: RegExpMatchArray) => boolean;
 };
 
-type ParsedAllowlistRule = { kind: 'path'; value: string } | { kind: 'text'; value: string } | { kind: 'regex'; pattern: RegExp };
+type ParsedAllowlistRule = { kind: 'path'; value: string } | { kind: 'text'; value: string } | { kind: 'regex'; pattern: RegExp; timedOut: boolean };
+
+// Allowlist regexes come from a repository file (shared with every clone) and
+// run synchronously in the main process. A catastrophic pattern such as
+// `(a+)+$` would otherwise hang the whole app, so each test runs under a V8
+// watchdog. A pattern that exceeds the budget is ignored for the rest of the
+// scan, which keeps the finding (fail closed).
+const ALLOWLIST_REGEX_TIMEOUT_MS = 100;
+const allowlistRegexContext = vm.createContext({ pattern: null as RegExp | null, input: '' });
+const allowlistRegexTest = new vm.Script('pattern.test(input)');
+
+function testAllowlistRegex(rule: Extract<ParsedAllowlistRule, { kind: 'regex' }>, input: string): boolean {
+  if (rule.timedOut) return false;
+  allowlistRegexContext.pattern = rule.pattern;
+  allowlistRegexContext.input = input;
+  try {
+    return allowlistRegexTest.runInContext(allowlistRegexContext, { timeout: ALLOWLIST_REGEX_TIMEOUT_MS }) === true;
+  } catch {
+    rule.timedOut = true;
+    return false;
+  } finally {
+    allowlistRegexContext.pattern = null;
+    allowlistRegexContext.input = '';
+  }
+}
 
 type DiffCandidateLine = {
   filePath: string;
@@ -251,7 +276,7 @@ function parseAllowlist(rawAllowlist: string): ParsedAllowlistRule[] {
         continue;
       }
       try {
-        rules.push({ kind: 'regex', pattern: new RegExp(value, 'i') });
+        rules.push({ kind: 'regex', pattern: new RegExp(value, 'i'), timedOut: false });
       } catch {
         // Ignore malformed allowlist regex entries.
       }
@@ -280,7 +305,7 @@ function isAllowlisted(findingCandidate: { filePath: string; line: string; ruleI
     if (rule.kind === 'text') {
       return normalizedPath.includes(rule.value) || normalizedLine.includes(rule.value) || normalizedRuleId.includes(rule.value);
     }
-    return rule.pattern.test(findingCandidate.line) || rule.pattern.test(findingCandidate.filePath);
+    return testAllowlistRegex(rule, findingCandidate.line) || testAllowlistRegex(rule, findingCandidate.filePath);
   });
 }
 
@@ -695,6 +720,10 @@ export class SecretScanService {
     options.onProgress?.(stagedLines + toPushLines + tagLines);
     options.signal?.throwIfAborted();
     progress.phase('verifying');
+    const timedOutAllowlistRules = allowlistRules.filter((rule) => rule.kind === 'regex' && rule.timedOut).length;
+    if (timedOutAllowlistRules > 0) {
+      notes.push(`${timedOutAllowlistRules} allowlist regex rule(s) took too long to evaluate and were ignored. Simplify them in the repository allowlist.`);
+    }
 
     return {
       scanned: true,

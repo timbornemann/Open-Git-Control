@@ -261,6 +261,33 @@ describe('SecretScanService diff scanning', () => {
     expect(result.findings).toHaveLength(0);
   });
 
+  it('ignores a catastrophic repository allowlist regex instead of hanging the scan', async () => {
+    const stagedDiff = [
+      'diff --git a/src/app.ts b/src/app.ts',
+      '+++ b/src/app.ts',
+      '@@ -0,0 +2 @@',
+      '+const token = "ghp_abcdefghijklmnopqrstuvwxyz123456";',
+      '+const other = "ghp_zyxwvutsrqponmlkjihgfedcba654321";',
+    ].join('\n');
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': stagedDiff,
+      }),
+    );
+    const startedAt = Date.now();
+
+    const result = await service.scanStagedDiffs({
+      repoPath: '/tmp/repo',
+      strictness: 'low',
+      allowlistText: ['regex:^(.+)+X$', 'regex:zyxwvut'].join('\n'),
+    });
+
+    expect(Date.now() - startedAt).toBeLessThan(5_000);
+    // The hanging rule is skipped (fail closed); the valid rule still applies.
+    expect(result.findings).toHaveLength(1);
+    expect(result.notes.some((note) => note.includes('allowlist regex'))).toBe(true);
+  });
+
   it('falls back to unpushed HEAD commits when no upstream is configured', async () => {
     const commitHash = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
     const outgoingCommitDiff = ['diff --git a/.env b/.env', '+++ b/.env', '@@ -0,0 +1 @@', '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF'].join('\n');
