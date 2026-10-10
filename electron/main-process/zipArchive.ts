@@ -111,16 +111,26 @@ export async function createZipArchive(targetPath: string, entries: ZipArchiveEn
   if (entries.length > MAX_UINT16) throw new Error('The selection contains too many files for a ZIP archive.');
 
   const stream = fs.createWriteStream(targetPath, { flags: 'wx' });
+  // Attach error handling before opening/writing: filesystem stream errors can
+  // otherwise become uncaught exceptions while a source file is being read.
+  const completion = finished(stream, { cleanup: true });
+  let streamFailure: unknown;
+  void completion.catch((error: unknown) => {
+    streamFailure = error;
+  });
   let written = 0;
   const centralEntries: CentralDirectoryEntry[] = [];
   const seenNames = new Set<string>();
   const write = async (buffer: Buffer): Promise<void> => {
+    if (streamFailure) throw streamFailure;
+    if (stream.destroyed) throw new Error('The ZIP output stream was closed.');
     if (written + buffer.length > MAX_UINT32) throw new Error('The ZIP archive exceeds the 4 GB limit.');
     if (!stream.write(buffer)) await once(stream, 'drain');
     written += buffer.length;
   };
 
   try {
+    await once(stream, 'open');
     for (const entry of entries) {
       const archivePath = normalizeArchivePath(entry.archivePath, entry.kind === 'directory');
       if (seenNames.has(archivePath)) throw new Error(`Archive entry "${archivePath}" appears more than once.`);
@@ -159,11 +169,11 @@ export async function createZipArchive(targetPath: string, entries: ZipArchiveEn
     const centralSize = written - centralOffset;
     await write(endOfCentralDirectory(centralEntries.length, centralSize, centralOffset));
     stream.end();
-    await finished(stream);
+    await completion;
   } catch (error) {
     stream.destroy();
     try {
-      await finished(stream);
+      await completion;
     } catch {
       // Preserve the original archive error.
     }
