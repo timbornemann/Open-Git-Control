@@ -5,6 +5,7 @@ import * as path from 'path';
 import type { GitService } from '../../../GitService';
 import { requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
 import { IpcChannel } from '../../../../src/types/ipcContract';
+import { windowsSystemExecutable } from '../../../system-tools/windowsSystemExecutable';
 
 type WorkingDirectoryPathResolver = (repoPath: string, value: unknown, label: string, allowMissing?: boolean) => string;
 
@@ -140,10 +141,14 @@ try {
 `,
     'utf16le',
   ).toString('base64');
-  const result = spawnSync('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', encodedScript], {
-    encoding: 'utf8',
-    windowsHide: true,
-  });
+  const result = spawnSync(
+    windowsSystemExecutable('WindowsPowerShell', 'v1.0', 'powershell.exe'),
+    ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', encodedScript],
+    {
+      encoding: 'utf8',
+      windowsHide: true,
+    },
+  );
   if (result.error) throw result.error;
   if (result.status !== 0) {
     const stderr = result.stderr?.trim();
