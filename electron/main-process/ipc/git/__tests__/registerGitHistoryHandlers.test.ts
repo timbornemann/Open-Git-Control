@@ -37,6 +37,18 @@ describe('registerGitHistoryHandlers through registerGitHandlers', () => {
     });
   };
 
+  it('forwards the captured timeline commit and rejects untrusted revision arguments', async () => {
+    const gitService = { getRepoPath: vi.fn(() => 'C:/repo'), history: { getFileTimelineData: vi.fn().mockResolvedValue([]) } };
+    register(gitService);
+    const handler = handlers.get(IpcChannel.GitGetFileTimelineData)!;
+    const hash = 'a'.repeat(40);
+    expect(await handler({}, 5000, 'C:/repo', hash)).toEqual({ success: true, data: [] });
+    expect(gitService.history.getFileTimelineData).toHaveBeenCalledWith(5000, 'C:/repo', hash);
+    expect(await handler({}, 5000, 'C:/repo', '--all')).toMatchObject({ success: false });
+    expect(await handler({}, 5000, 'C:/repo', { revision: hash })).toMatchObject({ success: false });
+    expect(gitService.history.getFileTimelineData).toHaveBeenCalledOnce();
+  });
+
   it('returns an empty commit page only when HEAD is genuinely unborn', async () => {
     const gitService = {
       getRepoPath: vi.fn(() => 'C:/repo'),

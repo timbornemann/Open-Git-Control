@@ -12,7 +12,9 @@ export const useFileTimelineDimensions = () => {
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
-        setDimensions({ width, height });
+        const nextWidth = Math.round(width);
+        const nextHeight = Math.round(height);
+        setDimensions((current) => (current.width === nextWidth && current.height === nextHeight ? current : { width: nextWidth, height: nextHeight }));
       }
     });
 

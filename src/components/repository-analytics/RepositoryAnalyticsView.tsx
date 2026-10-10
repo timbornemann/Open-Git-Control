@@ -10,6 +10,7 @@ import { AnalyticsOverview } from './AnalyticsOverview';
 import { AnalyticsContributions, periodRange } from './AnalyticsActivity';
 import { AnalyticsChurn } from './AnalyticsChurn';
 import { AnalyticsReleaseComparison } from './AnalyticsReleaseComparison';
+import { AnalyticsTimeline } from './AnalyticsTimeline';
 import { AnalyticsDetailsView } from './AnalyticsDetails';
 import { AnalyticsEmpty, count } from './AnalyticsCharts';
 import { analyticsSections, selectAnalyticsTab, useAnalyticsTab, type AnalyticsTab } from './analyticsNavigationState';
@@ -75,11 +76,13 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
   return (
     <div className="repository-analytics">
       <div
-        className={`analytics-content${tab === 'overview' ? ' analytics-content--overview' : tab === 'churn' ? ' analytics-content--churn' : tab === 'coupling' ? ' analytics-content--coupling' : ''}`}
+        className={`analytics-content${tab === 'overview' ? ' analytics-content--overview' : tab === 'churn' ? ' analytics-content--churn' : tab === 'coupling' ? ' analytics-content--coupling' : tab === 'timeline' ? ' analytics-content--timeline' : ''}`}
         tabIndex={0}
         aria-label={labels.find(({ id }) => id === tab)?.label}
       >
-        {tab === 'comparison' ? (
+        {tab === 'timeline' ? (
+          <AnalyticsTimeline repoPath={repoPath} snapshot={snapshot} filters={filters} running={running || busy} />
+        ) : tab === 'comparison' ? (
           <AnalyticsReleaseComparison repoPath={repoPath} snapshot={snapshot} filters={filters} loading={running || busy} onChange={onFilters} />
         ) : !snapshot ? (
           <AnalyticsEmpty>

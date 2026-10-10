@@ -17,13 +17,11 @@ type Props = {
   activeRepo: string | null;
   isGitActionRunning: boolean;
   branchCount: number;
-  isTimelineLoading: boolean;
   pullOptions: MoreOption[];
   pushOptions: MoreOption[];
   renderMergePicker: () => React.ReactNode;
   onClearMergeQuery: () => void;
   onStageCommit: () => void;
-  onOpenTimeline?: () => void;
   onOpenReleaseCreator: () => void;
   activeRunConfig: RepositoryRunConfigStateDto | null;
   repositoryRun: RepositoryRunStateDto | null;
@@ -43,13 +41,11 @@ export const TopbarMoreMenu: React.FC<Props> = ({
   activeRepo,
   isGitActionRunning,
   branchCount,
-  isTimelineLoading,
   pullOptions,
   pushOptions,
   renderMergePicker,
   onClearMergeQuery,
   onStageCommit,
-  onOpenTimeline,
   onOpenReleaseCreator,
   activeRunConfig,
   repositoryRun,
@@ -172,16 +168,6 @@ export const TopbarMoreMenu: React.FC<Props> = ({
         disabled={!activeRepo || !onOpenSecretScanAllowlist}
       >
         <span className="topbar-dropdown-item-label">{tr('Secret-Scan-Allowlist', 'Secret-scan allowlist')}</span>
-      </button>
-      <button
-        className="topbar-dropdown-item"
-        onClick={() => {
-          setView(null);
-          onOpenTimeline?.();
-        }}
-        disabled={!activeRepo || isTimelineLoading}
-      >
-        <span className="topbar-dropdown-item-label">{t('generated.components.topbar.topbaractions.timeline_b35c2fb1')}</span>
       </button>
       <button
         className="topbar-dropdown-item"

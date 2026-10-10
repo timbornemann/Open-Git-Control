@@ -49,7 +49,6 @@ describe('TopbarActions', () => {
             onMergeBranch: vi.fn(),
             onStageCommit: vi.fn(),
             onOpenReleaseCreator: vi.fn(),
-            onOpenTimeline: vi.fn(),
             repositoryRun: null,
             activeRunConfig: {
               exists: true,
@@ -73,7 +72,9 @@ describe('TopbarActions', () => {
 
   it('opens the repository remote configuration from More without starting a transfer', async () => {
     await renderActions();
+    expect([...document.querySelectorAll('.topbar-action-label')].map((label) => label.textContent)).not.toContain('Timeline');
     await act(async () => document.querySelector<HTMLButtonElement>('.topbar-more-toggle')?.click());
+    expect(document.querySelector('.topbar-more-dropdown')?.textContent).not.toContain('Timeline');
     const remote = [...document.querySelectorAll<HTMLButtonElement>('.topbar-dropdown-item')].find((button) =>
       button.textContent?.includes('Remote configuration'),
     );

@@ -1,110 +1,11 @@
 // @vitest-environment jsdom
 import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { I18nProvider } from '@/i18n';
-import { NotificationProvider } from '@/contexts/NotificationContext';
-import { DEFAULT_ANALYTICS_FILTERS, type AnalyticsProgress, type RepositoryAnalyticsSnapshot } from '@/shared/ipc/repositoryAnalytics';
-import { RepositoryAnalyticsView } from '../RepositoryAnalyticsView';
-import { RepositoryAnalyticsToolbar } from '../RepositoryAnalyticsToolbar';
+import { describe, expect, it, vi } from 'vitest';
+import { DEFAULT_ANALYTICS_FILTERS, type AnalyticsFilters, type RepositoryAnalyticsSnapshot } from '@/shared/ipc/repositoryAnalytics';
 import { readAnalyticsFilters } from '../analyticsPreferences';
-import { AnalyticsNavigation } from '../AnalyticsNavigation';
-import { RepositoryAnalyticsFilters } from '../AnalyticsFilters';
-import { useAnalyticsNavigation } from '../analyticsNavigationState';
-import { useAnalyticsWorkspace } from '../analyticsWorkspaceState';
-import { clearCouplingSessions } from '../analyticsCouplingSession';
 import { analyticsReport as report, releaseComparison } from './analyticsFixtures';
+import { host, root, listeners, mocks, openFile, render, click, deferred, comparisonReport, chooseVersion } from './repositoryAnalyticsViewFixture';
 
-const mocks = vi.hoisted(() => ({
-  cache: vi.fn(),
-  refresh: vi.fn(),
-  details: vi.fn(),
-  subscribe: vi.fn(),
-  cancel: vi.fn(),
-  publish: vi.fn(),
-  update: vi.fn(),
-  dismiss: vi.fn(),
-}));
-vi.mock('@/services/gitClient', () => ({
-  gitClient: {
-    getRepositoryAnalyticsSnapshot: mocks.cache,
-    refreshRepositoryAnalytics: mocks.refresh,
-    getRepositoryAnalyticsDetails: mocks.details,
-    onRepositoryAnalyticsProgress: mocks.subscribe,
-  },
-}));
-vi.mock('@/data/ipcRead', () => ({
-  cancellableRead: async (signal: AbortSignal, _priority: string, run: (request: unknown) => Promise<unknown>) => {
-    signal.addEventListener('abort', mocks.cancel);
-    return run({ requestId: `test-${++serial}`, priority: 'speculative' });
-  },
-}));
-let serial = 0;
-let host: HTMLDivElement, root: Root;
-let listeners: ((event: AnalyticsProgress) => void)[];
-const openFile = vi.fn();
-const notifications = { publish: mocks.publish, update: mocks.update, dismiss: mocks.dismiss };
-const render = (repoPath = 'C:/repo', busy = false, refreshTrigger = 0) =>
-  act(async () =>
-    root.render(
-      <I18nProvider language="en">
-        <NotificationProvider value={notifications}>
-          <header>
-            <span>Statistics &amp; analytics</span>
-            <RepositoryAnalyticsToolbar repoPath={repoPath} />
-          </header>
-          <aside key={repoPath}>
-            <AnalyticsNavigation repoPath={repoPath} />
-            <RepositoryAnalyticsFilters repoPath={repoPath} />
-          </aside>
-          <RepositoryAnalyticsView repoPath={repoPath} refreshTrigger={refreshTrigger} busy={busy} onOpenFile={openFile} />
-        </NotificationProvider>
-      </I18nProvider>,
-    ),
-  );
-const click = async (text: string) => {
-  const button = [...host.querySelectorAll('button')].find((node) => node.textContent?.trim() === text);
-  expect(button).toBeTruthy();
-  await act(async () => button!.click());
-};
-const deferred = <T,>() => {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
-    resolve = done;
-  });
-  return { promise, resolve };
-};
-beforeEach(() => {
-  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  vi.clearAllMocks();
-  clearCouplingSessions();
-  useAnalyticsNavigation.setState({ sections: {} });
-  useAnalyticsWorkspace.setState({ filters: {}, snapshots: {} });
-  const storage = new Map<string, string>();
-  vi.stubGlobal('localStorage', { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value) });
-  listeners = [];
-  serial = 0;
-  mocks.cache.mockResolvedValue({ success: true, data: report() });
-  mocks.refresh.mockImplementation(() => new Promise(() => {}));
-  mocks.details.mockResolvedValue({ success: true, data: { items: [], total: 0, offset: 0 } });
-  mocks.subscribe.mockImplementation((listener) => {
-    listeners.push(listener);
-    return () => {
-      listeners = listeners.filter((value) => value !== listener);
-    };
-  });
-  mocks.publish.mockReturnValue(1);
-  mocks.update.mockReturnValue(true);
-  host = document.createElement('div');
-  document.body.append(host);
-  root = createRoot(host);
-});
-afterEach(() => {
-  act(() => root?.unmount());
-  host?.remove();
-  vi.useRealTimers();
-  vi.unstubAllGlobals();
-});
 describe('repository analytics dashboard', () => {
   it('opens release statistics without fetching or rendering individual file details', async () => {
     const saved = { ...report(), comparison: releaseComparison() };
@@ -116,6 +17,94 @@ describe('repository analytics dashboard', () => {
     expect(host.querySelector('table')).toBeNull();
     expect(host.textContent).not.toContain('do-not-list-me');
     expect(mocks.details).not.toHaveBeenCalled();
+  });
+  it.each(['unchanged', 'changed'] as const)('retains the selected release versions and mounted charts through a %s background sync', async (sourceState) => {
+    mocks.cache.mockImplementation(({ filters }: { filters: AnalyticsFilters }) => Promise.resolve({ success: true, data: comparisonReport(filters) }));
+    await render();
+    await click('Release comparison');
+    await chooseVersion(0, 'refs/tags/v1.0.0');
+    await chooseVersion(1, 'refs/tags/v2.0.0');
+    const filters = readAnalyticsFilters('C:/repo');
+    expect(filters).toMatchObject({ compareFrom: 'refs/tags/v1.0.0', compareTo: 'refs/tags/v2.0.0' });
+    const content = host.querySelector<HTMLDivElement>('.analytics-content')!;
+    const from = host.querySelectorAll<HTMLSelectElement>('.analytics-comparison-picker select')[0];
+    const to = host.querySelectorAll<HTMLSelectElement>('.analytics-comparison-picker select')[1];
+    const results = host.querySelector('.analytics-comparison-results')!;
+    const ring = host.querySelector('.analytics-comparison-ring');
+    const bars = host.querySelector('.analytics-comparison-file-bars');
+    const areas = host.querySelector('.analytics-comparison-areas');
+    const markup = results.innerHTML;
+    content.scrollTop = 80;
+    to.focus();
+    const sync = deferred<{ success: true; data: RepositoryAnalyticsSnapshot }>();
+    mocks.refresh.mockReturnValueOnce(sync.promise);
+    await render('C:/repo', true);
+    await render('C:/repo', true, 1);
+    await render('C:/repo', false, 1);
+    const requestId = mocks.refresh.mock.calls.at(-1)![0].readRequest.requestId;
+    expect(mocks.refresh.mock.calls.at(-1)![0].filters).toEqual(filters);
+    const refreshed = { ...comparisonReport(filters), savedAt: 2000 };
+    if (sourceState === 'changed') {
+      refreshed.id = 'new-refs';
+      refreshed.head = 'c'.repeat(40);
+      refreshed.tags = [{ name: 'v3.0.0', oid: refreshed.head, date: 3000, version: true }, ...refreshed.tags];
+      refreshed.totals = { ...refreshed.totals, commits: 4 };
+    }
+    const partial: RepositoryAnalyticsSnapshot = {
+      ...refreshed,
+      complete: false,
+      sections: ['history', 'comparison'],
+      project: { ...refreshed.project, files: 0, lines: 0, languages: [], ownership: [] },
+    };
+    await act(async () => listeners[0]({ repoPath: 'C:/repo', requestId, phase: 'aggregation', completed: 4, total: 4, snapshot: partial }));
+    expect(results.innerHTML).toBe(markup);
+    expect(host.querySelector('.analytics-comparison-placeholder')).toBeNull();
+    await act(async () => sync.resolve({ success: true, data: refreshed }));
+    expect(host.querySelectorAll('.analytics-comparison-picker select')[0]).toBe(from);
+    expect(host.querySelectorAll('.analytics-comparison-picker select')[1]).toBe(to);
+    expect(from.value).toBe('refs/tags/v1.0.0');
+    expect(to.value).toBe('refs/tags/v2.0.0');
+    expect(readAnalyticsFilters('C:/repo')).toEqual(filters);
+    expect(host.querySelector('.analytics-comparison-results')).toBe(results);
+    expect(host.querySelector('.analytics-comparison-ring')).toBe(ring);
+    expect(host.querySelector('.analytics-comparison-file-bars')).toBe(bars);
+    expect(host.querySelector('.analytics-comparison-areas')).toBe(areas);
+    expect(results.innerHTML).toBe(markup);
+    expect(document.activeElement).toBe(to);
+    expect(content.scrollTop).toBe(80);
+    expect(mocks.details).not.toHaveBeenCalled();
+    if (sourceState === 'changed') expect([...to.options].map((option) => option.value)).toContain('refs/tags/v3.0.0');
+    else expect(mocks.publish).not.toHaveBeenCalled();
+  });
+  it('ignores a late background comparison after the user selects another version and restores that choice on reopening', async () => {
+    mocks.cache.mockImplementation(({ filters }: { filters: AnalyticsFilters }) => Promise.resolve({ success: true, data: comparisonReport(filters) }));
+    await render();
+    await click('Release comparison');
+    await chooseVersion(0, 'refs/tags/v1.0.0');
+    await chooseVersion(1, 'refs/tags/v2.0.0');
+    const sync = deferred<{ success: true; data: RepositoryAnalyticsSnapshot }>();
+    mocks.refresh.mockReturnValueOnce(sync.promise);
+    await render('C:/repo', false, 1);
+    const old = listeners[0];
+    const oldRequest = mocks.refresh.mock.calls.at(-1)![0];
+    await chooseVersion(1, 'HEAD');
+    const current = host.querySelector('.analytics-comparison-results');
+    const stale = comparisonReport(oldRequest.filters);
+    stale.comparison!.commits = 99;
+    await act(async () => {
+      old({ repoPath: 'C:/repo', requestId: oldRequest.readRequest.requestId, phase: 'aggregation', completed: 99, total: 99, snapshot: stale });
+      sync.resolve({ success: true, data: stale });
+    });
+    expect(host.querySelectorAll<HTMLSelectElement>('.analytics-comparison-picker select')[1].value).toBe('HEAD');
+    expect(host.querySelector('.analytics-comparison-results')).toBe(current);
+    expect(host.querySelector('.analytics-comparison-metrics dd')?.textContent).toBe('12');
+    await act(async () => root.render(null));
+    mocks.cache.mockImplementation(() => new Promise(() => {}));
+    await render('C:/repo', false, 1);
+    const choices = host.querySelectorAll<HTMLSelectElement>('.analytics-comparison-picker select');
+    expect([...choices].map((select) => select.value)).toEqual(['refs/tags/v1.0.0', 'HEAD']);
+    expect(host.querySelector('.analytics-comparison-ring')).toBeTruthy();
+    expect(host.querySelector('.analytics-comparison-placeholder')).toBeNull();
   });
   it('preserves gaps in the time axis and lets the keyboard filter contributions by period', async () => {
     const saved = report();

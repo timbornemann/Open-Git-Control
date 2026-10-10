@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 
-export type AnalyticsTab = 'overview' | 'hotspots' | 'contributions' | 'churn' | 'coupling' | 'comparison';
+export type AnalyticsTab = 'overview' | 'hotspots' | 'contributions' | 'churn' | 'coupling' | 'comparison' | 'timeline';
 
 export function analyticsSections(tr: (de: string, en: string) => string): { id: AnalyticsTab; label: string }[] {
   return [
@@ -11,6 +11,7 @@ export function analyticsSections(tr: (de: string, en: string) => string): { id:
     { id: 'churn', label: 'Code Churn' },
     { id: 'coupling', label: tr('Dateikopplung', 'File coupling') },
     { id: 'comparison', label: tr('Release-Vergleich', 'Release comparison') },
+    { id: 'timeline', label: 'Timeline' },
   ];
 }
 

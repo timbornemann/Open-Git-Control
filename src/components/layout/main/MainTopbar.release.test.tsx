@@ -51,8 +51,6 @@ describe('local topbar release entry', () => {
                 showInspectorPane: false,
                 onToggleInspectorPane: vi.fn(),
                 onStageCommit: vi.fn(),
-                onOpenTimeline: vi.fn(),
-                isTimelineLoading: false,
               }),
             ),
           ),

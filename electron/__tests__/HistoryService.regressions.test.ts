@@ -4,6 +4,14 @@ import { HistoryService } from '../git/HistoryService';
 const hash = (value: string) => value.repeat(40);
 
 describe('HistoryService regression coverage', () => {
+  it('reads a captured timeline revision rather than a moving HEAD and rejects revision options', async () => {
+    const run = vi.fn().mockResolvedValue('');
+    const service = new HistoryService(run, vi.fn());
+    await service.getFileTimelineData(100, undefined, hash('a'));
+    expect(run).toHaveBeenCalledWith(expect.arrayContaining([hash('a'), '--']));
+    await expect(service.getFileTimelineData(100, undefined, '--all')).rejects.toThrow('valid captured commit ID');
+    expect(run).toHaveBeenCalledOnce();
+  });
   it('builds a first-parent timeline and attaches the parent tree as its baseline', async () => {
     const newest = hash('a');
     const oldest = hash('b');

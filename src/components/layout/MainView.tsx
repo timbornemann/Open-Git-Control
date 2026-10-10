@@ -1,6 +1,5 @@
 import React from 'react';
 import { useGitStore, useUIStore, useWorkflowStore } from '@/contexts/AppStateContext';
-import { useI18n } from '@/i18n';
 import { useWorkingTreeSnapshot } from '@/hooks/useWorkingTreeSnapshot';
 import { useMainViewInspector } from './hooks/useMainViewInspector';
 import { useMainViewPaneResizer } from './hooks/useMainViewPaneResizer';
@@ -8,12 +7,10 @@ import { MainInspectorPane } from './main/MainInspectorPane';
 import { MainPrimaryPane } from './main/MainPrimaryPane';
 import { MainTopbar } from './main/MainTopbar';
 import { useInspectorPaneVisibility } from './main/useInspectorPaneVisibility';
-import { useMainViewTimeline } from './main/useMainViewTimeline';
 import { APPLICATION_OPEN_STAGING_COMMIT_EVENT } from '@/utils/layoutPreferences';
 
 const MainViewComponent: React.FC = () => {
   const activeTab = useUIStore((state) => state.activeTab);
-  const setActiveTab = useUIStore((state) => state.setActiveTab);
   const isRunConfigOpen = useUIStore((state) => state.isRunConfigOpen);
   const onCloseRunConfig = useUIStore((state) => state.onCloseRunConfig);
   const isSecretScanAllowlistOpen = useUIStore((state) => state.isSecretScanAllowlistOpen);
@@ -32,7 +29,6 @@ const MainViewComponent: React.FC = () => {
   const onNavigateToCommit = useGitStore((state) => state.onNavigateToCommit);
   const autoOpenConflictResolverPath = useWorkflowStore((state) => state.autoOpenConflictResolverPath);
   const onAutoOpenConflictResolverConsumed = useWorkflowStore((state) => state.onAutoOpenConflictResolverConsumed);
-  const { t } = useI18n();
   const workingTree = useWorkingTreeSnapshot(activeRepo, refreshTrigger);
 
   const { primaryPaneBasis, isContentResizing, contentAreaRef, handleContentResizeStart } = useMainViewPaneResizer();
@@ -83,19 +79,12 @@ const MainViewComponent: React.FC = () => {
     setExpandedDirectoryPaths(new Set(['']));
   }, [activeRepo]);
 
-  const { showTimeline, setShowTimeline, isTimelineLoading, timelineCommits, openTimeline } = useMainViewTimeline({
-    activeRepo,
-    setActiveTab,
-    t,
-  });
-
   const handleRepositoryStagingOpen = React.useCallback(() => {
     onCloseRunConfig();
     onCloseRemoteConfig();
     onCloseSecretScanAllowlist();
     if (isReleaseCreatorOpen) onCloseReleaseCreator();
     if (isRepositoryPublicationOpen) onCloseRepositoryPublication?.();
-    setShowTimeline(false);
     handleStageCommitOpen();
   }, [
     handleStageCommitOpen,
@@ -106,12 +95,7 @@ const MainViewComponent: React.FC = () => {
     isReleaseCreatorOpen,
     isRepositoryPublicationOpen,
     onCloseRepositoryPublication,
-    setShowTimeline,
   ]);
-
-  React.useEffect(() => {
-    if (isReleaseCreatorOpen || isSecretScanAllowlistOpen || isRepositoryPublicationOpen || activeTab === 'analytics') setShowTimeline(false);
-  }, [isReleaseCreatorOpen, isSecretScanAllowlistOpen, isRepositoryPublicationOpen, activeTab, setShowTimeline]);
 
   React.useEffect(() => {
     const handleOpenStagingCommit = () => {
@@ -144,17 +128,12 @@ const MainViewComponent: React.FC = () => {
         showInspectorPane={showInspectorPane}
         onToggleInspectorPane={toggleInspectorPane}
         onStageCommit={handleRepositoryStagingOpen}
-        onOpenTimeline={openTimeline}
-        isTimelineLoading={isTimelineLoading}
       />
 
       <div ref={contentAreaRef} className="content-area">
         <MainPrimaryPane
           primaryPaneBasis={primaryPaneBasis}
           showInspectorPane={showInspectorPane}
-          showTimeline={showTimeline}
-          setShowTimeline={setShowTimeline}
-          timelineCommits={timelineCommits}
           workingTree={workingTree}
           activeDiffRequest={activeDiffRequest}
           workingDirectoryFilePath={workingDirectoryFilePath}

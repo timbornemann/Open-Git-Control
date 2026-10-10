@@ -13,18 +13,9 @@ type MainTopbarProps = {
   showInspectorPane: boolean;
   onToggleInspectorPane: () => void;
   onStageCommit: () => void;
-  onOpenTimeline: () => void;
-  isTimelineLoading: boolean;
 };
 
-export const MainTopbar: React.FC<MainTopbarProps> = ({
-  canShowInspectorPane,
-  showInspectorPane,
-  onToggleInspectorPane,
-  onStageCommit,
-  onOpenTimeline,
-  isTimelineLoading,
-}) => {
+export const MainTopbar: React.FC<MainTopbarProps> = ({ canShowInspectorPane, showInspectorPane, onToggleInspectorPane, onStageCommit }) => {
   const activeTab = useUIStore((state) => state.activeTab);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
   const onOpenRunConfig = useUIStore((state) => state.onOpenRunConfig);
@@ -37,8 +28,6 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
   const onPublishRepository = useUIStore((state) => state.onOpenRepositoryPublication);
   const onCloseRepositoryPublication = useUIStore((state) => state.onCloseRepositoryPublication);
   const isRepositoryPublicationOpen = useUIStore((state) => state.isRepositoryPublicationOpen);
-  const onCloseReleaseCreator = useUIStore((state) => state.onCloseReleaseCreator);
-  const isReleaseCreatorOpen = useUIStore((state) => state.isReleaseCreatorOpen);
   const activeRepo = useGitStore((state) => state.activeRepo);
   const branches = useGitStore((state) => state.branches);
   const tags = useGitStore((state) => state.tags);
@@ -158,14 +147,6 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
               onOpenReleaseCreator={() => {
                 onOpenReleaseCreator();
               }}
-              onOpenTimeline={() => {
-                if (isRepositoryPublicationOpen) onCloseRepositoryPublication?.();
-                if (isReleaseCreatorOpen) onCloseReleaseCreator();
-                onCloseRunConfig();
-                onCloseRemoteConfig();
-                onOpenTimeline();
-              }}
-              isTimelineLoading={isTimelineLoading}
               repositoryRun={repositoryRunForActiveRepo}
               activeRunConfig={activeRunConfig}
               hasUnreadRepositoryRunResult={hasUnreadRepositoryRunResult}

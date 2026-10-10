@@ -277,7 +277,7 @@ export interface ElectronGitAPI extends GitLfsApi, GitIdentityApi, ElectronRepos
   gitInit: (repoPath: string, options?: RepositoryInitializationOptionsDto) => Promise<GitInitResultDto>;
   getFileHistory: (filePath: string, commitHash?: string, limit?: number, repoPath?: string) => Promise<IpcResult<GitFileHistoryEntryDto[]>>;
   getFileBlame: (filePath: string, commitHash?: string, repoPath?: string, source?: FileBlameSourceDto) => Promise<IpcResult<GitFileBlameLineDto[]>>;
-  getFileTimelineData: (limit?: number, repoPath?: string) => Promise<IpcResult<FileTimelineCommitDto[]>>;
+  getFileTimelineData: (limit?: number, repoPath?: string, commitHash?: string) => Promise<IpcResult<FileTimelineCommitDto[]>>;
   readRepoFile: (filePath: string, repoPath?: string) => Promise<RepoFileReadResultDto>;
   getMarkdownPreviewFile: (params: RepositoryFileRequestDto) => Promise<IpcResult<MarkdownPreviewFileDto>>;
   getRepoFileDataUrl: (params: RepositoryFileRequestDto) => Promise<IpcResult<RepoFileDataUrlDto>>;

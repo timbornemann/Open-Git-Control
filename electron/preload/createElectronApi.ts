@@ -221,10 +221,10 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       repoPath
         ? invokeGitOperationForRepo(repoPath, 'blame', IpcChannel.GitFileBlame, filePath, commitHash, repoPath, source)
         : invokeGitOperation('blame', IpcChannel.GitFileBlame, filePath, commitHash, undefined, source),
-    getFileTimelineData: (limit?: number, repoPath?: string) =>
+    getFileTimelineData: (limit?: number, repoPath?: string, commitHash?: string) =>
       repoPath
-        ? invokeGitOperationForRepo(repoPath, 'log', IpcChannel.GitGetFileTimelineData, limit, repoPath)
-        : invokeGitOperation('log', IpcChannel.GitGetFileTimelineData, limit),
+        ? invokeGitOperationForRepo(repoPath, 'log', IpcChannel.GitGetFileTimelineData, limit, repoPath, ...(commitHash === undefined ? [] : [commitHash]))
+        : invokeGitOperation('log', IpcChannel.GitGetFileTimelineData, limit, ...(commitHash === undefined ? [] : [undefined, commitHash])),
     readRepoFile: (filePath: string, repoPath?: string) =>
       repoPath
         ? invokeGitOperationForRepo(repoPath, 'show', IpcChannel.GitReadRepoFile, filePath, repoPath)

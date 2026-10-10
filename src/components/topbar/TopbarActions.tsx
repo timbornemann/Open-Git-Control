@@ -1,7 +1,5 @@
-import { usePreloadIntent } from '@/data/usePreloadIntent';
-import { gitClient } from '@/services/gitClient';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDownCircle, ArrowUpCircle, ChevronDown, GitCommitHorizontal, GitMerge, History, MoreHorizontal, RefreshCw, Rocket } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, ChevronDown, GitCommitHorizontal, GitMerge, MoreHorizontal, RefreshCw, Rocket } from 'lucide-react';
 import type { BranchInfo, GitMergeMode } from '@/types/git';
 import type { RepositoryRunActionId, RepositoryRunConfigStateDto, RepositoryRunStateDto } from '@/types/repositoryRun';
 import { normalizeBranchRefForMerge } from '@/utils/gitParsing';
@@ -28,8 +26,6 @@ type Props = {
   onMergeBranch: (branchName: string, mode: GitMergeMode) => void;
   onStageCommit: () => void;
   onOpenReleaseCreator: () => void;
-  onOpenTimeline?: () => void;
-  isTimelineLoading?: boolean;
   repositoryRun: RepositoryRunStateDto | null;
   activeRunConfig: RepositoryRunConfigStateDto | null;
   hasUnreadRepositoryRunResult: boolean;
@@ -68,8 +64,6 @@ export const TopbarActions: React.FC<Props> = ({
   onMergeBranch,
   onStageCommit,
   onOpenReleaseCreator,
-  onOpenTimeline,
-  isTimelineLoading = false,
   repositoryRun,
   activeRunConfig,
   hasUnreadRepositoryRunResult,
@@ -82,7 +76,6 @@ export const TopbarActions: React.FC<Props> = ({
   onOpenRepositoryAnalytics,
   onPublishRepository,
 }) => {
-  const intent = usePreloadIntent();
   const { t, tr } = useI18n();
   const normalizedAction = (activeActionLabel || '').toLowerCase();
   const isPullRunning = isGitActionRunning && normalizedAction.includes('pull');
@@ -399,17 +392,6 @@ export const TopbarActions: React.FC<Props> = ({
         onOpenConsole={onOpenRunConsole}
         onOpenSettings={onOpenRunSettings}
       />
-      <button
-        className="icon-btn topbar-action-btn topbar-action-secondary"
-        onClick={onOpenTimeline}
-        onMouseEnter={() => activeRepo && intent.hover(() => gitClient.getFileTimelineData(1500, activeRepo))}
-        onMouseLeave={intent.cancel}
-        onFocus={() => activeRepo && intent.focus(() => gitClient.getFileTimelineData(1500, activeRepo))}
-        disabled={!activeRepo || isTimelineLoading}
-      >
-        <History size={16} className={isTimelineLoading ? 'spin' : ''} />
-        <span className="topbar-action-label">{t('generated.components.topbar.topbaractions.timeline_b35c2fb1')}</span>
-      </button>
       <button className="icon-btn topbar-action-btn topbar-action-secondary" onClick={onOpenReleaseCreator} disabled={!activeRepo}>
         <Rocket size={16} />
         <span className="topbar-action-label">{t('generated.components.topbar.topbaractions.release_f55496ba')}</span>
@@ -435,13 +417,11 @@ export const TopbarActions: React.FC<Props> = ({
             activeRepo={activeRepo}
             isGitActionRunning={isGitActionRunning}
             branchCount={branches.length}
-            isTimelineLoading={isTimelineLoading}
             pullOptions={pullOptions}
             pushOptions={pushOptions}
             renderMergePicker={renderMergePicker}
             onClearMergeQuery={() => setMergeQuery('')}
             onStageCommit={onStageCommit}
-            onOpenTimeline={onOpenTimeline}
             onOpenReleaseCreator={onOpenReleaseCreator}
             activeRunConfig={activeRunConfig}
             repositoryRun={repositoryRun}

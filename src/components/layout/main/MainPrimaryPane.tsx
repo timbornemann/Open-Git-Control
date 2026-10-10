@@ -8,7 +8,6 @@ import { useRepositoryContext, useSettingsContext, useUIContext, useWorkflowCont
 import { useI18n } from '@/i18n';
 import type { DiffRequest } from '@/types/diff';
 import type { WorkingDirectoryNavigationGuard } from '@/components/layout/hooks/useMainViewInspector';
-import type { FileTimelineCommitDto } from '@/types/gitDtos';
 import type { WorkingTreeState } from '@/hooks/useWorkingTreeSnapshot';
 import { PRIMARY_PANE_MIN_WIDTH } from '@/components/layout/hooks/useMainViewPaneResizer';
 import { getMainPrimaryRoute, getMainPrimaryTitle, hasMainPrimaryHeader } from './mainPrimaryRoute';
@@ -22,7 +21,6 @@ import { useCommitMessageEditor } from '@/components/commit-graph/useCommitMessa
 
 const CommitGraph = viewModules.repo.View;
 const FileViewer = viewModules.file.View;
-const FileTimelineView = viewModules.timeline.View;
 const ProjectPlannerView = viewModules.planner.View;
 const HostingWorkspaceView = viewModules.hosting.View;
 const SettingsMainContent = viewModules.settings.View;
@@ -32,9 +30,6 @@ const RepositoryAnalyticsView = viewModules.analytics.View;
 type MainPrimaryPaneProps = {
   primaryPaneBasis: string;
   showInspectorPane: boolean;
-  showTimeline: boolean;
-  setShowTimeline: (value: boolean) => void;
-  timelineCommits: FileTimelineCommitDto[];
   workingTree: WorkingTreeState;
   activeDiffRequest: DiffRequest | null;
   workingDirectoryFilePath: string | null;
@@ -52,9 +47,6 @@ type MainPrimaryPaneProps = {
 export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   primaryPaneBasis,
   showInspectorPane,
-  showTimeline,
-  setShowTimeline,
-  timelineCommits,
   workingTree,
   activeDiffRequest,
   workingDirectoryFilePath,
@@ -99,7 +91,6 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
     workingDirectoryFilePath,
     activeTab: ui.activeTab,
     showRecoveryCenter,
-    showTimeline,
     showRunConsole: workflow.isRunConsoleOpen && workflow.repositoryRun?.repoPath === repository.activeRepo,
     showRunConfig: ui.isRunConfigOpen,
     showSecretScanAllowlist: ui.isSecretScanAllowlistOpen,
@@ -111,7 +102,6 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   const isPlannerView = route === 'planner';
   const isHostingView = route === 'hosting';
   const isLocalReposView = route === 'localRepos';
-  const isTimelineView = route === 'timeline';
   const isRunConsoleView = route === 'runConsole';
   const isRunConfigView = route === 'runConfig';
   const isSecretScanAllowlistView = route === 'secretScanAllowlist';
@@ -176,10 +166,6 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
             <button className="icon-btn pane-header-nav-btn" onClick={isRemoteConfigView ? ui.onCloseRemoteConfig : ui.onCloseRunConfig}>
               {tr('Zurück zum Repository', 'Back to repository')}
             </button>
-          ) : isTimelineView ? (
-            <button className="icon-btn pane-header-nav-btn" onClick={() => setShowTimeline(false)}>
-              {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
-            </button>
           ) : showRecoveryCenter ? (
             <button className="icon-btn pane-header-nav-btn" onClick={() => setShowRecoveryCenter(false)}>
               {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
@@ -241,10 +227,6 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
               onSelectTab={settingsState.onSelectSettingsTab}
               onResetLayout={ui.onResetLayout}
             />
-          </React.Suspense>
-        ) : isTimelineView ? (
-          <React.Suspense fallback={lazyPaneFallback}>
-            <FileTimelineView onClose={() => setShowTimeline(false)} commits={timelineCommits} />
           </React.Suspense>
         ) : isRunConsoleView && workflow.repositoryRun ? (
           <RepositoryRunConsole run={workflow.repositoryRun} onStop={() => void workflow.onStopRepositoryRun()} onBack={workflow.onCloseRunConsole} />

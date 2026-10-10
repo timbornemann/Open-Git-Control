@@ -219,10 +219,12 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
     },
   );
 
-  ipcMain.handle(IpcChannel.GitGetFileTimelineData, async (_event: unknown, limit?: number, requestedRepoPath?: unknown) => {
+  ipcMain.handle(IpcChannel.GitGetFileTimelineData, async (_event: unknown, limit?: number, requestedRepoPath?: unknown, commitHash?: unknown) => {
     try {
       const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitGetFileTimelineData);
-      const commits = await gitService.history.getFileTimelineData(limit, repoPath);
+      if (commitHash !== undefined && (typeof commitHash !== 'string' || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/i.test(commitHash)))
+        throw new Error('Timeline requires a valid captured commit ID.');
+      const commits = await gitService.history.getFileTimelineData(limit, repoPath, ...(commitHash === undefined ? [] : [commitHash as string]));
       return { success: true, data: commits };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };

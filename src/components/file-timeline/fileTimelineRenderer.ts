@@ -1,4 +1,5 @@
 import type { FileTimelineDimensions, FileTimelineLayoutNode, FileTimelineViewport } from './types';
+import { FileTimelineSpatialIndex, type TimelineBounds } from './fileTimelineSpatialIndex';
 
 type RenderParams = {
   ctx: CanvasRenderingContext2D;
@@ -6,14 +7,10 @@ type RenderParams = {
   viewport: FileTimelineViewport;
   nodes: FileTimelineLayoutNode[];
   devicePixelRatio: number;
+  spatialIndex?: FileTimelineSpatialIndex;
 };
 
-type Bounds = {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-};
+type Bounds = TimelineBounds;
 
 const drawFolderIcon = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) => {
   ctx.fillStyle = color;
@@ -59,59 +56,76 @@ const drawFileIcon = (ctx: CanvasRenderingContext2D, x: number, y: number, size:
 };
 
 const drawGrid = (ctx: CanvasRenderingContext2D, dimensions: FileTimelineDimensions, viewport: FileTimelineViewport) => {
-  ctx.fillStyle = 'rgba(150, 130, 160, 0.4)';
-  const gridSize = 40;
-  const left = -viewport.translateX / viewport.scale;
-  const top = -viewport.translateY / viewport.scale;
-  const right = (dimensions.width - viewport.translateX) / viewport.scale;
-  const bottom = (dimensions.height - viewport.translateY) / viewport.scale;
-  const startX = Math.floor(left / gridSize) * gridSize;
-  const startY = Math.floor(top / gridSize) * gridSize;
-
-  for (let x = startX; x < right; x += gridSize) {
-    for (let y = startY; y < bottom; y += gridSize) {
-      ctx.beginPath();
+  // Draw in screen space. A fixed world-space raster grows quadratically when zooming out.
+  const step = 40 * viewport.scale * 2 ** Math.ceil(Math.log2(32 / (40 * viewport.scale)));
+  const startX = ((viewport.translateX % step) + step) % step;
+  const startY = ((viewport.translateY % step) + step) % step;
+  ctx.fillStyle = 'rgba(150, 130, 160, 0.24)';
+  ctx.beginPath();
+  for (let x = startX; x < dimensions.width; x += step) {
+    for (let y = startY; y < dimensions.height; y += step) {
+      ctx.moveTo(x + 1, y);
       ctx.arc(x, y, 1, 0, Math.PI * 2);
-      ctx.fill();
     }
   }
+  ctx.fill();
 };
 
-const drawConnections = (ctx: CanvasRenderingContext2D, nodes: FileTimelineLayoutNode[], bounds: Bounds) => {
-  ctx.lineWidth = 2.5;
-  for (const node of nodes) {
-    for (const child of node.children) {
-      const isNodeVisible = node.x >= bounds.left && node.x <= bounds.right && node.y >= bounds.top && node.y <= bounds.bottom;
-      const isChildVisible = child.x >= bounds.left && child.x <= bounds.right && child.y >= bounds.top && child.y <= bounds.bottom;
-      if (!isNodeVisible && !isChildVisible) continue;
-
-      ctx.beginPath();
+const drawConnections = (ctx: CanvasRenderingContext2D, index: FileTimelineSpatialIndex, bounds: Bounds, scale: number) => {
+  const connections = visibleConnections(index, bounds, scale);
+  const styles = [
+    { status: 'unchanged', color: 'rgba(179, 170, 162, 0.4)', width: 2 },
+    { status: 'added', color: '#4fae94', width: 4 },
+    { status: 'modified', color: '#5f9ec2', width: 4 },
+    { status: 'renamed', color: '#9a79c8', width: 4 },
+  ];
+  for (const style of styles) {
+    ctx.beginPath();
+    let visible = false;
+    for (const { parent: node, child } of connections) {
+      if (child.status !== style.status) continue;
+      visible = true;
       ctx.moveTo(node.x, node.y);
       const midX = (node.x + child.x) / 2;
       ctx.bezierCurveTo(midX, node.y, midX, child.y, child.x, child.y);
-
-      if (child.status === 'added') {
-        ctx.strokeStyle = 'rgba(79, 174, 148, 1.0)';
-        ctx.lineWidth = 4;
-      } else if (child.status === 'modified') {
-        ctx.strokeStyle = 'rgba(95, 158, 194, 1.0)';
-        ctx.lineWidth = 4;
-      } else if (child.status === 'renamed') {
-        ctx.strokeStyle = 'rgba(154, 121, 200, 1.0)';
-        ctx.lineWidth = 4;
-      } else {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-        ctx.lineWidth = 2;
-      }
+    }
+    if (visible) {
+      ctx.strokeStyle = style.color;
+      ctx.lineWidth = scale < 0.3 ? 0.5 / scale : style.width;
       ctx.stroke();
     }
   }
 };
 
+function visibleConnections(index: FileTimelineSpatialIndex, bounds: Bounds, scale: number) {
+  const visible = index.connections.filter(
+    ({ parent, child }) =>
+      child.x >= bounds.left && parent.x <= bounds.right && Math.max(parent.y, child.y) >= bounds.top && Math.min(parent.y, child.y) <= bounds.bottom,
+  );
+  if (scale >= 0.3) return visible;
+  const groups = new Map<string, (typeof visible)[number]>();
+  for (const connection of visible) {
+    const key = `${connection.parent.path}\0${Math.round((connection.child.x * scale) / 2)}:${Math.round((connection.child.y * scale) / 2)}`;
+    const previous = groups.get(key);
+    if (!previous || (previous.child.status === 'unchanged' && connection.child.status !== 'unchanged')) groups.set(key, connection);
+  }
+  return [...groups.values()];
+}
+
+function overviewNodes(nodes: FileTimelineLayoutNode[], scale: number) {
+  const groups = new Map<string, FileTimelineLayoutNode>();
+  for (const node of nodes) {
+    const key = `${Math.round((node.x * scale) / 3)}:${Math.round((node.y * scale) / 3)}`;
+    const previous = groups.get(key);
+    if (!previous || (previous.status === 'unchanged' && node.status !== 'unchanged')) groups.set(key, node);
+  }
+  return [...groups.values()];
+}
+
 const getNodeIconColor = (node: FileTimelineLayoutNode, isFolder: boolean) => {
   if (node.status === 'added') return '#4fae94';
   if (node.status === 'modified') return '#5f9ec2';
-  if (node.status === 'renamed') return '#7890a1';
+  if (node.status === 'renamed') return '#9a79c8';
   return isFolder ? '#d09a72' : '#b3aaa2';
 };
 
@@ -144,7 +158,7 @@ const drawNodeBorder = (ctx: CanvasRenderingContext2D, node: FileTimelineLayoutN
     ctx.strokeStyle = '#5f9ec2';
     ctx.lineWidth = 3.5;
   } else if (node.status === 'renamed') {
-    ctx.strokeStyle = '#7890a1';
+    ctx.strokeStyle = '#9a79c8';
     ctx.lineWidth = 3.5;
   } else {
     ctx.strokeStyle = isFolder ? '#d09a72' : '#b3aaa2';
@@ -190,6 +204,22 @@ const drawNodeText = (ctx: CanvasRenderingContext2D, node: FileTimelineLayoutNod
 };
 
 const drawNodes = (ctx: CanvasRenderingContext2D, nodes: FileTimelineLayoutNode[], bounds: Bounds, scale: number) => {
+  if (scale < 0.3) {
+    // At overview scale icons, glows and outlined labels are subpixel work. Batch visible dots instead.
+    const visible = overviewNodes(nodes, scale);
+    for (const color of ['#4fae94', '#5f9ec2', '#9a79c8', '#d09a72', '#b3aaa2']) {
+      ctx.beginPath();
+      for (const node of visible) {
+        if (getNodeIconColor(node, node.type === 'folder') !== color) continue;
+        const radius = (node.type === 'folder' ? 2.5 : 1.5) / scale;
+        ctx.moveTo(node.x + radius, node.y);
+        ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
+      }
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+    return;
+  }
   for (const node of nodes) {
     if (node.x + 250 < bounds.left || node.x - 50 > bounds.right || node.y + 50 < bounds.top || node.y - 50 > bounds.bottom) continue;
 
@@ -213,7 +243,9 @@ const drawNodes = (ctx: CanvasRenderingContext2D, nodes: FileTimelineLayoutNode[
   }
 };
 
-export const renderFileTimelineCanvas = ({ ctx, dimensions, viewport, nodes, devicePixelRatio }: RenderParams) => {
+export const renderFileTimelineCanvas = ({ ctx, dimensions, viewport, nodes, devicePixelRatio, spatialIndex }: RenderParams) => {
+  if (!Number.isFinite(viewport.scale) || viewport.scale <= 0) return;
+  const index = spatialIndex ?? new FileTimelineSpatialIndex(nodes);
   const bounds: Bounds = {
     left: (-100 - viewport.translateX) / viewport.scale,
     right: (dimensions.width + 250 - viewport.translateX) / viewport.scale,
@@ -224,12 +256,13 @@ export const renderFileTimelineCanvas = ({ ctx, dimensions, viewport, nodes, dev
   ctx.clearRect(0, 0, dimensions.width * devicePixelRatio, dimensions.height * devicePixelRatio);
   ctx.save();
   ctx.scale(devicePixelRatio, devicePixelRatio);
+  drawGrid(ctx, dimensions, viewport);
   ctx.translate(viewport.translateX, viewport.translateY);
   ctx.scale(viewport.scale, viewport.scale);
 
-  drawGrid(ctx, dimensions, viewport);
-  drawConnections(ctx, nodes, bounds);
-  drawNodes(ctx, nodes, bounds, viewport.scale);
+  drawConnections(ctx, index, bounds, viewport.scale);
+  const visible = index.query({ left: bounds.left - 250, right: bounds.right + 50, top: bounds.top - 50, bottom: bounds.bottom + 50 });
+  drawNodes(ctx, visible, bounds, viewport.scale);
 
   ctx.restore();
 };

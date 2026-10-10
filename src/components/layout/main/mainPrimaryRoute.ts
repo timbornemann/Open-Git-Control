@@ -12,7 +12,6 @@ export type MainPrimaryRoute =
   | 'analytics'
   | 'releaseCreator'
   | 'repositoryPublication'
-  | 'timeline'
   | 'runConsole'
   | 'hosting'
   | 'recovery'
@@ -27,7 +26,6 @@ type RouteParams = {
   workingDirectoryFilePath?: string | null;
   activeTab: AppTabId;
   showRecoveryCenter: boolean;
-  showTimeline: boolean;
   showRunConsole: boolean;
   showRunConfig?: boolean;
   showSecretScanAllowlist?: boolean;
@@ -44,7 +42,6 @@ export const getMainPrimaryRoute = ({
   workingDirectoryFilePath,
   activeTab,
   showRecoveryCenter,
-  showTimeline,
   showRunConsole,
   showRunConfig,
   showSecretScanAllowlist,
@@ -61,7 +58,6 @@ export const getMainPrimaryRoute = ({
   if (activeTab === 'repo' && showReleaseCreator) return 'releaseCreator';
   if (activeTab === 'repo' && showRemoteConfig) return 'remoteConfig';
   if (activeTab === 'repo' && showRunConfig) return 'runConfig';
-  if (activeTab === 'repo' && showTimeline) return 'timeline';
   if (activeTab === 'repo' && showRunConsole) return 'runConsole';
   if (activeTab === 'hosting' || activeTab === 'github') return 'hosting';
   if (showRecoveryCenter) return 'recovery';
@@ -87,8 +83,6 @@ export const getMainPrimaryTitle = (route: MainPrimaryRoute, t: Translate, tr: (
       return tr('Release erstellen', 'Create release');
     case 'repositoryPublication':
       return tr('Repository veröffentlichen', 'Publish repository');
-    case 'timeline':
-      return t('generated.components.layout.main.mainprimarypane.codebase_timeline_cd023f25');
     case 'recovery':
       return t('generated.components.layout.main.mainprimarypane.recovery_center_0adebec8');
     case 'conflict':

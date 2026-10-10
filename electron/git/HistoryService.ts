@@ -330,7 +330,8 @@ export class HistoryService {
     return stats;
   }
 
-  async getFileTimelineData(limit: number = 2000, repoPath?: string): Promise<FileTimelineCommit[]> {
+  async getFileTimelineData(limit: number = 2000, repoPath?: string, commitHash?: string): Promise<FileTimelineCommit[]> {
+    if (commitHash !== undefined && !COMMIT_HASH_RE.test(commitHash)) throw new Error('Timeline requires a valid captured commit ID.');
     const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 5000)) : 2000;
     const recordSeparator = '\x1e';
     const fieldSeparator = '\x1f';
@@ -338,6 +339,7 @@ export class HistoryService {
     // A timeline must follow a real sequence of repository states. Flattening
     // every side branch from the commit DAG produces states that never existed.
     const args = ['log', '--first-parent', '--diff-merges=first-parent', `-${safeLimit}`, '-z', '--name-status', `--pretty=format:${format}`, '--date=iso'];
+    if (commitHash) args.push(commitHash, '--');
     const output = await this.execute(args, repoPath);
     const commits: FileTimelineCommit[] = [];
 

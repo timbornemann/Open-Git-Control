@@ -55,14 +55,7 @@ async function render(repoPath: string | null = 'C:/Code/alpha', collapsed = fal
             <SidebarHeaderContainer />
             <SidebarContentRouter />
           </aside>
-          <MainTopbar
-            canShowInspectorPane={false}
-            showInspectorPane={false}
-            onToggleInspectorPane={vi.fn()}
-            onStageCommit={vi.fn()}
-            onOpenTimeline={vi.fn()}
-            isTimelineLoading={false}
-          />
+          <MainTopbar canShowInspectorPane={false} showInspectorPane={false} onToggleInspectorPane={vi.fn()} onStageCommit={vi.fn()} />
         </AppStateSlicesProvider>
       </I18nProvider>,
     ),
@@ -92,7 +85,7 @@ describe('standalone analytics navigation', () => {
     expect(icon?.getAttribute('aria-current')).toBe('page');
     expect(host.querySelector('.sidebar-header')?.textContent).toBe('Statistics & analytics');
     expect(host.querySelector('.analytics-sidebar-repository-path')?.textContent).toBe('C:/Code/alpha');
-    expect(host.querySelectorAll('.analytics-sidebar-nav button')).toHaveLength(6);
+    expect(host.querySelectorAll('.analytics-sidebar-nav button')).toHaveLength(7);
     expect(host.querySelector('.activity-bar [title="Current repository"]')?.nextElementSibling).toBe(icon);
     expect(icon?.nextElementSibling?.getAttribute('title')).toBe('Project planning');
     expect(icon?.nextElementSibling?.nextElementSibling?.getAttribute('title')).toBe('Local repositories');
@@ -123,6 +116,18 @@ describe('standalone analytics navigation', () => {
     await render();
     expect(current()).toBe('Contributions');
     expect([...host.querySelectorAll('.analytics-sidebar-nav button')].map((node) => node.textContent)).not.toContain('Last changed lines');
+  });
+  it('opens Timeline from analytics navigation without switching the repository or opening staging', async () => {
+    await render();
+    const timeline = [...host.querySelectorAll<HTMLButtonElement>('.analytics-sidebar-nav button')].find((button) => button.textContent === 'Timeline')!;
+    await act(async () => timeline.click());
+    expect(current()).toBe('Timeline');
+    expect(switchRepo).not.toHaveBeenCalled();
+    expect(host.querySelector('.topbar-panel-toggle')).toBeNull();
+    await render('D:/Code/beta');
+    expect(current()).toBe('Overview');
+    await render();
+    expect(current()).toBe('Timeline');
   });
   it('shows the active repository without offering repository switching in analytics', async () => {
     await render();
