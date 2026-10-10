@@ -13,7 +13,7 @@ const filename = (path: string) => path.slice(path.lastIndexOf('/') + 1);
 
 export function AnalyticsCoupling({ rows, maxCommits, loading = false, onPath }: Props) {
   const { tr, locale } = useI18n();
-  const scene = useCouplingScene(rows);
+  const { scene, settling, lock } = useCouplingScene(rows, loading);
   const [selectedFile, setSelectedFile] = useState('');
   const [selectedKey, setSelectedKey] = useState('');
   const file = scene.nodes.some((node) => node.path === selectedFile) ? selectedFile : '';
@@ -22,10 +22,12 @@ export function AnalyticsCoupling({ rows, maxCommits, loading = false, onPath }:
   const selected = connections.find((pair) => couplingPairKey(pair) === selectedKey) ?? connections[0];
   const max = rows.reduce((value, pair) => Math.max(value, pair.commits), Math.max(1, maxCommits));
   const selectFile = (path: string) => {
+    lock();
     setSelectedFile(path);
     setSelectedKey('');
   };
   const selectPair = (pair: Coupling) => {
+    lock();
     if (file && pair.first !== file && pair.second !== file) setSelectedFile('');
     setSelectedKey(couplingPairKey(pair));
   };
@@ -54,7 +56,8 @@ export function AnalyticsCoupling({ rows, maxCommits, loading = false, onPath }:
           file={file}
           selected={selected}
           max={max}
-          loading={loading}
+          loading={loading || settling}
+          onInteract={lock}
           onSelectFile={selectFile}
           onSelectPair={selectPair}
         />

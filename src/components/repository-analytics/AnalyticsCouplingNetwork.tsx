@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useState } from 'react';
-import { FileCode2, Maximize2, Minus, Plus } from 'lucide-react';
+import { Maximize2, Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import type { AnalyticsCoupling } from '@/shared/ipc/repositoryAnalytics';
@@ -19,12 +19,13 @@ type Props = {
   loading: boolean;
   onSelectFile: (path: string) => void;
   onSelectPair: (pair: AnalyticsCoupling) => void;
+  onInteract: () => void;
 };
 
-export function AnalyticsCouplingNetwork({ scene, rows, file, selected, max, loading, onSelectFile, onSelectPair }: Props) {
+export function AnalyticsCouplingNetwork({ scene, rows, file, selected, max, loading, onSelectFile, onSelectPair, onInteract }: Props) {
   const { tr, locale } = useI18n();
   const { ref, width, height } = useAnalyticsSize(700, 440);
-  const viewport = useCouplingViewport(scene, width, height, loading, ref);
+  const viewport = useCouplingViewport(scene, width, height, loading, ref, onInteract);
   const { camera } = viewport;
   const [hovered, setHovered] = useState(''),
     [focused, setFocused] = useState('');
@@ -37,11 +38,13 @@ export function AnalyticsCouplingNetwork({ scene, rows, file, selected, max, loa
   const preference = JSON.stringify(preferred);
   const labels = useMemo(() => {
     const paths = JSON.parse(preference) as string[];
-    const candidates =
-      scene.nodes.length > 180 ? [...scene.nodes].sort((a, b) => b.connections - a.connections || a.path.localeCompare(b.path)).slice(0, 180) : scene.nodes;
-    const nodes = [...new Map([...candidates, ...scene.nodes.filter((node) => paths.includes(node.path))].map((node) => [node.path, node])).values()];
-    return couplingLabelLayout(nodes, scene.width, scene.height, paths);
-  }, [scene, preference]);
+    const visible = scene.nodes
+      .map((node) => ({ ...node, x: node.x * camera.scale + camera.x, y: node.y * camera.scale + camera.y }))
+      .filter((node) => node.x >= 0 && node.x <= width && node.y >= 0 && node.y <= height);
+    const budget = camera.scale < 0.3 ? 6 : camera.scale < 0.8 ? 12 : 60;
+    return couplingLabelLayout(visible, width, height, paths, Math.max(paths.length, Math.min(budget, Math.floor((width * height) / 9000))), visible);
+  }, [scene, preference, camera, width, height]);
+  const edgeOpacity = Math.max(0.035, Math.min(0.23, 0.4 / Math.sqrt(Math.max(1, (rows.length * 2) / Math.max(1, scene.nodes.length)))));
   const selectedNode = byPath.get(file);
   const reveal = viewport.reveal;
   const selectedX = selectedNode?.x,
@@ -71,13 +74,20 @@ export function AnalyticsCouplingNetwork({ scene, rows, file, selected, max, loa
         role="group"
         tabIndex={0}
         aria-label={tr('Netz gemeinsam geänderter Dateien', 'Network of files changed together')}
+        aria-busy={loading}
+        style={{ '--coupling-edge-opacity': edgeOpacity } as React.CSSProperties}
         {...viewport.interaction}
       >
         <div
           className="analytics-coupling-scene"
           style={{ width: scene.width, height: scene.height, transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})` }}
         >
-          <svg viewBox={`0 0 ${scene.width} ${scene.height}`} className="analytics-coupling-lines" aria-hidden="true">
+          <svg
+            viewBox={`${scene.left ?? 0} ${scene.top ?? 0} ${scene.width} ${scene.height}`}
+            style={{ left: scene.left ?? 0, top: scene.top ?? 0 }}
+            className="analytics-coupling-lines"
+            aria-hidden="true"
+          >
             {rows.map((pair) => {
               const first = byPath.get(pair.first)!,
                 second = byPath.get(pair.second)!;
@@ -90,8 +100,7 @@ export function AnalyticsCouplingNetwork({ scene, rows, file, selected, max, loa
                     y1={first.y}
                     x2={second.x}
                     y2={second.y}
-                    strokeWidth={1 + Math.sqrt(pair.commits / max) * 6}
-                    vectorEffect="non-scaling-stroke"
+                    strokeWidth={(0.6 + Math.sqrt(pair.commits / max) * (active ? 2 : 1.2)) / camera.scale}
                   />
                   <line
                     className="analytics-coupling-edge-hit"
@@ -99,7 +108,7 @@ export function AnalyticsCouplingNetwork({ scene, rows, file, selected, max, loa
                     y1={first.y}
                     x2={second.x}
                     y2={second.y}
-                    vectorEffect="non-scaling-stroke"
+                    style={{ strokeWidth: 12 / camera.scale }}
                     onClick={() => onSelectPair(pair)}
                   >
                     <title>{`${pair.first} ↔ ${pair.second}\n${count(pair.commits)} ${tr('gemeinsame Commits', 'shared commits')} · ${percent(pair.share, locale)}`}</title>
@@ -110,14 +119,21 @@ export function AnalyticsCouplingNetwork({ scene, rows, file, selected, max, loa
           </svg>
           {scene.nodes.map((node) => {
             const active = activeFile ? related.has(node.path) : selected?.first === node.path || selected?.second === node.path;
-            const label = labels.get(node.path);
             return (
               <button
                 key={node.path}
                 type="button"
                 className={`analytics-coupling-node${active ? ' is-active' : ''}${activeFile && !active ? ' is-muted' : ''}`}
                 data-path={node.path}
-                style={{ left: node.x, top: node.y }}
+                style={
+                  {
+                    left: node.x,
+                    top: node.y,
+                    width: Math.max(12, Math.min(28, 34 * camera.scale)) / camera.scale,
+                    height: Math.max(12, Math.min(28, 34 * camera.scale)) / camera.scale,
+                    '--coupling-node-size': `${Math.max(3, Math.min(18, 9 + Math.log2(1 + node.connections)) * camera.scale) / camera.scale}px`,
+                  } as React.CSSProperties
+                }
                 aria-label={`${node.path} · ${count(node.connections)} ${node.connections === 1 ? tr('Verbindung', 'connection') : tr('Verbindungen', 'connections')}`}
                 aria-pressed={file === node.path}
                 title={node.path}
@@ -130,17 +146,16 @@ export function AnalyticsCouplingNetwork({ scene, rows, file, selected, max, loa
                 }}
                 onBlur={() => setFocused('')}
                 onKeyDown={nodeKey}
-              >
-                <FileCode2 size={16} aria-hidden="true" />
-                <span
-                  className={label && (camera.scale >= 0.5 || active) ? '' : 'is-hidden'}
-                  style={label ? { left: label.x - node.x + 17, top: label.y - node.y + 17, width: label.width } : undefined}
-                >
-                  {node.path.slice(node.path.lastIndexOf('/') + 1)}
-                </span>
-              </button>
+              />
             );
           })}
+        </div>
+        <div className="analytics-coupling-labels" aria-hidden="true">
+          {[...labels].map(([path, label]) => (
+            <span key={path} className={preferred.includes(path) ? 'is-active' : ''} style={{ left: label.x, top: label.y, width: label.width }}>
+              {path.slice(path.lastIndexOf('/') + 1)}
+            </span>
+          ))}
         </div>
         {!rows.length && (
           <AnalyticsEmpty>

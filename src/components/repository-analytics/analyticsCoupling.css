@@ -59,20 +59,21 @@
 }
 .analytics-coupling-lines {
   position: absolute;
-  inset: 0;
+  right: auto;
+  bottom: auto;
   width: 100%;
   height: 100%;
 }
 .analytics-coupling-edge {
   stroke: var(--text-secondary);
-  opacity: 0.32;
+  opacity: var(--coupling-edge-opacity, 0.16);
 }
 .analytics-coupling-edge.is-active {
   stroke: var(--accent-primary);
-  opacity: 0.9;
+  opacity: 0.8;
 }
 .analytics-coupling-edge.is-muted {
-  opacity: 0.1;
+  opacity: 0.025;
 }
 .analytics-coupling-edge line {
   pointer-events: none;
@@ -91,24 +92,41 @@
   height: 34px;
   transform: translate(-50%, -50%);
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--text-secondary) 50%, var(--border-color));
+  border: 0;
   border-radius: 50%;
-  background: var(--bg-panel);
+  background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
 }
+.analytics-coupling-node::before {
+  content: '';
+  width: var(--coupling-node-size, 12px);
+  height: var(--coupling-node-size, 12px);
+  border-radius: 50%;
+  background: var(--text-secondary);
+  opacity: 0.8;
+}
 .analytics-coupling-node.is-active {
   color: var(--text-primary);
-  border-color: var(--accent-primary);
-  background: color-mix(in srgb, var(--accent-primary) 25%, var(--bg-panel));
   z-index: 1;
+}
+.analytics-coupling-node.is-active::before,
+.analytics-coupling-node:hover::before,
+.analytics-coupling-node:focus-visible::before {
+  background: var(--accent-primary);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent-primary) 25%, transparent);
+  opacity: 1;
 }
 .analytics-coupling-node.is-muted {
   opacity: 0.28;
 }
-.analytics-coupling-node > span {
+.analytics-coupling-labels {
   position: absolute;
-  top: calc(100% + 5px);
+  inset: 0;
+  pointer-events: none;
+}
+.analytics-coupling-labels > span {
+  position: absolute;
   padding: 2px 4px;
   background: var(--bg-darker);
   font-size: 0.71rem;
@@ -116,19 +134,17 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--text-secondary);
 }
-.analytics-coupling-node > span.is-hidden {
-  visibility: hidden;
+.analytics-coupling-labels > span.is-active {
+  color: var(--text-primary);
+  z-index: 1;
 }
 .analytics-coupling-node:hover,
 .analytics-coupling-node:focus-visible {
   z-index: 2;
   color: var(--text-primary);
   opacity: 1;
-}
-.analytics-coupling-node:hover > span,
-.analytics-coupling-node:focus-visible > span {
-  visibility: visible;
 }
 .analytics-coupling-node:focus-visible,
 .analytics-coupling-connection:focus-visible,

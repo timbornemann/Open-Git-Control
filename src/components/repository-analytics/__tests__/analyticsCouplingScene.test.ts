@@ -4,12 +4,17 @@ import { fitCouplingCamera, zoomCouplingCamera } from '../useCouplingViewport';
 
 const pairs = (count: number) => Array.from({ length: count }, (_, i) => ({ first: 'hub.ts', second: `file-${i}.ts` }));
 describe('unbounded coupling scene and camera', () => {
-  it('retains every edge endpoint in large graphs without a force-layout or file-count cap', () => {
+  it('seeds every edge endpoint in large graphs without a file-count cap', () => {
     const scene = buildCouplingScene(pairs(2000));
     expect(scene.nodes).toHaveLength(2001);
     expect(scene.nodes.find((node) => node.path === 'hub.ts')?.connections).toBe(2000);
     expect(new Set(scene.nodes.map((node) => `${node.x},${node.y}`)).size).toBe(2001);
-    expect(scene.nodes.every((node) => node.x >= 0 && node.x <= scene.width && node.y >= 0 && node.y <= scene.height)).toBe(true);
+    expect(
+      scene.nodes.every(
+        (node) =>
+          node.x >= (scene.left ?? 0) && node.x <= (scene.left ?? 0) + scene.width && node.y >= (scene.top ?? 0) && node.y <= (scene.top ?? 0) + scene.height,
+      ),
+    ).toBe(true);
   });
   it('preserves existing positions when batches add peers, when edges change, and when rows reorder', () => {
     const initial = buildCouplingScene(pairs(80));

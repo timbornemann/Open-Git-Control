@@ -7,14 +7,21 @@ export function fitCouplingCamera(scene: CouplingScene, width: number, height: n
     0.000001,
     Math.min((Math.max(1, width) - Math.min(40, width / 4)) / scene.width, (Math.max(1, height) - Math.min(40, height / 4)) / scene.height, 1.8),
   );
-  return { scale, x: (width - scene.width * scale) / 2, y: (height - scene.height * scale) / 2 };
+  return { scale, x: (width - scene.width * scale) / 2 - (scene.left ?? 0) * scale, y: (height - scene.height * scale) / 2 - (scene.top ?? 0) * scale };
 }
 export function zoomCouplingCamera(camera: CouplingCamera, factor: number, point: { x: number; y: number }, minScale: number): CouplingCamera {
   const scale = Math.max(minScale, Math.min(8, camera.scale * factor));
   return { scale, x: point.x - ((point.x - camera.x) * scale) / camera.scale, y: point.y - ((point.y - camera.y) * scale) / camera.scale };
 }
 
-export function useCouplingViewport(scene: CouplingScene, width: number, height: number, loading: boolean, element: React.RefObject<HTMLDivElement>) {
+export function useCouplingViewport(
+  scene: CouplingScene,
+  width: number,
+  height: number,
+  loading: boolean,
+  element: React.RefObject<HTMLDivElement>,
+  onInteract: () => void,
+) {
   const [camera, setCamera] = useState<CouplingCamera>({ x: 0, y: 0, scale: 1 });
   const [dragging, setDragging] = useState(false);
   const automatic = useRef(true);
@@ -22,9 +29,10 @@ export function useCouplingViewport(scene: CouplingScene, width: number, height:
   const ignoreClick = useRef(false);
   const dimensions = useRef({ width, height });
   const fit = useCallback(() => {
+    onInteract();
     automatic.current = false;
     setCamera(fitCouplingCamera(scene, width, height));
-  }, [scene, width, height]);
+  }, [scene, width, height, onInteract]);
   useLayoutEffect(() => {
     const previous = dimensions.current;
     dimensions.current = { width, height };
@@ -38,17 +46,23 @@ export function useCouplingViewport(scene: CouplingScene, width: number, height:
   }, [scene, width, height, loading, element]);
   const zoom = useCallback(
     (factor: number, point = { x: width / 2, y: height / 2 }) => {
+      onInteract();
       automatic.current = false;
       setCamera((value) => zoomCouplingCamera(value, factor, point, Math.min(0.05, fitCouplingCamera(scene, width, height).scale / 4)));
     },
-    [scene, width, height],
+    [scene, width, height, onInteract],
   );
-  const pan = useCallback((x: number, y: number) => {
-    automatic.current = false;
-    setCamera((value) => ({ ...value, x: value.x + x, y: value.y + y }));
-  }, []);
+  const pan = useCallback(
+    (x: number, y: number) => {
+      onInteract();
+      automatic.current = false;
+      setCamera((value) => ({ ...value, x: value.x + x, y: value.y + y }));
+    },
+    [onInteract],
+  );
   const reveal = useCallback(
     (point: { x: number; y: number }) => {
+      onInteract();
       automatic.current = false;
       setCamera((value) => {
         const x = point.x * value.scale + value.x,
@@ -60,7 +74,7 @@ export function useCouplingViewport(scene: CouplingScene, width: number, height:
         };
       });
     },
-    [width, height],
+    [width, height, onInteract],
   );
   useEffect(() => {
     const target = element.current;
@@ -92,6 +106,7 @@ export function useCouplingViewport(scene: CouplingScene, width: number, height:
         ignoreClick.current = false;
         if (event.button !== 0 || event.isPrimary === false || (event.target as Element).closest('button')) return;
         event.preventDefault();
+        onInteract();
         automatic.current = false;
         gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY, camera, moved: false };
       },
