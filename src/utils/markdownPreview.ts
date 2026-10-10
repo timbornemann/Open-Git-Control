@@ -48,6 +48,12 @@ const normalizeRepoRelativePath = (value: string): string | null => {
   return segments.length > 0 ? segments.join('/') : null;
 };
 
+// Markdown can come from remote release notes or untrusted repositories. Only
+// the language hint that marked emits for fenced code may keep a class; any
+// other class could borrow app styles (fixed overlays, modals) to spoof the UI.
+const MARKDOWN_CLASS_TOKEN = /^language-[A-Za-z0-9_+#.-]+$/;
+export const MARKDOWN_USER_CONTENT_ID_PREFIX = 'user-content-';
+
 export const isMarkdownFilePath = (filePath: string): boolean => MARKDOWN_EXTENSIONS.has(getExtension(filePath));
 
 export const isExternalMarkdownUrl = (value: string): boolean => {
@@ -84,7 +90,13 @@ export const renderMarkdownToSanitizedHtml = (markdown: string): string => {
     ADD_ATTR: ['checked', 'disabled', 'rel', 'target'],
     ADD_TAGS: ['input'],
     ALLOW_DATA_ATTR: false,
+    // Inline styles would let untrusted Markdown cover the whole app window
+    // (position: fixed) with a fake interface.
+    FORBID_ATTR: ['style'],
     FORBID_TAGS: ['button', 'embed', 'form', 'iframe', 'meta', 'object', 'script', 'style', 'template'],
+    // Prefix id/name values so Markdown cannot clobber or collide with app
+    // element IDs (for example the React root).
+    SANITIZE_NAMED_PROPS: true,
   });
 
   if (typeof DOMParser === 'undefined') {
@@ -92,6 +104,11 @@ export const renderMarkdownToSanitizedHtml = (markdown: string): string => {
   }
 
   const document = new DOMParser().parseFromString(sanitized, 'text/html');
+  for (const element of Array.from(document.body.querySelectorAll('[class]'))) {
+    const allowedClasses = (element.getAttribute('class') || '').split(/\s+/).filter((token) => MARKDOWN_CLASS_TOKEN.test(token));
+    if (allowedClasses.length > 0 && element.tagName.toLowerCase() === 'code') element.setAttribute('class', allowedClasses.join(' '));
+    else element.removeAttribute('class');
+  }
   for (const anchor of Array.from(document.body.querySelectorAll('a[href]'))) {
     const href = anchor.getAttribute('href') || '';
     if (isExternalMarkdownUrl(href)) {

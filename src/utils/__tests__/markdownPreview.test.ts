@@ -91,6 +91,28 @@ describe('markdown preview helpers', () => {
     expect(body.querySelector('input[type="text"]')).toBeNull();
   });
 
+  it('prevents untrusted Markdown from restyling or overlaying the app', () => {
+    const html = renderMarkdownToSanitizedHtml(
+      [
+        '<div style="position:fixed;inset:0;z-index:99999" class="modal-backdrop toast" id="root">Fake dialog</div>',
+        '<a name="install">Install</a>',
+        '',
+        '```ts',
+        'const value = 1;',
+        '```',
+      ].join('\n'),
+    );
+    const body = parseBody(html);
+    const overlay = body.querySelector('div');
+
+    expect(overlay?.textContent).toBe('Fake dialog');
+    expect(overlay?.hasAttribute('style')).toBe(false);
+    expect(overlay?.hasAttribute('class')).toBe(false);
+    expect(overlay?.getAttribute('id')).toBe('user-content-root');
+    expect(body.querySelector('a[name]')?.getAttribute('name')).toBe('user-content-install');
+    expect(body.querySelector('pre > code')?.getAttribute('class')).toBe('language-ts');
+  });
+
   it('returns parsed Markdown without sanitizing when no browser window exists', () => {
     vi.stubGlobal('window', undefined);
 
