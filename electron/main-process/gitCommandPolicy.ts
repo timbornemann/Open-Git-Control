@@ -381,18 +381,17 @@ const validateMergeArgs = (args: string[]): void => {
   assertSafeValue(refs[0], 'merge target');
 };
 
+/** Accepts exactly `[-m <parent>] [--no-edit] <commit>`, the shape built by gitClient. */
 const validateRevertArgs = (args: string[]): void => {
-  const values = args.filter((arg) => !arg.startsWith('-'));
-  if (values.length < 1 || values.length > 2) throw new Error('Invalid revert arguments.');
-  const hash = values[values.length - 1];
-  assertCommitHash(hash);
-  if (args.includes('-m')) {
-    const mainline = args[args.indexOf('-m') + 1];
-    if (!/^[1-9]\d*$/.test(mainline || '')) throw new Error('Invalid revert mainline.');
+  const options = args.slice(0, -1);
+  assertCommitHash(args[args.length - 1] || '');
+  let index = 0;
+  if (options[index] === '-m') {
+    if (!/^[1-9]\d*$/.test(options[index + 1] || '')) throw new Error('Invalid revert mainline.');
+    index += 2;
   }
-  if (args.some((arg) => ![hash, '-m', args[args.indexOf('-m') + 1], '--no-edit'].includes(arg))) {
-    throw new Error('Unsupported argument for git revert.');
-  }
+  if (options[index] === '--no-edit') index += 1;
+  if (index !== options.length) throw new Error('Unsupported argument for git revert.');
 };
 
 // eslint-disable-next-line complexity -- The exhaustive IPC allowlist is intentionally expressed as one command switch.

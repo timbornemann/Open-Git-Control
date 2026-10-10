@@ -40,6 +40,19 @@ describe('gitCommandPolicy', () => {
     expect(() => validateCommandArgs('push', ['ext::sh -c evil', 'HEAD'])).toThrow('remote-helper URLs are not allowed');
   });
 
+  it('allows only the revert shapes built by the UI', () => {
+    const hash = 'a'.repeat(40);
+    expect(() => validateCommandArgs('revert', ['--no-edit', hash])).not.toThrow();
+    expect(() => validateCommandArgs('revert', ['-m', '1', '--no-edit', hash])).not.toThrow();
+    expect(() => validateCommandArgs('revert', [hash])).not.toThrow();
+    // A leading option used to pass because args[indexOf('-m') + 1] was args[0].
+    expect(() => validateCommandArgs('revert', ['--strategy=ours', hash])).toThrow('Unsupported argument for git revert.');
+    expect(() => validateCommandArgs('revert', ['--edit', hash])).toThrow('Unsupported argument for git revert.');
+    expect(() => validateCommandArgs('revert', ['HEAD~5..HEAD', hash])).toThrow('Unsupported argument for git revert.');
+    expect(() => validateCommandArgs('revert', ['-m', 'x', hash])).toThrow('Invalid revert mainline.');
+    expect(() => validateCommandArgs('revert', ['--no-edit', 'HEAD'])).toThrow('Invalid commit hash.');
+  });
+
   it('allows the tag-free background fetch used for remote status checks', () => {
     expect(() => validateCommandArgs('fetch', ['origin', '--prune', '--no-tags', '--quiet'])).not.toThrow();
     expect(() => validateCommandArgs('fetch', ['origin', '--prune', '--no-tags', '--quiet', '+refs/tags/*:refs/ogc/remote-tags/origin/*'])).not.toThrow();
