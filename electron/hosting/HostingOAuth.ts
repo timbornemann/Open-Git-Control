@@ -109,10 +109,17 @@ export async function browserOAuthLogin(connection: HostingConnection, clientSec
       };
       onAbort = () => finish(new Error('Hosting login cancelled.'));
       server = createServer((request, response) => {
-        const target = new URL(request.url || '/', redirect.origin);
         response.setHeader('Content-Type', 'text/plain; charset=utf-8');
         response.setHeader('Cache-Control', 'no-store');
         response.setHeader('Content-Security-Policy', "default-src 'none'");
+        let target: URL;
+        try {
+          target = new URL(request.url || '/', redirect.origin);
+        } catch {
+          response.writeHead(400);
+          response.end('Invalid callback URL.');
+          return;
+        }
         if (request.method !== 'GET' || target.pathname !== redirect.pathname) {
           response.writeHead(404);
           response.end('Not found.');

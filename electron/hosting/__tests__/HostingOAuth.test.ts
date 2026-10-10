@@ -49,6 +49,7 @@ describe('desktop browser OAuth', () => {
     let authorization!: URL;
     let forgedStatus = 0;
     let unicodeStatus = 0;
+    const malformedStatuses: number[] = [];
     const fetchMock = vi.fn(
       async () =>
         new Response(JSON.stringify({ access_token: 'oauth-access-secret', refresh_token: 'rotating-refresh-secret', expires_in: 3600 }), { status: 200 }),
@@ -56,6 +57,9 @@ describe('desktop browser OAuth', () => {
     vi.stubGlobal('fetch', fetchMock);
     state.open.mockImplementation(async (url) => {
       authorization = new URL(url);
+      for (const malformedPath of ['//%', '//[::1']) {
+        malformedStatuses.push(await callback(`${new URL(connection.oauth!.redirectUri!).origin}${malformedPath}`));
+      }
       forgedStatus = await callback(`${connection.oauth!.redirectUri}?state=invalid&code=forged`);
       unicodeStatus = await callback(
         `${connection.oauth!.redirectUri}?state=${encodeURIComponent('ä'.repeat(authorization.searchParams.get('state')!.length))}&code=forged`,
@@ -65,6 +69,7 @@ describe('desktop browser OAuth', () => {
     const result = await browserOAuthLogin(connection, undefined, new AbortController().signal);
     expect(forgedStatus).toBe(400);
     expect(unicodeStatus).toBe(400);
+    expect(malformedStatuses).toEqual([400, 400]);
     expect(result).toMatchObject({ accessToken: 'oauth-access-secret', refreshToken: 'rotating-refresh-secret', authType: 'oauth' });
     const [tokenUrl, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     const params = new URLSearchParams(String(init.body));
