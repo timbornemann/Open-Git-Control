@@ -4,6 +4,7 @@ import * as path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IpcChannel } from '../../../../../src/types/ipcContract';
 import { registerWorkingDirectoryToolsHandlers } from '../workingDirectoryTools';
+import * as zipArchive from '../../../zipArchive';
 
 const { assertEntryAccessMock, createEntrySafelyMock, handleMock } = vi.hoisted(() => ({
   assertEntryAccessMock: vi.fn(),
@@ -18,6 +19,10 @@ vi.mock('../workingDirectoryFileCreation', () => ({
   assertWindowsWorkingDirectoryAccess: assertEntryAccessMock,
   createWorkingDirectoryEntrySafely: createEntrySafelyMock,
 }));
+vi.mock('../../../zipArchive', async (importOriginal) => {
+  const original = await importOriginal<typeof zipArchive>();
+  return { ...original, createZipArchive: vi.fn(original.createZipArchive) };
+});
 
 describe('working-directory tool handlers', () => {
   const handlers = new Map<string, (...args: any[]) => Promise<any>>();
@@ -227,5 +232,19 @@ describe('working-directory tool handlers', () => {
     expect(archive.includes(Buffer.from('folder/beta.txt'))).toBe(true);
     expect(archive.includes(Buffer.from('alpha'))).toBe(true);
     expect(archive.includes(Buffer.from('beta'))).toBe(true);
+  });
+
+  it('preserves a destination created while the ZIP archive is being written', async () => {
+    fs.writeFileSync(path.join(repoPath, 'source.txt'), 'source');
+    const original = await vi.importActual<typeof zipArchive>('../../../zipArchive');
+    vi.mocked(zipArchive.createZipArchive).mockImplementationOnce(async (temporaryPath, entries) => {
+      await original.createZipArchive(temporaryPath, entries);
+      fs.writeFileSync(path.join(repoPath, 'bundle.zip'), 'new file from another operation');
+    });
+
+    const result = await handlers.get(IpcChannel.GitCreateWorkingDirectoryArchive)?.({}, { sourcePaths: ['source.txt'], targetPath: 'bundle.zip' }, repoPath);
+    expect(result).toMatchObject({ success: false });
+    expect(fs.readFileSync(path.join(repoPath, 'bundle.zip'), 'utf8')).toBe('new file from another operation');
+    expect(fs.readdirSync(repoPath).sort()).toEqual(['bundle.zip', 'source.txt']);
   });
 });

@@ -303,7 +303,16 @@ export function registerWorkingDirectoryToolsHandlers({
         await createZipArchive(temporaryPath, entries);
         requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), IpcChannel.GitCreateWorkingDirectoryArchive);
         ensureWriteAllowed(repoPath);
-        fs.renameSync(temporaryPath, targetPath);
+        // Publishing must remain exclusive after the asynchronous ZIP work.
+        // rename would replace a file created since the initial existence check.
+        try {
+          fs.linkSync(temporaryPath, targetPath);
+        } catch (publishError: unknown) {
+          if ((publishError as NodeJS.ErrnoException).code === 'EEXIST') throw publishError;
+          // FAT/exFAT and some network filesystems do not support hard links.
+          await fs.promises.copyFile(temporaryPath, targetPath, fs.constants.COPYFILE_EXCL);
+        }
+        fs.unlinkSync(temporaryPath);
         temporaryPath = null;
         return { success: true, targetPath: asPath(params.targetPath) };
       } catch (error: unknown) {
