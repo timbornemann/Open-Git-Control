@@ -1,6 +1,6 @@
 import type { AppSettings } from '../../settings';
 import type { AiConnectionResult, AiConnectionTestRequest, AiModelListRequest, AiProvider, AiTextRequest } from './AiProvider';
-import { AI_DISCOVERY_TIMEOUT_MS, fetchWithTimeout, safeString, uniqueSorted } from './providerUtils';
+import { AI_DISCOVERY_TIMEOUT_MS, fetchJsonWithTimeout, fetchWithTimeout, safeString, uniqueSorted } from './providerUtils';
 
 export class OllamaProvider implements AiProvider {
   readonly id = 'ollama' as const;
@@ -13,14 +13,13 @@ export class OllamaProvider implements AiProvider {
     const model = this.getSelectedModel(settings);
     if (!model) throw new Error('Ollama Modell fehlt.');
 
-    const response = await fetchWithTimeout(`${settings.ollamaBaseUrl}/api/version`, {}, AI_DISCOVERY_TIMEOUT_MS);
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Ollama nicht erreichbar (${response.status}): ${text || response.statusText}`);
-    }
-
-    const json = (await response.json()) as { version?: unknown };
-    const showResponse = await fetchWithTimeout(
+    const json = await fetchJsonWithTimeout<{ version?: unknown }>(
+      `${settings.ollamaBaseUrl}/api/version`,
+      {},
+      AI_DISCOVERY_TIMEOUT_MS,
+      'Ollama nicht erreichbar',
+    );
+    const modelInfo = await fetchJsonWithTimeout<{ capabilities?: unknown }>(
       `${settings.ollamaBaseUrl}/api/show`,
       {
         method: 'POST',
@@ -28,12 +27,8 @@ export class OllamaProvider implements AiProvider {
         body: JSON.stringify({ model }),
       },
       AI_DISCOVERY_TIMEOUT_MS,
+      `Ollama Modell "${model}" ist nicht verfuegbar`,
     );
-    if (!showResponse.ok) {
-      const text = await showResponse.text();
-      throw new Error(`Ollama Modell "${model}" ist nicht verfuegbar (${showResponse.status}): ${text || showResponse.statusText}`);
-    }
-    const modelInfo = (await showResponse.json()) as { capabilities?: unknown };
     const capabilities = Array.isArray(modelInfo.capabilities) ? modelInfo.capabilities : [];
     if (capabilities.length > 0 && !capabilities.includes('completion')) {
       throw new Error(`Ollama Modell "${model}" unterstuetzt keine Textgenerierung.`);
@@ -47,13 +42,12 @@ export class OllamaProvider implements AiProvider {
   }
 
   async listModels({ settings }: AiModelListRequest): Promise<string[]> {
-    const response = await fetchWithTimeout(`${settings.ollamaBaseUrl}/api/tags`, {}, AI_DISCOVERY_TIMEOUT_MS);
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Ollama Modelle konnten nicht geladen werden (${response.status}): ${text || response.statusText}`);
-    }
-
-    const data = (await response.json()) as { models?: Array<{ name?: unknown; model?: unknown }> };
+    const data = await fetchJsonWithTimeout<{ models?: Array<{ name?: unknown; model?: unknown }> }>(
+      `${settings.ollamaBaseUrl}/api/tags`,
+      {},
+      AI_DISCOVERY_TIMEOUT_MS,
+      'Ollama Modelle konnten nicht geladen werden',
+    );
     const models = Array.isArray(data.models) ? data.models : [];
     return uniqueSorted(models.map((model) => safeString(model.name || model.model).trim()).filter(Boolean));
   }

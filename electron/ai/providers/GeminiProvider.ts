@@ -1,6 +1,6 @@
 import type { AppSettings } from '../../settings';
 import type { AiConnectionResult, AiConnectionTestRequest, AiModelListRequest, AiProvider, AiTextRequest } from './AiProvider';
-import { AI_DISCOVERY_TIMEOUT_MS, fetchWithTimeout, safeString, uniqueSorted } from './providerUtils';
+import { AI_DISCOVERY_TIMEOUT_MS, fetchJsonWithTimeout, fetchWithTimeout, safeString, uniqueSorted } from './providerUtils';
 
 const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -32,17 +32,12 @@ export class GeminiProvider implements AiProvider {
       throw new Error('Gemini Modell fehlt.');
     }
 
-    const response = await fetchWithTimeout(
+    const data = await fetchJsonWithTimeout<{ supportedGenerationMethods?: unknown }>(
       `${GEMINI_API_BASE_URL}/models/${encodeURIComponent(model)}`,
       { headers: geminiHeaders(apiKey) },
       AI_DISCOVERY_TIMEOUT_MS,
+      'Gemini nicht erreichbar',
     );
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Gemini nicht erreichbar (${response.status}): ${text || response.statusText}`);
-    }
-
-    const data = (await response.json()) as { supportedGenerationMethods?: unknown };
     const methods = Array.isArray(data.supportedGenerationMethods) ? data.supportedGenerationMethods : [];
     if (!methods.includes('generateContent')) {
       throw new Error(`Gemini Modell "${model}" unterstuetzt keine Textgenerierung.`);
@@ -57,13 +52,12 @@ export class GeminiProvider implements AiProvider {
       throw new Error('Gemini API key fehlt.');
     }
 
-    const response = await fetchWithTimeout(`${GEMINI_API_BASE_URL}/models`, { headers: geminiHeaders(apiKey) }, AI_DISCOVERY_TIMEOUT_MS);
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Gemini Modelle konnten nicht geladen werden (${response.status}): ${text || response.statusText}`);
-    }
-
-    const data = (await response.json()) as { models?: Array<{ name?: unknown; supportedGenerationMethods?: unknown }> };
+    const data = await fetchJsonWithTimeout<{ models?: Array<{ name?: unknown; supportedGenerationMethods?: unknown }> }>(
+      `${GEMINI_API_BASE_URL}/models`,
+      { headers: geminiHeaders(apiKey) },
+      AI_DISCOVERY_TIMEOUT_MS,
+      'Gemini Modelle konnten nicht geladen werden',
+    );
     const models = Array.isArray(data.models) ? data.models : [];
     return uniqueSorted(
       models

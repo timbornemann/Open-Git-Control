@@ -1,6 +1,6 @@
 import type { AppSettings } from '../../settings';
 import type { AiConnectionResult, AiConnectionTestRequest, AiModelListRequest, AiProvider, AiTextRequest } from './AiProvider';
-import { AI_DISCOVERY_TIMEOUT_MS, fetchWithTimeout, safeString, uniqueSorted } from './providerUtils';
+import { AI_DISCOVERY_TIMEOUT_MS, fetchJsonWithTimeout, fetchWithTimeout, safeString, uniqueSorted } from './providerUtils';
 
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_OPENAI_MODEL = 'gpt-4.1-mini';
@@ -62,7 +62,7 @@ export class OpenAiProvider implements AiProvider {
     // Use the same endpoint as generation. GET /models only proves that an ID
     // exists; embedding/image/audio models otherwise appeared as healthy even
     // though every real chat request failed.
-    const response = await fetchWithTimeout(
+    await fetchJsonWithTimeout(
       `${getOpenAiBaseUrl(settings)}/chat/completions`,
       {
         method: 'POST',
@@ -77,11 +77,8 @@ export class OpenAiProvider implements AiProvider {
         }),
       },
       AI_DISCOVERY_TIMEOUT_MS,
+      'OpenAI nicht erreichbar',
     );
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`OpenAI nicht erreichbar (${response.status}): ${text || response.statusText}`);
-    }
 
     return { ok: true, provider: this.id, model, detail: 'OpenAI API erreichbar' };
   }
@@ -92,17 +89,12 @@ export class OpenAiProvider implements AiProvider {
       throw new Error('OpenAI API key fehlt.');
     }
 
-    const response = await fetchWithTimeout(
+    const data = await fetchJsonWithTimeout<{ data?: Array<{ id?: unknown }> }>(
       `${getOpenAiBaseUrl(settings)}/models`,
       { headers: { Authorization: `Bearer ${apiKey}` } },
       AI_DISCOVERY_TIMEOUT_MS,
+      'OpenAI Modelle konnten nicht geladen werden',
     );
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`OpenAI Modelle konnten nicht geladen werden (${response.status}): ${text || response.statusText}`);
-    }
-
-    const data = (await response.json()) as { data?: Array<{ id?: unknown }> };
     const models = Array.isArray(data.data) ? data.data : [];
     return uniqueSorted(models.map((model) => safeString(model.id).trim()).filter(isLikelyTextChatModel));
   }

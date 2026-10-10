@@ -5,6 +5,17 @@ export const uniqueSorted = (values: string[]): string[] => [...new Set(values)]
 /** Fast enough for settings UI checks while still tolerating local model startup. */
 export const AI_DISCOVERY_TIMEOUT_MS = 15_000;
 
+/** Discovery must keep its deadline active while consuming the response body. */
+export function fetchJsonWithTimeout<T>(url: string, init: RequestInit, timeoutMs: number, errorPrefix: string): Promise<T> {
+  return fetchWithTimeout(url, init, timeoutMs, undefined, async (response) => {
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`${errorPrefix} (${response.status}): ${text || response.statusText}`);
+    }
+    return response.json() as Promise<T>;
+  });
+}
+
 export function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number, shouldCancel?: () => boolean): Promise<Response>;
 export function fetchWithTimeout<T>(
   url: string,
