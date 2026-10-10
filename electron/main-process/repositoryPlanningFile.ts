@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
-import * as fs from 'fs';
 import { writeTextFileAtomically } from './atomicFile';
+import { readBoundedTextFile, readBoundedTextFileAsync } from './boundedTextFile';
 import {
   createEmptyProjectPlannerData,
   normalizePlannerRepoPath,
@@ -19,6 +19,7 @@ import {
  */
 
 export const REPOSITORY_PLANNING_FILE = 'planning.json';
+export const MAX_REPOSITORY_PLANNING_BYTES = 8 * 1024 * 1024;
 
 export function parsePlannerData(raw: string, fileLabel: string, prepare: (value: unknown) => unknown = (value) => value): ProjectPlannerData {
   const parsed = prepare(JSON.parse(raw) as unknown);
@@ -58,7 +59,7 @@ export function normalizeRepositoryPlannerData(data: ProjectPlannerData, repoPat
 export function readRepositoryPlanningFile(planningPath: string, repoPath: string): ProjectPlannerData {
   let raw: string;
   try {
-    raw = fs.readFileSync(planningPath, 'utf8');
+    raw = readBoundedTextFile(planningPath, MAX_REPOSITORY_PLANNING_BYTES, 'Repository planning data');
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return createEmptyProjectPlannerData();
     const message = error instanceof Error ? error.message : String(error);
@@ -77,7 +78,7 @@ export function readRepositoryPlanningFile(planningPath: string, repoPath: strin
 
 export async function readRepositoryPlanningFileAsync(planningPath: string, repoPath: string): Promise<ProjectPlannerData> {
   try {
-    const raw = await fs.promises.readFile(planningPath, 'utf8');
+    const raw = await readBoundedTextFileAsync(planningPath, MAX_REPOSITORY_PLANNING_BYTES, 'Repository planning data');
     return normalizeRepositoryPlannerData(
       parsePlannerData(raw, 'Repository planning data', (value) => withRepositoryIdentity(value, repoPath)),
       repoPath,
@@ -95,7 +96,9 @@ export function serializeRepositoryPlanningFile(data: ProjectPlannerData): strin
 }
 
 export function writeRepositoryPlanningFile(planningPath: string, data: ProjectPlannerData): void {
-  writeTextFileAtomically(planningPath, serializeRepositoryPlanningFile(data));
+  const text = serializeRepositoryPlanningFile(data);
+  if (Buffer.byteLength(text, 'utf8') > MAX_REPOSITORY_PLANNING_BYTES) throw new Error('Repository planning data is too large.');
+  writeTextFileAtomically(planningPath, text);
 }
 
 /**

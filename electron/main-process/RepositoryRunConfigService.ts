@@ -2,6 +2,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { writeTextFileAtomically } from './atomicFile';
 import { ensureOpenGitControlReadme, getOpenGitControlAssetPath } from './openGitControlDirectory';
+import { readBoundedTextFile } from './boundedTextFile';
+import { resolveExistingRepositoryPathWithoutSymlinks } from '../git/RepositoryPathSafety';
 import {
   REPOSITORY_RUN_ACTION_IDS,
   createEmptyRepositoryRunConfig,
@@ -100,7 +102,8 @@ export const detectRepositoryRunTemplates = (repoPath: string): RepositoryRunTem
   if (exists('package.json')) {
     let scripts: Record<string, unknown> = {};
     try {
-      const parsed = JSON.parse(fs.readFileSync(path.join(repoPath, 'package.json'), 'utf8')) as { scripts?: Record<string, unknown> };
+      const packagePath = resolveExistingRepositoryPathWithoutSymlinks(repoPath, 'package.json', 'Package manifest');
+      const parsed = JSON.parse(readBoundedTextFile(packagePath, MAX_CONFIG_BYTES, 'Package manifest')) as { scripts?: Record<string, unknown> };
       scripts = isRecord(parsed.scripts) ? parsed.scripts : {};
     } catch {
       scripts = {};
@@ -156,9 +159,7 @@ export class RepositoryRunConfigService {
       return { exists: false, config, configPath, availableActions: withAvailability(config), templates: detectRepositoryRunTemplates(repoPath) };
     }
     try {
-      const stats = fs.statSync(configPath);
-      if (stats.size > MAX_CONFIG_BYTES) throw new Error('Run configuration is too large.');
-      const config = normalizeRepositoryRunConfig(JSON.parse(fs.readFileSync(configPath, 'utf8')));
+      const config = normalizeRepositoryRunConfig(JSON.parse(readBoundedTextFile(configPath, MAX_CONFIG_BYTES, 'Run configuration')));
       return { exists: true, config, configPath, availableActions: withAvailability(config), templates: detectRepositoryRunTemplates(repoPath) };
     } catch (error) {
       return {
@@ -174,7 +175,9 @@ export class RepositoryRunConfigService {
 
   write(repoPath: string, rawConfig: unknown): RepositoryRunConfigDto {
     const config = normalizeRepositoryRunConfig(rawConfig);
-    writeTextFileAtomically(this.getConfigPath(repoPath), `${JSON.stringify(config, null, 2)}\n`);
+    const text = `${JSON.stringify(config, null, 2)}\n`;
+    if (Buffer.byteLength(text, 'utf8') > MAX_CONFIG_BYTES) throw new Error('Run configuration is too large.');
+    writeTextFileAtomically(this.getConfigPath(repoPath), text);
     ensureOpenGitControlReadme(repoPath);
     return config;
   }

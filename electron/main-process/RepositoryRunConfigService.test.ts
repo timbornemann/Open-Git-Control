@@ -17,6 +17,31 @@ afterEach(() => {
 });
 
 describe('RepositoryRunConfigService', () => {
+  it('skips oversized package manifests while detecting workflow templates', () => {
+    const repoPath = createRepository();
+    const manifest = path.join(repoPath, 'package.json');
+    fs.writeFileSync(manifest, '');
+    fs.truncateSync(manifest, 256 * 1024 + 1);
+    expect(new RepositoryRunConfigService().read(repoPath).templates).toEqual([]);
+  });
+
+  it('rejects an oversized configuration before replacing an existing one', () => {
+    const repoPath = createRepository();
+    const service = new RepositoryRunConfigService();
+    service.write(repoPath, createEmptyRepositoryRunConfig());
+    const file = service.getConfigPath(repoPath);
+    const original = fs.readFileSync(file, 'utf8');
+    const config = createEmptyRepositoryRunConfig();
+    config.actions.run.steps = Array.from({ length: 24 }, (_, index) => ({
+      id: String(index),
+      label: 'Large step',
+      parser: 'none' as const,
+      windows: { shell: 'powershell' as const, command: 'x'.repeat(16_000) },
+    }));
+    expect(() => service.write(repoPath, config)).toThrow('too large');
+    expect(fs.readFileSync(file, 'utf8')).toBe(original);
+  });
+
   it('keeps a missing configuration empty and does not create files while reading', () => {
     const repoPath = createRepository();
     const service = new RepositoryRunConfigService();

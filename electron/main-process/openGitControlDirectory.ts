@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { resolveRepositoryPathForCreate } from '../git/RepositoryPathSafety';
 import { writeTextFileAtomically } from './atomicFile';
+import { readBoundedTextFile } from './boundedTextFile';
 
 export const OPEN_GIT_CONTROL_DIRECTORY = '.Open-Git-Control';
 export const OPEN_GIT_CONTROL_README_FILE = 'README.md';
@@ -67,7 +68,11 @@ export function ensureOpenGitControlReadme(repoPath: string): void {
     writeTextFileAtomically(readmePath, OPEN_GIT_CONTROL_README_CONTENT);
     return;
   }
-  const existing = fs.readFileSync(readmePath, 'utf8');
+  // A custom README is user data. Only inspect small regular files for the
+  // exact legacy text; do not load an arbitrary committed file into memory.
+  const stats = fs.lstatSync(readmePath);
+  if (!stats.isFile() || stats.size > 64 * 1024) return;
+  const existing = readBoundedTextFile(readmePath, 64 * 1024, 'Open Git Control README');
   if (existing === LEGACY_RUN_WORKFLOW_README_CONTENT || existing === PREVIOUS_REPOSITORY_README_CONTENT) {
     writeTextFileAtomically(readmePath, OPEN_GIT_CONTROL_README_CONTENT);
   }
