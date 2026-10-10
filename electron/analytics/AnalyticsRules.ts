@@ -7,6 +7,18 @@ import type { AnalyticsGit } from './AnalyticsGit';
 import { identity } from './AnalyticsParsing';
 import { digest } from './AnalyticsCache';
 
+/**
+ * Splits a `Name <email>` line exactly like `/^(.*?)\s*<([^>]*)>$/`, but in
+ * linear time. Author names come from repository history; a crafted name with a
+ * long whitespace run made that expression quadratic and froze the main process.
+ */
+export function parseMailmapIdentity(line: string): { name: string; email: string } | null {
+  if (!line.endsWith('>')) return null;
+  const emailStart = line.indexOf('<', line.lastIndexOf('>', line.length - 2) + 1);
+  if (emailStart < 0) return null;
+  return { name: line.slice(0, emailStart).trim(), email: line.slice(emailStart + 1, -1) };
+}
+
 /** A temporary, isolated Git worktree gives check-ignore Git's own complete matching semantics. */
 export class AnalyticsRules {
   private directory: string;
@@ -62,8 +74,8 @@ export class AnalyticsRules {
       .trimEnd()
       .split('\n')
       .forEach((line, index) => {
-        const match = /^(.*?)\s*<([^>]*)>$/.exec(line.replace(/\r$/, ''));
-        if (match && unique[index]) this.mappings.set(unique[index].id, identity(match[1].trim(), match[2]));
+        const match = parseMailmapIdentity(line.replace(/\r$/, ''));
+        if (match && unique[index]) this.mappings.set(unique[index].id, identity(match.name, match.email));
       });
   }
   dispose(): void {
