@@ -34,16 +34,17 @@ jobs:
       - id: release
         name: Derive release version from tag
         shell: bash
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
         run: |
-          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}"
-          if ! git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
-            echo "Release tag does not exist: $TAG"
-            exit 1
-          fi
           if [[ "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
             VERSION="${BASH_REMATCH[1]}"
           else
             echo "Invalid release tag: $TAG (expected vX.Y.Z)"
+            exit 1
+          fi
+          if ! git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
+            echo "Release tag does not exist: $TAG"
             exit 1
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
