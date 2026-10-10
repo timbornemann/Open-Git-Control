@@ -1,5 +1,4 @@
 import { randomUUID } from 'crypto';
-import * as path from 'path';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { BrowserWindow } from 'electron';
 import { getRepositoryRunPlatform, getRunPlatformCommand, isRepositoryRunActionConfigured } from '../../src/types/repositoryRun';
@@ -15,6 +14,7 @@ import type {
 import type { RepositoryRunConfigService } from './RepositoryRunConfigService';
 import { IpcChannel } from '../../src/types/ipcContract';
 import { normalizeTerminalText, TerminalTextSanitizer } from '../../src/shared/terminalText';
+import { windowsSystemExecutable } from '../system-tools/windowsSystemExecutable';
 
 const MAX_OUTPUT_LINES = 4_000;
 const MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
@@ -42,7 +42,7 @@ type ActiveRun = RepositoryRunStateDto & {
 const getShellInvocation = (shell: RepositoryRunShell, command: string): { executable: string; args: string[] } => {
   if (shell === 'powershell')
     return {
-      executable: process.env.SystemRoot ? path.join(process.env.SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe') : 'powershell.exe',
+      executable: windowsSystemExecutable('WindowsPowerShell', 'v1.0', 'powershell.exe'),
       args: [
         '-NoLogo',
         '-NoProfile',
@@ -51,7 +51,7 @@ const getShellInvocation = (shell: RepositoryRunShell, command: string): { execu
         `[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $OutputEncoding = [Console]::OutputEncoding; ${command}`,
       ],
     };
-  if (shell === 'cmd') return { executable: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', command] };
+  if (shell === 'cmd') return { executable: windowsSystemExecutable('cmd.exe'), args: ['/d', '/s', '/c', command] };
   if (shell === 'zsh') return { executable: '/bin/zsh', args: ['-lc', command] };
   return { executable: '/usr/bin/env', args: ['bash', '-lc', command] };
 };
@@ -227,7 +227,7 @@ export class RepositoryRunService {
       const args = ['/pid', String(child.pid), '/t', ...(force ? ['/f'] : [])];
       let killer: ReturnType<typeof spawn>;
       try {
-        killer = spawn('taskkill.exe', args, { windowsHide: true });
+        killer = spawn(windowsSystemExecutable('taskkill.exe'), args, { windowsHide: true });
       } catch (error) {
         this.appendSystemLine(run, `Could not ${force ? 'force-stop' : 'stop'} process tree: ${error instanceof Error ? error.message : String(error)}`);
         if (!force) this.escalateStop(run);

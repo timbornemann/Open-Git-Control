@@ -19,6 +19,7 @@ import { registerWorkingDirectoryToolsHandlers } from './workingDirectoryTools';
 import { registerWorkingDirectoryPreviewHandler } from './workingDirectoryPreview';
 import { registerRepositoryFileViewerHandlers } from './repositoryFileViewer';
 import { registerGitLfsHandlers } from './gitLfsHandlers';
+import { windowsSystemExecutable } from '../../../system-tools/windowsSystemExecutable';
 
 type RegisterGitFileHandlersDeps = {
   gitService: GitService;
@@ -139,7 +140,11 @@ const openWithSystemChooser = async (targetPath: string): Promise<void> => {
   }
 
   await new Promise<void>((resolve, reject) => {
-    const child = spawn('rundll32.exe', ['shell32.dll,OpenAs_RunDLL', targetPath], { detached: true, stdio: 'ignore', windowsHide: true });
+    const child = spawn(windowsSystemExecutable('rundll32.exe'), ['shell32.dll,OpenAs_RunDLL', targetPath], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
     child.once('error', reject);
     child.once('spawn', () => {
       child.unref();

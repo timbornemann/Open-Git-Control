@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import type { ChildProcess } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { gitProcessTree } from '../GitProcessTree';
+import { windowsSystemExecutable } from '../../system-tools/windowsSystemExecutable';
 
 const spawn = vi.hoisted(() => vi.fn());
 vi.mock('node:child_process', () => ({ spawn }));
@@ -23,7 +24,10 @@ describe('owned Git process trees', () => {
     const tree = gitProcessTree(git as unknown as ChildProcess);
     tree.stop();
     tree.stop();
-    expect(spawn).toHaveBeenCalledExactlyOnceWith('taskkill', ['/PID', '4321', '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+    expect(spawn).toHaveBeenCalledExactlyOnceWith(windowsSystemExecutable('taskkill.exe'), ['/PID', '4321', '/T', '/F'], {
+      windowsHide: true,
+      stdio: 'ignore',
+    });
     const finished = vi.fn();
     const stopping = tree.waitForStop().then(finished);
     await Promise.resolve();

@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GitSpawnOperations } from '../GitSpawnOperations';
+import { windowsSystemExecutable } from '../../system-tools/windowsSystemExecutable';
 
 const { execFileMock, spawnMock } = vi.hoisted(() => ({ execFileMock: vi.fn(), spawnMock: vi.fn() }));
 
@@ -171,7 +172,7 @@ describe('GitSpawnOperations stream limits', () => {
       },
     );
     controller.abort();
-    expect(spawnMock.mock.calls[1].slice(0, 2)).toEqual(['taskkill', ['/PID', '4321', '/T', '/F']]);
+    expect(spawnMock.mock.calls[1].slice(0, 2)).toEqual([windowsSystemExecutable('taskkill.exe'), ['/PID', '4321', '/T', '/F']]);
     git.emit('close', null);
     await Promise.resolve();
     expect(finished).not.toHaveBeenCalled();

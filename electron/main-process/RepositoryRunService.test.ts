@@ -11,6 +11,7 @@ vi.mock('electron', () => ({ BrowserWindow: { getAllWindows: () => [] } }));
 import { RepositoryRunConfigService } from './RepositoryRunConfigService';
 import { RepositoryRunService } from './RepositoryRunService';
 import { createEmptyRepositoryRunConfig } from '../../src/types/repositoryRun';
+import { windowsSystemExecutable } from '../system-tools/windowsSystemExecutable';
 
 const directories: string[] = [];
 const originalPlatform = process.platform;
@@ -221,7 +222,7 @@ describe('RepositoryRunService', () => {
     expect(service.stop(started.runId)).toBe(true);
     const state = await waitForCompletion(service);
 
-    const taskkillCalls = spawnMock.mock.calls.filter(([command]) => command === 'taskkill.exe');
+    const taskkillCalls = spawnMock.mock.calls.filter(([command]) => command === windowsSystemExecutable('taskkill.exe'));
     expect(taskkillCalls).toHaveLength(2);
     expect(taskkillCalls[0][1]).toEqual(['/pid', '4321', '/t']);
     expect(taskkillCalls[1][1]).toEqual(['/pid', '4321', '/t', '/f']);
