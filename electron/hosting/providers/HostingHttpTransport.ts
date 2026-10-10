@@ -200,7 +200,9 @@ export class HostingHttpTransport {
   private async downloadResponse(path: string, params: HostingHttpRequest): Promise<Response> {
     let url = this.url(path, params.query);
     for (let redirects = 0; redirects <= 5; redirects += 1) {
-      const response = await this.send(url, params, url.origin === this.baseUrl.origin);
+      // A same-host redirect can leave the configured API (for example for
+      // user-controlled uploads). The token is scoped to the API path too.
+      const response = await this.send(url, params, this.isApiUrl(url));
       if (response.status < 300 || response.status >= 400) return response;
       const location = response.headers.get('location');
       await response.body?.cancel();
