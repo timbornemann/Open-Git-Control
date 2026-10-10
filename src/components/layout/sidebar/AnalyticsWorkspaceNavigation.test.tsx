@@ -94,7 +94,8 @@ describe('standalone analytics navigation', () => {
     expect(host.querySelector('.analytics-sidebar-repository-path')?.textContent).toBe('C:/Code/alpha');
     expect(host.querySelectorAll('.analytics-sidebar-nav button')).toHaveLength(6);
     expect(host.querySelector('.activity-bar [title="Current repository"]')?.nextElementSibling).toBe(icon);
-    expect(icon?.nextElementSibling?.getAttribute('title')).toBe('Local repositories');
+    expect(icon?.nextElementSibling?.getAttribute('title')).toBe('Project planning');
+    expect(icon?.nextElementSibling?.nextElementSibling?.getAttribute('title')).toBe('Local repositories');
     expect(host.querySelector('aside .analytics-filters')).toBeTruthy();
     expect(host.querySelectorAll('aside .analytics-filter-panel label')).toHaveLength(7);
     expect(current()).toBe('Overview');

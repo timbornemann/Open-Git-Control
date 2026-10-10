@@ -43,11 +43,11 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({ activeTa
       >
         <BarChart3 size={22} />
       </button>
-      <button className={`icon-btn ${activeTab === 'localRepos' ? 'active' : ''}`} onClick={() => activateTab('localRepos')} title={t('sidebar.localRepos')}>
-        <FolderOpen size={22} />
-      </button>
       <button className={`icon-btn ${activeTab === 'planner' ? 'active' : ''}`} onClick={() => activateTab('planner')} title={t('sidebar.planner')}>
         <ListTodo size={22} />
+      </button>
+      <button className={`icon-btn ${activeTab === 'localRepos' ? 'active' : ''}`} onClick={() => activateTab('localRepos')} title={t('sidebar.localRepos')}>
+        <FolderOpen size={22} />
       </button>
       <button
         className={`icon-btn ${activeTab === 'hosting' || activeTab === 'github' ? 'active' : ''}`}

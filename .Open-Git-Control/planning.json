@@ -67,17 +67,6 @@
       "updatedAt": 1784044499627
     },
     {
-      "id": "bb1dcde3-552a-4bf3-b18a-8108194673f6",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Repository Analytics Dashboard",
-      "description": "Repository Analytics Dashboard: Features:\nCode Hotspots: Welche Dateien werden am häufigsten geändert? (Hinweis auf hohe Komplexität / Refactoring-Bedarf).\nContribution Graphen: Wer hat wann woran gearbeitet?\nCode Churn: Verhältnis von hinzugefügtem zu gelöschtem Code über Zeit. und weitere die du mit mir zusammen planst",
-      "priority": "medium",
-      "status": "idea",
-      "tags": [],
-      "createdAt": 1784044921004,
-      "updatedAt": 1791557972021
-    },
-    {
       "id": "9f2665dd-9e6a-44cd-9fac-d8d551df6c1e",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Time Tracking & Activity Log",
