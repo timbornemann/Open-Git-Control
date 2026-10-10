@@ -36,7 +36,9 @@ export async function fetchWithTimeout<T>(
       abortedByCancel = true;
       controller.abort();
     }
-    const response = await fetch(url, { ...init, signal: controller.signal });
+    // Redirects can forward prompts and custom credential headers (such as
+    // x-goog-api-key) to a destination the user did not configure.
+    const response = await fetch(url, { ...init, redirect: 'error', signal: controller.signal });
     return consume ? await consume(response) : response;
   } catch (error: unknown) {
     const errorName = error instanceof Error ? error.name : '';
