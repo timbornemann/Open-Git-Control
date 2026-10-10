@@ -93,8 +93,8 @@ describe('standalone analytics navigation', () => {
     expect(host.querySelector('.sidebar-header')?.textContent).toBe('Statistics & analytics');
     expect(host.querySelector('.analytics-sidebar-repository-path')?.textContent).toBe('C:/Code/alpha');
     expect(host.querySelectorAll('.analytics-sidebar-nav button')).toHaveLength(6);
-    expect(host.querySelector('.activity-bar [title="Local Repositories"]')?.nextElementSibling).toBe(icon);
-    expect(icon?.nextElementSibling?.getAttribute('title')).toBe('Project planning');
+    expect(host.querySelector('.activity-bar [title="Current repository"]')?.nextElementSibling).toBe(icon);
+    expect(icon?.nextElementSibling?.getAttribute('title')).toBe('Local repositories');
     expect(host.querySelector('aside .analytics-filters')).toBeTruthy();
     expect(host.querySelectorAll('aside .analytics-filter-panel label')).toHaveLength(7);
     expect(current()).toBe('Overview');
@@ -123,16 +123,13 @@ describe('standalone analytics navigation', () => {
     expect(current()).toBe('Contributions');
     expect([...host.querySelectorAll('.analytics-sidebar-nav button')].map((node) => node.textContent)).not.toContain('Last changed lines');
   });
-  it('delegates repository selection to the normal activation workflow and retains the current repository until activation completes', async () => {
+  it('shows the active repository without offering repository switching in analytics', async () => {
     await render();
-    const picker = host.querySelector<HTMLSelectElement>('[aria-label="Active repository"]')!;
-    await act(async () => {
-      picker.value = 'D:/Code/beta';
-      picker.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    expect(switchRepo).toHaveBeenCalledWith('D:/Code/beta');
+    expect(host.querySelector('[aria-label="Active repository"]')).toBeNull();
+    expect(host.querySelector('.analytics-sidebar-repository select')).toBeNull();
+    expect(host.querySelector('.analytics-sidebar-repository strong')?.textContent).toBe('alpha');
+    expect(switchRepo).not.toHaveBeenCalled();
     expect(setTab).not.toHaveBeenCalled();
-    expect(picker.value).toBe('C:/Code/alpha');
     expect(host.querySelector('.analytics-sidebar-repository-path')?.textContent).toBe('C:/Code/alpha');
   });
   it('keeps update status and working refresh, cancel and resume controls in the main title row', async () => {

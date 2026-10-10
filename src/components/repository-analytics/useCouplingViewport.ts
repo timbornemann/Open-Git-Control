@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CouplingScene } from './analyticsCouplingScene';
+import { couplingSession } from './analyticsCouplingSession';
 
 export type CouplingCamera = { x: number; y: number; scale: number };
 export function fitCouplingCamera(scene: CouplingScene, width: number, height: number): CouplingCamera {
@@ -21,13 +22,16 @@ export function useCouplingViewport(
   loading: boolean,
   element: React.RefObject<HTMLDivElement>,
   onInteract: () => void,
+  sessionKey?: string,
 ) {
-  const [camera, setCamera] = useState<CouplingCamera>({ x: 0, y: 0, scale: 1 });
+  const session = couplingSession(sessionKey);
+  const [saved] = useState(() => session?.viewport);
+  const [camera, setCamera] = useState<CouplingCamera>(() => saved?.camera ?? { x: 0, y: 0, scale: 1 });
   const [dragging, setDragging] = useState(false);
-  const automatic = useRef(true);
+  const automatic = useRef(saved?.automatic ?? true);
   const gesture = useRef<{ id: number; x: number; y: number; camera: CouplingCamera; moved: boolean }>();
   const ignoreClick = useRef(false);
-  const dimensions = useRef({ width, height });
+  const dimensions = useRef(saved ? { width: saved.width, height: saved.height } : { width, height });
   const fit = useCallback(() => {
     onInteract();
     automatic.current = false;
@@ -44,6 +48,9 @@ export function useCouplingViewport(
       setCamera((value) => ({ ...value, x: value.x + (width - previous.width) / 2, y: value.y + (height - previous.height) / 2 }));
     }
   }, [scene, width, height, loading, element]);
+  useEffect(() => {
+    if (session) session.viewport = { camera, width, height, automatic: automatic.current };
+  }, [session, camera, width, height]);
   const zoom = useCallback(
     (factor: number, point = { x: width / 2, y: height / 2 }) => {
       onInteract();

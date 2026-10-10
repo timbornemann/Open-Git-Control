@@ -53,10 +53,13 @@ function AnalyticsDashboard({ repoPath, refreshTrigger, busy = false, onOpenFile
   useEffect(() => {
     if (snapshot) rememberAnalyticsSnapshot(snapshot);
   }, [snapshot]);
-  const onPath = (path: string) => {
-    onFilters({ ...filters, path });
-    setTab('hotspots');
-  };
+  const onPath = useCallback(
+    (path: string) => {
+      onFilters({ ...filters, path });
+      selectAnalyticsTab(repoPath, 'hotspots');
+    },
+    [filters, onFilters, repoPath],
+  );
   const onPerson = (author: string) => {
     onFilters({ ...filters, author });
     setTab('contributions');

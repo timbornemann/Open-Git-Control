@@ -19,12 +19,6 @@
   white-space: nowrap;
   font-size: 0.84rem;
 }
-.analytics-sidebar-repository-title .ui-field {
-  flex: 1;
-  min-width: 0;
-  width: 100%;
-  font-size: 0.8rem;
-}
 .analytics-sidebar-repository-path {
   display: block;
   overflow: hidden;

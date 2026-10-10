@@ -23,6 +23,8 @@ type FullReport = {
   all: Awaited<ReturnType<typeof aggregateAnalytics>>;
   comparisonPaths: RepositoryAnalyticsSnapshot['hotspots'];
 };
+const reportKey = (repoPath: string, snapshotId: string) => JSON.stringify([repoPath, snapshotId]);
+const MAX_REPORTS = 8;
 export class RepositoryAnalyticsService {
   private reports = new Map<string, FullReport>();
   constructor(
@@ -42,6 +44,11 @@ export class RepositoryAnalyticsService {
     const git = new AnalyticsGit(this.gitService, request.repoPath, signal, revision);
     const tree = revision ? await git.tree(revision) : [];
     const context = await git.signature(tree);
+    const id = digest(JSON.stringify([captured, filters, context]));
+    const key = reportKey(request.repoPath, id);
+    const shallow = (await git.text(['rev-parse', '--is-shallow-repository'])).trim() === 'true';
+    const existing = this.reuseReport(request, key, shallow, signal, onProgress);
+    if (existing) return existing;
     const cache = new AnalyticsCache(this.cacheRoot, request.repoPath, context);
     await cache.load();
     cache.data.snapshot = AnalyticsCache.readSnapshot(this.cacheRoot, request.repoPath);
@@ -87,14 +94,13 @@ export class RepositoryAnalyticsService {
       const records = selected.map((hash) => cache.data.commits.get(hash)!);
       const all = await aggregateAnalytics(records, rules, filters, cache.data.blobs, signal);
       const warnings: string[] = [];
-      if ((await git.text(['rev-parse', '--is-shallow-repository'])).trim() === 'true')
-        warnings.push('Shallow repository: only locally available history is included.');
+      if (shallow) warnings.push('Shallow repository: only locally available history is included.');
       const comparison = comparisonRecord
         ? await buildComparison(git, cache, rules, comparisonRecord, comparisonHashes, from, to, fromOid, toOid, filters.path)
         : null;
       const snapshot: RepositoryAnalyticsSnapshot = {
         ...all,
-        id: digest(JSON.stringify([captured, filters])),
+        id,
         repoPath: request.repoPath,
         savedAt: Date.now(),
         complete: false,
@@ -111,14 +117,14 @@ export class RepositoryAnalyticsService {
         hotspots: all.hotspots.slice(0, 100),
         directories: all.directories.slice(0, 100),
         coupling: all.coupling.slice(0, 100),
+        couplingVersion: digest(JSON.stringify(all.coupling)),
         project: emptyProject(revision),
         comparison: comparison ? { ...comparison, paths: comparison.paths.slice(0, 100) } : null,
         warnings,
         sections: ['history', 'comparison'],
       };
       const report: FullReport = { snapshot, all, commits: this.commitRows(records, rules, filters, cache), comparisonPaths: comparison?.paths ?? [] };
-      this.reports.clear();
-      this.reports.set(snapshot.id, report);
+      this.rememberReport(key, report);
       partial = snapshot;
       emit('aggregation', selected.length, selected.length, snapshot);
       if (revision) {
@@ -151,6 +157,26 @@ export class RepositoryAnalyticsService {
       rules.dispose();
     }
   }
+  private rememberReport(key: string, report: FullReport) {
+    this.reports.delete(key);
+    this.reports.set(key, report);
+    while (this.reports.size > MAX_REPORTS) this.reports.delete(this.reports.keys().next().value!);
+  }
+  private reuseReport(request: AnalyticsRequest, key: string, shallow: boolean, signal: AbortSignal, onProgress: (event: AnalyticsProgress) => void) {
+    const existing = this.reports.get(key);
+    if (shallow || !existing?.snapshot.complete) return;
+    signal.throwIfAborted();
+    this.rememberReport(key, existing);
+    onProgress({
+      repoPath: request.repoPath,
+      requestId: request.readRequest?.requestId ?? '',
+      phase: 'aggregation',
+      completed: existing.snapshot.filteredCommits,
+      total: existing.snapshot.filteredCommits,
+      snapshot: existing.snapshot,
+    });
+    return existing.snapshot;
+  }
   private commitRows(records: CommitRecord[], rules: AnalyticsRules, filters: AnalyticsRequest['filters'], cache: AnalyticsCache) {
     return records
       .filter(
@@ -176,7 +202,7 @@ export class RepositoryAnalyticsService {
       .sort((a, b) => b.date - a.date);
   }
   details(request: AnalyticsDetailRequest): AnalyticsDetails {
-    const report = this.reports.get(request.snapshotId);
+    const report = this.reports.get(reportKey(request.repoPath, request.snapshotId));
     if (!report || report.snapshot.repoPath !== request.repoPath) throw new Error('This analytics snapshot is no longer active. Refresh the dashboard.');
     let rows: AnalyticsDetails['items'];
     switch (request.kind) {

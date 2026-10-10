@@ -12,6 +12,8 @@ import { AnalyticsNavigation } from '../AnalyticsNavigation';
 import { RepositoryAnalyticsFilters } from '../AnalyticsFilters';
 import { useAnalyticsNavigation } from '../analyticsNavigationState';
 import { useAnalyticsWorkspace } from '../analyticsWorkspaceState';
+import { clearCouplingSessions } from '../analyticsCouplingSession';
+import { analyticsReport as report } from './analyticsFixtures';
 
 const mocks = vi.hoisted(() => ({
   cache: vi.fn(),
@@ -41,48 +43,6 @@ let serial = 0;
 let host: HTMLDivElement, root: Root;
 let listeners: ((event: AnalyticsProgress) => void)[];
 const openFile = vi.fn();
-function report(repoPath = 'C:/repo', commits = 3): RepositoryAnalyticsSnapshot {
-  return {
-    id: repoPath,
-    repoPath,
-    savedAt: 1000,
-    complete: true,
-    filters: { ...DEFAULT_ANALYTICS_FILTERS },
-    sections: ['history', 'project', 'blame', 'comparison'],
-    authors: [{ id: 'alice', name: 'Alice', email: 'alice@test.invalid' }],
-    refs: [{ name: 'refs/heads/main', oid: 'a'.repeat(40), remote: false }],
-    tags: [{ name: 'v1.0.0', oid: 'a'.repeat(40), version: true, date: 1000 }],
-    head: 'b'.repeat(40),
-    totals: { commits, merges: 0, contributors: 1, firstActivity: 1000, lastActivity: 2000 },
-    filteredCommits: commits,
-    additions: 3,
-    deletions: 0,
-    excludedCouplingCommits: 0,
-    contributors: [],
-    periods: [{ date: '2026-10-08', commits, merges: 0, additions: 3, deletions: 0 }],
-    calendar: [],
-    hotspots: [{ path: 'a.ts', changes: 3, additions: 3, deletions: 0, authors: 1, hash: 'b'.repeat(40), lastChanged: 2000, binary: false }],
-    directories: [],
-    coupling: [],
-    comparison: null,
-    warnings: [],
-    project: {
-      oid: 'b'.repeat(40),
-      files: 1,
-      textFiles: 1,
-      binaryFiles: 0,
-      lfsFiles: 0,
-      symlinks: 0,
-      submodules: 0,
-      excludedFiles: 0,
-      lines: 3,
-      blamedLines: 3,
-      unblamedFiles: 0,
-      languages: [{ language: 'TypeScript', files: 1, lines: 3 }],
-      ownership: [],
-    },
-  };
-}
 const notifications = { publish: mocks.publish, update: mocks.update, dismiss: mocks.dismiss };
 const render = (repoPath = 'C:/repo', busy = false, refreshTrigger = 0) =>
   act(async () =>
@@ -117,6 +77,7 @@ const deferred = <T,>() => {
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
+  clearCouplingSessions();
   useAnalyticsNavigation.setState({ sections: {} });
   useAnalyticsWorkspace.setState({ filters: {}, snapshots: {} });
   const storage = new Map<string, string>();
@@ -396,6 +357,40 @@ describe('repository analytics dashboard', () => {
     expect(host.querySelector('.analytics-pagination')).toBeNull();
     expect(host.querySelector<HTMLElement>('.analytics-coupling-scene')!.style.transform).toBe(transform);
     expect(content.scrollTop).toBe(80);
+  });
+  it('resumes saved connection details once main recreates an unchanged report after an app restart', async () => {
+    const all = Array.from({ length: 251 }, (_, index) => ({ first: 'src/hub.ts', second: `src/file-${index}.ts`, commits: 3, share: 0.5 }));
+    const saved = { ...report(), coupling: all.slice(0, 100), couplingVersion: 'unchanged-connections' };
+    const ready = deferred<{ success: true; data: RepositoryAnalyticsSnapshot }>();
+    mocks.cache.mockResolvedValue({ success: true, data: saved });
+    mocks.refresh.mockReturnValue(ready.promise);
+    mocks.details.mockResolvedValue({ success: false, error: 'This analytics snapshot is no longer active. Refresh the dashboard.' });
+    await render();
+    await click('File coupling');
+    expect(host.textContent).toContain('Not all connections could be loaded');
+    mocks.details.mockImplementation(({ offset, limit }) =>
+      Promise.resolve({ success: true, data: { items: all.slice(offset, offset + limit), total: all.length, offset } }),
+    );
+    await act(async () => ready.resolve({ success: true, data: { ...saved, savedAt: 2000 } }));
+    expect(host.querySelectorAll('.analytics-coupling-edge')).toHaveLength(251);
+    expect(host.querySelector('.analytics-coupling-loading')).toBeNull();
+    expect(mocks.details.mock.calls.map(([request]) => request.offset)).toEqual([0, 0, 200]);
+  });
+  it('shows the session report and cached graph immediately after reopening the main analytics page', async () => {
+    const pair = { first: 'a.ts', second: 'b.ts', commits: 3, share: 0.5 };
+    mocks.details.mockResolvedValue({ success: true, data: { items: [pair], total: 1, offset: 0 } });
+    await render();
+    await click('File coupling');
+    const details = mocks.details.mock.calls.length,
+      cacheReads = mocks.cache.mock.calls.length;
+    await act(async () => root.render(null));
+    mocks.cache.mockImplementation(() => new Promise(() => {}));
+    await render();
+    expect(host.querySelectorAll('.analytics-coupling-edge')).toHaveLength(1);
+    expect(host.textContent).not.toContain('Preparing local analysis');
+    expect(host.querySelector('.analytics-coupling-loading')).toBeNull();
+    expect(mocks.details).toHaveBeenCalledTimes(details);
+    expect(mocks.cache).toHaveBeenCalledTimes(cacheReads);
   });
   it('uses central progress and cancellation and preserves usable results', async () => {
     await render();

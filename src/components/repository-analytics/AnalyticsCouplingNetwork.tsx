@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Maximize2, Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { useI18n } from '@/i18n';
@@ -8,6 +8,7 @@ import { couplingLabelLayout, couplingPairKey } from './analyticsCouplingLayout'
 import type { CouplingScene } from './analyticsCouplingScene';
 import { useAnalyticsSize } from './useAnalyticsSize';
 import { useCouplingViewport } from './useCouplingViewport';
+import { couplingSession } from './analyticsCouplingSession';
 import './analyticsCouplingViewport.css';
 
 type Props = {
@@ -20,12 +21,13 @@ type Props = {
   onSelectFile: (path: string) => void;
   onSelectPair: (pair: AnalyticsCoupling) => void;
   onInteract: () => void;
+  sessionKey?: string;
 };
 
-export function AnalyticsCouplingNetwork({ scene, rows, file, selected, max, loading, onSelectFile, onSelectPair, onInteract }: Props) {
+export function AnalyticsCouplingNetwork({ scene, rows, file, selected, max, loading, onSelectFile, onSelectPair, onInteract, sessionKey }: Props) {
   const { tr, locale } = useI18n();
   const { ref, width, height } = useAnalyticsSize(700, 440);
-  const viewport = useCouplingViewport(scene, width, height, loading, ref, onInteract);
+  const viewport = useCouplingViewport(scene, width, height, loading, ref, onInteract, sessionKey);
   const { camera } = viewport;
   const [hovered, setHovered] = useState(''),
     [focused, setFocused] = useState('');
@@ -49,8 +51,10 @@ export function AnalyticsCouplingNetwork({ scene, rows, file, selected, max, loa
   const reveal = viewport.reveal;
   const selectedX = selectedNode?.x,
     selectedY = selectedNode?.y;
+  const lastRevealedFile = useRef(couplingSession(sessionKey)?.viewport ? file : '');
   useLayoutEffect(() => {
-    if (selectedX !== undefined && selectedY !== undefined) reveal({ x: selectedX, y: selectedY });
+    if (file !== lastRevealedFile.current && selectedX !== undefined && selectedY !== undefined) reveal({ x: selectedX, y: selectedY });
+    lastRevealedFile.current = file;
   }, [file, selectedX, selectedY, reveal]);
   const nodeKey = (event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'Escape') {

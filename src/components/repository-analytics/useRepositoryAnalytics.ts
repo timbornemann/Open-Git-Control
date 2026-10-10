@@ -5,13 +5,18 @@ import { useOptionalNotifications } from '@/contexts/NotificationContext';
 import { useI18n } from '@/i18n';
 import type { AnalyticsFilters, AnalyticsProgress, RepositoryAnalyticsSnapshot } from '@/shared/ipc/repositoryAnalytics';
 import type { NotificationMessage } from '@/types/notifications';
+import { useAnalyticsWorkspace } from './analyticsWorkspaceState';
+import { normalizeRepoPathKey } from '@/utils/repoPath';
 
 const reportContent = ({ savedAt: _savedAt, ...snapshot }: RepositoryAnalyticsSnapshot) => JSON.stringify(snapshot);
 
 export function useRepositoryAnalytics(repoPath: string, filters: AnalyticsFilters, refreshTrigger: number, busy: boolean) {
   const filterKey = JSON.stringify(filters);
   const contextKey = JSON.stringify([repoPath, filterKey]);
-  const [report, setReport] = useState<{ contextKey: string; snapshot: RepositoryAnalyticsSnapshot } | null>(null);
+  const [report, setReport] = useState<{ contextKey: string; snapshot: RepositoryAnalyticsSnapshot } | null>(() => {
+    const saved = useAnalyticsWorkspace.getState().snapshots[normalizeRepoPathKey(repoPath)];
+    return saved && JSON.stringify(saved.filters) === filterKey ? { contextKey, snapshot: saved } : null;
+  });
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
   const [refresh, setRefresh] = useState(0);
@@ -83,8 +88,9 @@ export function useRepositoryAnalytics(repoPath: string, filters: AnalyticsFilte
     };
     setError('');
     setProgress(null);
-    const cacheRead = gitClient
-      .getRepositoryAnalyticsSnapshot({ repoPath, filters: parsedFilters })
+    const cacheRead = (
+      baseline ? Promise.resolve({ success: true, data: baseline }) : gitClient.getRepositoryAnalyticsSnapshot({ repoPath, filters: parsedFilters })
+    )
       .then((result) => {
         const snapshot = result.success ? result.data : null;
         if (active && snapshot) baseline ??= snapshot;
@@ -123,6 +129,7 @@ export function useRepositoryAnalytics(repoPath: string, filters: AnalyticsFilte
         setReport((previous) => {
           // Keep completed sections visible while a refresh calculates its earlier phases.
           if (previous?.contextKey === contextKey && previous.snapshot.sections.some((section) => !snapshot.sections.includes(section))) return previous;
+          if (previous?.contextKey === contextKey && reportContent(previous.snapshot) === reportContent(snapshot)) return previous;
           return { contextKey, snapshot };
         });
       }
@@ -139,7 +146,14 @@ export function useRepositoryAnalytics(repoPath: string, filters: AnalyticsFilte
           throw new Error(result.error ?? tr('Die Analyse konnte nicht abgeschlossen werden.', 'The analysis could not be completed.'));
         completed = true;
         live = true;
-        setReport({ contextKey, snapshot: result.data });
+        // A freshly hydrated main report makes saved detail reads retryable even if its totals are unchanged.
+        setReport((previous) =>
+          previous?.contextKey === contextKey &&
+          previous.snapshot.savedAt === result.data!.savedAt &&
+          reportContent(previous.snapshot) === reportContent(result.data!)
+            ? previous
+            : { contextKey, snapshot: result.data! },
+        );
         setRunning(false);
         // A fast cached calculation can finish before its saved baseline reaches the renderer.
         if (!notifyProgress && !baseline) await cacheRead;

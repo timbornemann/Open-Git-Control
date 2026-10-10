@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Button } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import type { RepositoryAnalyticsSnapshot } from '@/shared/ipc/repositoryAnalytics';
@@ -5,12 +6,24 @@ import { AnalyticsCoupling } from './AnalyticsCoupling';
 import { count } from './AnalyticsCharts';
 import { useAnalyticsCoupling } from './useAnalyticsCoupling';
 
-export function AnalyticsCouplingView({ snapshot, onPath }: { snapshot: RepositoryAnalyticsSnapshot; onPath: (path: string) => void }) {
+export const AnalyticsCouplingView = memo(function AnalyticsCouplingView({
+  snapshot,
+  onPath,
+}: {
+  snapshot: RepositoryAnalyticsSnapshot;
+  onPath: (path: string) => void;
+}) {
   const { tr } = useI18n();
-  const { rows, pending, loaded, total, error, retry } = useAnalyticsCoupling(snapshot);
+  const { rows, pending, loaded, total, error, retry, sessionKey } = useAnalyticsCoupling(snapshot);
   return (
     <div className="analytics-coupling-host">
-      <AnalyticsCoupling rows={rows} maxCommits={snapshot.coupling.reduce((max, pair) => Math.max(max, pair.commits), 0)} loading={pending} onPath={onPath} />
+      <AnalyticsCoupling
+        rows={rows}
+        maxCommits={snapshot.coupling.reduce((max, pair) => Math.max(max, pair.commits), 0)}
+        loading={pending}
+        onPath={onPath}
+        sessionKey={sessionKey}
+      />
       {(pending || error) && (
         <div className="analytics-coupling-loading" role="status">
           {error ? (
@@ -30,4 +43,4 @@ export function AnalyticsCouplingView({ snapshot, onPath }: { snapshot: Reposito
       )}
     </div>
   );
-}
+});

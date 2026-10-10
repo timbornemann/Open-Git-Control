@@ -6,6 +6,7 @@ import { I18nProvider } from '@/i18n';
 import { AnalyticsCoupling } from '../AnalyticsCoupling';
 import { relaxCouplingScene, type CouplingForceRequest, type CouplingForceResult } from '../analyticsCouplingForce';
 import type { AnalyticsCoupling as Pair } from '@/shared/ipc/repositoryAnalytics';
+import { clearCouplingSessions } from '../analyticsCouplingSession';
 
 class LayoutWorker {
   static tasks: LayoutWorker[] = [];
@@ -33,11 +34,11 @@ class LayoutWorker {
 }
 let host: HTMLDivElement, root: Root;
 const rows: Pair[] = Array.from({ length: 120 }, (_, index) => ({ first: 'hub.ts', second: `file-${index}.ts`, commits: 4, share: 0.5 }));
-const render = (value = rows, loading = false) =>
+const render = (value = rows, loading = false, sessionKey?: string) =>
   act(() =>
     root.render(
       <I18nProvider language="en">
-        <AnalyticsCoupling rows={value} maxCommits={4} loading={loading} onPath={vi.fn()} />
+        <AnalyticsCoupling rows={value} maxCommits={4} loading={loading} onPath={vi.fn()} sessionKey={sessionKey} />
       </I18nProvider>,
     ),
   );
@@ -46,6 +47,7 @@ const camera = () => host.querySelector<HTMLElement>('.analytics-coupling-scene'
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   LayoutWorker.tasks = [];
+  clearCouplingSessions();
   vi.stubGlobal('Worker', LayoutWorker);
   host = document.createElement('div');
   document.body.append(host);
@@ -143,5 +145,37 @@ describe('background coupling force layout', () => {
     render();
     expect(positions()).toHaveLength(121);
     expect(host.querySelector('.analytics-coupling-network')?.getAttribute('aria-busy')).toBe('false');
+  });
+  it('restores a settled layout and camera on reopening without starting any new force worker', () => {
+    render(rows, false, 'repo-and-filter');
+    act(() => LayoutWorker.tasks[0].deliver());
+    act(() => host.querySelector<HTMLButtonElement>('[aria-label="Zoom in"]')!.click());
+    const stable = positions(),
+      view = camera();
+    act(() => root.render(null));
+    render(rows, false, 'repo-and-filter');
+    expect(LayoutWorker.tasks).toHaveLength(1);
+    expect(positions()).toEqual(stable);
+    expect(camera()).toBe(view);
+    expect(host.querySelector('.analytics-coupling-network')?.getAttribute('aria-busy')).toBe('false');
+  });
+  it('does not restart layout when a completed initial batch is later marked fully loaded', () => {
+    render(rows, true, 'loading-then-finished');
+    act(() => LayoutWorker.tasks[0].deliver());
+    render(rows, false, 'loading-then-finished');
+    const stable = positions();
+    act(() => root.render(null));
+    render(rows, false, 'loading-then-finished');
+    expect(LayoutWorker.tasks).toHaveLength(1);
+    expect(positions()).toEqual(stable);
+  });
+  it('retains positions without simulating when only links between existing files change', () => {
+    render();
+    act(() => LayoutWorker.tasks[0].deliver());
+    const stable = positions();
+    render([...rows, { first: 'file-0.ts', second: 'file-1.ts', commits: 3, share: 0.5 }]);
+    expect(LayoutWorker.tasks).toHaveLength(1);
+    expect(positions()).toEqual(stable);
+    expect(host.querySelectorAll('.analytics-coupling-edge')).toHaveLength(121);
   });
 });

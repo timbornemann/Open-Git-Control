@@ -34,9 +34,6 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({ activeTa
       <button className={`icon-btn ${activeTab === 'repo' ? 'active' : ''}`} onClick={() => activateTab('repo')} title={t('sidebar.currentRepository')}>
         <FolderGit2 size={22} />
       </button>
-      <button className={`icon-btn ${activeTab === 'localRepos' ? 'active' : ''}`} onClick={() => activateTab('localRepos')} title={t('sidebar.localRepos')}>
-        <FolderOpen size={22} />
-      </button>
       <button
         className={`icon-btn ${activeTab === 'analytics' ? 'active' : ''}`}
         onClick={() => activateTab('analytics')}
@@ -45,6 +42,9 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({ activeTa
         aria-current={activeTab === 'analytics' ? 'page' : undefined}
       >
         <BarChart3 size={22} />
+      </button>
+      <button className={`icon-btn ${activeTab === 'localRepos' ? 'active' : ''}`} onClick={() => activateTab('localRepos')} title={t('sidebar.localRepos')}>
+        <FolderOpen size={22} />
       </button>
       <button className={`icon-btn ${activeTab === 'planner' ? 'active' : ''}`} onClick={() => activateTab('planner')} title={t('sidebar.planner')}>
         <ListTodo size={22} />

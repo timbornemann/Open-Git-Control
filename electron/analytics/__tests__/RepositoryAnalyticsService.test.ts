@@ -32,8 +32,9 @@ describe('offline repository analytics with real Git', () => {
     const restored = new RepositoryAnalyticsService(f.engine, f.cache);
     expect(restored.snapshot({ repoPath: f.repo, filters: DEFAULT_ANALYTICS_FILTERS })?.id).toBe(first.id);
     const spy = vi.spyOn(f.engine, 'streamReadAtPath');
-    await f.refresh();
-    expect(spy.mock.calls.filter((call) => call[1].includes('--numstat'))).toHaveLength(1); // release comparison only
+    const unchanged = await f.refresh();
+    expect(unchanged.savedAt).toBe(first.savedAt);
+    expect(spy.mock.calls.some((call) => call[1].includes('--numstat') || call[1].includes('rev-list') || call[1].includes('log'))).toBe(false);
     expect(spy.mock.calls.some((call) => call[1].includes('blame'))).toBe(false);
     spy.mockClear();
     f.write('a.ts', 'new\n');
@@ -46,6 +47,26 @@ describe('offline repository analytics with real Git', () => {
     expect(history).toHaveLength(1);
     expect(history[0][4]!.toString().trim().split('\n')).toHaveLength(1);
     expect(spy.mock.calls.filter((call) => call[1].includes('blame')).map((call) => call[1].at(-1))).toEqual(['a.ts']);
+  }, 90000);
+  it('retains immutable old detail reports while a background analysis publishes a new snapshot', async () => {
+    const f = await fixture();
+    const first = await f.refresh();
+    const original = f.service.details({ repoPath: f.repo, snapshotId: first.id, kind: 'coupling', offset: 0, limit: 200 });
+    f.write('a.ts', 'changed\n');
+    await f.git('add', 'a.ts');
+    await f.git('commit', '-m', 'A new project state');
+    let checked = false;
+    const next = await f.service.refresh({ repoPath: f.repo, filters: DEFAULT_ANALYTICS_FILTERS }, new AbortController().signal, (event) => {
+      if (event.snapshot && event.snapshot.id !== first.id) {
+        expect(f.service.details({ repoPath: f.repo, snapshotId: first.id, kind: 'coupling', offset: 0, limit: 200 })).toEqual(original);
+        checked = true;
+      }
+    });
+    expect(checked).toBe(true);
+    expect(next.couplingVersion).not.toBe(first.couplingVersion);
+    const filtered = await f.refresh({ ...DEFAULT_ANALYTICS_FILTERS, path: 'a.ts' });
+    expect(filtered.id).not.toBe(next.id);
+    expect(f.service.details({ repoPath: f.repo, snapshotId: next.id, kind: 'coupling', offset: 0, limit: 200 }).items).toEqual(next.coupling);
   }, 90000);
   it('keeps all filtered coupling pairs beyond the 100-row preview and 200-row transfer batch', async () => {
     const f = await fixture(false);

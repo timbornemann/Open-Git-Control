@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '@/i18n';
 import { DEFAULT_ANALYTICS_FILTERS, type AnalyticsCoupling, type AnalyticsDetails, type RepositoryAnalyticsSnapshot } from '@/shared/ipc/repositoryAnalytics';
 import { AnalyticsDetailsView } from '../AnalyticsDetails';
+import { clearCouplingSessions } from '../analyticsCouplingSession';
 
 const getDetails = vi.hoisted(() => vi.fn());
 vi.mock('@/services/gitClient', () => ({ gitClient: { getRepositoryAnalyticsDetails: getDetails } }));
@@ -50,6 +51,7 @@ const click = (name: string) =>
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
+  clearCouplingSessions();
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -169,6 +171,107 @@ describe('complete file coupling network loading', () => {
     await click('Retry loading');
     expect(host.querySelectorAll('.analytics-coupling-edge')).toHaveLength(121);
     expect(nodes()).toHaveLength(122);
+    expect(host.querySelector('.analytics-coupling-loading')).toBeNull();
+  });
+  it('does not reload unchanged complete connections for timestamps or changed refs with the same content version', async () => {
+    const all = pairs(451);
+    getDetails.mockImplementation(({ offset, limit }) => Promise.resolve(response(all, offset, limit)));
+    const initial = { ...saved(all), couplingVersion: 'same-connections' };
+    await render(initial);
+    const network = host.querySelector('.analytics-coupling-network'),
+      before = nodes().map((node) => [node.dataset.path, node.style.left, node.style.top]);
+    const calls = getDetails.mock.calls.length;
+    for (let generation = 1; generation <= 3; generation++) {
+      await render({ ...initial, id: `new-refs-${generation}`, savedAt: 1000 + generation });
+      expect(getDetails).toHaveBeenCalledTimes(calls);
+      expect(host.querySelector('.analytics-coupling-network')).toBe(network);
+      expect(nodes().map((node) => [node.dataset.path, node.style.left, node.style.top])).toEqual(before);
+      expect(host.querySelector('.analytics-coupling-loading')).toBeNull();
+    }
+  });
+  it('lets an in-flight batch finish through repeated automatic sync timestamps instead of restarting it', async () => {
+    const all = pairs(251),
+      tail = deferred();
+    getDetails.mockImplementation(({ offset, limit }) => (offset === 0 ? Promise.resolve(response(all, offset, limit)) : tail.promise));
+    const initial = saved(all);
+    await render(initial);
+    for (let stamp = 2; stamp <= 4; stamp++) await render({ ...initial, savedAt: stamp * 1000 });
+    expect(getDetails.mock.calls.map(([request]) => request.offset)).toEqual([0, 200]);
+    await act(async () => tail.resolve(response(all, 200)));
+    expect(host.querySelectorAll('.analytics-coupling-edge')).toHaveLength(251);
+    expect(host.querySelector('.analytics-coupling-loading')).toBeNull();
+  });
+  it('restores all rows, file selection, positions and an off-center camera after reopening without fetching again', async () => {
+    const all = pairs(251),
+      initial = saved(all);
+    getDetails.mockImplementation(({ offset, limit }) => Promise.resolve(response(all, offset, limit)));
+    await render(initial);
+    await act(async () =>
+      nodes()
+        .find((node) => node.dataset.path === all[230].second)!
+        .click(),
+    );
+    await click('Zoom in');
+    const network = host.querySelector<HTMLDivElement>('.analytics-coupling-network')!;
+    await act(async () => {
+      for (let step = 0; step < 10; step++) network.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    });
+    const view = scene().style.transform,
+      before = nodes().map((node) => [node.dataset.path, node.style.left, node.style.top]);
+    const calls = getDetails.mock.calls.length;
+    await act(async () => root.render(null));
+    await render(initial);
+    expect(getDetails).toHaveBeenCalledTimes(calls);
+    expect(scene().style.transform).toBe(view);
+    expect(nodes().map((node) => [node.dataset.path, node.style.left, node.style.top])).toEqual(before);
+    expect(host.querySelector('.analytics-coupling-node[aria-pressed="true"]')?.getAttribute('data-path')).toBe(all[230].second);
+    expect(host.querySelector('.analytics-coupling-loading')).toBeNull();
+  });
+  it('resumes partially loaded rows after reopening and ignores a reply from the cancelled batch', async () => {
+    const all = pairs(251),
+      late = deferred(),
+      initial = saved(all);
+    getDetails.mockImplementation(({ offset, limit }) => (offset === 0 ? Promise.resolve(response(all, offset, limit)) : late.promise));
+    await render(initial);
+    await act(async () => root.render(null));
+    getDetails.mockImplementation(({ offset, limit }) => Promise.resolve(response(all, offset, limit)));
+    await render(initial);
+    expect(getDetails.mock.calls.map(([request]) => request.offset)).toEqual([0, 200, 200]);
+    const calls = getDetails.mock.calls.length;
+    await act(async () => late.resolve(response(all, 200)));
+    expect(getDetails).toHaveBeenCalledTimes(calls);
+    expect(host.querySelectorAll('.analytics-coupling-edge')).toHaveLength(251);
+    expect(host.querySelector('.analytics-coupling-loading')).toBeNull();
+  });
+  it('recovers when a previous failed detail response arrives after the refreshed report is already ready', async () => {
+    const all = pairs(251),
+      initial = saved(all);
+    let fail!: (value: { success: false; error: string }) => void;
+    const unavailable = new Promise<{ success: false; error: string }>((resolve) => {
+      fail = resolve;
+    });
+    getDetails.mockReturnValueOnce(unavailable);
+    getDetails.mockImplementation(({ offset, limit }) => Promise.resolve(response(all, offset, limit)));
+    await render(initial);
+    await render({ ...initial, savedAt: 2000 });
+    expect(getDetails).toHaveBeenCalledTimes(1);
+    await act(async () => fail({ success: false, error: 'This analytics snapshot is no longer active. Refresh the dashboard.' }));
+    expect(getDetails.mock.calls.map(([request]) => request.offset)).toEqual([0, 0, 200]);
+    expect(host.querySelectorAll('.analytics-coupling-edge')).toHaveLength(251);
+    expect(host.querySelector('.analytics-coupling-loading')).toBeNull();
+  });
+  it('recovers a saved snapshot that is initially unavailable in main when the refreshed report becomes ready', async () => {
+    const all = pairs(251),
+      initial = saved(all);
+    getDetails.mockResolvedValue({ success: false, error: 'This analytics snapshot is no longer active. Refresh the dashboard.' });
+    await render(initial);
+    expect(host.textContent).toContain('Not all connections could be loaded');
+    const calls = getDetails.mock.calls.length;
+    await render({ ...initial });
+    expect(getDetails).toHaveBeenCalledTimes(calls);
+    getDetails.mockImplementation(({ offset, limit }) => Promise.resolve(response(all, offset, limit)));
+    await render({ ...initial, savedAt: 2000 });
+    expect(host.querySelectorAll('.analytics-coupling-edge')).toHaveLength(251);
     expect(host.querySelector('.analytics-coupling-loading')).toBeNull();
   });
 });

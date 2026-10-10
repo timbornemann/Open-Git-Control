@@ -99,6 +99,8 @@ export type RepositoryAnalyticsSnapshot = {
   hotspots: AnalyticsChanges[];
   directories: AnalyticsChanges[];
   coupling: AnalyticsCoupling[];
+  /** Content version of all coupling pairs, including rows outside the preview. */
+  couplingVersion?: string;
   project: AnalyticsProject;
   comparison: AnalyticsComparison | null;
   warnings: string[];

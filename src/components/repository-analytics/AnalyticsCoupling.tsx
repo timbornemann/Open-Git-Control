@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowUpRight, FileCode2, Link2 } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import type { AnalyticsCoupling as Coupling } from '@/shared/ipc/repositoryAnalytics';
@@ -6,16 +6,21 @@ import { AnalyticsEmpty, count, moveChartFocus, percent, percentWidth } from './
 import { couplingPairKey } from './analyticsCouplingLayout';
 import { useCouplingScene } from './analyticsCouplingScene';
 import { AnalyticsCouplingNetwork } from './AnalyticsCouplingNetwork';
+import { couplingSession } from './analyticsCouplingSession';
 import './analyticsCoupling.css';
 
-type Props = { rows: Coupling[]; maxCommits: number; loading?: boolean; onPath: (path: string) => void };
+type Props = { rows: Coupling[]; maxCommits: number; loading?: boolean; onPath: (path: string) => void; sessionKey?: string };
 const filename = (path: string) => path.slice(path.lastIndexOf('/') + 1);
 
-export function AnalyticsCoupling({ rows, maxCommits, loading = false, onPath }: Props) {
+export function AnalyticsCoupling({ rows, maxCommits, loading = false, onPath, sessionKey }: Props) {
   const { tr, locale } = useI18n();
-  const { scene, settling, lock } = useCouplingScene(rows, loading);
-  const [selectedFile, setSelectedFile] = useState('');
-  const [selectedKey, setSelectedKey] = useState('');
+  const { scene, settling, lock } = useCouplingScene(rows, loading, sessionKey);
+  const session = couplingSession(sessionKey);
+  const [selectedFile, setSelectedFile] = useState(() => session?.selection?.file ?? '');
+  const [selectedKey, setSelectedKey] = useState(() => session?.selection?.pair ?? '');
+  useEffect(() => {
+    if (session) session.selection = { file: selectedFile, pair: selectedKey };
+  }, [session, selectedFile, selectedKey]);
   const file = scene.nodes.some((node) => node.path === selectedFile) ? selectedFile : '';
   const ranked = [...rows].sort((a, b) => b.commits - a.commits || couplingPairKey(a).localeCompare(couplingPairKey(b)));
   const connections = file ? ranked.filter((pair) => pair.first === file || pair.second === file) : ranked;
@@ -60,6 +65,7 @@ export function AnalyticsCoupling({ rows, maxCommits, loading = false, onPath }:
           onInteract={lock}
           onSelectFile={selectFile}
           onSelectPair={selectPair}
+          sessionKey={sessionKey}
         />
         <aside className="analytics-coupling-details" aria-label={tr('Verbindungsdetails', 'Connection details')}>
           {selected ? (
