@@ -64,6 +64,21 @@ const assertOutsideGitMetadata = (relativePath: string, label: string): void => 
 };
 
 /**
+ * Windows also reaches `.git` through its 8.3 short name (for example
+ * `GIT~1`, or a hashed form after collisions). fs.realpathSync keeps such
+ * aliases, while the native resolver returns the long names, so the metadata
+ * boundary is re-checked on the native path of an existing location.
+ */
+const assertNativePathOutsideGitMetadata = (physicalRepoPath: string, existingPath: string, label: string): void => {
+  if (process.platform !== 'win32') return;
+  const relative = path.relative(fs.realpathSync.native(physicalRepoPath), fs.realpathSync.native(existingPath));
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(`${label} is outside the current repository.`);
+  }
+  assertOutsideGitMetadata(relative, label);
+};
+
+/**
  * Resolves a repository-relative, existing path through all symlinks and
  * rejects targets outside of the physical repository root.
  */
@@ -78,6 +93,7 @@ export function resolveExistingRepositoryPath(repoPath: string, relativePath: un
     throw new Error(`${label} is outside the current repository.`);
   }
   assertOutsideGitMetadata(path.relative(physicalRepoPath, physicalTargetPath), label);
+  assertNativePathOutsideGitMetadata(physicalRepoPath, physicalTargetPath, label);
 
   return physicalTargetPath;
 }
@@ -112,6 +128,7 @@ export function resolveExistingRepositoryPathWithoutSymlinks(repoPath: string, r
     throw new Error(`${label} is outside the current repository.`);
   }
   assertOutsideGitMetadata(path.relative(physicalRepoPath, physicalTargetPath), label);
+  assertNativePathOutsideGitMetadata(physicalRepoPath, physicalTargetPath, label);
   return physicalTargetPath;
 }
 
@@ -165,6 +182,7 @@ export function resolveRepositoryPathForCreate(repoPath: string, relativePath: u
     throw new Error(`${label} is outside the current repository.`);
   }
   assertOutsideGitMetadata(path.relative(physicalRepoPath, physicalParent), label);
+  assertNativePathOutsideGitMetadata(physicalRepoPath, physicalParent, label);
 
   return candidatePath;
 }

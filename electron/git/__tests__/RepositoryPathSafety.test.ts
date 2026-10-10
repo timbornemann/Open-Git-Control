@@ -66,6 +66,22 @@ describe('normalizeRepositoryRelativePath', () => {
     }
   });
 
+  it('blocks the Windows 8.3 short-name alias of .git', () => {
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-path-short-name-'));
+    fs.mkdirSync(path.join(repoPath, '.git', 'hooks'), { recursive: true });
+    fs.writeFileSync(path.join(repoPath, '.git', 'config'), '[core]\n', 'utf8');
+    try {
+      // Short names exist only on Windows volumes with 8.3 generation enabled.
+      if (process.platform !== 'win32' || !fs.existsSync(path.join(repoPath, 'GIT~1', 'config'))) return;
+      expect(() => resolveExistingRepositoryPath(repoPath, 'GIT~1/config')).toThrow(/Git metadata/);
+      expect(() => resolveExistingRepositoryPathWithoutSymlinks(repoPath, 'GIT~1/config')).toThrow(/Git metadata/);
+      expect(() => resolveRepositoryPathForCreate(repoPath, 'GIT~1/hooks/pre-commit')).toThrow(/Git metadata/);
+      expect(() => resolveRepositoryPathForCreateWithoutSymlinks(repoPath, 'GIT~1/hooks/pre-commit')).toThrow(/Git metadata/);
+    } finally {
+      fs.rmSync(repoPath, { recursive: true, force: true });
+    }
+  });
+
   it('rejects paths that traverse an in-repository symbolic link or junction', () => {
     const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-path-symlink-'));
     const targetDirectory = path.join(repoPath, 'target');
