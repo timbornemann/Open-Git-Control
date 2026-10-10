@@ -2,6 +2,12 @@ import type { AppSettings } from '../../settings';
 import type { AiConnectionResult, AiConnectionTestRequest, AiModelListRequest, AiProvider, AiTextRequest } from './AiProvider';
 import { AI_DISCOVERY_TIMEOUT_MS, fetchWithTimeout, safeString, uniqueSorted } from './providerUtils';
 
+const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
+
+// The key travels in a header, never in the URL, where it could end up in
+// proxy logs, error messages or diagnostics.
+const geminiHeaders = (apiKey: string, headers: Record<string, string> = {}): Record<string, string> => ({ ...headers, 'x-goog-api-key': apiKey });
+
 export function normalizeGeminiModel(model: string): string {
   const trimmed = model.trim();
   if (!trimmed) return '';
@@ -27,8 +33,8 @@ export class GeminiProvider implements AiProvider {
     }
 
     const response = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}?key=${encodeURIComponent(apiKey)}`,
-      {},
+      `${GEMINI_API_BASE_URL}/models/${encodeURIComponent(model)}`,
+      { headers: geminiHeaders(apiKey) },
       AI_DISCOVERY_TIMEOUT_MS,
     );
     if (!response.ok) {
@@ -51,11 +57,7 @@ export class GeminiProvider implements AiProvider {
       throw new Error('Gemini API key fehlt.');
     }
 
-    const response = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
-      {},
-      AI_DISCOVERY_TIMEOUT_MS,
-    );
+    const response = await fetchWithTimeout(`${GEMINI_API_BASE_URL}/models`, { headers: geminiHeaders(apiKey) }, AI_DISCOVERY_TIMEOUT_MS);
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`Gemini Modelle konnten nicht geladen werden (${response.status}): ${text || response.statusText}`);
@@ -86,10 +88,10 @@ export class GeminiProvider implements AiProvider {
     }
 
     const response = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      `${GEMINI_API_BASE_URL}/models/${encodeURIComponent(model)}:generateContent`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: geminiHeaders(apiKey, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemPrompt }] },
           contents: [{ role: 'user', parts: [{ text: userPrompt }] }],

@@ -35,7 +35,8 @@ describe('AiService gemini secret access', () => {
     await service.listModels(baseSettings, () => 'secure-key-123');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(String(fetchMock.mock.calls[0][0])).toContain('key=secure-key-123');
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain('secure-key-123');
+    expect((fetchMock.mock.calls[0] as unknown[])[1]).toMatchObject({ headers: { 'x-goog-api-key': 'secure-key-123' } });
   });
 });
 
