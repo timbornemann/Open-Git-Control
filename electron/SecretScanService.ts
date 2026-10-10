@@ -197,8 +197,12 @@ const SECRET_PATTERNS: PatternDefinition[] = [
     minStrictness: 'medium',
     severity: 'high',
     configFileOnly: true,
+    // Both repetitions are bounded: an unbounded name prefix or value (up to the
+    // end-of-line lookahead) made every word boundary rescan the rest of the
+    // line, so one crafted 1 MB line blocked the main process for minutes.
+    // Longer values are rejected by isLikelyHighEntropySecret anyway.
     regex:
-      /\b(?:[A-Za-z0-9]+[_-])*(?:api[_-]?(?:key|token)|access[_-]?(?:key|token)|auth(?:entication|orization)?[_-]?(?:key|token)|bearer[_-]?token|client[_-]?(?:secret|key)|consumer[_-]?(?:secret|key)|webhook[_-]?secret|signing[_-]?key|encryption[_-]?key|private[_-]?key|secret(?:[_-]?key)?|token|password|passwd|credential(?:s)?|key)\b\s*[:=]\s*["']?([A-Za-z0-9+/_=.-]{20,})["']?(?=\s*(?:[#;].*)?$)/i,
+      /\b(?:[A-Za-z0-9]+[_-]){0,16}(?:api[_-]?(?:key|token)|access[_-]?(?:key|token)|auth(?:entication|orization)?[_-]?(?:key|token)|bearer[_-]?token|client[_-]?(?:secret|key)|consumer[_-]?(?:secret|key)|webhook[_-]?secret|signing[_-]?key|encryption[_-]?key|private[_-]?key|secret(?:[_-]?key)?|token|password|passwd|credential(?:s)?|key)\b\s*[:=]\s*["']?([A-Za-z0-9+/_=.-]{20,512})["']?(?=\s*(?:[#;].*)?$)/i,
     validateMatch: (match) => isLikelyHighEntropySecret(match[1] || ''),
   },
 ];

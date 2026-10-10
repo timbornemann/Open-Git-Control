@@ -106,6 +106,31 @@ describe('SecretScanService diff scanning', () => {
     expect(result.findings).toHaveLength(0);
   });
 
+  it('scans crafted long configuration lines in linear time and still finds long prefixed names', async () => {
+    const secret = 'Xy7kLm2Pq9Rs4Tu8Vw3Za6Bc1De5';
+    const stagedDiff = [
+      'diff --git a/.env b/.env',
+      '+++ b/.env',
+      '@@ -0,0 +1,3 @@',
+      `+${'key-'.repeat(64 * 1024)}!`,
+      `+${'key='.repeat(64 * 1024)}!`,
+      `+MY_COMPANY_PROD_SERVICE_DB_API_KEY=${secret}`,
+    ].join('\n');
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': stagedDiff,
+      }),
+    );
+
+    const startedAt = Date.now();
+    const result = await service.scanStagedDiffs({ repoPath: '/tmp/repo', strictness: 'medium', allowlistText: '' });
+
+    // The previous pattern needed tens of seconds for these two lines.
+    expect(Date.now() - startedAt).toBeLessThan(5_000);
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]).toMatchObject({ filePath: '.env', ruleId: 'configuration-secret-assignment', lineNumber: 3 });
+  });
+
   it('scans only the staged patch for the fast pre-commit check', async () => {
     const stagedDiff = ['diff --git a/.env b/.env', '+++ b/.env', '@@ -0,0 +1 @@', '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF'].join('\n');
     const runCommandAtPath = vi.fn();
