@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { gitClient } from '@/services/gitClient';
 import { buildHtmlPreviewUrl } from '@/shared/htmlPreviewSecurity';
 import type { RepositoryFileContextDto } from '@/shared/ipc/repositoryFiles';
-import { buildSandboxedHtmlPreviewDocument, collectHtmlPreviewAssets, type HtmlPreviewAssetContent, type HtmlPreviewAssetKind } from '@/utils/htmlPreview';
+import { buildSandboxedHtmlPreviewDocument, collectHtmlPreviewAssets } from '@/utils/htmlPreview';
+import { loadHtmlPreviewAssets } from '@/utils/htmlPreviewAssetLoader';
 
 export type HtmlPreviewState = { loading: boolean; error: string | null; url: string };
 
@@ -35,24 +36,21 @@ export const useHtmlPreview = ({
 
     const loadPreview = async () => {
       setHtmlPreview({ loading: true, error: null, url: '' });
-      const assetContent: HtmlPreviewAssetContent = { images: {}, scripts: {}, styles: {} };
-
       try {
         const assets = collectHtmlPreviewAssets(html, path);
-        const missing: string[] = [];
-        await Promise.all(
-          assets.map(async (asset) => {
+        const { content: assetContent, missing } = await loadHtmlPreviewAssets(
+          html,
+          assets,
+          async (asset) => {
             if (asset.kind === 'image') {
               const result = await gitClient.getRepoFileDataUrl({ source, commitHash, path: asset.path, repoPath });
-              if (result.success) assetContent.images[asset.path] = result.data.dataUrl;
-              else missing.push(asset.path);
-              return;
+              return result.success ? result.data.dataUrl : null;
             }
 
             const result = await gitClient.getMarkdownPreviewFile({ source, commitHash, path: asset.path, repoPath });
-            if (result.success) assetContent[`${asset.kind}s` as `${HtmlPreviewAssetKind}s`][asset.path] = result.data.text;
-            else missing.push(asset.path);
-          }),
+            return result.success ? result.data.text : null;
+          },
+          isCurrentRequest,
         );
 
         if (isCurrentRequest()) {
