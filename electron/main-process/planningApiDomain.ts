@@ -127,7 +127,7 @@ export const parseLimit = (value: unknown, fallback?: number): number | undefine
 export const parseStatus = (value: unknown, fieldName = 'status'): PlannerStatus | undefined => {
   const raw = cleanString(value).toLowerCase();
   if (!raw) return undefined;
-  const normalized = STATUS_ALIASES[raw];
+  const normalized = Object.hasOwn(STATUS_ALIASES, raw) ? STATUS_ALIASES[raw] : undefined;
   if (!normalized) {
     throw new ApiError(400, 'INVALID_STATUS', `${fieldName} must be one of ${PLANNER_STATUSES.join(', ')}.`);
   }
@@ -137,7 +137,7 @@ export const parseStatus = (value: unknown, fieldName = 'status'): PlannerStatus
 export const parsePriority = (value: unknown): PlannerPriority | undefined => {
   const raw = cleanString(value).toLowerCase();
   if (!raw) return undefined;
-  const normalized = PRIORITY_ALIASES[raw];
+  const normalized = Object.hasOwn(PRIORITY_ALIASES, raw) ? PRIORITY_ALIASES[raw] : undefined;
   if (!normalized) {
     throw new ApiError(400, 'INVALID_PRIORITY', `priority must be one of ${PLANNER_PRIORITIES.join(', ')}.`);
   }
