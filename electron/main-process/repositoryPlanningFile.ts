@@ -42,9 +42,15 @@ export function parsePlannerData(raw: string, fileLabel: string, prepare: (value
 const withRepositoryIdentity = (value: unknown, repoPath: string): unknown => {
   if (!value || typeof value !== 'object') return value;
   const candidate = value as Partial<ProjectPlannerData>;
-  const [first, ...rest] = Array.isArray(candidate.projects) ? candidate.projects : [];
+  // Validate this before general normalization: additional repository records
+  // could otherwise send fs.realpathSync to paths supplied by a committed
+  // file, including a Windows network share, even though they are discarded.
+  if (Array.isArray(candidate.projects) && candidate.projects.length > 1) {
+    throw new Error('Repository planning data may describe only one project.');
+  }
+  const [first] = Array.isArray(candidate.projects) ? candidate.projects : [];
   if (!first || typeof first !== 'object') return value;
-  return { ...candidate, projects: [{ ...(first as PlannerProject), kind: 'repository', repoPath }, ...rest] };
+  return { ...candidate, projects: [{ ...(first as PlannerProject), kind: 'repository', repoPath }] };
 };
 
 /** Reduces planner data to the single project a repository file may describe. */
