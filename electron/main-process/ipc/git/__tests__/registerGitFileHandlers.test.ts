@@ -283,6 +283,17 @@ describe('registerGitFileHandlers repository path opening', () => {
     expect(showItemInFolderMock).not.toHaveBeenCalled();
   });
 
+  it('opens submodule directories but never hands a file to the shell', async () => {
+    const opened = await handlers.get(IpcChannel.GitOpenSubmodule)!({}, 'src', repoPath);
+    expect(opened).toEqual({ success: true });
+    expect(openPathMock).toHaveBeenCalledWith(fs.realpathSync(path.join(repoPath, 'src')));
+
+    openPathMock.mockClear();
+    const file = await handlers.get(IpcChannel.GitOpenSubmodule)!({}, 'src/app.ts', repoPath);
+    expect(file).toEqual({ success: false, error: 'Submodule path is not a directory.' });
+    expect(openPathMock).not.toHaveBeenCalled();
+  });
+
   it('rejects traversal before interacting with the operating system', async () => {
     const result = await handlers.get(IpcChannel.GitOpenRepositoryPath)!({}, { path: '../outside.txt', action: 'reveal', repoPath });
 

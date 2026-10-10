@@ -424,6 +424,11 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
       const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitOpenSubmodule);
 
       const resolvedPath = resolveExistingRepositoryPath(repoPath, relativePath, 'Submodule path');
+      // shell.openPath executes files (.exe, .bat, .lnk …); a submodule is
+      // always a directory, so never hand anything else to the shell here.
+      if (!fs.statSync(resolvedPath).isDirectory()) {
+        return { success: false, error: 'Submodule path is not a directory.' };
+      }
 
       const openError = await shell.openPath(resolvedPath);
       if (openError) {
