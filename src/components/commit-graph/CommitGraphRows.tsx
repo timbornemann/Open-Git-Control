@@ -9,6 +9,8 @@ import type { GraphNode } from '@/utils/graphLayout';
 import { getRefKind, resolveHighlightableBranchRef, sortRefs } from './commitGraphRefs';
 import { ROW_HEIGHT } from './commitGraphConstants';
 import type { WorkingTreeChangeSummary } from './commitGraphWorkingTree';
+import { useCommitRowTooltip } from './useCommitRowTooltip';
+import { CommitRowTooltip } from './CommitRowTooltip';
 
 type CommitGraphRowStyle = CSSProperties & {
   '--branch-focus-color'?: string;
@@ -121,6 +123,7 @@ export const CommitGraphRows = ({
   t,
 }: CommitGraphRowsProps) => {
   const intent = usePreloadIntent();
+  const tooltip = useCommitRowTooltip(visibleNodes);
   return (
     <>
       {hasWorkingTreeChanges && workingTreeStatus && (
@@ -179,13 +182,41 @@ export const CommitGraphRows = ({
           ...(isSelected ? { '--commit-focus-color': selectedPathColor } : {}),
           ...(isLatestCommitFocus ? { '--latest-focus-color': node.color } : {}),
         };
+        const selectCommit = () => {
+          tooltip.dismiss();
+          if (!onSelectCommit) return;
+          if (resetsToDefaultFocus) onClearBranchHighlight();
+          onSelectCommit(node.commit.hash);
+        };
 
         return (
           <div
             key={node.commit.hash}
-            onMouseEnter={() => intent.hover(() => loadCommitOverview(getActiveResourceRepository(), node.commit.hash))}
-            onMouseLeave={intent.cancel}
-            onFocus={() => intent.focus(() => loadCommitOverview(getActiveResourceRepository(), node.commit.hash))}
+            tabIndex={0}
+            role="group"
+            aria-label={node.commit.subject}
+            aria-describedby={tooltip.target?.hash === node.commit.hash ? tooltip.id : undefined}
+            onMouseEnter={(event) => {
+              intent.hover(() => loadCommitOverview(getActiveResourceRepository(), node.commit.hash));
+              tooltip.show(event.currentTarget, node.commit.hash);
+            }}
+            onMouseLeave={(event) => {
+              intent.cancel();
+              tooltip.leave(event.currentTarget);
+            }}
+            onFocus={(event) => {
+              intent.focus(() => loadCommitOverview(getActiveResourceRepository(), node.commit.hash));
+              tooltip.show(event.currentTarget, node.commit.hash, true);
+            }}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) tooltip.leave();
+            }}
+            onKeyDown={(event) => {
+              if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                event.preventDefault();
+                selectCommit();
+              }
+            }}
             className={getCommitRowClassName({
               isSelected,
               showSecondaryHistory,
@@ -196,14 +227,11 @@ export const CommitGraphRows = ({
               isMutedByPathFocus,
               isHeadCommit,
             })}
-            onClick={() => {
-              if (!onSelectCommit) return;
-              if (resetsToDefaultFocus) {
-                onClearBranchHighlight();
-              }
-              onSelectCommit(node.commit.hash);
+            onClick={selectCommit}
+            onContextMenu={(event) => {
+              tooltip.dismiss();
+              onContextMenu(event, node);
             }}
-            onContextMenu={(event) => onContextMenu(event, node)}
             style={rowStyle}
             data-commit-hash={node.commit.hash}
           >
@@ -237,6 +265,7 @@ export const CommitGraphRows = ({
                           key={index}
                           type="button"
                           className={`branch-label ${getRefKind(ref, localBranchNames)} branch-toggle ${isActiveBranchRef ? 'active' : ''}`}
+                          aria-describedby={tooltip.target?.hash === node.commit.hash ? tooltip.id : undefined}
                           onClick={(event) => {
                             event.stopPropagation();
                             onToggleBranchHighlight(branchTarget);
@@ -282,6 +311,16 @@ export const CommitGraphRows = ({
           </div>
         );
       })}
+      {tooltip.target && (
+        <CommitRowTooltip
+          id={tooltip.id}
+          anchor={tooltip.target.anchor}
+          commit={tooltip.target.node.commit}
+          refs={sortRefs(tooltip.target.node.commit.refs, localBranchNames)}
+          onMouseEnter={tooltip.keepOpen}
+          onMouseLeave={() => tooltip.leave(tooltip.target?.anchor)}
+        />
+      )}
       {bottomSpacerHeight > 0 && <div style={{ height: bottomSpacerHeight }} aria-hidden="true" />}
       {(loadingMore || hasMoreCommits) && (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 18px', paddingLeft: graphWidth }}>

@@ -430,6 +430,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         />
 
         <CommitGraphRows
+          key={repoPath}
           graphWidth={graphWidth}
           workingTreeStatus={workingTreeStatus}
           hasWorkingTreeChanges={hasWorkingTreeChanges}
