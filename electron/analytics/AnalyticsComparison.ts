@@ -2,9 +2,35 @@ import type { AnalyticsComparison } from '../../src/shared/ipc/repositoryAnalyti
 import type { AnalyticsGit } from './AnalyticsGit';
 import type { AnalyticsCache } from './AnalyticsCache';
 import type { AnalyticsRules } from './AnalyticsRules';
-import type { CommitRecord } from './AnalyticsTypes';
+import type { CommitRecord, FileChange } from './AnalyticsTypes';
 import { AnalyticsLogParser } from './AnalyticsParsing';
 import { eligibleChanges } from './AnalyticsAggregation';
+
+export function summarizeComparison(changes: FileChange[]): NonNullable<AnalyticsComparison['summary']> {
+  const fileChanges = { added: 0, modified: 0, deleted: 0, renamed: 0 };
+  const areas = new Map<string, { path: string; files: number; additions: number; deletions: number }>();
+  let nonTextFiles = 0;
+  for (const change of changes) {
+    const status = change.status[0];
+    if (status === 'A' || status === 'C') fileChanges.added++;
+    else if (status === 'D') fileChanges.deleted++;
+    else if (status === 'R') fileChanges.renamed++;
+    else fileChanges.modified++;
+    nonTextFiles += Number(change.binary);
+    const path = change.path.includes('/') ? change.path.split('/')[0] + '/' : '.';
+    const area = areas.get(path) ?? { path, files: 0, additions: 0, deletions: 0 };
+    area.files++;
+    area.additions += change.additions;
+    area.deletions += change.deletions;
+    areas.set(path, area);
+  }
+  return {
+    fileChanges,
+    textFiles: changes.length - nonTextFiles,
+    nonTextFiles,
+    areas: [...areas.values()].sort((a, b) => b.files - a.files || a.path.localeCompare(b.path)),
+  };
+}
 
 export async function readComparison(git: AnalyticsGit, from: string, to: string): Promise<CommitRecord> {
   let record: CommitRecord | undefined;
@@ -55,6 +81,7 @@ export async function buildComparison(
     additions: changes.reduce((sum, change) => sum + change.additions, 0),
     deletions: changes.reduce((sum, change) => sum + change.deletions, 0),
     files: changes.length,
+    summary: summarizeComparison(changes),
     paths: changes.map((change) => ({
       path: change.path,
       oldPath: change.oldPath,

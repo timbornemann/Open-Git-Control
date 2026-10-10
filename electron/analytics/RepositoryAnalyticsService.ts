@@ -10,7 +10,7 @@ import type {
 import { AnalyticsGit } from './AnalyticsGit';
 import { AnalyticsCache, digest } from './AnalyticsCache';
 import { AnalyticsRules } from './AnalyticsRules';
-import { captureAnalyticsRefs, resolveAnalyticsRevision, validateAnalyticsFilters } from './AnalyticsRefs';
+import { captureAnalyticsRefs, resolveAnalyticsRevision, resolveAnalyticsComparisonBase, validateAnalyticsFilters } from './AnalyticsRefs';
 import { aggregateAnalytics, dateMatches, pathMatches, eligibleChanges } from './AnalyticsAggregation';
 import { analyzeProject, emptyProject } from './AnalyticsProject';
 import { classifySmallHistoricalBlobs } from './AnalyticsBlobs';
@@ -68,7 +68,7 @@ export class RepositoryAnalyticsService {
       versionTags.sort((a, b) => b.date - a.date || reachable.get(a.oid)! - reachable.get(b.oid)! || a.name.localeCompare(b.name));
       const from = filters.compareFrom || versionTags[0]?.name || '';
       const to = filters.compareTo || 'HEAD';
-      const fromOid = from ? resolveAnalyticsRevision(from, captured) : '';
+      const fromOid = resolveAnalyticsComparisonBase(filters.compareFrom, captured, versionTags[0]);
       const toOid = captured.head || filters.compareTo !== 'HEAD' ? resolveAnalyticsRevision(to, captured) : '';
       const comparisonHashes = fromOid && toOid ? await git.membership([toOid, `^${fromOid}`]) : [];
       const needed = [...new Set([...selected, ...(revision ? await git.membership([revision]) : []), ...comparisonHashes])];

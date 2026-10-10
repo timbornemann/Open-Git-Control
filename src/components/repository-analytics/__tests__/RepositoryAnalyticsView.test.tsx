@@ -13,7 +13,7 @@ import { RepositoryAnalyticsFilters } from '../AnalyticsFilters';
 import { useAnalyticsNavigation } from '../analyticsNavigationState';
 import { useAnalyticsWorkspace } from '../analyticsWorkspaceState';
 import { clearCouplingSessions } from '../analyticsCouplingSession';
-import { analyticsReport as report } from './analyticsFixtures';
+import { analyticsReport as report, releaseComparison } from './analyticsFixtures';
 
 const mocks = vi.hoisted(() => ({
   cache: vi.fn(),
@@ -106,6 +106,17 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe('repository analytics dashboard', () => {
+  it('opens release statistics without fetching or rendering individual file details', async () => {
+    const saved = { ...report(), comparison: releaseComparison() };
+    mocks.cache.mockResolvedValue({ success: true, data: saved });
+    await render();
+    await click('Release comparison');
+    expect(host.querySelector('.analytics-comparison-ring')).toBeTruthy();
+    expect(host.querySelectorAll('.analytics-comparison-picker select')).toHaveLength(2);
+    expect(host.querySelector('table')).toBeNull();
+    expect(host.textContent).not.toContain('do-not-list-me');
+    expect(mocks.details).not.toHaveBeenCalled();
+  });
   it('preserves gaps in the time axis and lets the keyboard filter contributions by period', async () => {
     const saved = report();
     saved.periods.push({ date: '2026-10-11', commits: 1, merges: 0, additions: 1, deletions: 0 });

@@ -41,6 +41,9 @@ export function resolveAnalyticsRevision(value: string, captured: Awaited<Return
   if (/^[a-f0-9]{40,64}$/.test(value)) return value;
   throw new Error('The selected analytics revision is no longer available.');
 }
+export function resolveAnalyticsComparisonBase(value: string, captured: Awaited<ReturnType<typeof captureAnalyticsRefs>>, automatic?: AnalyticsTag): string {
+  return value ? resolveAnalyticsRevision(value, captured) : automatic?.oid || '';
+}
 export function validateAnalyticsFilters(value: AnalyticsFilters): AnalyticsFilters {
   if (!value || typeof value !== 'object') throw new Error('Analytics filters are required.');
   for (const key of ['scope', 'revision', 'since', 'until', 'author', 'path', 'compareFrom', 'compareTo'] as const) {

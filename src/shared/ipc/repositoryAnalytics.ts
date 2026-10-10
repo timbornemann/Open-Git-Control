@@ -76,6 +76,13 @@ export type AnalyticsComparison = {
   deletions: number;
   files: number;
   paths: AnalyticsChanges[];
+  /** Aggregated from the complete tree diff, independently of the path preview limit. */
+  summary?: {
+    fileChanges: { added: number; modified: number; deleted: number; renamed: number };
+    textFiles: number;
+    nonTextFiles: number;
+    areas: { path: string; files: number; additions: number; deletions: number }[];
+  };
 };
 export type RepositoryAnalyticsSnapshot = {
   id: string;
