@@ -16,6 +16,7 @@ import { startPlanningApiServer } from './main-process/planningApiServer';
 import { enforceProductionCommandLineSecurity, installAppSecurity, isDevelopmentRuntime } from './main-process/security';
 import { acquireSingleInstanceLock } from './main-process/singleInstance';
 import { installIpcSenderValidation } from './main-process/ipcSecurity';
+import { installHtmlPreviewProtocol, registerHtmlPreviewScheme } from './main-process/htmlPreviewProtocol';
 import { systemToolsService } from './system-tools/SystemToolsService';
 import { registerSystemToolsHandlers } from './system-tools/registerSystemToolsHandlers';
 import { IpcChannel } from '../src/types/ipcContract';
@@ -38,6 +39,7 @@ const openMainWindowIfReady = () => {
 const isPrimaryInstance = acquireSingleInstanceLock(app, BrowserWindow, openMainWindowIfReady);
 
 if (isPrimaryInstance) {
+  registerHtmlPreviewScheme();
   installIpcSenderValidation({ isDev, mainProcessDir: __dirname });
   const updaterManager = new UpdaterManager(isDev);
   let planningApiServer: PlanningApiServerHandle | null = null;
@@ -139,6 +141,7 @@ if (isPrimaryInstance) {
     }));
 
     installAppSecurity({ isDev, mainProcessDir: __dirname });
+    installHtmlPreviewProtocol();
     openMainWindowIfReady();
     updaterManager.configureAutoUpdates(readSettingsWithMigration().autoUpdateEnabled);
     if (process.env.OPEN_GIT_CONTROL_API_DISABLED !== 'true') {

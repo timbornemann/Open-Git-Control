@@ -126,13 +126,14 @@ describe('shared file viewer sources', () => {
     const request = viewerRequest(source, 'docs/page.html');
     const view = await renderViewer(request);
     await click('Preview');
-    await vi.waitFor(() => expect(document.querySelector<HTMLIFrameElement>('iframe')?.srcdoc).toContain('Selected HTML'));
+    const previewDocument = () => new URL(document.querySelector<HTMLIFrameElement>('iframe')!.src).searchParams.get('document')!;
+    await vi.waitFor(() => expect(previewDocument()).toContain('Selected HTML'));
     const expectedContext = { source, repoPath: request.repoPath, commitHash: request.commitHash };
     expect(gitClient.getMarkdownPreviewFile).toHaveBeenCalledWith({ ...expectedContext, path: 'docs/style.css' });
     expect(gitClient.getRepoFileDataUrl).toHaveBeenCalledWith({ ...expectedContext, path: 'docs/missing.png' });
     expect(gitClient.getRepoFileDataUrl).toHaveBeenCalledTimes(1);
     expect(document.body.textContent).toContain('Assets unavailable in this version: docs/missing.png');
-    const html = document.querySelector<HTMLIFrameElement>('iframe')!.srcdoc;
+    const html = previewDocument();
     expect(html).toContain('h1 { color: red; }');
     expect(html).not.toContain('src="missing.png"');
     expect(document.querySelector('iframe')?.getAttribute('sandbox')).toBe('allow-scripts');

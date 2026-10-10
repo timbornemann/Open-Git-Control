@@ -1,19 +1,7 @@
 import { resolveMarkdownPreviewAssetPath } from './markdownPreview';
+import { HTML_PREVIEW_CSP } from '@/shared/htmlPreviewSecurity';
 
 const HTML_EXTENSIONS = new Set(['htm', 'html']);
-const HTML_PREVIEW_CSP = [
-  "default-src 'none'",
-  "script-src 'unsafe-inline'",
-  "style-src 'unsafe-inline'",
-  'img-src data:',
-  'font-src data:',
-  "media-src 'none'",
-  "connect-src 'none'",
-  "object-src 'none'",
-  "frame-src 'none'",
-  "base-uri 'none'",
-  "form-action 'none'",
-].join('; ');
 const INTERNAL_ANCHOR_NAVIGATION_SCRIPT = `
 document.addEventListener('click', function (event) {
   var source = event.target;

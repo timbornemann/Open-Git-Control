@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { gitClient } from '@/services/gitClient';
+import { buildHtmlPreviewUrl } from '@/shared/htmlPreviewSecurity';
 import type { RepositoryFileContextDto } from '@/shared/ipc/repositoryFiles';
 import { buildSandboxedHtmlPreviewDocument, collectHtmlPreviewAssets, type HtmlPreviewAssetContent, type HtmlPreviewAssetKind } from '@/utils/htmlPreview';
 
-export type HtmlPreviewState = { loading: boolean; error: string | null; document: string };
+export type HtmlPreviewState = { loading: boolean; error: string | null; url: string };
 
-const EMPTY_HTML_PREVIEW: HtmlPreviewState = { loading: false, error: null, document: '' };
+const EMPTY_HTML_PREVIEW: HtmlPreviewState = { loading: false, error: null, url: '' };
 
 export const useHtmlPreview = ({
   repoPath,
@@ -33,7 +34,7 @@ export const useHtmlPreview = ({
     }
 
     const loadPreview = async () => {
-      setHtmlPreview({ loading: true, error: null, document: '' });
+      setHtmlPreview({ loading: true, error: null, url: '' });
       const assetContent: HtmlPreviewAssetContent = { images: {}, scripts: {}, styles: {} };
 
       try {
@@ -58,12 +59,12 @@ export const useHtmlPreview = ({
           setHtmlPreview({
             loading: false,
             error: missing.length ? `Assets unavailable in this version: ${missing.join(', ')}` : null,
-            document: buildSandboxedHtmlPreviewDocument(html, path, assetContent),
+            url: buildHtmlPreviewUrl(buildSandboxedHtmlPreviewDocument(html, path, assetContent)),
           });
         }
       } catch (previewError: unknown) {
         if (isCurrentRequest()) {
-          setHtmlPreview({ loading: false, error: previewError instanceof Error ? previewError.message : 'Could not prepare HTML preview.', document: '' });
+          setHtmlPreview({ loading: false, error: previewError instanceof Error ? previewError.message : 'Could not prepare HTML preview.', url: '' });
         }
       }
     };

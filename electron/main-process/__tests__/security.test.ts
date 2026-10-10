@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { pathToFileURL } from 'url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { HTML_PREVIEW_RESPONSE_CSP, buildHtmlPreviewUrl } from '../../../src/shared/htmlPreviewSecurity';
 
 const { appState, appExitMock, appOnMock, setApplicationMenuMock, permissionRequestMock, permissionCheckMock, headersReceivedMock } = vi.hoisted(() => ({
   appState: { isPackaged: false },
@@ -152,6 +153,19 @@ describe('Electron security guards', () => {
         'Content-Security-Policy': [buildContentSecurityPolicy(false)],
       }),
     });
+  });
+
+  it('gives only the isolated preview scheme its own sandboxed CSP', () => {
+    installAppSecurity({ isDev: false, mainProcessDir: __dirname });
+    const headersHandler = headersReceivedMock.mock.calls[0][0];
+    const callback = vi.fn();
+    headersHandler({ url: buildHtmlPreviewUrl('<h1>Preview</h1>'), responseHeaders: {} }, callback);
+    expect(callback).toHaveBeenLastCalledWith({ responseHeaders: { 'Content-Security-Policy': [HTML_PREVIEW_RESPONSE_CSP] } });
+    headersHandler({ url: 'file:///application/index.html', responseHeaders: {} }, callback);
+    expect(callback).toHaveBeenLastCalledWith({ responseHeaders: { 'Content-Security-Policy': [buildContentSecurityPolicy(false)] } });
+    expect(buildContentSecurityPolicy(false)).toContain('frame-src ogc-html-preview:');
+    expect(buildContentSecurityPolicy(false)).toContain("script-src 'self'");
+    expect(isAllowedAppNavigation(buildHtmlPreviewUrl('<h1>Preview</h1>'), { isDev: false, mainProcessDir: __dirname })).toBe(false);
   });
 
   it('blocks unsafe navigation and devtools shortcuts on protected web contents', () => {

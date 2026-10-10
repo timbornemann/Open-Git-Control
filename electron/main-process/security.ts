@@ -2,6 +2,7 @@ import { app, Menu, session } from 'electron';
 import type { WebContents } from 'electron';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { HTML_PREVIEW_RESPONSE_CSP, HTML_PREVIEW_SCHEME, isHtmlPreviewUrl } from '../../src/shared/htmlPreviewSecurity';
 
 type ShortcutInput = {
   key?: string;
@@ -88,6 +89,7 @@ export function buildContentSecurityPolicy(isDev: boolean): string {
       "object-src 'none'",
       "base-uri 'none'",
       "form-action 'none'",
+      `frame-src ${HTML_PREVIEW_SCHEME}:`,
       "frame-ancestors 'none'",
     ].join('; ');
   }
@@ -103,7 +105,7 @@ export function buildContentSecurityPolicy(isDev: boolean): string {
     "object-src 'none'",
     "base-uri 'none'",
     "form-action 'none'",
-    "frame-src 'none'",
+    `frame-src ${HTML_PREVIEW_SCHEME}:`,
     "frame-ancestors 'none'",
   ].join('; ');
 }
@@ -160,7 +162,7 @@ export function installAppSecurity(options: InstallSecurityOptions): void {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': [buildContentSecurityPolicy(options.isDev)],
+        'Content-Security-Policy': [isHtmlPreviewUrl(details.url || '') ? HTML_PREVIEW_RESPONSE_CSP : buildContentSecurityPolicy(options.isDev)],
       },
     });
   });
