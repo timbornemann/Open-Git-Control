@@ -133,17 +133,6 @@
       "updatedAt": 1791504660702
     },
     {
-      "id": "efdf4dcc-de53-4ba0-b61f-46458b3cde1e",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Run console",
-      "description": "in der console werden viele zeichenfehler angezeigt und nicht richrig dargetsellt das sollte nicht sein",
-      "priority": "medium",
-      "status": "bug",
-      "tags": [],
-      "createdAt": 1791568186445,
-      "updatedAt": 1791568186445
-    },
-    {
       "id": "4d6fe0be-ed8f-48c2-8e52-500f3e0477b2",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "überarbeite +- changens in timeline",
@@ -152,7 +141,7 @@
       "status": "planned",
       "tags": [],
       "createdAt": 1791639138466,
-      "updatedAt": 1791639138466
+      "updatedAt": 1791647288202
     }
   ]
 }

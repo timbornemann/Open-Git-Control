@@ -23,7 +23,7 @@ import { useCommitGraphGitActions } from './useCommitGraphGitActions';
 import { useCommitGraphContextMenu } from './useCommitGraphContextMenu';
 import { CommitGraphContextMenuLayer } from './CommitGraphContextMenuLayer';
 import { CommitGraphRows } from './CommitGraphRows';
-import { formatCommitDate, formatCommitStats } from './commitGraphFormatters';
+import { formatCommitDate } from './commitGraphFormatters';
 import { summarizeWorkingTreeChanges } from './commitGraphWorkingTree';
 import '@/styles/commit-graph.css';
 import type { RunGitCommandOptions } from '@/app/state/contracts';
@@ -466,7 +466,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
           onToggleBranchHighlight={(branchTarget) => setHighlightedBranchRef((previous) => (previous === branchTarget ? null : branchTarget))}
           onClearBranchHighlight={() => setHighlightedBranchRef(null)}
           formatCommitDate={(dateStr) => formatCommitDate(dateStr, locale)}
-          formatCommitStats={formatCommitStats}
           t={t}
         />
       </div>

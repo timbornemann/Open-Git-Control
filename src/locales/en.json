@@ -67,6 +67,7 @@
           "click_to_stage_commit_ed989f59": "Click to stage / commit",
           "highlight_branch_path_d8128078": "Highlight branch path",
           "commit_statistics_are_loading_in_the_background_e5b6b683": "Commit statistics are loading in the background.",
+          "change_summary": "{files} files changed; {additions} added lines, {deletions} deleted lines.",
           "merge_commit_29707783": "Merge commit?",
           "git_merge_merges_this_commit_into_the_current_branch_may_a39118f2": "git merge merges this commit into the current branch (may create a merge commit).",
           "commit_b9ec78bd": "Commit",

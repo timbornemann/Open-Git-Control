@@ -20,11 +20,3 @@ export const formatCommitDate = (dateStr: string, locale: string): string => {
     return '';
   }
 };
-
-export const formatCommitStats = (files: number, additions: number, deletions: number): string => {
-  if (files === 0 && additions === 0 && deletions === 0) {
-    return '0f +0 -0';
-  }
-
-  return `${files}f +${additions} -${deletions}`;
-};

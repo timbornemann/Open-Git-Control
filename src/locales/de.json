@@ -67,6 +67,7 @@
           "click_to_stage_commit_ed989f59": "Klicken zum Stage / Commit",
           "highlight_branch_path_d8128078": "Branch-Pfad hervorheben",
           "commit_statistics_are_loading_in_the_background_e5b6b683": "Commit-Statistiken werden im Hintergrund geladen.",
+          "change_summary": "{files} geänderte Dateien; {additions} hinzugefügte und {deletions} gelöschte Zeilen.",
           "merge_commit_29707783": "Commit mergen?",
           "git_merge_merges_this_commit_into_the_current_branch_may_a39118f2": "git merge fuegt diesen Commit-Stand in den aktuellen Branch ein (ggf. Merge-Commit).",
           "commit_b9ec78bd": "Commit",

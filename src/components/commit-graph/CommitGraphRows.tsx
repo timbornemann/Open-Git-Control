@@ -2,6 +2,7 @@ import { usePreloadIntent } from '@/data/usePreloadIntent';
 import { getActiveResourceRepository } from '@/data/clientCache';
 import { loadCommitOverview } from '@/data/commitDetails';
 import type { CSSProperties, MouseEvent } from 'react';
+import { Files } from 'lucide-react';
 import type { CatalogTranslateFn } from '@/i18n';
 import type { GitStatusDetailed } from '@/utils/gitParsing';
 import type { GraphNode } from '@/utils/graphLayout';
@@ -54,7 +55,6 @@ type CommitGraphRowsProps = {
   onToggleBranchHighlight: (branchTarget: string) => void;
   onClearBranchHighlight: () => void;
   formatCommitDate: (dateStr: string) => string;
-  formatCommitStats: (files: number, additions: number, deletions: number) => string;
   t: CatalogTranslateFn;
 };
 
@@ -118,7 +118,6 @@ export const CommitGraphRows = ({
   onToggleBranchHighlight,
   onClearBranchHighlight,
   formatCommitDate,
-  formatCommitStats,
   t,
 }: CommitGraphRowsProps) => {
   const intent = usePreloadIntent();
@@ -166,6 +165,10 @@ export const CommitGraphRows = ({
         const resetsToDefaultFocus = node.commit.hash === headNode.commit.hash;
         const isLatestCommitFocus = hasPassiveHeadFocus && resetsToDefaultFocus;
         const isMutedByPathFocus = hasAnyPathHighlight && !isOnCurrentPath && !isOnSelectedPath && !isSelected;
+        const stats = node.commit.stats;
+        const statsLabel = stats
+          ? t('generated.components.commit_graph.commitgraph.change_summary', stats)
+          : t('generated.components.commit_graph.commitgraph.commit_statistics_are_loading_in_the_background_e5b6b683');
         const sortedRefs = sortRefs(node.commit.refs, localBranchNames);
         const rowStyle: CommitGraphRowStyle = {
           height: ROW_HEIGHT,
@@ -251,15 +254,25 @@ export const CommitGraphRows = ({
                   <span className="commit-subject">{node.commit.subject}</span>
                   <span className="commit-meta">
                     <span className="commit-author">{node.commit.author}</span>
-                    <span
-                      className="commit-stats"
-                      title={
-                        node.commit.stats
-                          ? `${node.commit.stats.files} files changed, ${node.commit.stats.additions} additions, ${node.commit.stats.deletions} deletions`
-                          : t('generated.components.commit_graph.commitgraph.commit_statistics_are_loading_in_the_background_e5b6b683')
-                      }
-                    >
-                      {node.commit.stats ? formatCommitStats(node.commit.stats.files, node.commit.stats.additions, node.commit.stats.deletions) : '...'}
+                    <span className="commit-stats" role="img" aria-label={statsLabel} title={statsLabel}>
+                      {stats ? (
+                        <>
+                          <span className="commit-stats-files" aria-hidden="true">
+                            <Files size={12} />
+                            <span className="commit-stats-value">{stats.files}</span>
+                          </span>
+                          <span className="commit-stats-value commit-stats-additions" data-empty={stats.additions === 0} aria-hidden="true">
+                            +{stats.additions}
+                          </span>
+                          <span className="commit-stats-value commit-stats-deletions" data-empty={stats.deletions === 0} aria-hidden="true">
+                            −{stats.deletions}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="commit-stats-loading" aria-hidden="true">
+                          …
+                        </span>
+                      )}
                     </span>
                     <span className="commit-date">{formatCommitDate(node.commit.date)}</span>
                   </span>

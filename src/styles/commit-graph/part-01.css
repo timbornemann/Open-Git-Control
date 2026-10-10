@@ -164,7 +164,7 @@
 
 .commit-meta {
   --commit-author-width: 120px;
-  --commit-stats-width: 118px;
+  --commit-stats-width: 168px;
   --commit-date-width: 88px;
   display: grid;
   grid-template-columns: var(--commit-author-width) var(--commit-stats-width) var(--commit-date-width);
@@ -187,21 +187,58 @@
 
 .commit-stats {
   grid-column: 2;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.72rem;
-  color: var(--status-info);
-  background: var(--status-info-soft);
-  border: 1px solid var(--status-info-border);
-  border-radius: 999px;
-  padding: 1px 7px;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  column-gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-secondary);
   width: var(--commit-stats-width);
-  min-width: var(--commit-stats-width);
-  max-width: var(--commit-stats-width);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: center;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+
+.commit-stats-files {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding-right: 7px;
+  border-right: 1px solid var(--border-color);
+}
+
+.commit-stats-files svg {
+  flex-shrink: 0;
+}
+
+.commit-stats-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+.commit-stats-files .commit-stats-value {
+  flex: 1;
+}
+
+.commit-stats-additions {
+  color: var(--status-success);
+}
+
+.commit-stats-deletions {
+  color: var(--status-danger);
+}
+
+.commit-stats-value[data-empty='true'] {
+  color: var(--text-secondary);
+}
+
+.commit-stats-loading {
+  grid-column: 1 / -1;
+  text-align: center;
 }
 
 .commit-date {
