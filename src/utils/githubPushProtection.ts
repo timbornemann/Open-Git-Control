@@ -17,12 +17,29 @@ const unblockUrlPattern = /^https:\/\/github\.com\/[^\s/]+\/[^\s/]+\/security\/s
 const documentationUrlPattern = /^https:\/\/docs\.github\.com\/[^\s]+$/;
 const securitySettingsUrlPattern = /^https:\/\/github\.com\/[^\s/]+\/[^\s/]+\/settings\/security_analysis$/;
 
+// The secret type must start and end with a non-dash character. A bare `(.+?)`
+// between the two dash runs could split a long dash line in cubically many
+// ways; 4 KB of server-sent dashes froze the renderer for over a minute.
+const secretTypeLinePattern = /^\s*(?:remote:\s*)?[\u2014-]{2,}\s*([^\s\u2014-](?:.*?[^\s\u2014-])?)\s*[\u2014-]{2,}\s*$/;
+const locationLinePattern = /^\s*(?:remote:\s*)?path:\s*(.+?):(\d+)\s*$/;
+const MAX_PARSED_LINE_LENGTH = 2_000;
+
 const unique = <T>(values: T[]): T[] => [...new Set(values)];
 
 const parseViolation = (message: string, unblockUrl: string | null): GitHubPushProtectionViolation => {
-  const secretType = message.match(/^\s*(?:remote:\s*)?(?:\u2014|-){2,}\s*(.+?)\s*(?:\u2014|-){2,}\s*$/m)?.[1]?.trim() || null;
+  // Push output is chosen by the remote server; match it line by line so no
+  // pattern can scan across lines or through arbitrarily long lines.
+  const lines = message.split(/\r?\n/).filter((line) => line.length <= MAX_PARSED_LINE_LENGTH);
+  const firstLineMatch = (pattern: RegExp): RegExpExecArray | null => {
+    for (const line of lines) {
+      const match = pattern.exec(line);
+      if (match) return match;
+    }
+    return null;
+  };
+  const secretType = firstLineMatch(secretTypeLinePattern)?.[1]?.trim() || null;
   const commitHash = message.match(/\bcommit:\s*([0-9a-f]{7,64})\b/i)?.[1] || null;
-  const location = message.match(/^\s*(?:remote:\s*)?path:\s*(.+?):(\d+)\s*$/m);
+  const location = firstLineMatch(locationLinePattern);
 
   return {
     secretType,

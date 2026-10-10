@@ -29,6 +29,23 @@ describe('parseGitHubPushProtectionFailure', () => {
     });
   });
 
+  it('parses crafted server output with long dash and blank runs in linear time', () => {
+    const crafted = [
+      'remote: error: GH013: Repository rule violations found for refs/heads/main.',
+      'remote: - GITHUB PUSH PROTECTION',
+      `remote: ${'-'.repeat(256 * 1024)}`,
+      '\n'.repeat(64 * 1024),
+      `remote: ${'—'.repeat(1_500)}`,
+      'remote:       —— Azure-AD Client Secret ——————',
+    ].join('\n');
+    const startedAt = Date.now();
+
+    const result = parseGitHubPushProtectionFailure(crafted);
+
+    expect(Date.now() - startedAt).toBeLessThan(2_000);
+    expect(result?.violations[0].secretType).toBe('Azure-AD Client Secret');
+  });
+
   it('does not treat unrelated push errors as Push Protection failures', () => {
     expect(parseGitHubPushProtectionFailure('remote: error: failed to update ref')).toBeNull();
   });
