@@ -13,6 +13,10 @@ import {
 const parseBody = (html: string): HTMLElement => new DOMParser().parseFromString(html, 'text/html').body;
 
 describe('markdown preview helpers', () => {
+  it('bounds repeated image expansion before serializing the resulting markup', () => {
+    const dataUrl = 'data:image/png;base64,' + 'A'.repeat(9 * 1024 * 1024);
+    expect(() => applyMarkdownPreviewImageDataUrls('<img src="logo.png"><img src="logo.png">', { 'logo.png': dataUrl }, true)).toThrow('size limit');
+  });
   afterEach(() => {
     vi.unstubAllGlobals();
   });

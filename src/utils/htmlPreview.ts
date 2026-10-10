@@ -1,5 +1,5 @@
 import { resolveMarkdownPreviewAssetPath } from './markdownPreview';
-import { HTML_PREVIEW_CSP } from '@/shared/htmlPreviewSecurity';
+import { HTML_PREVIEW_CSP, MAX_HTML_PREVIEW_BYTES } from '@/shared/htmlPreviewSecurity';
 
 const HTML_EXTENSIONS = new Set(['htm', 'html']);
 const INTERNAL_ANCHOR_NAVIGATION_SCRIPT = `
@@ -64,23 +64,25 @@ export const collectHtmlPreviewAssets = (html: string, htmlPath: string): HtmlPr
 
 const escapeClosingTag = (source: string, tagName: 'script' | 'style'): string => source.replace(new RegExp(`</${tagName}`, 'gi'), `<\\/${tagName}`);
 
-const replaceStylesheet = (link: Element, htmlPath: string, styles: Record<string, string>, document: Document): void => {
+const replaceStylesheet = (link: Element, htmlPath: string, styles: Record<string, string>, document: Document, reserve: (source: string) => void): void => {
   const assetPath = resolveAsset(htmlPath, link.getAttribute('href') || '');
   const stylesheet = assetPath ? styles[assetPath] : undefined;
-  if (stylesheet === undefined) {
+  if (typeof stylesheet !== 'string') {
     link.remove();
     return;
   }
 
   const style = document.createElement('style');
-  style.textContent = escapeClosingTag(stylesheet, 'style');
+  const source = escapeClosingTag(stylesheet, 'style');
+  reserve(source);
+  style.textContent = source;
   link.replaceWith(style);
 };
 
-const replaceScript = (script: HTMLScriptElement, htmlPath: string, scripts: Record<string, string>): void => {
+const replaceScript = (script: HTMLScriptElement, htmlPath: string, scripts: Record<string, string>, reserve: (source: string) => void): void => {
   const sourcePath = resolveAsset(htmlPath, script.getAttribute('src') || '');
   const source = sourcePath ? scripts[sourcePath] : undefined;
-  if (source === undefined) {
+  if (typeof source !== 'string') {
     script.remove();
     return;
   }
@@ -88,17 +90,21 @@ const replaceScript = (script: HTMLScriptElement, htmlPath: string, scripts: Rec
   script.removeAttribute('src');
   script.removeAttribute('integrity');
   script.removeAttribute('crossorigin');
-  script.textContent = escapeClosingTag(source, 'script');
+  const escaped = escapeClosingTag(source, 'script');
+  reserve(escaped);
+  script.textContent = escaped;
 };
 
-const replaceImage = (image: HTMLImageElement, htmlPath: string, images: Record<string, string>): void => {
+const replaceImage = (image: HTMLImageElement, htmlPath: string, images: Record<string, string>, reserve: (source: string) => void): void => {
   const rawSource = image.getAttribute('src') || '';
   if (isDataUrl(rawSource)) return;
 
   const sourcePath = resolveAsset(htmlPath, rawSource);
   const dataUrl = sourcePath ? images[sourcePath] : undefined;
-  if (dataUrl) image.setAttribute('src', dataUrl);
-  else image.removeAttribute('src');
+  if (typeof dataUrl === 'string' && dataUrl) {
+    reserve(dataUrl);
+    image.setAttribute('src', dataUrl);
+  } else image.removeAttribute('src');
 };
 
 /**
@@ -108,6 +114,13 @@ const replaceImage = (image: HTMLImageElement, htmlPath: string, images: Record<
 export const buildSandboxedHtmlPreviewDocument = (html: string, htmlPath: string, assets: HtmlPreviewAssetContent): string => {
   if (typeof DOMParser === 'undefined') return html;
 
+  let bytes = new TextEncoder().encode(html).byteLength;
+  const reserve = (source: string) => {
+    bytes += new TextEncoder().encode(source).byteLength;
+    if (bytes > MAX_HTML_PREVIEW_BYTES) throw new Error('HTML preview exceeds the 16 MiB size limit.');
+  };
+  reserve('');
+
   const document = new DOMParser().parseFromString(html, 'text/html');
   for (const element of Array.from(
     document.querySelectorAll('base, iframe, frame, object, embed, meta[http-equiv="refresh"], meta[http-equiv="Content-Security-Policy"]'),
@@ -115,11 +128,11 @@ export const buildSandboxedHtmlPreviewDocument = (html: string, htmlPath: string
     element.remove();
   }
   for (const link of Array.from(document.querySelectorAll('link'))) {
-    if (isStylesheet(link)) replaceStylesheet(link, htmlPath, assets.styles, document);
+    if (isStylesheet(link)) replaceStylesheet(link, htmlPath, assets.styles, document, reserve);
     else link.remove();
   }
-  for (const script of Array.from(document.querySelectorAll<HTMLScriptElement>('script[src]'))) replaceScript(script, htmlPath, assets.scripts);
-  for (const image of Array.from(document.querySelectorAll<HTMLImageElement>('img[src]'))) replaceImage(image, htmlPath, assets.images);
+  for (const script of Array.from(document.querySelectorAll<HTMLScriptElement>('script[src]'))) replaceScript(script, htmlPath, assets.scripts, reserve);
+  for (const image of Array.from(document.querySelectorAll<HTMLImageElement>('img[src]'))) replaceImage(image, htmlPath, assets.images, reserve);
   for (const element of Array.from(document.querySelectorAll('[srcset]'))) element.removeAttribute('srcset');
   for (const anchor of Array.from(document.querySelectorAll('a[href]'))) {
     if (!(anchor.getAttribute('href') || '').trim().startsWith('#')) anchor.removeAttribute('href');

@@ -9,6 +9,7 @@ import {
   resolveMarkdownPreviewAssetPath,
 } from '@/utils/markdownPreview';
 import type { CatalogTranslateFn } from '@/i18n';
+import { loadHtmlPreviewAssets } from '@/utils/htmlPreviewAssetLoader';
 
 export type MarkdownPreviewState = {
   loading: boolean;
@@ -78,14 +79,15 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, t, markdownTex
 
         const initialHtml = renderMarkdownToSanitizedHtml(sourceText);
         const imageSources = collectMarkdownPreviewImageSources(initialHtml);
-        const dataUrlsBySource: Record<string, string> = {};
-        const missing: string[] = [];
-
-        await Promise.all(
-          imageSources.map(async (imageSource) => {
-            const assetPath = resolveMarkdownPreviewAssetPath(request.path, imageSource);
-            if (!assetPath || !gitClient.isAvailable()) return;
-
+        const assets = imageSources
+          .filter((source) => resolveMarkdownPreviewAssetPath(request.path, source))
+          .map((source) => ({ kind: 'image' as const, path: source }));
+        const { content, missing } = await loadHtmlPreviewAssets(
+          initialHtml,
+          assets,
+          async (asset) => {
+            const assetPath = resolveMarkdownPreviewAssetPath(request.path, asset.path)!;
+            if (!gitClient.isAvailable()) return null;
             const assetResult = await gitClient.getRepoFileDataUrl({
               source: request.source,
               path: assetPath,
@@ -93,15 +95,16 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, t, markdownTex
               repoPath: repoAtStart,
             });
 
-            if (assetResult.success) {
-              dataUrlsBySource[imageSource] = assetResult.data.dataUrl;
-            } else missing.push(assetPath);
-          }),
+            return assetResult.success ? assetResult.data.dataUrl : null;
+          },
+          isCurrentRequest,
+          'Markdown preview',
         );
 
-        const html = applyMarkdownPreviewImageDataUrls(initialHtml, dataUrlsBySource, true);
+        const html = applyMarkdownPreviewImageDataUrls(initialHtml, content.images, true);
         if (isCurrentRequest()) {
-          setMarkdownPreview({ loading: false, error: missing.length ? `Assets unavailable in this version: ${missing.join(', ')}` : null, html });
+          const missingPaths = missing.map((source) => resolveMarkdownPreviewAssetPath(request.path, source));
+          setMarkdownPreview({ loading: false, error: missing.length ? `Assets unavailable in this version: ${missingPaths.join(', ')}` : null, html });
         }
       } catch (previewError: unknown) {
         if (isCurrentRequest()) {

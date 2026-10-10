@@ -9,10 +9,11 @@ export async function loadHtmlPreviewAssets(
   assets: HtmlPreviewAsset[],
   readAsset: (asset: HtmlPreviewAsset) => Promise<string | null>,
   isCurrent: () => boolean,
+  label = 'HTML preview',
 ): Promise<{ content: HtmlPreviewAssetContent; missing: string[] }> {
   let bytes = new TextEncoder().encode(html).byteLength;
-  if (assets.length > MAX_HTML_PREVIEW_ASSETS) throw new Error(`HTML preview exceeds the ${MAX_HTML_PREVIEW_ASSETS} asset limit.`);
-  if (bytes > MAX_HTML_PREVIEW_BYTES) throw new Error('HTML preview exceeds the 16 MiB size limit.');
+  if (assets.length > MAX_HTML_PREVIEW_ASSETS) throw new Error(`${label} exceeds the ${MAX_HTML_PREVIEW_ASSETS} asset limit.`);
+  if (bytes > MAX_HTML_PREVIEW_BYTES) throw new Error(`${label} exceeds the 16 MiB size limit.`);
   const content: HtmlPreviewAssetContent = { images: Object.create(null), scripts: Object.create(null), styles: Object.create(null) };
   const missing: string[] = [];
   let next = 0;
@@ -28,7 +29,7 @@ export async function loadHtmlPreviewAssets(
           continue;
         }
         bytes += new TextEncoder().encode(value).byteLength;
-        if (bytes > MAX_HTML_PREVIEW_BYTES) throw new Error('HTML preview exceeds the 16 MiB size limit.');
+        if (bytes > MAX_HTML_PREVIEW_BYTES) throw new Error(`${label} exceeds the 16 MiB size limit.`);
         content[`${asset.kind}s`][asset.path] = value;
       } catch (error) {
         failed = true;

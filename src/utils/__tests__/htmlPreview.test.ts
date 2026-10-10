@@ -4,6 +4,16 @@ import { describe, expect, it } from 'vitest';
 import { buildSandboxedHtmlPreviewDocument, collectHtmlPreviewAssets, isHtmlFilePath } from '@/utils/htmlPreview';
 
 describe('HTML preview helpers', () => {
+  it('counts every repeated image reference before serializing the preview document', () => {
+    const dataUrl = 'data:image/png;base64,' + 'A'.repeat(9 * 1024 * 1024);
+    expect(() =>
+      buildSandboxedHtmlPreviewDocument('<img src="logo.png"><img src="logo.png">', 'index.html', {
+        images: { 'logo.png': dataUrl },
+        scripts: {},
+        styles: {},
+      }),
+    ).toThrow('size limit');
+  });
   it('detects supported HTML files', () => {
     expect(isHtmlFilePath('index.html')).toBe(true);
     expect(isHtmlFilePath('docs/page.HTM')).toBe(true);

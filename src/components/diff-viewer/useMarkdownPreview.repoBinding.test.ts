@@ -21,6 +21,23 @@ afterEach(() => {
 });
 
 describe('useMarkdownPreview repository binding', () => {
+  it('rejects excessive image requests before reading any repository assets', async () => {
+    const getAsset = vi.spyOn(gitClient, 'getRepoFileDataUrl');
+    const request = { source: 'unstaged' as const, path: 'docs/readme.md', title: 'README' };
+    const markdownText = Array.from({ length: 257 }, (_, index) => `![image](${index}.png)`).join('\n');
+    const t = ((key: string) => key) as any;
+    let state: ReturnType<typeof useMarkdownPreview> | null = null;
+    const Harness = () => {
+      state = useMarkdownPreview({ repoPath: 'C:/repo-a', request, isActive: true, t, markdownText });
+      return null;
+    };
+    const root = createRoot(document.getElementById('root')!);
+    await act(async () => root.render(createElement(Harness)));
+    await vi.waitFor(() => expect(state?.markdownPreview.loading).toBe(false));
+    expect(state?.markdownPreview.error).toContain('Markdown preview exceeds the 256 asset limit');
+    expect(getAsset).not.toHaveBeenCalled();
+    act(() => root.unmount());
+  });
   it('binds staged assets to the captured repository and explains missing assets without a working-file fallback', async () => {
     const getMarkdown = vi.spyOn(gitClient, 'getMarkdownPreviewFile').mockResolvedValue({
       success: true,

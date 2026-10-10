@@ -1,5 +1,6 @@
 import createDOMPurify from 'dompurify';
 import { Marked } from 'marked';
+import { MAX_HTML_PREVIEW_BYTES } from '@/shared/htmlPreviewSecurity';
 
 const MARKDOWN_EXTENSIONS = new Set(['md', 'markdown', 'mdown', 'mkd', 'mkdn']);
 const markdownParser = new Marked({
@@ -143,11 +144,16 @@ export const collectMarkdownPreviewImageSources = (html: string): string[] => {
 export const applyMarkdownPreviewImageDataUrls = (html: string, dataUrlsBySource: Record<string, string>, strictLocalAssets = false): string => {
   if (typeof DOMParser === 'undefined') return html;
 
+  let bytes = new TextEncoder().encode(html).byteLength;
+  if (bytes > MAX_HTML_PREVIEW_BYTES) throw new Error('Markdown preview exceeds the 16 MiB size limit.');
+
   const document = new DOMParser().parseFromString(html, 'text/html');
   for (const image of Array.from(document.body.querySelectorAll('img[src]'))) {
     const source = image.getAttribute('src') || '';
     const dataUrl = dataUrlsBySource[source];
-    if (dataUrl) {
+    if (typeof dataUrl === 'string' && dataUrl) {
+      bytes += new TextEncoder().encode(dataUrl).byteLength;
+      if (bytes > MAX_HTML_PREVIEW_BYTES) throw new Error('Markdown preview exceeds the 16 MiB size limit.');
       image.setAttribute('src', dataUrl);
       image.setAttribute('loading', 'lazy');
     } else if (strictLocalAssets && !isExternalMarkdownUrl(source)) {
