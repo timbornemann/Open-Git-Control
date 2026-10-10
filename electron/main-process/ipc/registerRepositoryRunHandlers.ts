@@ -6,17 +6,19 @@ import { repositoryPathKey } from '../activeRepositoryAuthorization';
 import type { RepositoryRunConfigService } from '../RepositoryRunConfigService';
 import { RepositoryRunConfigWatcher } from '../RepositoryRunConfigWatcher';
 import type { RepositoryRunService } from '../RepositoryRunService';
+import { RepositoryRunApprovals } from '../RepositoryRunApprovals';
 
 type Deps = {
   configService: RepositoryRunConfigService;
   runService: RepositoryRunService;
   readStoredRepoPaths: () => string[];
+  approvals?: Pick<RepositoryRunApprovals, 'authorize'>;
 };
 
 const isAction = (value: unknown): value is RepositoryRunActionId =>
   typeof value === 'string' && (REPOSITORY_RUN_ACTION_IDS as readonly string[]).includes(value);
 
-export const registerRepositoryRunHandlers = ({ configService, runService, readStoredRepoPaths }: Deps): void => {
+export const registerRepositoryRunHandlers = ({ configService, runService, readStoredRepoPaths, approvals = new RepositoryRunApprovals() }: Deps): void => {
   const configWatchers = new Map<number, RepositoryRunConfigWatcher>();
   const requireStoredRepository = (value: unknown): string => {
     const requested = String(value || '').trim();
@@ -66,10 +68,13 @@ export const registerRepositoryRunHandlers = ({ configService, runService, readS
     }
   });
 
-  ipcMain.handle(IpcChannel.RepositoryRunStart, async (_event, repoPath: unknown, action: unknown) => {
+  ipcMain.handle(IpcChannel.RepositoryRunStart, async (event: IpcMainInvokeEvent, repoPath: unknown, action: unknown) => {
     try {
       if (!isAction(action)) throw new Error('Unknown run action.');
-      return { success: true as const, data: await runService.start(requireStoredRepository(repoPath), action) };
+      const repository = requireStoredRepository(repoPath);
+      // Commands from the committed run.json only start after a main-process approval.
+      const data = await runService.start(repository, action, (config) => approvals.authorize(event.sender, repository, config, action));
+      return { success: true as const, data };
     } catch (error) {
       return { success: false as const, error: error instanceof Error ? error.message : 'Could not start command.' };
     }

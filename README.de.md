@@ -921,7 +921,7 @@ git config --global user.email "dein@email.de"
 
 ## Repository-Run-Kommandos
 
-Das **Run**-Menue in der Topbar startet repository-spezifische **Run**-, **Test**-, **Format**-, **Start**- und **Build**-Befehle. Die Konfiguration wird versioniert in `.Open-Git-Control/run.json` abgelegt; Befehle laufen nur nach einem expliziten Klick und immer mit dem Repository-Root als Arbeitsverzeichnis.
+Das **Run**-Menue in der Topbar startet repository-spezifische **Run**-, **Test**-, **Format**-, **Start**- und **Build**-Befehle. Die Konfiguration wird versioniert in `.Open-Git-Control/run.json` abgelegt; Befehle laufen nur nach einem expliziten Klick und immer mit dem Repository-Root als Arbeitsverzeichnis. Da die Datei per Git geteilt wird, zeigt die App die exakten Befehle einer Aktion vor der ersten Ausführung und nach jeder Änderung (z. B. nach einem Pull) in einem Bestätigungsdialog an.
 
 ```json
 {

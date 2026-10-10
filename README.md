@@ -921,7 +921,7 @@ git config --global user.email "your@email.com"
 
 ## Repository run commands
 
-The **Run** menu in the top bar can run repository-specific **Run**, **Test**, **Format**, **Start**, and **Build** commands. Configuration is versioned in `.Open-Git-Control/run.json`; commands execute only after an explicit click and always use the repository root as their working directory.
+The **Run** menu in the top bar can run repository-specific **Run**, **Test**, **Format**, **Start**, and **Build** commands. Configuration is versioned in `.Open-Git-Control/run.json`; commands execute only after an explicit click and always use the repository root as their working directory. Because the file is shared through Git, the app shows the exact commands of an action in a confirmation dialog before they run for the first time and again whenever they change (for example after a pull).
 
 ```json
 {

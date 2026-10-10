@@ -70,15 +70,27 @@ export class RepositoryRunService {
     return this.activeRun ? this.snapshot(this.activeRun) : null;
   }
 
-  async start(repoPath: string, action: RepositoryRunActionId): Promise<RepositoryRunStateDto> {
-    if (this.activeRun?.status === 'running') throw new Error('Another repository command is already running.');
-    if (this.terminationUnconfirmedChild) {
-      throw new Error('The previous repository command may still be running. Wait until its process exit is confirmed before starting another command.');
-    }
+  /**
+   * `authorize` receives the exact configuration that will run, after it was
+   * read and validated; it must reject unapproved repository commands.
+   */
+  async start(repoPath: string, action: RepositoryRunActionId, authorize?: (config: RepositoryRunConfigDto) => Promise<void>): Promise<RepositoryRunStateDto> {
+    const assertCanStart = (): void => {
+      if (this.activeRun?.status === 'running') throw new Error('Another repository command is already running.');
+      if (this.terminationUnconfirmedChild) {
+        throw new Error('The previous repository command may still be running. Wait until its process exit is confirmed before starting another command.');
+      }
+    };
+    assertCanStart();
     const configState = this.configService.read(repoPath);
     if (!configState.config) throw new Error(configState.error || 'Run configuration is invalid.');
     if (!isRepositoryRunActionConfigured(configState.config, action, getRepositoryRunPlatform(process.platform))) {
       throw new Error(`The ${action} action is not configured for this platform.`);
+    }
+    if (authorize) {
+      await authorize(configState.config);
+      // The approval dialog can stay open while another run starts.
+      assertCanStart();
     }
 
     const run: ActiveRun = {

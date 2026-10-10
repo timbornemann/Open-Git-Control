@@ -203,6 +203,24 @@ describe('RepositoryRunService', () => {
     await waitForCompletion(service);
   });
 
+  it('starts no process when the configuration is not authorized and runs exactly the authorized configuration', async () => {
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));
+    directories.push(repoPath);
+    prepareConfig(repoPath, [0]);
+    const service = new RepositoryRunService(new RepositoryRunConfigService());
+
+    await expect(service.start(repoPath, 'test', async () => Promise.reject(new Error('not approved')))).rejects.toThrow('not approved');
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(service.getState()).toBeNull();
+
+    spawnMock.mockImplementation(() => createChild(0));
+    const authorize = vi.fn(async () => {});
+    await service.start(repoPath, 'test', authorize);
+    await waitForCompletion(service);
+    expect(authorize).toHaveBeenCalledWith(expect.objectContaining({ version: 1 }));
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+  });
+
   it('handles taskkill failures and still reaches a terminal cancelled state on Windows', async () => {
     setPlatform('win32');
     const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));
