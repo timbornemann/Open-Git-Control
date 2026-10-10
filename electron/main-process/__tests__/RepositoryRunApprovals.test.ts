@@ -10,7 +10,7 @@ vi.mock('electron', () => ({
   dialog: { showMessageBox: vi.fn() },
 }));
 
-import { RepositoryRunApprovals, describeRepositoryRunAction, formatCommandForApproval } from '../RepositoryRunApprovals';
+import { RepositoryRunApprovals, describeRepositoryRunAction, formatCommandForApproval, type RepositoryRunApprovalPrompt } from '../RepositoryRunApprovals';
 
 const configWith = (command: string, label = 'Unit tests'): RepositoryRunConfigDto => {
   const config = createEmptyRepositoryRunConfig();
@@ -29,13 +29,13 @@ const configWith = (command: string, label = 'Unit tests'): RepositoryRunConfigD
 
 describe('RepositoryRunApprovals', () => {
   let directory = '';
-  let confirm: ReturnType<typeof vi.fn>;
+  let confirm: ReturnType<typeof vi.fn<(prompt: RepositoryRunApprovalPrompt) => Promise<boolean>>>;
   let approvals: RepositoryRunApprovals;
   const repoPath = path.resolve('approval-repository');
 
   beforeEach(() => {
     directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-approvals-'));
-    confirm = vi.fn(async () => true);
+    confirm = vi.fn<(prompt: RepositoryRunApprovalPrompt) => Promise<boolean>>(async () => true);
     approvals = new RepositoryRunApprovals(() => path.join(directory, 'run-approvals.json'), confirm);
   });
 
