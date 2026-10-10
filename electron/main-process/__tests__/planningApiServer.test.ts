@@ -245,9 +245,30 @@ describe('planningApiServer', () => {
     });
   });
 
+  it('only creates repository planning files in Git repositories, never in arbitrary directories', async () => {
+    const folder = path.join(tempDirectory, 'plain-folder');
+    fs.mkdirSync(folder);
+    const call = (repoPath: string) =>
+      requestJson('/mcp', {
+        method: 'POST',
+        body: JSON.stringify({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'ensure_repository_project', arguments: { repoPath } } }),
+      });
+
+    expect((await call(folder)).result.structuredContent.error.code).toBe('REPOSITORY_NOT_FOUND');
+    expect((await call('relative-folder')).result.structuredContent.error.code).toBe('REPOSITORY_PATH_INVALID');
+    const rest = await requestJson('/api/repositories/ensure', { method: 'POST', body: JSON.stringify({ repoPath: folder }) });
+    expect(rest.error.code).toBe('REPOSITORY_NOT_FOUND');
+    const todo = await requestJson('/api/todos', { method: 'POST', body: JSON.stringify({ repoPath: folder, title: 'Must not be written' }) });
+    expect(todo.error.code).toBe('REPOSITORY_NOT_FOUND');
+    expect(fs.existsSync(path.join(folder, '.Open-Git-Control'))).toBe(false);
+
+    fs.mkdirSync(path.join(folder, '.git'));
+    expect((await call(folder)).result.structuredContent).toMatchObject({ kind: 'repository', repoPath: folder });
+  });
+
   it('persists repository todos created through the API and returns them through MCP', async () => {
     const repoPath = path.join(tempDirectory, 'repository-planning');
-    fs.mkdirSync(repoPath);
+    fs.mkdirSync(path.join(repoPath, '.git'), { recursive: true });
 
     const created = await requestJson('/api/todos', {
       method: 'POST',

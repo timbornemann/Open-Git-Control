@@ -12,6 +12,36 @@ import type { StoredRepoEntry } from './repoStore';
 import { readStoreData } from './repoStore';
 import type { EnrichedTodo, JsonObject, PlannerCounts, ProjectSummary, TodoQueryOptions } from './planningApiTypes';
 import { ApiError } from './planningApiTypes';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const isGitWorkingTreeRoot = (repoPath: string): boolean => {
+  try {
+    const gitEntry = fs.lstatSync(path.join(repoPath, '.git'));
+    return gitEntry.isDirectory() || gitEntry.isFile();
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * The local API is used by agents holding the token. Ensuring a repository
+ * project writes `.Open-Git-Control/` files into the given directory, so API
+ * callers may only target a saved repository or a Git working-tree root, never
+ * an arbitrary (or app-relative) directory.
+ */
+export const ensureApiRepositoryProject = (value: unknown): PlannerProject => {
+  const repoPath = cleanString(value);
+  if (!repoPath || !path.isAbsolute(repoPath)) {
+    throw new ApiError(400, 'REPOSITORY_PATH_INVALID', 'repoPath must be an absolute repository path.');
+  }
+  const repoKey = getRepositoryProjectKey(repoPath);
+  const saved = readStoreData().repos.some((repo) => getRepositoryProjectKey(repo.path) === repoKey);
+  if (!saved && !isGitWorkingTreeRoot(repoPath)) {
+    throw new ApiError(404, 'REPOSITORY_NOT_FOUND', 'repoPath must be a saved repository or the root of a Git working tree.');
+  }
+  return ensureRepositoryProject(repoPath);
+};
 
 const PRIORITY_RANK: Record<PlannerPriority, number> = {
   urgent: 4,
@@ -178,7 +208,7 @@ export const resolveProjectLocator = (input: JsonObject): PlannerProject => {
   if (projectId) return findProjectById(projectId);
 
   const repoPath = cleanString(input.repoPath);
-  if (repoPath) return ensureRepositoryProject(repoPath);
+  if (repoPath) return ensureApiRepositoryProject(repoPath);
 
   const projectName = cleanString(input.projectName);
   if (projectName) return findProjectByNameInData(readProjectPlannerData(), projectName);

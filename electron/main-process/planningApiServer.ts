@@ -1,7 +1,16 @@
-import { PLANNER_PRIORITIES, PLANNER_STATUSES, ensureRepositoryProject } from './projectPlannerStore';
+import { PLANNER_PRIORITIES, PLANNER_STATUSES } from './projectPlannerStore';
 import { AUTH_HEADER_NAME, ApiError, SERVER_NAME } from './planningApiTypes';
 import type { PlanningApiServerHandle, JsonObject, PlanningApiServerOptions, RequestContext } from './planningApiTypes';
-import { getRepositories, getTabs, createTodoFromBody, getTodos, parseStatus, queryOptionsFromUrl, cleanString } from './planningApiDomain';
+import {
+  getRepositories,
+  getTabs,
+  createTodoFromBody,
+  ensureApiRepositoryProject,
+  getTodos,
+  parseStatus,
+  queryOptionsFromUrl,
+  cleanString,
+} from './planningApiDomain';
 import { handleProjectsRoute } from './planningProjectsController';
 import { handleTodosRoute } from './planningTodosController';
 import { startPlanningApiHost } from './planningApiServerHost';
@@ -50,7 +59,7 @@ const handleRepositoriesRoute = (ctx: RequestContext, resource: string | undefin
   if (resource !== 'repositories') return unhandledRoute();
   if (!idOrAction && ctx.method === 'GET') return { handled: true, value: { repositories: getRepositories() } };
   if (idOrAction === 'ensure' && ctx.method === 'POST') {
-    return { handled: true, value: ensureRepositoryProject(cleanString(ctx.body.repoPath)) };
+    return { handled: true, value: ensureApiRepositoryProject(ctx.body.repoPath) };
   }
   if (idOrAction === 'todos' && ctx.method === 'GET') {
     return { handled: true, value: { todos: getTodos(queryOptionsFromUrl(ctx.url, { kind: 'repository' })) } };

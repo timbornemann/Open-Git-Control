@@ -1,4 +1,4 @@
-import { PLANNER_PRIORITIES, PLANNER_STATUSES, createPlannedProject, deletePlannerItem, ensureRepositoryProject } from './projectPlannerStore';
+import { PLANNER_PRIORITIES, PLANNER_STATUSES, createPlannedProject, deletePlannerItem } from './projectPlannerStore';
 import type { JsonObject } from './planningApiTypes';
 import { MCP_PROTOCOL_VERSION, SERVER_NAME, ApiError } from './planningApiTypes';
 import {
@@ -6,6 +6,7 @@ import {
   getRepositories,
   getTabs,
   createTodoFromBody,
+  ensureApiRepositoryProject,
   getTodos,
   listProjectsForTool,
   moveTodoFromBody,
@@ -31,7 +32,7 @@ export const callMcpTool = async (name: string, args: JsonObject): Promise<unkno
         description: cleanString(args.description),
       });
     case 'ensure_repository_project':
-      return ensureRepositoryProject(cleanString(args.repoPath));
+      return ensureApiRepositoryProject(args.repoPath);
     case 'create_todo': {
       return createTodoFromBody(args);
     }
