@@ -8,6 +8,7 @@ import { registerGitIdentityHandlers } from '../registerGitIdentityHandlers';
 
 const mocks = vi.hoisted(() => ({ handlers: new Map<string, (...args: any[]) => Promise<any>>(), protection: vi.fn(), window: true }));
 vi.mock('electron', () => ({
+  app: { isPackaged: false },
   ipcMain: { handle: (channel: string, callback: (...args: any[]) => Promise<any>) => mocks.handlers.set(channel, callback) },
   BrowserWindow: { fromWebContents: () => (mocks.window ? {} : null) },
 }));

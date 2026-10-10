@@ -7,7 +7,7 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { beginReadRequest } from '../readRequests';
 import { requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
 import { repoJobRegistry } from '../repoJobRegistry';
-import { isAllowedAppNavigation } from '../security';
+import { isAllowedAppNavigation, isDevelopmentRuntime } from '../security';
 
 export function registerRepositoryAnalyticsHandlers(gitService: GitService): void {
   const service = new RepositoryAnalyticsService(gitService, path.join(app.getPath('userData'), 'repository-analytics'));
@@ -17,7 +17,7 @@ export function registerRepositoryAnalyticsHandlers(gitService: GitService): voi
       !event.senderFrame ||
       event.senderFrame !== event.sender.mainFrame ||
       !BrowserWindow.fromWebContents(event.sender) ||
-      !isAllowedAppNavigation(event.senderFrame.url, { isDev: process.env.NODE_ENV === 'development', mainProcessDir: path.join(__dirname, '../..') })
+      !isAllowedAppNavigation(event.senderFrame.url, { isDev: isDevelopmentRuntime(), mainProcessDir: path.join(__dirname, '../..') })
     )
       throw new Error('Analytics requires the trusted app window.');
     return requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), channel);

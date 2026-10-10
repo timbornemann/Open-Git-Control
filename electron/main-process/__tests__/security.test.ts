@@ -2,7 +2,8 @@ import * as path from 'path';
 import { pathToFileURL } from 'url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { appExitMock, appOnMock, setApplicationMenuMock, permissionRequestMock, permissionCheckMock, headersReceivedMock } = vi.hoisted(() => ({
+const { appState, appExitMock, appOnMock, setApplicationMenuMock, permissionRequestMock, permissionCheckMock, headersReceivedMock } = vi.hoisted(() => ({
+  appState: { isPackaged: false },
   appExitMock: vi.fn(),
   appOnMock: vi.fn(),
   setApplicationMenuMock: vi.fn(),
@@ -15,6 +16,9 @@ vi.mock('electron', () => ({
   app: {
     exit: appExitMock,
     on: appOnMock,
+    get isPackaged() {
+      return appState.isPackaged;
+    },
   },
   Menu: {
     setApplicationMenu: setApplicationMenuMock,
@@ -36,6 +40,7 @@ import {
   hasUnsafeDebugSwitch,
   installAppSecurity,
   isAllowedAppNavigation,
+  isDevelopmentRuntime,
   isDevToolsAccelerator,
 } from '../security';
 
@@ -54,6 +59,21 @@ describe('Electron security guards', () => {
     expect(isDevToolsAccelerator({ key: 'I', control: true, shift: true })).toBe(true);
     expect(isDevToolsAccelerator({ key: 'J', meta: true, alt: true })).toBe(true);
     expect(isDevToolsAccelerator({ key: 'R', control: true })).toBe(false);
+  });
+
+  it('never reports development mode for a packaged app, even with an inherited NODE_ENV', () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    try {
+      appState.isPackaged = true;
+      expect(isDevelopmentRuntime()).toBe(false);
+      appState.isPackaged = false;
+      expect(isDevelopmentRuntime()).toBe(true);
+      vi.stubEnv('NODE_ENV', 'production');
+      expect(isDevelopmentRuntime()).toBe(false);
+    } finally {
+      appState.isPackaged = false;
+      vi.unstubAllEnvs();
+    }
   });
 
   it('detects unsafe production debugging switches', () => {

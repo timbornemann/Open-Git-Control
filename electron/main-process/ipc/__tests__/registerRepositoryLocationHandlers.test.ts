@@ -8,6 +8,7 @@ import { registerRepositoryLocationHandlers } from '../registerRepositoryLocatio
 
 const mocks = vi.hoisted(() => ({ handlers: new Map<string, (...args: any[]) => Promise<any>>(), picker: vi.fn(), window: true, protection: vi.fn() }));
 vi.mock('electron', () => ({
+  app: { isPackaged: false },
   ipcMain: { handle: (channel: string, callback: (...args: any[]) => Promise<any>) => mocks.handlers.set(channel, callback) },
   BrowserWindow: { fromWebContents: () => (mocks.window ? {} : null) },
   dialog: { showOpenDialog: mocks.picker },

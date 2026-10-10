@@ -13,7 +13,7 @@ import { UpdaterManager } from './main-process/updaterManager';
 import { createMainWindow } from './main-process/windowFactory';
 import type { PlanningApiServerHandle } from './main-process/planningApiServer';
 import { startPlanningApiServer } from './main-process/planningApiServer';
-import { enforceProductionCommandLineSecurity, installAppSecurity } from './main-process/security';
+import { enforceProductionCommandLineSecurity, installAppSecurity, isDevelopmentRuntime } from './main-process/security';
 import { acquireSingleInstanceLock } from './main-process/singleInstance';
 import { systemToolsService } from './system-tools/SystemToolsService';
 import { registerSystemToolsHandlers } from './system-tools/registerSystemToolsHandlers';
@@ -21,11 +21,10 @@ import { IpcChannel } from '../src/types/ipcContract';
 import type { PlanningApiTokenLifetime } from './main-process/planningApiAuth';
 import { clearSavedPlanningApiAuthToken, generateSavedPlanningApiAuthToken, getPlanningApiAuthState } from './main-process/planningApiAuth';
 
-// Development mode must never be reachable in an installed/packaged binary,
-// regardless of an inherited NODE_ENV. A packaged app in "dev mode" would load
-// the localhost dev server, open DevTools and apply the relaxed dev CSP.
-// app.isPackaged is the authoritative signal for a built application.
-const isDev = !app.isPackaged && process.env.NODE_ENV === 'development';
+// A packaged app in "dev mode" would load the localhost dev server, open
+// DevTools and apply the relaxed dev CSP; isDevelopmentRuntime() gates on
+// app.isPackaged, the authoritative signal for a built application.
+const isDev = isDevelopmentRuntime();
 const APP_DISPLAY_NAME = 'Open-Git-Control';
 const WINDOWS_APP_ID = 'com.opengitcontrol.app';
 

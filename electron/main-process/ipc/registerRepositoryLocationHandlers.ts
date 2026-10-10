@@ -6,7 +6,7 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { RepositoryLocationService } from '../RepositoryLocationService';
 import { repositoryPathKey } from '../activeRepositoryAuthorization';
 import { repoJobRegistry } from '../repoJobRegistry';
-import { isAllowedAppNavigation } from '../security';
+import { isAllowedAppNavigation, isDevelopmentRuntime } from '../security';
 import { redactGitSensitiveText } from '../../git/GitErrorFormatter';
 import { ensureCommitProtectionIsIdle } from '../RepositoryCommitProtection';
 
@@ -18,7 +18,7 @@ export function registerRepositoryLocationHandlers(gitService: GitService, servi
           !event.senderFrame ||
           event.senderFrame !== event.sender.mainFrame ||
           !BrowserWindow.fromWebContents(event.sender) ||
-          !isAllowedAppNavigation(event.senderFrame.url, { isDev: process.env.NODE_ENV === 'development', mainProcessDir: path.join(__dirname, '../..') })
+          !isAllowedAppNavigation(event.senderFrame.url, { isDev: isDevelopmentRuntime(), mainProcessDir: path.join(__dirname, '../..') })
         )
           throw new Error('Repository recovery requires the trusted app window.');
         if (!request || typeof request.repoPath !== 'string' || !path.isAbsolute(request.repoPath)) throw new Error('Choose a saved repository.');

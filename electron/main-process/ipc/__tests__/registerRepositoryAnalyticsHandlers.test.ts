@@ -11,7 +11,7 @@ import { DEFAULT_ANALYTICS_FILTERS } from '../../../../src/shared/ipc/repository
 
 const mocks = vi.hoisted(() => ({ handlers: new Map<string, (...args: any[]) => Promise<any>>(), window: true }));
 vi.mock('electron', () => ({
-  app: { getPath: () => '/app-data' },
+  app: { getPath: () => '/app-data', isPackaged: false },
   BrowserWindow: { fromWebContents: () => (mocks.window ? {} : null) },
   ipcMain: { handle: (channel: string, handler: (...args: any[]) => Promise<any>) => mocks.handlers.set(channel, handler) },
 }));

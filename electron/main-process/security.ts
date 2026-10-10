@@ -20,6 +20,14 @@ type InstallSecurityOptions = NavigationOptions;
 
 const DEV_SERVER_ORIGINS = new Set(['http://localhost:5173', 'http://127.0.0.1:5173']);
 
+/**
+ * Development mode must never be reachable in an installed/packaged binary,
+ * regardless of an inherited NODE_ENV. Every trusted-window check has to use
+ * this single source; NODE_ENV alone would expect the dev-server origin in a
+ * packaged app and reject the real app window.
+ */
+export const isDevelopmentRuntime = (): boolean => !app.isPackaged && process.env.NODE_ENV === 'development';
+
 const UNSAFE_DEBUG_SWITCHES = ['--remote-debugging-port', '--remote-debugging-pipe', '--inspect', '--inspect-brk'];
 
 const normalizePathForCompare = (value: string): string => {

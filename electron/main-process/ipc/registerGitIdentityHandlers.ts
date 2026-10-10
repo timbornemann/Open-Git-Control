@@ -8,7 +8,7 @@ import type { GitIdentityRequest, SaveGitIdentityRequest } from '../../../src/sh
 import { requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
 import { ensureCommitProtectionIsIdle } from '../RepositoryCommitProtection';
 import { repoJobRegistry } from '../repoJobRegistry';
-import { isAllowedAppNavigation } from '../security';
+import { isAllowedAppNavigation, isDevelopmentRuntime } from '../security';
 
 export function registerGitIdentityHandlers(gitService: GitService) {
   const service = new GitIdentityService(gitService.runner);
@@ -17,7 +17,7 @@ export function registerGitIdentityHandlers(gitService: GitService) {
       !event.senderFrame ||
       event.senderFrame !== event.sender.mainFrame ||
       !BrowserWindow.fromWebContents(event.sender) ||
-      !isAllowedAppNavigation(event.senderFrame.url, { isDev: process.env.NODE_ENV === 'development', mainProcessDir: path.join(__dirname, '../..') })
+      !isAllowedAppNavigation(event.senderFrame.url, { isDev: isDevelopmentRuntime(), mainProcessDir: path.join(__dirname, '../..') })
     )
       throw new Error('Git identity configuration requires the trusted app window.');
     if (!request || !['repository', 'global'].includes(request.scope)) throw new Error('Choose the Git configuration scope.');

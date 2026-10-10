@@ -13,7 +13,7 @@ import { clearSelectedFileGrants, grantSelectedProjectParentDirectory } from '..
 
 const state = vi.hoisted(() => ({ directory: '', targetDirectory: '', handlers: new Map<string, (...args: unknown[]) => Promise<unknown>>() }));
 vi.mock('electron', () => ({
-  app: { getPath: () => state.directory },
+  app: { getPath: () => state.directory, isPackaged: false },
   ipcMain: { handle: (name: string, handler: (...args: unknown[]) => Promise<unknown>) => state.handlers.set(name, handler) },
   BrowserWindow: { fromWebContents: () => null },
   dialog: { showSaveDialog: vi.fn() },

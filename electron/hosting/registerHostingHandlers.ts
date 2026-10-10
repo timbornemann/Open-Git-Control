@@ -23,7 +23,7 @@ import type { GitCredentialEnvironment } from './HostingCredentialBridge';
 import { hasControlCharacters } from './hostingUrls';
 import { parseReleaseCommits, RELEASE_COMMIT_FORMAT } from '../main-process/parsing';
 import { RepositoryPublicationService } from './RepositoryPublicationService';
-import { isAllowedAppNavigation } from '../main-process/security';
+import { isAllowedAppNavigation, isDevelopmentRuntime } from '../main-process/security';
 
 type Dependencies = { gitService: GitService; pushGuard?: SecretScanPushGuard; hostingService?: HostingService };
 const MAX_TRANSFER_BYTES = 512 * 1024 * 1024;
@@ -245,7 +245,7 @@ export function registerHostingHandlers({ gitService, pushGuard, hostingService:
           !event.senderFrame ||
           event.senderFrame !== event.sender.mainFrame ||
           !BrowserWindow.fromWebContents(event.sender) ||
-          !isAllowedAppNavigation(event.senderFrame.url, { isDev: process.env.NODE_ENV === 'development', mainProcessDir: path.join(__dirname, '..') })
+          !isAllowedAppNavigation(event.senderFrame.url, { isDev: isDevelopmentRuntime(), mainProcessDir: path.join(__dirname, '..') })
         )
           throw new Error('Repository publication requires the trusted app window.');
         if (operation === 'cancelPublication') data = publication.cancel((input as HostingOperations['cancelPublication']['input']).repoPath);
