@@ -130,18 +130,7 @@
       "status": "planned",
       "tags": [],
       "createdAt": 1791504660702,
-      "updatedAt": 1791504660702
-    },
-    {
-      "id": "4d6fe0be-ed8f-48c2-8e52-500f3e0477b2",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "überarbeite +- changens in timeline",
-      "description": "überarbeite +- changens in timeline",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1791639138466,
-      "updatedAt": 1791647288202
+      "updatedAt": 1791649713463
     }
   ]
 }

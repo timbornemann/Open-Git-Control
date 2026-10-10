@@ -1,16 +1,16 @@
 # Open-Git-Control
 
-Git ist erforderlich; Git LFS und GitHub CLI sind optional. Die App prüft diese Werkzeuge und bietet unter **Einstellungen → App & Diagnose → Werkzeuge** offizielle Downloads oder die Installation über einen vorhandenen Paketmanager an. Siehe [Werkzeuge einrichten](docs/SYSTEM_TOOLS.md).
-
 [![CI (Linux, Windows, macOS)](https://github.com/timbornemann/Open-Git-Control/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/timbornemann/Open-Git-Control/actions/workflows/ci.yml?query=branch%3Amaster+event%3Apush)
 [![Latest release](https://img.shields.io/github/v/release/timbornemann/Open-Git-Control?sort=semver)](https://github.com/timbornemann/Open-Git-Control/releases/latest)
 [![License](https://img.shields.io/github/license/timbornemann/Open-Git-Control)](LICENSE)
 
-Open-Git-Control ist ein freier, quelloffener Desktop-Git-Client fuer Windows, macOS und Linux. Die App kombiniert visuellen Commit-Graph, Staging, einen Working-Directory-Dateibaum mit Editor, Diff-Ansicht, Konfliktloesung, Hosting mit Pull/Merge Requests und CI, Releases, Projektplanung, Secret-Scanning, Recovery-Werkzeuge, Repository-Run-Workflows und optionale KI-Unterstuetzung in einer lokalen Anwendung.
+Open-Git-Control ist ein freier, quelloffener Desktop-Git-Client für Windows, macOS und Linux. Die App kombiniert visuellen Commit-Graph, Staging, einen Working-Directory-Dateibaum mit Editor, Diff-Ansicht, Konfliktlösung, Offline-Repository-Analysen, Hosting mit Pull/Merge Requests und CI, geführte Repository-Veröffentlichung, Releases, Projektplanung, Secret-Scanning, Recovery-Werkzeuge, Repository-Run-Workflows und optionale KI-Unterstützung in einer lokalen Anwendung.
 
 Sprache: **Deutsch** | English version: [README.md](README.md)
 
-![Open-Git-Control App-Uebersicht](Docs/App%20Overview.png)
+Git ist erforderlich; Git LFS und GitHub CLI sind optional. Die App prüft diese Werkzeuge und bietet unter **Einstellungen → App & Diagnose → Werkzeuge** offizielle Downloads oder die Installation über einen vorhandenen Paketmanager an. Siehe [Werkzeuge einrichten](Docs/SYSTEM_TOOLS.md).
+
+![Atlas-Workspace in der Repository-Ansicht mit Commit-Graph, Branches, Dateistatistiken und Staging](Docs/screenshots/repository.jpg)
 
 ## Warum Open-Git-Control?
 
@@ -20,13 +20,16 @@ Open-Git-Control ist fuer dich interessant, wenn dir ein sehr kleiner Git-Client
 - Git-Operationen laufen lokal gegen deine Repositories
 - Visueller Commit-Graph mit Branch-, Tag-, Merge-, Reset-, Rebase-, Cherry-Pick-, Revert- und Recovery-Aktionen
 - Staging, Stash, Hunk-Diffs, Datei-Historie, Blame und Konfliktloesung in einem Workflow
+- Offline-Repository-Analysen: Aktivität, Sprachverteilung, Änderungsschwerpunkte, Code Churn, Dateikopplungsnetz, Release-Vergleiche und Timeline-Wiedergabe
 - Konten von GitHub, Forgejo, GitLab, Bitbucket Cloud und Data Center, Repository-Kataloge, Klonen/Forken, PRs/MRs, CI und anbieterspezifische Veröffentlichungen
+- Geführter Ablauf **Repository veröffentlichen** zum Erstellen, Verbinden und Hochladen ausgewählter Branches und Tags
 - Unabhängige Pull-Quellen, Hosting-Ziele und gespeicherte Push-Profile für mehrere Endpunkte mit einzelnen Ergebnissen
 - Projektplanung mit lokaler REST- und MCP-aehnlicher API fuer agentengestuetzte Arbeit
 - Working-Directory-Dateibaum mit sicheren In-App-Dateivorschauen und Bearbeitung sowie System-Dateiaktionen bei Bedarf
-- Repository-spezifische Run-Workflows fuer Tests, Formatieren, Starten und Bauen mit Live-Konsole
+- Repository-spezifische Run-Workflows mit strukturierter Konsole, erkannten Problemen und anklickbaren Dateiverweisen zum In-App-Editor
 - Optionale KI-Unterstuetzung durch Ollama, Google Gemini oder OpenAI fuer Commit-Nachrichten, Auto-Commits, Release Notes und Planner-Uebergaben
-- Secret-Scanning vor Commits und Pushes, Allowlist, Sicherheitsabfragen fuer gefaehrliche Aktionen und lokale verschluesselte Token-Speicherung, wenn vom OS unterstuetzt
+- Secret-Scanning vor Commits und Pushes, versionierte Repository-Allowlists, Sicherheitsabfragen für gefährliche Aktionen und lokale verschlüsselte Token-Speicherung, wenn vom OS unterstützt
+- Geführte Git-Installation, Commit-Identität und Wiederfinden verschobener Repositories
 
 ## Downloads
 
@@ -50,40 +53,96 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 
 ## Voraussetzungen
 
-- Git muss installiert und im `PATH` verfuegbar sein.
+- Git muss installiert und ausführbar sein. Die App prüft den Prozess-`PATH` und übliche Installationsorte; fehlendes Git öffnet einen Einrichtungsdialog und hinterlässt bis zur erfolgreichen Prüfung ein Warnsymbol in der Seitenleiste.
+- Git LFS ist optional, für LFS-Inhalte und Transfers aber erforderlich. Git for Windows liefert es normalerweise mit; die Verfügbarkeit wird trotzdem separat geprüft.
 - GitHub CLI (`gh`) ist optional und nur zum Importieren einer bestehenden GitHub-CLI-Anmeldung erforderlich.
 - Ollama, ein Gemini API Key oder ein OpenAI API Key ist optional und nur fuer KI-Funktionen erforderlich.
-- Entwicklung aus dem Quellcode benoetigt Node.js und npm. CI nutzt aktuell Node.js 20.
+- Entwicklung aus dem Quellcode benötigt Node.js und npm. CI nutzt aktuell Node.js 22.
 
 ## Screenshots
 
-### Repository Cockpit und Commit Graph
+Diese neuen Browser-Aufnahmen zeigen die tatsächliche App-Oberfläche mit fiktiven Atlas-Projekten, Konten und Team-Aktivitäten im Theme **Copper Night**. Sie stammen aus dem aktuellen Quellcode-Stand; einige Funktionen können neuer als das oben verlinkte Paket-Release sein.
 
-![Repository Cockpit und Commit Graph](Docs/App%20Overview.png)
+Die Ansicht für das aktuelle Repository und Staging ist oben abgebildet. Diese Hauptbereiche zeigen den übrigen Arbeitsalltag in der App.
 
-### Diff Viewer mit Hunk-Aktionen, Blame und Datei-Inspector
+### Lokaler Repository-Workspace
 
-![Diff Viewer](Docs/View%20diff.png)
+Gespeicherte Projekte finden, Favoriten anpinnen, das aktive Repository erkennen sowie Projekte an einer Stelle öffnen oder klonen.
 
-### Conflict Resolver
+![Local Repositories mit gespeicherten Atlas-Projekten, angepinntem aktivem Repository und Öffnen-/Klonen-Aktionen](Docs/screenshots/local-repositories.jpg)
 
-![Conflict Resolver](Docs/Conflict%20Resolver.png)
+### Hosting über mehrere Anbieter
 
-### Codebase Timeline
+Repositories über Konten und Server hinweg durchsuchen, lokale Klone erkennen und direkt aus dem Katalog zur Erstellung oder Veröffentlichung gelangen.
 
-![Codebase Timeline](Docs/Timeline.png)
+![Hosting-Katalog mit GitHub-Repositories, privatem Forgejo-Mirror und passenden lokalen Klonen](Docs/screenshots/hosting-catalog.jpg)
 
-### Project Planning Board
+### Offline-Statistiken und Änderungsschwerpunkte
 
-![Project Planning Board](Docs/Project%20Planning.png)
+Aktivität, Sprachverteilung und eine nach Verzeichnissen gegliederte Hotspot-Karte teilen sich eine kompakte Übersicht. Die Filter liegen in der Analyse-Seitenleiste.
 
-### Release Creator
+![Statistikübersicht mit Wochenaktivität, Sprachanteilen und Hotspot-Treemap](Docs/screenshots/analytics-overview.jpg)
 
-![Release Creator](Docs/Release.png)
+### Planung, die mit dem Repository reist
 
-### Settings
+Ideen, Bugs und Umsetzungsarbeit als gemeinsames Board, gespeichert in `.Open-Git-Control/planning.json`.
 
-![Settings](Docs/Settings.png)
+![Atlas-Planungsboard mit Prioritäten, Beschreibungen und Statusspalten](Docs/screenshots/planning.jpg)
+
+### Allgemeine Einstellungen
+
+Einstellungen über Kategorien hinweg suchen und Erscheinungsbild, Git-Workflow, Commit-Identität, Konten, KI, Sicherheit und Diagnose konfigurieren.
+
+![Allgemeine Einstellungen mit Kategorienavigation, Suche, Erscheinungsbild und Git-Commit-Vorgaben](Docs/screenshots/settings-general.jpg)
+
+<details>
+<summary>Weitere Ansichten: Dateikopplung, Run, Churn, Releases, Timeline, Hosting-Konten, Veröffentlichung und Einrichtung</summary>
+
+### Dateikopplung als zusammenhängendes Netz
+
+Gemeinsam geänderte Dateien erkunden, Partner einer Datei hervorheben und jede Verbindung prüfen. Zoom, Verschieben und die Gesamtansicht ersetzen das Blättern durch Ergebnisse.
+
+![Dateikopplungsnetz mit ausgewählter Datei und hervorgehobenen Verbindungen](Docs/screenshots/file-coupling.jpg)
+
+### Run-Ausgaben mit hilfreichen Diagnosen
+
+Tests und Builds als strukturiertes Protokoll lesen, Probleme prüfen und genannte Dateien direkt im Working-Directory-Editor öffnen.
+
+![Run-Konsole mit gruppierten Testausgaben, Fehlerhinweis und anklickbaren Quellcodepositionen](Docs/screenshots/run-console.jpg)
+
+### Code Churn über die Zeit
+
+![Code-Churn-Kennzahlen und beschriftetes Diagramm für hinzugefügte und gelöschte Zeilen](Docs/screenshots/code-churn.jpg)
+
+### Statistische Release-Vergleiche
+
+![Vergleich zweier ausgewählter Tags mit Commit-, Personen- und Nettoänderungsstatistik](Docs/screenshots/release-comparison.jpg)
+
+### Timeline-Wiedergabe
+
+![Canvas-Timeline mit Projektdateibaum und Wiedergabesteuerung](Docs/screenshots/timeline.jpg)
+
+### Hosting und Pull Requests
+
+![Hosting-Ansicht mit fiktiven Atlas-Pull-Requests und verbundenen Anbieter-Konten](Docs/screenshots/hosting.jpg)
+
+### Hosting-Konten und Server
+
+![Hosting-Kontoverwaltung mit getrennten GitHub- und Forgejo-Verbindungen samt Serveradressen](Docs/screenshots/hosting-accounts.jpg)
+
+### Neues Hosting-Repository anlegen
+
+![Veröffentlichungsassistent mit Remote-, Anmeldungs- und Branch-Auswahl](Docs/screenshots/publish.jpg)
+
+### Unabhängige Transfer-Einstellungen
+
+![Remote-Konfiguration mit Erklärungen zu Fetch, Pull-Strategie und Push-Zielen](Docs/screenshots/remotes.jpg)
+
+### Erforderliche und optionale Werkzeuge
+
+![Einstellungen mit Git, optionalem Git LFS und optionaler GitHub CLI samt Versionen und Einrichtungsaktionen](Docs/screenshots/settings-tools.jpg)
+
+</details>
 
 ## Inhaltsverzeichnis
 
@@ -92,6 +151,10 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 - [Voraussetzungen](#voraussetzungen)
 - [Screenshots](#screenshots)
 - [Feature-Referenz](#feature-referenz)
+  - [Statistik & Analyse](#statistik--analyse)
+  - [Git-Werkzeuge und Commit-Identität](#git-werkzeuge-und-commit-identität)
+  - [Remote-Konfiguration und Pull-Strategie](#remote-konfiguration-und-pull-strategie)
+  - [Geführte Repository-Veröffentlichung](#geführte-repository-veröffentlichung)
 - [Typische Workflows](#typische-workflows)
 - [Lokale Planning API und MCP](#lokale-planning-api-und-mcp)
 - [Git installieren](#git-installieren)
@@ -114,12 +177,21 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 - Lokale Repositories suchen und nach zuletzt geoeffnet, Name, Erstellzeit, aufsteigend oder absteigend sortieren.
 - Repositories anhand lokal gefundener Icons und Logos in Seitenleiste und Repository-Liste erkennen. Über das Kontextmenü **Repository-Logo** lässt sich ein anderes Bild auswählen, auf Buchstaben umstellen oder erneut suchen. Kleine Vorschaubilder und Einstellungen bleiben lokal über Neustarts erhalten; Originalbilder und Repository-Konfiguration bleiben unverändert.
 - Repositories anpinnen, schliessen und schnell zwischen bekannten Repositories wechseln.
-- Nicht verfuegbare Repositories erkennen und fehlende Pfade sauber behandeln.
+- Nicht verfügbare Repositories mit **Neuen Speicherort auswählen** oder **Erneut prüfen** wiederfinden. Bei verschobenen Projekten bleiben Repository-Einstellungen, Planungsdaten und aktive Auswahl erhalten.
 - Repository-Ordner direkt aus Local Repositories oder dem Header des aktiven Repositories im Dateisystem anzeigen.
 - Vorhandene `LICENSE`-/`LICENCE`-Datei erkennen sowie Lizenzen aus gebuendelten, nachvollziehbaren SPDX-/Choose-a-License-Vorlagen anlegen oder ersetzen. Benoetigte Copyright-, Programmname-, Programmbeschreibung- und Apache/GNU-Notice-Felder werden vor dem Schreiben abgefragt.
 - Gespeicherte Layout-Groessen in den Settings zuruecksetzen.
 - Haupt-Sidebar und Graph/Inspector-Split vergroessern oder verkleinern.
 - Eingeklappte Sidebar-Panels pro Repository fuer Remotes, Branches, Tags und Submodule merken.
+
+### Git-Werkzeuge und Commit-Identität
+
+- Die Startprüfung unterscheidet verfügbares, fehlendes und nicht ausführbares Git, Git LFS sowie GitHub CLI und zeigt erkannte Versionen. Ein negativer Git-Test öffnet einmal pro App-Sitzung einen Dialog; optionale Werkzeuge lösen keine Startwarnung aus.
+- **Einstellungen → App & Diagnose → Werkzeuge** bietet erneute Prüfungen, offizielle Downloads und die Prüfung eines unterstützten Installationsbefehls. Die Installation startet ausschließlich durch eine Nutzeraktion, nutzt einen vorhandenen Paketmanager und die Rechte-/Zustimmungsdialoge des Betriebssystems. Erfolg wird erst nach erneuter Werkzeugprüfung gemeldet.
+- Unter Windows liefert Git for Windows LFS normalerweise mit. Nach einer Git-Installation wird LFS erneut geprüft, bevor eine separate Installation angeboten wird. Repository-lokale LFS-Filter und Hooks bleiben ein eigener Einrichtungsschritt.
+- Fehlendes Git pausiert Git-abhängige Arbeit, ohne gespeicherte Repositories zu entfernen. Prüfungen nach Installation, App-Fokus oder manueller Anforderung setzen die Repository-Wiederherstellung fort, sobald Git nutzbar ist. Siehe [Werkzeugerkennung und Installation](Docs/SYSTEM_TOOLS.md).
+- Vor einem Commit öffnen fehlender wirksamer Git-Name oder E-Mail die **Git-Commit-Identität**. Vorhandene Werte bleiben erhalten; der Geltungsbereich ist **dieses Repository** oder **global**. Eine Hosting-Anmeldung richtet diese Angaben nicht ein.
+- Name und E-Mail lassen sich später unter **Einstellungen → Allgemein → Git-Commit-Identität** ändern. Das gilt für zukünftige Commits; bestehende Commits behalten ihre Identitäten. Abbrechen erhält Commit-Entwurf und gestagte Dateien.
 
 ### Branches, Remotes, Tags und Submodule
 
@@ -157,18 +229,15 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 
 - Fetch vom ausdrücklich ausgewählten Remote.
 - Ausgewaehlten Branch mit waehlbarem Merge-Modus mergen.
-- Pull mit:
-  - Standard-Pull
-  - Pull mit Rebase
-  - No-fast-forward-Pull
-  - Fast-forward-only-Pull
+- Normaler Pull verwendet die gespeicherte Repository-Strategie: Git-Standard, Rebase, Merge oder Nur Fast-forward.
+- Ausdrückliche Pull-Dropdown-Auswahlen gelten nur für diese Operation, einschließlich eines No-fast-forward-Merge (`--no-rebase --no-ff`).
 - Direkt zu einem eindeutigen oder gespeicherten Remote-Ziel pushen; bei mehreren Remotes die Ziele beim ersten Aufruf auswählen.
 - Auswahlmodi für Fetch, Pull und Push unabhängig auf der Repository-Seite Remote-Konfiguration einstellen.
+- **Remote-Konfiguration** aus dem Pull- oder Push-Dropdown öffnen.
 - Force-with-lease gegen den geprüften Stand jedes Endpunkts bestätigen.
 - Upstream ausdrücklich unter Remote-Konfiguration setzen.
 - Ergebnisse je Ziel prüfen und erfolglose Ziele mit dem geprüften Commit erneut versuchen.
 - Repository-spezifische Run-, Test-, Format-, Start- und Build-Workflows starten.
-- Codebase Timeline oeffnen.
 - Release Creator oeffnen.
 - Staging/Commit-Panel oeffnen.
 - Kompakte "More actions"-Varianten bei schmalen Fenstern.
@@ -178,7 +247,8 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 - Visueller Commit-Graph mit Branch- und Merge-Topologie.
 - Paged Commit Loading fuer groessere Historien.
 - Working-Tree-Zeile ueber der Historie mit staged, unstaged und untracked Counts.
-- Asynchrone Commit-Statistiken fuer Dateien, Additions und Deletions.
+- Asynchrone Commit-Statistiken mit kompakter Dateianzahl und ausgerichteten hinzugefügten/gelöschten Zeilenzahlen.
+- Hover oder Tastaturfokus zeigt bei gekürzten oder ausgeblendeten Informationen den vollständigen Titel, Autor, Hash, Zeitstempel, Refs und verfügbare Statistiken, auch in schmalen Fenstern.
 - Commits suchen nach:
   - allen Feldern
   - Subject
@@ -199,14 +269,39 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
   - Reset `--mixed`
   - Reset `--hard`
   - interaktiver Rebase mit editierbarer Todo-Liste
+  - Commit-Nachricht bearbeiten, mit erforderlichen Prüfungen für eine Historienänderung
   - ausgewaehlte Ref in aktuellen Branch mergen
   - Commit-Hash kopieren
 - Tag-Auswahl springt zum getaggten Commit.
 
+### Statistik & Analyse
+
+Der eigene Menüpunkt **Statistik & Analyse** liegt direkt unter **Aktuelles Repository** und ist außerdem über Repository-Menü, Kontextmenü lokaler Repositories und Command Palette erreichbar. Die Ansicht bezieht sich immer auf das aktive lokale Repository. Ihre Seitenleiste enthält Unterseiten und gemeinsame Filter; ein Repository-Wechsel erfolgt weiterhin über Local Repositories oder Hosting.
+
+| Bereich               | Auswertungen                                                                                                                                                |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Überblick             | Commits, Mitwirkende, Branches, Tags, versionierte Dateien und Textzeilen, Aktivität, Sprach-/Dateitypanteile und Hotspot-Vorschau                          |
+| Änderungsschwerpunkte | Verzeichnisbasierte Treemap häufig geänderter Dateien; Hover zeigt Änderungshäufigkeit, Churn, Personen und letzte Aktivität, mit Einstieg zur Dateianalyse |
+| Contributions         | Responsiver Aktivitätskalender, Beiträge über Zeit und Personenkennzahlen sowie **Zuletzt geänderte Zeilen** aus Blame mit Abdeckung                        |
+| Code Churn            | Hinzugefügte und gelöschte Zeilen über Zeit, deren Anteile, gesamte Änderungsmenge und Nettoveränderung                                                     |
+| Dateikopplung         | Ein zusammenhängendes, zoombares Netz aller passenden Dateipaare, hervorgehobene Partner und Verbindungsdetails mit Links zur Dateianalyse                  |
+| Release-Vergleich     | Tag-/Branch-/Revisionsauswahl und statistische Übersicht neuer Commits, Personen, Netto-Dateiänderungen, Dateitypen und betroffener Bereiche                |
+| Timeline              | Wiedergabe des versionierten Dateibaums mit Zoom und Verschieben                                                                                            |
+
+Standardmäßig werden alle vorhandenen lokalen und Remote-Branches einschließlich HEAD betrachtet; jeder erreichbare Commit zählt einmal. Zeitraum-, Personen- und Pfadfilter bleiben repositorybezogen gespeichert. Der separat beschriftete **Projektstand** ist standardmäßig HEAD und bestimmt Datei-, Zeilen- und Blame-Zahlen. Uncommittete Dateien und Staging-Änderungen fließen nicht ein.
+
+Die Analyse arbeitet offline und speichert Ergebnisse in den App-Daten. Beim erneuten Öffnen erscheint der letzte Bericht sofort; anschließend werden geänderte Refs und neue Commits ergänzt, ohne unveränderte Commit-Diffs erneut auszuwerten. Unveränderte Background-Fetches bleiben ohne Analyse-Notification. Aktualisierungen erhalten Ansicht, Release-Auswahl sowie Auswahl, Zoom und Anordnung im Dateikopplungsnetz. Hintergrundarbeit zeigt Fortschritt und Abbruch im zentralen Notification-System.
+
+Die Zählung berücksichtigt `.mailmap`-Identitäten und `.gitignore`-Regeln des ausgewählten Projektstands. Diese Ignore-Regeln wirken bei Analytics ausdrücklich auch auf versionierte und historische Pfade. Binärdateien, LFS-Pointer, Symlinks und Submodule bleiben eigene Kategorien ohne künstliche Textzeilenzahlen. Flache Historie, fehlende Objekte und unvollständige Blame-Abdeckung werden angezeigt. Hotspots beschreiben Änderungshäufigkeit; **Zuletzt geänderte Zeilen** nennt die letzte bearbeitende Person vorhandener Zeilen. Daraus werden weder Code-Komplexität noch Eigentum abgeleitet.
+
+Dateikopplung benötigt standardmäßig drei gemeinsame Commits; Commits mit mehr als 50 berücksichtigten Dateien entfallen ausschließlich in dieser Auswertung. Release-Vergleiche trennen neu erreichbare Commits (`A..B`) von der Netto-Baumänderung zwischen den Revisionen und kennzeichnen nichtlineare Vergleiche. Siehe [Zählregeln und Cache-Verhalten](Docs/REPOSITORY_ANALYTICS.md).
+
 ### Codebase Timeline
 
-- Timeline-Ansicht rekonstruiert Datei-Aenderungen ueber die Commit-Historie.
+- Einstieg über **Statistik & Analyse → Timeline**; der Staging-Inspector ist hier ausgeblendet.
+- Rekonstruiert die First-parent-Historie bis zum ausgewählten Projektstand mit maximal den neuesten 5.000 Commits. Analytics-Filter bestimmen die Wiedergabepositionen; zwischenzeitliche Änderungen gehen weiterhin in den rekonstruierten Baum ein.
 - Canvas-basierte File-Tree-Visualisierung.
+- Zoom und Verschieben mit zwischengespeicherten Baumanordnungen und pro Bild zusammengefassten Eingaben. Wiedergabeposition, eingeklappte Verzeichnisse und Kamera bleiben beim Ansichtswechsel erhalten.
 - Markiert hinzugefuegte, geaenderte, geloeschte und umbenannte Dateien.
 - Playback-Steuerung:
   - Play/Pause
@@ -256,12 +351,15 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 - Commit-Signoff standardmaessig in den Settings aktivieren.
 - Konfigurierbares Commit Template.
 - Commit mit `Ctrl+Enter` in Commit-Feldern ausfuehren.
+- Manuelle und KI-/gruppierte Commits prüfen wirksame Git-Identität und Secret-Regeln. Index-Snapshots erhalten dabei unabhängige oder teilweise gestagte Änderungen.
 
 ### Working Directory und Datei-Viewer
 
 - Rechten Inspector zwischen Staging Area und repositorygebundenem Working-Directory-Dateibaum umschalten.
 - Sichtbare Dateien und Ordner ohne `.git` oder weitere Dot-Entries durchsuchen; aufgeklappte Ordner bleiben beim Umschalten erhalten und werden lazy geladen.
 - Kontextaktionen fuer Dateien und Ordner: oeffnen, umbenennen, ausschneiden, kopieren, einfuegen, loeschen, im Dateisystem zeigen, extern oeffnen oder Anwendung waehlen. Copy/Cut/Paste bleibt im aktiven Repository, destruktive Aktionen verlangen eine Bestaetigung.
+- Dateien und Ordner erstellen, mehrere Einträge für Sammelaktionen auswählen sowie Präfixe oder Suffixe beim Umbenennen ergänzen.
+- Repository-Dateinamen und Textinhalte durchsuchen, Treffer prüfen und Text über die Working-Directory-Suche ersetzen.
 - Dateien im Hauptbereich statt des Graphen oeffnen:
   - editierbarer, syntaxhervorgehobener Text mit explizitem Speichern und `Ctrl/Cmd+S`
   - Markdown-Editor und Vorschau
@@ -269,6 +367,11 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
   - abgeschirmte HTML-/HTM-Vorschau
   - History- und Blame-Tabs
   - sichere Informationsansicht fuer Binaer- oder zu grosse Dateien mit System-Oeffnen-Aktionen
+- Working Directory, Staging und Commit-Diffs nutzen einen gemeinsamen Viewer mit Text, Diff, Vorschau, CSV-Tabelle, History und Blame. Working Directory startet im Text; geänderte Dateien und Commits starten im Diff.
+- **Arbeitsdatei speichern** schreibt den Working Tree. **Staging speichern** bearbeitet nur den ausgewählten Index-Eintrag und erhält teilweise gestagte Änderungen, andere gestagte Dateien und die Arbeitsdatei. Commit-Versionen bleiben schreibgeschützt, auch in Werkzeugen und CSV-Zellen.
+- Vorschau, relative Assets und Hashes verwenden die ausgewählte Quelle. Fehlende Assets werden erklärt, statt aus einer anderen Version geladen.
+- Aufklappbare Textwerkzeuge bieten JSON-/JSONC-Formatierung, CSV-Tabellenbearbeitung und kopierbare Inhaltshashes.
+- Ungespeicherte Entwürfe überstehen Wechsel zwischen Text, Tabelle und Vorschau. Vor Diff, anderer Datei/Quelle/Repository oder Schließen wird Speichern, Verwerfen oder Abbrechen angeboten. Externe Änderungen und Index-Sperren verhindern Überschreiben und erhalten den Entwurf.
 
 ### Diff Viewer und Datei-Inspector
 
@@ -323,7 +426,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 
 Der gemeinsame **Hosting**-Bereich verwaltet mehrere Server und Konten gleichzeitig. Native Git-Funktionen bleiben mit jedem passenden Git-Server nutzbar. Adapter ergänzen Repository-Kataloge, Erstellen, Forks, PRs/MRs, CI und Veröffentlichungen für GitHub, Forgejo, GitLab sowie Bitbucket Cloud und Data Center. Verfügbare Aktionen richten sich nach API, Serverversion und Repository-Berechtigungen. Die [Hosting-Dokumentation](Docs/HOSTING.md) beschreibt Anmeldung, OAuth, Endpunktauswahl und Anbieterunterschiede.
 
-Für jedes lokale Repository werden Fetch-Quelle, Pull-Quelle, Push-Ziele und Hosting-Ziel unabhängig in der **Remote-Konfiguration** gewählt. Ein einzelnes Remote startet normale Transfers direkt. Bei mehreren Remotes kann die Auswahl gespeichert oder jedes Mal abgefragt werden, getrennt für Fetch, Pull und Push. Ein Push-Profil kann denselben geprüften Commit auf einen privaten Forgejo-Server und ein GitHub-Backup veröffentlichen. Das Upstream-Tracking bleibt erhalten. Teil-Erfolge werden angezeigt; Wiederholungen prüfen und adressieren nur erfolglose Ziele. Bestehende mehrere Push-URLs werden erhalten.
+Die gemeinsame [Remote-Konfiguration](#remote-konfiguration-und-pull-strategie) macht Git-Transferquellen, Hosting-Ziele und Anmeldung ausdrücklich sichtbar.
 
 Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ein normaler Push alle URLs dieses benannten Remote als Gruppe. Force, gezielte Wiederholung und unterschiedliche ausdrücklich zugeordnete Hosting-Konten innerhalb einer solchen Gruppe benötigen getrennte benannte Remotes oder ein Git-Update.
 
@@ -336,6 +439,26 @@ Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ei
 - Tatsächliche Fetch-/Push-URLs ihrem Hosting-Konto zuordnen. Bei SSH-Aliasen löst eine Repository-Web-URL die Identität auf; die SSH-Remote-URL bleibt erhalten.
 - Für die Git-Anmeldung je Endpunkt zwischen zugeordnetem Hosting-Konto und vorhandenen System-/SSH-Zugangsdaten wählen.
 
+### Remote-Konfiguration und Pull-Strategie
+
+- **Remote-Konfiguration** ist über Repository-Seitenleiste, Aktionsmenü und unten in den Pull-/Push-Dropdowns erreichbar. Die geführte Transfer-Seite erklärt Herunterladen, Integration und Hochladen getrennt und zeigt den nächsten Transfer vor dem Speichern.
+- Fetch- und Pull-Quelle, ein Hosting-Ziel und ein oder mehrere Push-Ziele unabhängig wählen. Eine einzelne/gespeicherte Auswahl direkt verwenden oder für jede Aktion getrennt immer nachfragen. Verbindungen & Konten verwaltet Endpunkt-URLs und Kontozuordnungen.
+- **Git-Standard**, **Rebase**, **Merge** oder **Nur Fast-forward** als Repository-Pull-Strategie speichern. Git-Standard zeigt die wirksame Git-Konfiguration und bleibt für bestehende Repositories der Standard. Alle normalen Pull-Einstiege verwenden diese Einstellung; ausdrückliche Dropdown-Modi gelten einmalig.
+- Fehlgeschlagene Pull-Wiederholungen behalten Quelle, Branch und Strategie. Push-Profile können denselben geprüften Commit auf Hauptserver und Backup übertragen, während Upstream-Tracking und mehrere Push-URLs erhalten bleiben. Ergebnisse unterscheiden Erfolg und Fehler je Ziel; Wiederholung adressiert erfolglose Ziele.
+- Erweiterte Branch-Zuordnungen, Push-Profile und Upstream-Einstellungen bleiben verfügbar, ohne für normale Transfers erforderlich zu sein. Speichern startet keinen Transfer.
+
+### Geführte Repository-Veröffentlichung
+
+**Repository veröffentlichen** ist ein gemeinsamer Ablauf aus lokaler Seitenleiste, Repository-/Aktions-/Kontextmenüs, Remote-Konfiguration, Hosting und Command Palette. Die Seite nutzt die volle Breite, erhält die lokale Seitenleiste und schützt ungespeicherte Editoränderungen.
+
+1. **Hosting-Ziel:** Anbieter, Server, Konto und persönliches/Organisations-/Namespace-/Workspace-/Projektziel auswählen. Der lokale Ordner schlägt den Namen vor; Sichtbarkeit ist standardmäßig privat.
+2. **Verbindung & Inhalt:** freien Remote-Namen, HTTPS mit gewähltem App-Konto oder SSH/System-Zugangsdaten und Hauptbranch auswählen. Weitere Branches und Tags sind ausdrücklich wählbar. Bestehende Remotes und Tracking bleiben erhalten, sofern **Als neues Hauptziel verwenden** nicht ausdrücklich aktiviert wird.
+3. **Veröffentlichen:** erfassten Commit-Stand prüfen und **Erstellen und veröffentlichen** wählen. Die App erstellt ein leeres Hosting-Repository, verbindet das neue Remote und lädt über den gemeinsamen Secret-Scan-/LFS-/Anmeldeablauf hoch. Nach geprüftem Upload werden Default-Branch und gewünschtes Tracking eingerichtet.
+
+GitHub und Forgejo unterstützen persönliche oder Organisationsziele; GitLab Namespaces sowie Gruppen/Untergruppen; Bitbucket Cloud benötigt Workspace und ausgewähltes Projekt, Data Center ein bestehendes Projekt. Anbieter-Berechtigungen bestimmen die Verfügbarkeit. Ein gleichnamiges vorhandenes Repository wird nicht stillschweigend übernommen.
+
+Uncommittete Dateien werden angezeigt und nicht automatisch committed. Ohne Commit bleibt **Erstellen und verbinden** möglich, anschließend Staging und Fortsetzung nach dem ersten Commit. Detached HEAD verlangt die Wahl oder Erstellung eines Branches. Sitzungsentwürfe sind nach Repository und Konto getrennt; erledigte Einrichtungsschritte werden lokal ohne Zugangsdaten gespeichert. Ein fehlgeschlagener Upload oder Abschluss kann deshalb am erstellten Repository fortgesetzt werden, ohne es doppelt anzulegen. Siehe [Veröffentlichung und Wiederaufnahme](Docs/REPOSITORY_PUBLICATION.md).
+
 ### Pull Requests, CI und Workflows
 
 - PR-/MR-Listen und Checks verwenden das ausdrücklich gewählte Hosting-Ziel und Konto.
@@ -347,7 +470,9 @@ Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ei
 
 ### Release Creator
 
-- Eigene Release-Ansicht aus der Topbar.
+- Gemeinsamer Release Creator über die volle Breite aus Repository-Topbar, Aktionsmenü und Command Palette oder **Release erstellen** in Hosting. Die lokale Seitenleiste bleibt sichtbar; der Creator besitzt eine eigene Commit-Historie.
+- Sitzungsentwürfe sind nach lokalem Repository und vollständiger Hosting-Identität getrennt. Öffnen oder Verlassen veröffentlicht nichts.
+- Markdown-Notes mit Vorschau bearbeiten; fehlgeschlagener Upload oder lokale Tag-Einrichtung lassen sich wiederholen, ohne den Release erneut zu veröffentlichen.
 - Release-Kontext des ausdrücklich ausgewählten Endpunkts lesen:
   - Repository URL
   - bestehende Tags
@@ -407,7 +532,7 @@ Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ei
 - Agentenfertigen Umsetzungs-Prompt fuer einen Eintrag oder alle aktuell sichtbaren Eintraege einer Status-Spalte kopieren. Spalten-Prompts behalten die sichtbare, nach Prioritaet sortierte Reihenfolge.
 - KI-Commit-Message aus einem Eintrag oder einer sichtbaren Status-Spalte generieren. Das Ergebnis wird als Commit-Entwurf des Repositories gespeichert und oeffnet die Staging-Ansicht.
 
-### Lokale Planning API und MCP
+### Funktionen der lokalen Planning API und MCP
 
 - Lokaler HTTP-Server, gebunden an `127.0.0.1`.
 - Bevorzugter Port: `2990`; wenn belegt, nutzt die App den naechsten freien lokalen Port.
@@ -513,8 +638,11 @@ Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ei
 - External-Link-Policy oeffnet erlaubte URLs ueber den Main Process.
 - Diff-Preview-Policy normalisiert sichere Diff-Befehle.
 - Secret-Scan vor Commit und Push:
-  - scannt staged Diffs lokal vor einem Commit und den Push-Bereich erneut vor dem Push
-  - kann Tags einbeziehen
+  - scannt staged Diffs lokal vor einem Commit
+  - prüft jeden gewählten Push-Endpunkt frisch und scannt nur dort fehlende Commits, einschließlich aller Zwischenstände, in denen Secrets hinzugefügt und später entfernt wurden
+  - berücksichtigt mehrere Endpunkte, ausgewählte Branches/Tags und Force-Push-Pläne; gemeinsame Commits werden innerhalb eines Scans nur einmal geprüft
+  - überspringt die Historienprüfung ohne neue Commits; bei unklarer Remote-Basis folgt ein vollständiger Scan mit angezeigtem Grund
+  - richtet Fortschritt am tatsächlichen Prüfumfang aus
   - unterstuetzt Abbruch
   - meldet Treffer mit Rule, Severity, Datei, Zeile und bereinigtem Kontext
   - nutzt app-eigene Dialoge zum Abbrechen, Fortfahren oder Hinzufuegen betroffener Dateien zur Allowlist
@@ -523,17 +651,28 @@ Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ei
   - low
   - medium
   - high
-- Secret-Scan-Allowlist-Formate:
-  - `path:...`
-  - `regex:...`
-  - freier Text
-  - Kommentarzeilen mit `#`
+- Repository-Secret-Scan-Allowlist: `.Open-Git-Control/secret-scan-allowlist.txt`
+  - **Secret-Scan-Allowlist** aus Repository-Menü, Kontextmenü lokaler Repositories, Command Palette oder Scan-Dialog öffnen
+  - gespeicherte Working-Tree-Regeln gelten sofort für Commit-, Push- und KI-Auto-Commit-Scans; Staging oder Committen ist dafür nicht nötig
+  - **Dateien erlauben und committen** stagt die gesamte aktualisierte Allowlist, prüft den Index erneut und nimmt sie in denselben Commit auf; fehlgeschlagenes Staging stoppt den Commit
+  - Speichern im Editor oder Erlauben während eines Pushs stagt und committet die Datei nicht; normal committen, um die Regeln im Team zu teilen
+  - fehlende Dateien bedeuten keine Ausnahmen; Lesen erstellt keine Datei
+  - Speichern erkennt gleichzeitige Änderungen; Regeländerungen machen bestehende Scan-Freigaben ungültig
+  - **Dateien erlauben** ergänzt repositoryrelative Pfade und prüft vor der Fortsetzung erneut
+  - frühere Einstellungen migrieren nur nachweislich passende `path:`-Regeln für bekannte Repositories; bestehende Repository-Regeln bleiben erhalten
+  - allgemeiner Text, Regex und nicht zuordenbare frühere Regeln werden nicht übernommen; nicht verfügbare bekannte Repositories werden beim Öffnen erneut geprüft
+  - Formate pro Zeile (UTF-8, maximal 256 KiB): `path:...`, `regex:...`, freier Text oder Kommentar mit `#`
 - Hosting-Zugangsdaten, KI-Schlüssel und persistente Planning-API-Token werden OS-verschluesselt ueber Electron `safeStorage` gespeichert, wenn verfuegbar.
 - Wenn OS-Verschluesselung nicht verfuegbar ist, werden Secrets nicht persistent gespeichert.
 
 ### Settings, Updates und Job Center
 
-- General Settings:
+- Fünf Kategorien mit gemeinsamer kompakter Gestaltung: **Allgemein**, **Konten & Server**, **KI & API**, **Sicherheit** und **App & Diagnose**.
+- **Einstellungen suchen** findet Gruppen über alle Kategorien hinweg und öffnet den passenden Abschnitt. Das Löschen der Suche erhält ausstehende Feldentwürfe.
+- Nur der Inhalt scrollt; Überschrift und Suche bleiben sichtbar. Schmale Fenster bieten zusätzlich eine Kategorieauswahl.
+- API-Referenzen, Anfragebeispiele und Update-Release-Notes werden bei Bedarf aufgeklappt.
+- Deaktivierte Aktionen erklären die fehlende Voraussetzung und verlinken deren Einrichtung, beispielsweise die OAuth Client ID einer Verbindung. Git-Fehler ergänzen eine kurze Erklärung und passende Aktion (Anmelden, Git installieren, Verbindung erneut prüfen oder Konflikt öffnen); technische Ausgabe bleibt aufklappbar.
+- Allgemein:
   - Theme
   - Sprache
   - Default Branch
@@ -541,6 +680,7 @@ Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ei
   - Secondary History
   - Commit Signoff Default
   - Commit Template
+  - Repository-/globale Git-Commit-Identität
   - Auto-Fetch Intervall
 - Themes:
   - Copper Night
@@ -554,9 +694,9 @@ Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ei
   - Mono Light Red
   - Mono Dark Green
   - Mono Light Green
-- Integrations Settings:
+- Konten & Server:
   - Hosting-Konten, Server-/API-URLs, Token und OAuth-Konfiguration je Verbindung
-- KI & MCP Settings:
+- KI & API:
   - KI Provider
   - KI Modell
   - KI Message Style/Language
@@ -568,13 +708,14 @@ Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ei
   - Token generieren und loeschen
   - Beispiel-cURL-Befehle
   - Beispiel-MCP-Server-Config
-- Security Settings:
+- Sicherheit:
   - Bestaetigungen fuer gefaehrliche Operationen
   - Secret-Scan vor Commit
   - Secret-Scan vor Push
   - Strictness
-  - Allowlist
-- System Settings:
+  - Repository-Allowlists auf der Unterseite **Secret-Scan-Allowlist** des jeweiligen Repositorys
+- App & Diagnose:
+  - Status und Versionen von erforderlichem Git und optionalem Git LFS/GitHub CLI, erneute Prüfungen, offizielle Downloads und geprüfte Installationsaktionen
   - installierte App-Version
   - Updater-Status
   - verfuegbare Version
@@ -582,6 +723,7 @@ Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ei
   - Background-Update-Toggle
   - One-click Update
   - Release Notes
+  - kopierbarer, bereinigter Diagnosebericht
   - Job Center
 - Run Settings:
   - repository-spezifische `.Open-Git-Control/run.json`-Konfiguration
@@ -600,7 +742,7 @@ Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ei
 
 ### Shortcuts und Produktivitaet
 
-- `Ctrl+1..4`: Haupt-Sidebar-Tabs wechseln
+- `Ctrl/Cmd+1..6`: Local Repositories, Aktuelles Repository, Hosting, Einstellungen, Todos und Statistik & Analyse in dieser Reihenfolge
 - `Ctrl+Shift+F`: Fetch
 - `Ctrl+Shift+P`: Command Palette
 - `Ctrl+Shift+T`: Todo fuer das aktive Repository erstellen
@@ -624,9 +766,23 @@ Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ei
 2. Branch erstellen oder wechseln.
 3. Geaenderte Dateien im Working Directory pruefen.
 4. Diffs oeffnen, Dateien oder Hunks stagen und bei Bedarf stashen.
-5. Commit mit Titel und Beschreibung erstellen.
+5. Commit mit Titel und Beschreibung erstellen. Bei fehlendem Namen oder E-Mail die Git-Identität im Dialog für dieses Repository oder global einrichten.
 6. Den aktuellen Branch mit Push direkt auf die einzelnen oder gespeicherten Ziele veröffentlichen. Bei mehreren Remotes die Ziele beim ersten Aufruf wählen. Tags über die separate Tag-Aktion veröffentlichen; Force und Secret-Treffer weiterhin bestätigen. Upstream bei Bedarf separat setzen.
 7. Ergebnisse je Ziel prüfen; erfolglose Ziele mit dem geprüften Stand erneut versuchen.
+
+### Bestehendes lokales Repository veröffentlichen
+
+1. **Repository veröffentlichen** für das aktive lokale Repository öffnen und verbundenes Hosting-Konto sowie Erstellungsziel auswählen.
+2. Privaten Repository-Namen, neues Remote, Hauptbranch und zusätzliche Branches/Tags prüfen. Arbeitsänderungen vorher in Staging committen, wenn sie hochgeladen werden sollen.
+3. **Erstellen und veröffentlichen** wählen, mögliche Secret-Funde prüfen und dem Fortschritt je Schritt folgen.
+4. Den Repository-Link öffnen. Bei fehlgeschlagenem Upload oder Abschluss den ausstehenden Schritt am selben erstellten Repository fortsetzen.
+
+### Repository-Statistiken erkunden
+
+1. Lokales Repository aktivieren und **Statistik & Analyse** in der seitlichen Menüleiste öffnen.
+2. Historien-/Zeitraum-/Personen-/Pfadfilter in der Seitenleiste verwenden und den versionierten Projektstand separat wählen.
+3. Hotspots oder Dateikopplungsnetz erkunden, eine Datei zur Analyse anklicken oder zwei Tags über die Release-Dropdowns vergleichen.
+4. Timeline zur Wiedergabe des versionierten Dateibaums öffnen. Beim erneuten Öffnen verwendet Analytics den gespeicherten Bericht.
 
 ### Konflikte loesen
 
@@ -647,12 +803,13 @@ Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ei
 
 ### Release Flow
 
-1. Hosting-Endpunkt des Repositorys unter Remote-Konfiguration auswählen, dann Release in der Topbar oder Hosting-Repository-Ansicht öffnen.
-2. Zielbranch, Tag oder Commit eintragen und den ausgewählten Endpunkt prüfen.
-3. Fehlt der lokale Stand auf dem Server, zuerst den geprüften Push-Workflow verwenden und den Endpunkt erneut prüfen.
-4. Versionstag wählen oder vorschlagen lassen; Release-Name und Markdown-Notes anpassen, optional mit KI erzeugen.
-5. Geprüften Remote-Stand veröffentlichen. Draft, Prerelease und Release-Dateien erscheinen nur bei Unterstützung.
-6. Auf Bitbucket Cloud Tags und Downloads getrennt verwalten; auf Data Center Tags und kopierte/exportierte lokale Notes verwenden.
+1. **Release** in der Repository-Topbar oder **Release erstellen** in Hosting öffnen. Hosting aktiviert zuerst einen ausgewählten lokalen Klon; ohne Klon werden Klonen/Öffnen angeboten.
+2. Der Creator verwendet das konfigurierte Veröffentlichungsziel oder lässt zwischen mehreren Endpunkten wählen. Fehlende Konten oder Zuordnungen bieten Konfigurationslinks.
+3. Ausgangspunkt sind aktueller Branch und Patch-Vorschlag. Version, Zielbranch/Tag/Commit, optionale Notes-Ausgangsrevision, Markdown-Notes und KI-Optionen anpassen; Dateien vor dem Veröffentlichen auswählen.
+4. **Release erstellen** prüft den Endpunkt. Bei fehlenden Commits **Push und Release erstellen**, **Ohne Push erstellen** (soweit verfügbar) oder Abbrechen wählen. Der bestätigte Push überträgt ausschließlich den erfassten Release-Branch an diesen Endpunkt, auch wenn ein anderer Branch ausgecheckt ist. Backup-Ziele und Upstream bleiben erhalten; vor dem Release wird erneut geprüft.
+5. Draft, Prerelease und Dateianhänge erscheinen nur bei Unterstützung. Nach Upload-Fehlern bleiben hochgeladene und ausstehende Dateien sichtbar; Wiederholung sendet nur ausstehende Dateien.
+6. Der Abschluss erstellt das lokale Tag am geprüften veröffentlichten Commit, aktualisiert die Release-Historie und öffnet einen frischen Entwurf mit nächster Patch-Version. Notes, ausgewählte Dateien und Veröffentlichungsflags werden zurückgesetzt; Notes-Voreinstellungen bleiben. Bestehende lokale Tags bleiben erhalten. Eine gescheiterte lokale Tag-Einrichtung kann nach Beheben der Sperre/des Konflikts wiederholt werden, ohne den Release erneut zu veröffentlichen.
+7. Auf Bitbucket Cloud Tags und separate Downloads verwenden; auf Data Center Tags sowie kopierte/gespeicherte lokale Notes. Alle Anbieter teilen Creator und KI-Optionen.
 
 ### Recovery Flow
 
@@ -664,7 +821,7 @@ Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ei
 ### Agenten-Planning-Workflow
 
 1. Open-Git-Control starten.
-2. Settings -> KI & MCP oeffnen und MCP-URL plus Token kopieren.
+2. Einstellungen → KI & API öffnen, **URLs und Zugriff** aufklappen und MCP-URL plus Token kopieren.
 3. Externen Agenten mit MCP-URL oder REST-Endpunkten konfigurieren.
 4. Agent nach `get_next_todos` oder `GET /api/agent/next` fragen.
 5. Agent Planungseintraege erstellen oder verschieben lassen.
@@ -706,14 +863,14 @@ Beispiel-MCP-Server-Config:
 
 ## Git installieren
 
-Git muss installiert und im `PATH` verfuegbar sein.
+Startdialog und **Einstellungen → App & Diagnose → Werkzeuge** bieten offizielle Downloads und, soweit unterstützt, Installation über einen vorhandenen Paketmanager. Nach der Installation **Erneut prüfen** wählen; Git-abhängige Arbeit wird bei nutzbarem Werkzeug fortgesetzt. Die manuellen Möglichkeiten unten bleiben verfügbar. Siehe [Werkzeugerkennung und Installation](Docs/SYSTEM_TOOLS.md).
 
 ### Windows
 
 1. Git von [git-scm.com/downloads](https://git-scm.com/downloads) herunterladen.
 2. Windows Installer ausfuehren.
 3. "Git from the command line" aktiviert lassen.
-4. Terminal oder PC neu starten, falls `git` nicht sofort gefunden wird.
+4. In der App **Erneut prüfen** wählen. Die App nur neu starten, wenn die Installation weiterhin nicht erkannt wird.
 
 ### macOS
 
@@ -753,6 +910,11 @@ sudo pacman -S git
 
 ```bash
 git --version
+```
+
+Name und E-Mail unter **Einstellungen → Allgemein → Git-Commit-Identität** mit Repository- oder globalem Geltungsbereich setzen. Die entsprechenden globalen Git-Befehle sind:
+
+```bash
 git config --global user.name "Dein Name"
 git config --global user.email "dein@email.de"
 ```
@@ -782,6 +944,10 @@ Das **Run**-Menue in der Topbar startet repository-spezifische **Run**-, **Test*
 ```
 
 Unter **Einstellungen -> Run** lassen sich die fuenf festen Aktionen bearbeiten, erkannte Vorlagen uebernehmen und geordnete Workflows konfigurieren. Vorlagen decken npm, pnpm, Yarn, Bun, Python, Rust, Go, .NET, Maven, Gradle, Flutter und CMake ab. Jeder Schritt kann PowerShell oder CMD unter Windows, zsh unter macOS und bash unter Linux verwenden.
+
+Dateiverweise in Konsole, aufgeklappten technischen Details und **Probleme** öffnen die aktuelle Arbeitsdatei im App-Editor an der gemeldeten Zeile und Spalte. Relative Pfade werden vom Run-Arbeitsverzeichnis aus aufgelöst; absolute Pfade und lokale Datei-URLs müssen zum selben Repository gehören. Der Run läuft beim Öffnen weiter; der vorhandene Schutz ungespeicherter Editoränderungen greift.
+
+Die **Run-Konsole** zeigt standardmäßig ein strukturiertes Protokoll: Terminal-Farb-/Cursorsteuerung und OSC-Sequenzen werden entfernt, wiederholte Warnungen sowie Watcher-/Fortschrittsmeldungen gruppiert. Stacktraces und Folgefehler von Paketmanagern bleiben als Details aufklappbar. Der Inhalt bestimmt die Schwere, normale stderr-Informationen werden deshalb nicht als Fehler dargestellt. **Klartext** und **Ausgabe kopieren** erhalten das vollständige bereinigte Protokoll innerhalb der bestehenden 4.000-Zeilen-/2-MiB-Grenzen. Filter, Zeilenumbruch und automatisches Folgen bleiben verfügbar; Hochscrollen pausiert das Folgen. Bekannte npm-/pnpm-, Node.js-, Vite- und Cargo-Probleme werden auch ohne eigenen Parser erkannt. Portkonflikte, nicht unterstützte Node.js-Versionen, fehlende Befehle und Dependencies bieten nächste Schritte. PowerShell nutzt explizit UTF-8-Ausgabe; Projektbefehle werden nicht automatisch geändert oder neu gestartet.
 
 Es laeuft immer nur ein Workflow gleichzeitig. Er kann im Hintergrund weiterlaufen, ueber das Run-Menue erneut geoeffnet und in der App gestoppt werden. Die Konsole behaelt einen begrenzten Roh-Ausgabepuffer, einen ausgewerteten Probleme-Tab, eine Zusammenfassung sowie Kopieraktionen fuer Ausgabe und Probleme. Ein ungelesenes erfolgreiches Ergebnis faerbt den Run-Button gruen; ein ungelesenes fehlgeschlagenes Ergebnis rot, bis es geoeffnet wird.
 
@@ -869,7 +1035,9 @@ Erwartete Release Assets:
 - Git-Befehle laufen gegen das ausgewaehlte lokale Repository.
 - Repository-Workspace-State wird im Electron-User-Data-Verzeichnis gespeichert.
 - Settings werden lokal gespeichert.
-- Planning-Projekte und Planning-Items werden lokal gespeichert.
+- Repository-Planung, Run-Konfiguration und Secret-Scan-Allowlists liegen in `.Open-Git-Control/planning.json`, `run.json` und `secret-scan-allowlist.txt`; durch Committen lassen sie sich im Team teilen. Zukünftige Planungsprojekte bleiben in den App-Daten.
+- Analytics-Caches liegen ausschließlich in App-Daten und speichern Metadaten, Zahlen und Aggregate statt vollständiger Datei-/Patch-Inhalte. Die Analyse führt keinen Checkout durch und ändert den Index nicht.
+- Wiederaufnahmedaten der Repository-Veröffentlichung werden lokal ohne Zugangsdaten gespeichert.
 - Die Planning API bindet an `127.0.0.1`.
 - Token-geschuetzte Planning-API-Endpunkte sind fuer lokale Prozesse auf derselben Maschine gedacht.
 - Hosting-Zugangsdaten, KI-Schlüssel und persistente Planning-API-Token werden mit OS-gestuetzter Verschluesselung ueber Electron `safeStorage` gespeichert, wenn verfuegbar.
@@ -880,9 +1048,19 @@ Erwartete Release Assets:
 
 ### `git` nicht gefunden
 
-- Git installieren.
-- Terminal oder PC neu starten.
-- Mit `git --version` pruefen.
+- Warnsymbol oder **Einstellungen → App & Diagnose → Werkzeuge** öffnen. Fehlgeschlagene Prüfung ansehen, Git installieren oder offiziellen Download verwenden, dann **Erneut prüfen** wählen.
+- Gespeicherte Repositories bleiben erhalten; nach erfolgreicher Prüfung wird die Wiederherstellung fortgesetzt. Die App nur neu starten, wenn die Installation durch erneute Prüfung nicht erkannt wird.
+- Dieselbe Werkzeugseite verwaltet optionales LFS und GitHub CLI; `git --version` hilft bei manueller Prüfung.
+
+### Commit-Name oder E-Mail fehlt
+
+- Die **Git-Commit-Identität** im angebotenen Dialog einrichten oder **Einstellungen → Allgemein → Git-Commit-Identität** öffnen. Repository- oder globalen Geltungsbereich wählen und wirksame Werte prüfen.
+- Hosting-Anmeldedaten ersetzen die Git-Autor-/Committer-Identität nicht.
+
+### Repository wurde verschoben
+
+- Beim nicht verfügbaren Repository **Neuen Speicherort auswählen** und den neuen Ordner wählen; **Erneut prüfen** nutzen, wenn der bisherige Speicherort wieder verfügbar ist.
+- Neu zuordnen erhält Einstellungen und Planungszuordnung; Entfernen ist nicht erforderlich.
 
 ### GitHub-CLI-Anmeldung lässt sich nicht importieren
 
@@ -907,6 +1085,7 @@ Erwartete Release Assets:
 - Gemeldete Datei und Zeile pruefen.
 - Secret entfernen oder rotieren, falls es versehentlich committed wurde.
 - Die Allowlist-Aktion im Dialog nur fuer beabsichtigte Test- oder Beispielwerte verwenden; sie erlaubt den betroffenen Dateipfad bei künftigen Scans.
+- Ausnahmen liegen in `.Open-Git-Control/secret-scan-allowlist.txt` des aktuellen Repositorys. Die Datei committen, um sie zu teilen. Bei externen Änderungen den Editor neu laden, erhaltenen Entwurf prüfen und erneut speichern.
 - Allowlist nur eng fuer absichtliche Dummy-/Beispielwerte setzen.
 
 ### Auto-Update nicht verfuegbar
@@ -917,14 +1096,14 @@ Erwartete Release Assets:
 ### Planning API laeuft nicht auf Port `2990`
 
 - Eventuell nutzt ein anderer lokaler Prozess den Port.
-- In Settings -> KI & MCP steht der tatsaechliche Port.
+- In Einstellungen → KI & API steht der tatsächliche Port.
 - `OPEN_GIT_CONTROL_API_PORT=<PORT>` vor dem App-Start setzen, wenn ein anderer bevorzugter Port gewuenscht ist.
 
 ### KI-Funktionen reagieren nicht
 
 - Fuer Ollama Server-URL und Modellnamen pruefen.
 - Fuer Gemini gueltigen API Key speichern und passendes Modell auswaehlen.
-- "Test connection" und "Load models" in Settings -> Integrations nutzen.
+- "Test connection" und "Load models" unter Einstellungen → KI & API nutzen.
 
 ## Beitraege und Support
 

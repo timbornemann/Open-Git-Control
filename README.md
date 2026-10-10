@@ -4,13 +4,13 @@
 [![Latest release](https://img.shields.io/github/v/release/timbornemann/Open-Git-Control?sort=semver)](https://github.com/timbornemann/Open-Git-Control/releases/latest)
 [![License](https://img.shields.io/github/license/timbornemann/Open-Git-Control)](LICENSE)
 
-Open-Git-Control is a free, open-source desktop Git client for Windows, macOS, and Linux. It combines a visual commit graph, staging, a working-directory file browser and editor, diff inspection, conflict resolution, hosting-provider pull/merge requests, releases, project planning, secret scanning, recovery tools, repository run workflows, and optional AI assistance in one local-first application.
+Open-Git-Control is a free, open-source desktop Git client for Windows, macOS, and Linux. It combines a visual commit graph, staging, a working-directory file browser and editor, diff inspection, conflict resolution, offline repository analytics, hosting-provider pull/merge requests, guided repository publishing, releases, project planning, secret scanning, recovery tools, repository run workflows, and optional AI assistance in one local-first application.
 
 Language: **English** | Deutsche Version: [README.de.md](README.de.md)
 
-Git is required; Git LFS and GitHub CLI are optional. The app checks these tools and offers official downloads or installation through an existing package manager under **Settings → App & diagnostics → System tools**. See [tool setup](docs/SYSTEM_TOOLS.md).
+Git is required; Git LFS and GitHub CLI are optional. The app checks these tools and offers official downloads or installation through an existing package manager under **Settings → App & diagnostics → System tools**. See [tool setup](Docs/SYSTEM_TOOLS.md).
 
-![Open-Git-Control application overview](Docs/App%20Overview.png)
+![Atlas workspace in the current repository view: commit graph, branches, file statistics and staging](Docs/screenshots/repository.jpg)
 
 ## Why Open-Git-Control?
 
@@ -20,13 +20,16 @@ Use Open-Git-Control when you want more than a minimal Git GUI, but still want a
 - Git operations run locally against your repositories
 - Visual commit graph with branch, tag, merge, reset, rebase, cherry-pick, revert, and recovery actions
 - Staging, stash, hunk-based diffs, file history, blame, and conflict resolution in one workflow
+- Offline repository analytics: activity, language distribution, change hotspots, code churn, file-coupling networks, release comparisons and timeline playback
 - GitHub, Forgejo, GitLab, Bitbucket Cloud and Data Center accounts, repository catalogs, cloning/forking, PRs/MRs, CI and provider-specific publishing
+- Guided **Publish repository** flow to create a hosting repository, connect it and upload selected branches and tags
 - Independent pull sources, hosting targets, and saved multi-endpoint push profiles with per-target results
 - Project planning board with local REST and MCP-style API for agent-assisted work
 - Working-directory tree with safe in-app file previews and editing, plus native file-system actions when needed
-- Per-repository Run workflows for test, format, start, and build commands with a live console
+- Per-repository Run workflows with structured console output, detected problems and clickable file references that open the in-app editor
 - Optional AI support through Ollama, Google Gemini, or OpenAI for commit messages, auto-commits, release notes, and planner hand-offs
-- Secret scanning before commits and pushes, allowlists, safe prompts for dangerous operations, and local encrypted token storage when available
+- Secret scanning before commits and pushes, versioned repository allowlists, safe prompts for dangerous operations, and local encrypted token storage when available
+- Guided Git installation, commit identity setup and recovery of moved repositories
 
 ## Downloads
 
@@ -50,40 +53,96 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 
 ## Requirements
 
-- Git must be installed and available in your `PATH`.
+- Git must be installed and executable. The app checks the process `PATH` and common installation locations; missing Git opens a setup dialog and leaves a sidebar warning until a successful recheck.
+- Git LFS is optional, but required for LFS content and transfers. Git for Windows normally includes it; availability is still checked separately.
 - GitHub CLI (`gh`) is optional and only required to import an existing GitHub CLI login.
 - Ollama, a Gemini API key, or an OpenAI API key is optional and only required for AI features.
-- Development from source requires Node.js and npm. CI currently uses Node.js 20.
+- Development from source requires Node.js and npm. CI currently uses Node.js 22.
 
 ## Screenshots
 
-### Repository cockpit and commit graph
+These are fresh browser captures of the actual app UI, using fictional Atlas projects, accounts and team activity in the **Copper Night** theme. They show the current source checkout; some features may be newer than the packaged release linked above.
 
-![Repository cockpit and commit graph](Docs/App%20Overview.png)
+The current repository and staging view is shown above. These main areas cover the rest of the app's everyday workflow.
 
-### Diff viewer with hunk actions, blame, and file inspector
+### Local repository workspace
 
-![Diff viewer](Docs/View%20diff.png)
+Find saved projects, pin favorites, see the active repository and open or clone a project from one place.
 
-### Conflict resolver
+![Local Repositories with saved Atlas projects, a pinned active repository and open/clone actions](Docs/screenshots/local-repositories.jpg)
 
-![Conflict resolver](Docs/Conflict%20Resolver.png)
+### Hosting across providers
 
-### Codebase timeline
+Browse repositories across accounts and servers, identify local clones, and reach repository creation or publication directly from the catalog.
 
-![Codebase timeline](Docs/Timeline.png)
+![Hosting catalog with GitHub repositories, a private Forgejo mirror and matching local clones](Docs/screenshots/hosting-catalog.jpg)
 
-### Project planning board
+### Offline statistics and change hotspots
 
-![Project planning board](Docs/Project%20Planning.png)
+Activity, language distribution and a directory-based hotspot map share one compact overview. Filters live in the analytics sidebar.
 
-### Release creator
+![Statistics overview with weekly activity, language shares and a hotspot treemap](Docs/screenshots/analytics-overview.jpg)
 
-![Release creator](Docs/Release.png)
+### Planning that travels with the repository
 
-### Settings
+Turn ideas, bugs and implementation work into a shared board backed by `.Open-Git-Control/planning.json`.
 
-![Settings](Docs/Settings.png)
+![Atlas project planning board with priorities, descriptions and status columns](Docs/screenshots/planning.jpg)
+
+### General settings
+
+Search settings across categories and configure appearance, Git workflow, commit identity, accounts, AI, security and diagnostics.
+
+![General settings with category navigation, search, appearance and Git commit defaults](Docs/screenshots/settings-general.jpg)
+
+<details>
+<summary>More views: coupling, Run, churn, releases, timeline, hosting accounts, publishing and setup</summary>
+
+### A connected view of file coupling
+
+Explore files that change together, highlight a file's partners and inspect the strength of each connection. Zoom, pan and fit the entire network without paging through results.
+
+![File-coupling network with a selected file and highlighted connections](Docs/screenshots/file-coupling.jpg)
+
+### Run output with useful diagnostics
+
+Read test and build output as a structured transcript, inspect Problems and open referenced files directly in the working-directory editor.
+
+![Run console with grouped test output, an actionable failure and clickable source locations](Docs/screenshots/run-console.jpg)
+
+### Code churn over time
+
+![Code-churn metrics and a labeled chart of additions and deletions over time](Docs/screenshots/code-churn.jpg)
+
+### Statistical release comparisons
+
+![Comparison of two selected tags with commit, contributor and net-change statistics](Docs/screenshots/release-comparison.jpg)
+
+### Timeline playback
+
+![Canvas timeline showing the project file tree and playback controls](Docs/screenshots/timeline.jpg)
+
+### Hosting and pull requests
+
+![Hosting view with fictional Atlas pull requests and connected provider accounts](Docs/screenshots/hosting.jpg)
+
+### Hosting accounts and servers
+
+![Hosting account management with separate GitHub and Forgejo connections and their server addresses](Docs/screenshots/hosting-accounts.jpg)
+
+### Publish to a new hosting repository
+
+![Publish repository wizard with remote, authentication and branch selections](Docs/screenshots/publish.jpg)
+
+### Independent transfer settings
+
+![Remote configuration explaining fetch, pull strategy and push destinations](Docs/screenshots/remotes.jpg)
+
+### Required and optional system tools
+
+![Settings showing Git, optional Git LFS and optional GitHub CLI with versions and setup actions](Docs/screenshots/settings-tools.jpg)
+
+</details>
 
 ## Table of Contents
 
@@ -92,6 +151,10 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 - [Requirements](#requirements)
 - [Screenshots](#screenshots)
 - [Feature Reference](#feature-reference)
+  - [Statistics & analytics](#statistics--analytics)
+  - [Git tools and commit identity](#git-tools-and-commit-identity)
+  - [Remote configuration and pull strategy](#remote-configuration-and-pull-strategy)
+  - [Guided repository publication](#guided-repository-publication)
 - [Typical Workflows](#typical-workflows)
 - [Local Planning API and MCP](#local-planning-api-and-mcp)
 - [Install Git](#install-git)
@@ -114,12 +177,21 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 - Search and sort local repositories by last opened date, name, creation date, ascending, or descending order.
 - Recognize repositories by locally discovered icons and logos in the sidebar and repository list. Right-click a repository and choose **Repository logo** to select another image, use initials, or search again. Small thumbnails and preferences are cached locally across restarts; original images and repository configuration stay unchanged.
 - Pin repositories, close repositories, and switch between known repositories quickly.
-- Detect unavailable repositories and handle missing repository paths gracefully.
+- Recover unavailable repositories with **Select new location** or **Recheck**, preserving repository settings, planning data and the active selection when a project moves.
 - Reveal a repository folder directly from Local Repositories or the active repository header.
 - Detect an existing `LICENSE`/`LICENCE` file and add or replace a license from bundled, auditable SPDX/Choose a License templates. Required copyright, program-name, program-description, and Apache/GNU notice fields are collected before writing.
 - Reset stored layout dimensions from settings.
 - Resize the main sidebar and the graph/inspector split.
 - Persist collapsed sidebar panels per repository for remotes, branches, tags, and submodules.
+
+### Git tools and commit identity
+
+- Startup checks distinguish available, missing and non-executable Git, Git LFS and GitHub CLI, with their detected versions. A failed Git check opens a dialog once per app session; optional tools do not trigger a startup warning.
+- Open **Settings → App & diagnostics → System tools** to recheck, visit official downloads or review a supported installation command. Installation starts only after a user action, uses an existing package manager and the operating system's permission/consent flow, and reports success only after another tool check.
+- On Windows, Git for Windows normally supplies LFS. A Git installation rechecks LFS before offering a separate installation; repository-local LFS filters and hooks remain a separate setup step.
+- Missing Git pauses Git-dependent work without removing saved repositories. Rechecks after installation, app focus or a manual request resume repository restoration when Git becomes usable. See [system tools](Docs/SYSTEM_TOOLS.md).
+- Before committing, missing effective Git name or email opens **Git commit identity**. Existing values are retained; choose **this repository** or **global** scope. Hosting sign-in does not set the commit identity.
+- Change name and email later under **Settings → General → Git commit identity**. This configures future commits; existing commits keep their recorded identities. Cancelling setup preserves the commit draft and staged files.
 
 ### Branches, Remotes, Tags, and Submodules
 
@@ -157,18 +229,15 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 
 - Fetch from an explicitly selected remote.
 - Merge selected branch with selectable merge mode.
-- Pull with:
-  - default pull
-  - pull with rebase
-  - no-fast-forward pull
-  - fast-forward-only pull
+- Normal Pull uses the repository's saved strategy: Git default, Rebase, Merge or Fast-forward only.
+- Pull dropdown choices override the strategy for that operation only, including an explicit no-fast-forward merge (`--no-rebase --no-ff`).
 - Push directly to an unambiguous or remembered selection of remotes; choose destinations on first use when several remotes exist.
 - Configure independent Fetch, Pull and Push selection modes on the repository's Remote configuration page.
+- Open **Remote configuration** from either the Pull or Push dropdown.
 - Confirm force-with-lease against each destination's inspected revision.
 - Set upstream explicitly in Remote configuration.
 - Inspect results and retry unsuccessful destinations with the reviewed commit.
 - Run repository-specific Run, Test, Format, Start, and Build workflows.
-- Open the codebase timeline.
 - Open the release creator.
 - Open the staging/commit panel.
 - Access compact "more actions" variants when the window is narrow.
@@ -178,7 +247,8 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 - Visual commit graph with branch and merge topology.
 - Paged commit loading for larger histories.
 - Working tree row above history with staged, unstaged, and untracked counts.
-- Async commit statistics for files, additions, and deletions.
+- Async commit statistics with a compact file count and aligned added/deleted line counts.
+- Hover or focus a row with hidden or truncated information to see its full title, author, hash, timestamp, refs and available statistics, including in narrow windows.
 - Search commits by:
   - all fields
   - subject
@@ -199,14 +269,39 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
   - reset `--mixed`
   - reset `--hard`
   - interactive rebase with editable todo list
+  - edit commit message, with history-rewrite checks when needed
   - merge selected ref into current branch
   - copy commit hash
 - Tag selection jumps to the tagged commit.
 
+### Statistics & analytics
+
+Open the dedicated **Statistics & analytics** activity tab below **Current repository**, or use the repository menu, local repository context menu or Command Palette. It always follows the active local repository. Its own sidebar holds sections and shared filters; switching repositories stays in Local Repositories or Hosting.
+
+| Section            | What it shows                                                                                                                                   |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Overview           | Commits, contributors, branches, tags, committed files and text lines, activity, language/file-type shares and a hotspot preview                |
+| Change hotspots    | A directory-based treemap of frequently changed files; hover for change counts, churn, contributors and recent activity, or open file analysis  |
+| Contributions      | A responsive activity calendar, contributions over time and per-person totals, plus **Last changed lines** from Blame with attribution coverage |
+| Code Churn         | Added and deleted lines over time, their proportions, total churn and net change                                                                |
+| File coupling      | One connected, zoomable network of all matching file pairs, selected partners and connection details, with links to file analysis               |
+| Release comparison | Tag/branch/revision selectors and a statistical comparison of new commits, contributors, net file changes, file types and affected areas        |
+| Timeline           | Playback of the committed file tree with zoom and pan                                                                                           |
+
+History defaults to all available local and remote branches plus HEAD, counting each reachable commit once. Time, person and path filters are stored per repository. The separately labeled **Project tree** defaults to HEAD and determines file, line and Blame statistics; uncommitted files and staging changes are excluded.
+
+The analysis runs offline and caches results in app data. Reopening shows the last report immediately, then incorporates changed refs and new commits without recalculating unchanged commit diffs. Unchanged background fetches stay quiet; refreshes preserve the current view, release selections, and coupling selection/zoom/layout. Background work supports progress and cancellation through the central notifications.
+
+Counts use `.mailmap` identities and the selected tree's `.gitignore` rules. Analytics intentionally applies these ignore rules to tracked and historical paths as well. Binary files, LFS pointers, symlinks and submodules are identified separately and do not create artificial text-line counts. Shallow history, missing objects and incomplete Blame coverage are reported. Hotspots describe change frequency; **Last changed lines** identifies the latest editor of existing lines. Neither is a measurement of code complexity or ownership.
+
+File coupling normally requires three shared commits; commits touching more than 50 considered files are excluded from coupling only. Release comparison separates newly reachable commits (`A..B`) from the net tree difference between the two revisions and flags non-linear comparisons. See [analytics definitions and cache behavior](Docs/REPOSITORY_ANALYTICS.md).
+
 ### Codebase Timeline
 
-- Timeline view reconstructs repository file changes over commit history.
+- Open **Statistics & analytics → Timeline**; the staging inspector is hidden on this page.
+- Reconstructs the first-parent history ending at the selected Project tree, up to the latest 5,000 commits. Analytics filters select playback positions while intervening changes still contribute to the reconstructed tree.
 - Canvas-based file tree visualization.
+- Zoom and pan with cached tree layouts and frame-coalesced input; playback position, collapsed directories and camera survive view changes.
 - Highlights added, modified, deleted, and renamed files.
 - Playback controls:
   - play/pause
@@ -256,12 +351,15 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 - Enable commit signoff by default in settings.
 - Use a configurable commit template.
 - Commit with `Ctrl+Enter` in commit fields.
+- Manual and AI/grouped commits check the effective Git identity and secret policy before proceeding. Grouped commit execution preserves unrelated or partially staged changes through index snapshots.
 
 ### Working Directory and File Viewer
 
 - Switch the right inspector between the Staging Area and a repository-bound Working Directory tree.
 - Browse visible files and folders without exposing `.git` or other dot entries; expanded folders stay open while switching views and load lazily.
 - File and folder context actions: open, rename, cut, copy, paste, delete, reveal in the system file manager, open externally, or choose an application. Copy/cut/paste stays inside the active repository and destructive actions require confirmation.
+- Create files and folders, select multiple entries for batch operations, and add rename prefixes or suffixes.
+- Search repository filenames and text content, review matches, and replace text through the working-directory search.
 - Open files in the main pane instead of the graph:
   - editable syntax-highlighted text with explicit save and `Ctrl/Cmd+S`
   - Markdown editor and preview
@@ -272,6 +370,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 - Working Directory, Staging and commit diffs share one viewer with Text, Diff, Preview, CSV Table, History and Blame. Working Directory starts in Text; changed files and commits start in Diff.
 - **Save working file** writes the working-tree file. **Save staging** edits only the selected Git index entry, preserving partial staging, other staged files and the working file. Commit versions are read-only, including tools and CSV cells.
 - Previews, relative assets and hashes use the selected source. Missing assets are explained rather than loaded from another version.
+- Expand text tools for JSON/JSONC formatting, CSV table editing and copyable content hashes. Read-only commit sources remain read-only in tools and tables.
 - Unsaved drafts survive Text/Table/Preview changes. Switching to Diff, another file/source/repository or closing asks to save, discard or cancel. External changes and busy index locks refuse overwrites while keeping the draft.
 
 ### Diff Viewer and File Inspector
@@ -327,7 +426,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 
 The shared **Hosting** area manages several servers and accounts simultaneously. Native Git works with any compatible remote; adapters add catalogs, repository creation, forks, PRs/MRs, CI and publication for GitHub, Forgejo, GitLab, Bitbucket Cloud and Bitbucket Data Center. Capabilities follow the actual provider API and repository permissions. See [Hosting setup, OAuth, endpoint selection and feature differences](Docs/HOSTING.md).
 
-Select independent fetch and pull sources, push targets, and one hosting target for each local repository in **Remote configuration**. A single remote starts normal transfers directly. With several remotes, choose once and save the selection, or ask every time, independently for Fetch, Pull and Push. Push profiles can publish the same checked commit to a private Forgejo server and a GitHub backup while preserving upstream tracking. Existing multiple push URLs are retained. Partial successes remain visible and retries address unsuccessful destinations.
+The shared [Remote configuration](#remote-configuration-and-pull-strategy) page keeps Git transfer sources, hosting targets and authentication explicit.
 
 If the installed Git cannot isolate individual push URLs, a normal push publishes all URLs of that named remote as a group. Force, targeted retries and different explicit hosting accounts within such a group require separate named remotes or a Git update.
 
@@ -339,6 +438,26 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
 - Create or fork a repository where the provider supports it and connect it with an explicitly named local remote.
 - Bind each actual fetch/push URL to its hosting account. For SSH aliases, enter a repository web URL to resolve the identity while keeping the SSH remote URL.
 - Choose the bound hosting account or existing system/SSH credentials separately for Git authentication at each endpoint.
+
+### Remote configuration and pull strategy
+
+- Open **Remote configuration** from the repository sidebar, action menu or the bottom of the Pull/Push dropdowns. The guided Transfers page explains download, integration and upload separately, with a preview of the next transfer before saving.
+- Choose independent Fetch and Pull sources, one hosting target and one or more Push destinations. Use a single/remembered selection directly or ask every time, separately for each action. Connections & accounts manages endpoint URLs and account bindings.
+- Save **Git default**, **Rebase**, **Merge** or **Fast-forward only** as the repository's Pull strategy. Git default shows the effective Git configuration and remains the default for existing repositories. All normal Pull entry points use this preference; explicit dropdown modes apply once.
+- Failed Pull retries retain their original source, branch and strategy. Push profiles can send the same reviewed commit to a primary server and backup while retaining existing upstream tracking and multiple push URLs. Per-target results distinguish success from failure; retry addresses unsuccessful destinations.
+- Advanced branch mappings, push profiles and upstream settings stay available without requiring them for a normal transfer. Saving configuration does not start a transfer.
+
+### Guided repository publication
+
+**Publish repository** is shared by the local sidebar, repository/action/context menus, Remote configuration, Hosting and Command Palette. The full-width page keeps the local sidebar and protects unsaved editor changes.
+
+1. **Hosting target:** select provider, server, account and personal/organization/namespace/workspace/project target. The local folder suggests the name; visibility defaults to private.
+2. **Connection & content:** choose an unused remote name, HTTPS with the selected app account or SSH/system credentials, and the main branch. Additional branches and tags are opt-in. Existing remotes and tracking remain configured unless **Use as new primary target** is explicitly selected.
+3. **Publish:** review the captured commit state and choose **Create and publish**. The app creates an empty hosting repository, connects the new remote, and uploads through the shared secret-scan/LFS/credential workflow. After a verified upload it completes default-branch and requested tracking setup.
+
+GitHub and Forgejo support personal or organization targets; GitLab supports namespaces and groups/subgroups; Bitbucket Cloud requires a workspace and selected project, while Data Center uses an existing project. Availability follows provider permissions. An existing repository with the same name is not silently adopted.
+
+Uncommitted files are shown but not committed automatically. Without a commit, **Create and connect** remains available, followed by Staging and continuation after the first commit. Detached HEAD requires choosing or creating a branch. Session drafts are separated by repository and account; completed setup steps are saved locally without credentials, so a failed upload or final setup can resume at the created repository without creating it twice. See [publication and recovery](Docs/REPOSITORY_PUBLICATION.md).
 
 ### Pull Requests, CI, and Workflows
 
@@ -353,6 +472,7 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
 
 - Shared full-width release creator from the repository topbar, action menu and command palette, or **Create release** in Hosting. The local sidebar stays visible; the creator includes its own commit history.
 - Session-only drafts are separated by local repository and complete hosting identity. Opening or leaving the creator does not publish anything.
+- Edit Markdown notes with a preview; failed upload or final local-tag setup can be retried without publishing the release again.
 - Reads release context from the explicitly selected endpoint:
   - repository URL
   - existing tags
@@ -412,7 +532,7 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
 - Copy an agent-ready implementation prompt for one item or every currently visible item in a status column. Column prompts keep the visible order sorted by priority.
 - Generate an AI commit message from one item or a visible status column. The result is saved as the repository commit draft and opens the staging view.
 
-### Local Planning API and MCP
+### Local Planning API and MCP capabilities
 
 - Local HTTP server bound to `127.0.0.1`.
 - Preferred port: `2990`; if occupied, the app uses the next available local port.
@@ -518,8 +638,11 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
 - External link policy opens allowed URLs through the main process.
 - Diff preview policy normalizes safe diff commands.
 - Secret scan before commit and push:
-  - scans staged diffs locally before a commit and scans the push range again before push
-  - can include tags
+  - scans staged diffs locally before a commit
+  - freshly checks each selected push endpoint and scans only commits missing from that destination, including every intermediate commit where a secret may have been added and later removed
+  - handles multiple endpoints, selected branches/tags and force-push plans, checking shared commits only once within a scan
+  - skips history scanning when no commits are new; if the remote base is unclear, falls back to a full scan and explains why
+  - reports progress against the actual scan scope
   - supports cancellation
   - reports findings with rule, severity, file, line, and sanitized context
   - uses app-native dialogs to cancel, continue, or add affected files to the allowlist
@@ -538,11 +661,7 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
   - **Allowlist files** appends repository-relative paths and runs a new scan before continuing
   - legacy settings migrate only provably matching `path:` rules to already known repositories; existing repository policies remain untouched
   - general text, regex and unassignable legacy rules are omitted; unavailable known repositories are retried when opened
-  - rule formats (one per line, UTF-8, maximum 256 KiB):
-  - `path:...`
-  - `regex:...`
-  - plain text
-  - comment lines with `#`
+  - rule formats (one per line, UTF-8, maximum 256 KiB): `path:...`, `regex:...`, plain text, or comment lines with `#`
 - Hosting credentials, AI keys and persistent Planning API tokens are stored OS-encrypted through Electron `safeStorage` when available.
 - If OS encryption is unavailable, secrets are not stored persistently.
 
@@ -552,6 +671,7 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
 - **Search settings** finds groups across all categories and opens the matching section. Clearing a search preserves pending field drafts.
 - Only the settings content scrolls; the heading and search remain visible. Narrow windows also provide a category selector.
 - API references, request examples, and update release notes expand on demand.
+- Disabled actions explain the missing prerequisite and link to its setup, such as a connection's OAuth Client ID. Git errors add a short explanation and a relevant action (sign in, install Git, recheck connection or open conflicts), while technical output remains expandable.
 - General settings:
   - theme
   - language
@@ -560,6 +680,7 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
   - secondary history
   - commit signoff default
   - commit template
+  - repository/global Git commit identity
   - auto-fetch interval
 - Themes:
   - Copper Night
@@ -594,6 +715,7 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
   - strictness
   - repository allowlists are configured on the repository's **Secret-scan allowlist** subpage
 - App & diagnostics:
+  - required Git and optional Git LFS/GitHub CLI status, versions, rechecks, official downloads and reviewed installation actions
   - installed app version
   - updater status
   - available version
@@ -620,7 +742,7 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
 
 ### Shortcuts and Productivity
 
-- `Ctrl+1..4`: switch main sidebar tabs
+- `Ctrl/Cmd+1..6`: Local Repositories, Current repository, Hosting, Settings, Todos and Statistics & analytics, respectively
 - `Ctrl+Shift+F`: fetch
 - `Ctrl+Shift+P`: command palette
 - `Ctrl+Shift+T`: create a todo for the active repository
@@ -644,9 +766,23 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
 2. Create or switch a branch.
 3. Review changed files in the working directory.
 4. Open diffs, stage files or hunks, and optionally stash work.
-5. Create a commit with title and description.
+5. Create a commit with title and description. If name or email is missing, configure the Git identity for this repository or globally in the dialog.
 6. Use Push to publish the current branch directly to the single or remembered destination selection. Choose targets on first use with several remotes. Use the separate tag action to publish tags; Force and secret findings still require approval. Set upstream separately if needed.
 7. Inspect each destination's result; retry unsuccessful targets against the reviewed revision.
+
+### Publish an existing local repository
+
+1. Open **Publish repository** for the active local repository and select the connected hosting account and creation target.
+2. Review the private repository name, new remote, main branch and any additional branches/tags. Commit working changes in Staging first if they belong in the upload.
+3. Choose **Create and publish**, review secret findings if any, and follow the per-step progress.
+4. Open the resulting repository link. If upload or final setup fails, resume the pending step on the same created repository.
+
+### Explore repository statistics
+
+1. Activate a local repository, then open **Statistics & analytics** in the activity bar.
+2. Use the sidebar's history/time/person/path filters and choose the committed Project tree separately.
+3. Explore hotspots or the coupling network, click a file for analysis, or compare two tags from the release dropdowns.
+4. Open Timeline to replay the committed file tree. Reopening analytics reuses the cached report.
 
 ### Resolve conflicts
 
@@ -727,14 +863,14 @@ Example MCP server config:
 
 ## Install Git
 
-Git must be installed and available in your `PATH`.
+The startup dialog and **Settings → App & diagnostics → System tools** provide official downloads and, where supported, installation through an existing package manager. Choose **Recheck** after installing; Git-dependent work resumes when the tool is usable. The manual options below remain available. See [tool detection and installation](Docs/SYSTEM_TOOLS.md).
 
 ### Windows
 
 1. Download Git from [git-scm.com/downloads](https://git-scm.com/downloads).
 2. Run the Windows installer.
 3. Keep "Git from the command line" enabled.
-4. Restart your terminal or computer if `git` is not found immediately.
+4. Use **Recheck** in the app. Restart the app only if the new installation still cannot be detected.
 
 ### macOS
 
@@ -774,6 +910,11 @@ sudo pacman -S git
 
 ```bash
 git --version
+```
+
+Set your name and email through **Settings → General → Git commit identity**, selecting repository or global scope. The equivalent global Git commands are:
+
+```bash
 git config --global user.name "Your Name"
 git config --global user.email "your@email.com"
 ```
@@ -894,7 +1035,9 @@ Expected release assets:
 - Git commands operate on the selected local repository.
 - Repository workspace state is stored in the Electron user-data directory.
 - Settings are stored locally.
-- Planning projects and planning items are stored locally.
+- Repository planning, run configuration and secret-scan allowlists live in `.Open-Git-Control/planning.json`, `run.json` and `secret-scan-allowlist.txt`; commit them to share them with your team. Future planning projects remain in app data.
+- Analytics caches live exclusively in app data, storing metadata, counts and aggregates rather than full file/patch contents. Analysis does not check out files or change the index.
+- Repository publication recovery records are stored locally without credentials.
 - The Planning API binds to `127.0.0.1`.
 - Planning API token-protected endpoints are intended for local processes on the same machine.
 - Hosting credentials, AI keys and persistent Planning API tokens are stored with OS-backed encryption through Electron `safeStorage` when available.
@@ -905,9 +1048,19 @@ Expected release assets:
 
 ### `git` not found
 
-- Install Git.
-- Restart your terminal or computer.
-- Verify with `git --version`.
+- Open the sidebar warning or **Settings → App & diagnostics → System tools**. Review the failed check, install Git or use the official download, then select **Recheck**.
+- Saved repositories stay available and restoration resumes after a successful check. Restart the app only when the installation cannot be picked up by rechecking.
+- The same tool page handles optional LFS and GitHub CLI; `git --version` is a useful manual check.
+
+### Commit name or email is missing
+
+- Complete **Git commit identity** when prompted, or open **Settings → General → Git commit identity**. Choose repository or global scope and review the effective values.
+- Hosting login credentials do not provide the Git author/committer identity.
+
+### A repository was moved
+
+- Choose **Select new location** for the unavailable repository and select its new folder, or use **Recheck** if the existing location is available again.
+- Relocating keeps its settings and planning association; removal is not required.
 
 ### GitHub CLI login import does not work
 
