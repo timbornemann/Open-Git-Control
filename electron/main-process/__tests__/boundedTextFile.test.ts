@@ -4,7 +4,7 @@ import * as path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readBoundedTextFile, readBoundedTextFileAsync } from '../boundedTextFile';
 
-vi.mock('fs', async (importOriginal) => ({ ...(await importOriginal<typeof import('fs')>()) }));
+vi.mock('fs', async (importOriginal) => ({ ...(await importOriginal<typeof fs>()) }));
 
 describe('bounded regular-file reads', () => {
   let directory: string;

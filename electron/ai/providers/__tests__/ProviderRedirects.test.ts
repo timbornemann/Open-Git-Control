@@ -6,13 +6,17 @@ const servers: Server[] = [];
 afterEach(async () => {
   for (const server of servers.splice(0)) {
     server.closeAllConnections();
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    });
   }
 });
 
 async function listen(server: Server): Promise<string> {
   servers.push(server);
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', resolve);
+  });
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('No test server address.');
   return `http://127.0.0.1:${address.port}`;

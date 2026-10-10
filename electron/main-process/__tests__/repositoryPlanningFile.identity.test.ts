@@ -4,7 +4,7 @@ import * as path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readRepositoryPlanningFile, readRepositoryPlanningFileAsync } from '../repositoryPlanningFile';
 
-vi.mock('fs', async (importOriginal) => ({ ...(await importOriginal<typeof import('fs')>()) }));
+vi.mock('fs', async (importOriginal) => ({ ...(await importOriginal<typeof fs>()) }));
 
 describe('committed planner repository identities', () => {
   let directory: string;
