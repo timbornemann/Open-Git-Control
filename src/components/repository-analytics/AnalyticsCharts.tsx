@@ -3,7 +3,15 @@ import { useI18n } from '@/i18n';
 import type { AnalyticsFilters, AnalyticsPeriod, RepositoryAnalyticsSnapshot } from '@/shared/ipc/repositoryAnalytics';
 
 export const count = (value: number) => value.toLocaleString();
-export const percent = (value: number, locale?: string) => `${(100 * value).toLocaleString(locale, { maximumFractionDigits: 1 })}%`;
+const percentageFormats = new Map<string | undefined, Intl.NumberFormat>();
+export function percent(value: number, locale?: string) {
+  let format = percentageFormats.get(locale);
+  if (!format) {
+    format = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
+    percentageFormats.set(locale, format);
+  }
+  return `${format.format(100 * value)}%`;
+}
 export const percentWidth = (value: number) => `${100 * Math.max(0, Math.min(1, value))}%`;
 export const dateLabel = (date: number) => (date ? new Date(date).toLocaleDateString() : '—');
 export function AnalyticsTable({

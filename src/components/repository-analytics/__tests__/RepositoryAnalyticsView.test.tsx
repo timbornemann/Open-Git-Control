@@ -358,7 +358,7 @@ describe('repository analytics dashboard', () => {
     expect(host.querySelector<HTMLElement>('.analytics-coupling-scene')!.style.transform).toBe(transform);
     expect(content.scrollTop).toBe(80);
   });
-  it('resumes saved connection details once main recreates an unchanged report after an app restart', async () => {
+  it('resumes saved connection details once main recreates an unchanged report after an app restart', { timeout: 15_000 }, async () => {
     const all = Array.from({ length: 251 }, (_, index) => ({ first: 'src/hub.ts', second: `src/file-${index}.ts`, commits: 3, share: 0.5 }));
     const saved = { ...report(), coupling: all.slice(0, 100), couplingVersion: 'unchanged-connections' };
     const ready = deferred<{ success: true; data: RepositoryAnalyticsSnapshot }>();

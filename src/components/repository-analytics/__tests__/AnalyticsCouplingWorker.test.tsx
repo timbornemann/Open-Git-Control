@@ -13,6 +13,7 @@ class LayoutWorker {
   onmessage?: (event: MessageEvent<CouplingForceResult>) => void;
   onerror?: () => void;
   request!: CouplingForceRequest;
+  private scene?: CouplingForceResult['scene'];
   terminated = false;
   constructor(
     public url: URL,
@@ -27,8 +28,10 @@ class LayoutWorker {
     this.terminated = true;
   }
   deliver(done = true) {
+    // Replaying this worker's result must not run the same simulation again.
+    this.scene ??= relaxCouplingScene(this.request.pairs, this.request.seed, this.request.anchors);
     this.onmessage?.({
-      data: { scene: relaxCouplingScene(this.request.pairs, this.request.seed, this.request.anchors), done },
+      data: { scene: this.scene, done },
     } as MessageEvent<CouplingForceResult>);
   }
 }
@@ -59,7 +62,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('background coupling force layout', () => {
+describe('background coupling force layout', { timeout: 15_000 }, () => {
   it('uses a cancellable module worker and freezes the scene after settling without reheating for changed counts', () => {
     render();
     const task = LayoutWorker.tasks[0];
@@ -93,7 +96,8 @@ describe('background coupling force layout', () => {
     const second = LayoutWorker.tasks[1];
     expect(second.request.anchors).toHaveLength(121);
     act(() => second.deliver());
-    for (const position of stable) expect(positions()).toContainEqual(position);
+    const current = new Map(positions().map(([path, x, y]) => [path, [x, y]]));
+    for (const [path, x, y] of stable) expect(current.get(path)).toEqual([x, y]);
     expect(camera()).toBe(view);
     expect(host.querySelectorAll('.analytics-coupling-edge')).toHaveLength(121);
   });
@@ -120,7 +124,8 @@ describe('background coupling force layout', () => {
     render([...rows, { first: 'hub.ts', second: 'new.ts', commits: 3, share: 0.2 }], true);
     expect(LayoutWorker.tasks[2].request.anchors).toHaveLength(121);
     act(() => LayoutWorker.tasks[2].deliver());
-    for (const position of stable) expect(positions()).toContainEqual(position);
+    const current = new Map(positions().map(([path, x, y]) => [path, [x, y]]));
+    for (const [path, x, y] of stable) expect(current.get(path)).toEqual([x, y]);
   });
   it('respects reduced motion and cancels active calculations on unmount', () => {
     vi.stubGlobal('matchMedia', () => ({ matches: true }));

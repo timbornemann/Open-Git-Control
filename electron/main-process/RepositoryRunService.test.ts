@@ -110,7 +110,7 @@ describe('RepositoryRunService', () => {
     expect(stdout.map((line) => line.text).join('')).toBe(`${'x'.repeat(64 * 1024 - 2)}übernormal next step`);
     expect(state.output.some((line) => line.text === 'stderr remains visible')).toBe(true);
     expect(stdout.at(-1)?.stepIndex).toBe(1);
-    expect(state.output.every((line) => !line.text.includes('\u001b') && !line.text.includes('�'))).toBe(true);
+    expect(state.output.every((line) => !line.text.includes('\u001b') && !line.text.includes('\ufffd'))).toBe(true);
   });
   it('runs workflow steps in order and captures streamed output', async () => {
     const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));

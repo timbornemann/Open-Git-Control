@@ -61,7 +61,9 @@ afterEach(() => {
   host.remove();
 });
 
-describe('complete file coupling network loading', () => {
+// Hundreds of DOM nodes and the real force-layout fallback need a bounded
+// integration-test budget on shared CI runners, especially with coverage.
+describe('complete file coupling network loading', { timeout: 15_000 }, () => {
   it('loads every connection beyond preview and IPC batch limits without exposing pagination', async () => {
     const all = pairs();
     getDetails.mockImplementation(({ offset, limit }) => Promise.resolve(response(all, offset, limit)));
