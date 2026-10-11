@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/Button';
 import React from 'react';
 import { appClient } from '@/services/appClient';
+import { copyTextToClipboard } from '@/utils/clipboard';
 import { useI18n } from '@/i18n';
 import { useAppToast } from '@/hooks/useAppToast';
 import { ClipboardCopy } from 'lucide-react';
@@ -16,11 +17,6 @@ export const SettingsDiagnosticsSection: React.FC<{ variant?: SettingsLayoutVari
       showToast(t('generated.components.layout.sidebar.settingssidebarcontent.diagnostics_report_is_not_available_in_this_build_1da3b3a7'), true);
       return;
     }
-    if (!navigator.clipboard?.writeText) {
-      showToast(t('generated.components.layout.sidebar.settingssidebarcontent.clipboard_is_not_available_a62a50d3'), true);
-      return;
-    }
-
     setIsCopying(true);
     try {
       const result = await appClient.getDiagnosticsReport();
@@ -33,7 +29,10 @@ export const SettingsDiagnosticsSection: React.FC<{ variant?: SettingsLayoutVari
         return;
       }
 
-      await navigator.clipboard.writeText(result.data.report);
+      if (!(await copyTextToClipboard(result.data.report))) {
+        showToast(t('generated.components.layout.sidebar.settingssidebarcontent.could_not_copy_diagnostics_report_90e044b2'), true);
+        return;
+      }
       showToast(t('generated.components.layout.sidebar.settingssidebarcontent.diagnostics_report_copied_c5edd6fd'), false);
     } catch (error: unknown) {
       showToast(

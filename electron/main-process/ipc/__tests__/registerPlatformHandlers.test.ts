@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IpcChannel } from '../../../../src/types/ipcContract';
 
-const { appGetVersionMock, handleMock } = vi.hoisted(() => ({
+const { appGetVersionMock, handleMock, clipboardWriteTextMock } = vi.hoisted(() => ({
   appGetVersionMock: vi.fn(),
   handleMock: vi.fn(),
+  clipboardWriteTextMock: vi.fn(),
 }));
 
 vi.mock('electron', () => ({
+  clipboard: { writeText: clipboardWriteTextMock },
   app: {
     getVersion: appGetVersionMock,
   },
@@ -78,6 +80,7 @@ describe('platform IPC handlers', () => {
   beforeEach(() => {
     handleMock.mockReset();
     appGetVersionMock.mockReset();
+    clipboardWriteTextMock.mockReset();
     readStoreDataMock.mockReset();
     writeStoreDataMock.mockReset();
     mutateRepositoryStoreMock.mockReset();
@@ -126,6 +129,42 @@ describe('platform IPC handlers', () => {
       success: false,
       error: 'Diagnostics konnten nicht erstellt werden.',
     });
+  });
+
+  it('writes clipboard text natively and waits for completion before reporting success', async () => {
+    const { registerDiagnosticsHandlers } = await import('../registerDiagnosticsHandlers');
+    const handlers = getRegisteredHandlers();
+    registerDiagnosticsHandlers({ buildDiagnosticsReport: vi.fn() });
+    let finish!: () => void;
+    clipboardWriteTextMock.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const completed = vi.fn();
+    const writing = handlers.get(IpcChannel.ClipboardWriteText)!({}, 'Report\nä ö ü').then(completed);
+    await Promise.resolve();
+    expect(completed).not.toHaveBeenCalled();
+    expect(clipboardWriteTextMock).toHaveBeenCalledWith('Report\nä ö ü');
+    finish();
+    await writing;
+    expect(completed).toHaveBeenCalledWith({ success: true });
+    clipboardWriteTextMock.mockImplementationOnce(() => {
+      throw new Error('OS clipboard locked');
+    });
+    await expect(handlers.get(IpcChannel.ClipboardWriteText)!({}, 'report')).resolves.toMatchObject({ success: false });
+    clipboardWriteTextMock.mockRejectedValueOnce(new Error('Write failed'));
+    await expect(handlers.get(IpcChannel.ClipboardWriteText)!({}, 'report')).resolves.toMatchObject({ success: false });
+  });
+
+  it('rejects invalid clipboard payloads without changing the system clipboard', async () => {
+    const { registerDiagnosticsHandlers } = await import('../registerDiagnosticsHandlers');
+    const handlers = getRegisteredHandlers();
+    registerDiagnosticsHandlers({ buildDiagnosticsReport: vi.fn() });
+    for (const value of [null, 123, { text: 'report' }, '', 'ä'.repeat(4 * 1024 ** 2 + 1)]) {
+      await expect(handlers.get(IpcChannel.ClipboardWriteText)!({}, value)).resolves.toMatchObject({ success: false });
+    }
+    expect(clipboardWriteTextMock).not.toHaveBeenCalled();
   });
 
   it('registers updater IPC handlers as thin updater-manager delegates', async () => {

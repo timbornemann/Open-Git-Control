@@ -3,6 +3,16 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { createElectronApi } from '../createElectronApi';
 
 describe('createElectronApi', () => {
+  it('exposes native clipboard writes through both API namespaces', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+    await api.app.writeClipboardText('diagnostic report');
+    await api.writeClipboardText('selected text');
+    expect(invoke.mock.calls).toEqual([
+      [IpcChannel.ClipboardWriteText, 'diagnostic report'],
+      [IpcChannel.ClipboardWriteText, 'selected text'],
+    ]);
+  });
   it('exposes saved repository recovery in both namespaces without accepting a replacement path from the renderer', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true, data: null });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

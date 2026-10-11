@@ -353,6 +353,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     aiGenerateCommitMessage: (params: { notes: string }) => ipcRenderer.invoke(IpcChannel.AiGenerateCommitMessage, params),
     aiGenerateReleaseNotes: (params: ReleaseNotesGenerationParamsDto) => ipcRenderer.invoke(IpcChannel.AiGenerateReleaseNotes, params),
     getDiagnosticsReport: () => ipcRenderer.invoke(IpcChannel.DiagnosticsReport),
+    writeClipboardText: (text) => ipcRenderer.invoke(IpcChannel.ClipboardWriteText, text),
   } satisfies ElectronFlatAPI;
   const electronAPI: ElectronAPI = {
     ...flatApi,
@@ -477,6 +478,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       installAppUpdate: flatApi.installAppUpdate,
       onUpdaterEvent: flatApi.onUpdaterEvent,
       getDiagnosticsReport: flatApi.getDiagnosticsReport,
+      writeClipboardText: flatApi.writeClipboardText,
     },
     ai: {
       aiTestConnection: flatApi.aiTestConnection,

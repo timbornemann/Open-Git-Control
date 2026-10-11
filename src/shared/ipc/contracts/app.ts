@@ -42,4 +42,5 @@ export interface ElectronAppAPI extends ElectronStorageAPI {
   installAppUpdate: () => Promise<BasicActionResultDto>;
   onUpdaterEvent: (callback: (event: UpdaterStatusDto) => void) => () => void;
   getDiagnosticsReport: () => Promise<IpcResult<DiagnosticsReportDto>>;
+  writeClipboardText: (text: string) => Promise<BasicActionResultDto>;
 }

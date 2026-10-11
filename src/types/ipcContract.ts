@@ -31,6 +31,7 @@ export const enum IpcChannel {
   AppGetVersion = 'app:getVersion',
   CloneProgress = 'clone:progress',
   DiagnosticsReport = 'diagnostics:report',
+  ClipboardWriteText = 'clipboard:writeText',
   DialogOpenDirectory = 'dialog:openDirectory',
   DialogSelectDirectory = 'dialog:selectDirectory',
   DialogSelectFiles = 'dialog:selectFiles',

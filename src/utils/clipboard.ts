@@ -1,6 +1,16 @@
+import { clipboardClient } from '@/services/clipboardClient';
+
 export const copyTextToClipboard = async (value: string): Promise<boolean> => {
   const text = String(value || '');
   if (!text) return false;
+
+  if (clipboardClient.isAvailable()) {
+    try {
+      return (await clipboardClient.writeText(text)).success;
+    } catch {
+      return false;
+    }
+  }
 
   try {
     if (navigator.clipboard?.writeText) {
