@@ -3,7 +3,8 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { REPOSITORY_RUN_ACTION_IDS } from '../../../src/types/repositoryRun';
 import type { RepositoryRunActionId } from '../../../src/types/repositoryRun';
 import { repositoryPathKey } from '../activeRepositoryAuthorization';
-import type { RepositoryRunConfigService } from '../RepositoryRunConfigService';
+import { normalizeRepositoryRunConfig, type RepositoryRunConfigService } from '../RepositoryRunConfigService';
+import { RepositoryRunPrerequisites } from '../RepositoryRunPrerequisites';
 import { RepositoryRunConfigWatcher } from '../RepositoryRunConfigWatcher';
 import type { RepositoryRunService } from '../RepositoryRunService';
 import { RepositoryRunApprovals } from '../RepositoryRunApprovals';
@@ -20,6 +21,7 @@ const isAction = (value: unknown): value is RepositoryRunActionId =>
 
 export const registerRepositoryRunHandlers = ({ configService, runService, readStoredRepoPaths, approvals = new RepositoryRunApprovals() }: Deps): void => {
   const configWatchers = new Map<number, RepositoryRunConfigWatcher>();
+  const prerequisites = new RepositoryRunPrerequisites();
   const requireStoredRepository = (value: unknown): string => {
     const requested = String(value || '').trim();
     const repo = readStoredRepoPaths().find((candidate) => repositoryPathKey(candidate) === repositoryPathKey(requested));
@@ -43,9 +45,24 @@ export const registerRepositoryRunHandlers = ({ configService, runService, readS
 
   ipcMain.handle(IpcChannel.RepositoryRunGetConfig, async (_event, repoPath: unknown) => {
     try {
-      return { success: true as const, data: configService.read(requireStoredRepository(repoPath)) };
+      const repository = requireStoredRepository(repoPath);
+      const state = configService.read(repository);
+      const steps = [...Object.values(state.config?.actions ?? {}).flatMap((action) => action.steps), ...state.templates.map((template) => template.step)];
+      return { success: true as const, data: { ...state, prerequisites: await prerequisites.check(repository, steps) } };
     } catch (error) {
       return { success: false as const, error: error instanceof Error ? error.message : 'Could not load run configuration.' };
+    }
+  });
+
+  ipcMain.handle(IpcChannel.RepositoryRunCheckPrerequisites, async (_event, repoPath: unknown, rawConfig: unknown) => {
+    try {
+      const repository = requireStoredRepository(repoPath);
+      const config = normalizeRepositoryRunConfig(rawConfig);
+      const templates = configService.read(repository).templates;
+      const steps = [...Object.values(config.actions).flatMap((action) => action.steps), ...templates.map((template) => template.step)];
+      return { success: true as const, data: await prerequisites.check(repository, steps) };
+    } catch (error) {
+      return { success: false as const, error: error instanceof Error ? error.message : 'Could not check required programs.' };
     }
   });
 

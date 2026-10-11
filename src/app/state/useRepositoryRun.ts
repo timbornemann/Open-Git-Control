@@ -6,6 +6,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RepositoryRunActionId, RepositoryRunConfigStateDto, RepositoryRunStateDto } from '@/types/repositoryRun';
 import { repositoryRunClient } from '@/services/repositoryRunClient';
 import { confirmWorkingDirectoryNavigation, requestWorkingDirectoryNavigation } from '@/components/working-directory/workingDirectoryNavigationGuard';
+import { describeRunPrerequisiteError } from '@/shared/repositoryRunPrerequisites';
+import type { NotificationController } from '@/types/notifications';
 
 const MAX_RUN_OUTPUT_LINES = 4_000;
 const MAX_RUN_OUTPUT_BYTES = 2 * 1024 * 1024;
@@ -37,7 +39,17 @@ export const trimRepositoryRunOutput = (state: RepositoryRunStateDto): Repositor
   return { ...state, output: retained };
 };
 
-export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: string | null; triggerRefresh: () => void }) => {
+export const useRepositoryRun = ({
+  activeRepo,
+  triggerRefresh,
+  notify,
+  tr = (_de, en) => en,
+}: {
+  activeRepo: string | null;
+  triggerRefresh: () => void;
+  notify?: NotificationController['publish'];
+  tr?: (de: string, en: string) => string;
+}) => {
   const [runState, setRunState] = useState<RepositoryRunStateDto | null>(null);
   const [activeConfig, setActiveConfig] = useResourceState<RepositoryRunConfigStateDto | null>('runs', 'getConfig', [activeRepo], null);
   const [isConsoleOpen, setConsoleOpen] = useState(false);
@@ -46,6 +58,7 @@ export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: s
   const activeRepoRef = useRef(activeRepo);
   const isConsoleOpenRef = useRef(isConsoleOpen);
   const configRequestGenerationRef = useRef(0);
+  const startingRef = useRef(false);
   // A run event can arrive between committing a repository switch and its
   // effect. Keep this identity current during render so that event cannot
   // publish configuration from the repository that was just left.
@@ -145,17 +158,54 @@ export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: s
   }, [refreshConfig, triggerRefresh]);
 
   const startRun = useCallback(
-    async (action: RepositoryRunActionId): Promise<boolean> => {
-      if (!activeRepo || !repositoryRunClient.isAvailable()) return false;
-      if (!(await confirmWorkingDirectoryNavigation({ kind: 'view', label: 'run console' }))) return false;
-      const result = await repositoryRunClient.start(activeRepo, action);
-      if (!result.success) return false;
-      setRunState(trimRepositoryRunOutput(result.data));
-      isConsoleOpenRef.current = true;
-      setConsoleOpen(true);
-      return true;
+    async function startRun(action: RepositoryRunActionId): Promise<boolean> {
+      if (!activeRepo || !repositoryRunClient.isAvailable() || startingRef.current) return false;
+      startingRef.current = true;
+      try {
+        if (!(await confirmWorkingDirectoryNavigation({ kind: 'view', label: 'run console' })) || activeRepo !== activeRepoRef.current) return false;
+        const result = await repositoryRunClient.start(activeRepo, action);
+        if (!result.success) {
+          if (activeRepo !== activeRepoRef.current) return false;
+          const explanation = describeRunPrerequisiteError(result.error, tr);
+          notify?.({
+            msg: explanation ?? result.error,
+            isError: true,
+            title: tr('Befehl konnte nicht gestartet werden', 'Command could not be started'),
+            errorExplained: true,
+            ...(explanation
+              ? {
+                  actions: [
+                    {
+                      label: tr('Erneut prüfen und starten', 'Check again and start'),
+                      onClick: () => {
+                        if (activeRepo === activeRepoRef.current) void startRun(action);
+                      },
+                    },
+                  ],
+                }
+              : {}),
+          });
+          void refreshConfig(activeRepo);
+          return false;
+        }
+        setRunState(trimRepositoryRunOutput(result.data));
+        if (activeRepo !== activeRepoRef.current) return false;
+        isConsoleOpenRef.current = true;
+        setConsoleOpen(true);
+        return true;
+      } catch (error) {
+        if (activeRepo === activeRepoRef.current)
+          notify?.({
+            msg: error instanceof Error ? error.message : tr('Befehl konnte nicht gestartet werden.', 'Command could not be started.'),
+            isError: true,
+            errorExplained: true,
+          });
+        return false;
+      } finally {
+        startingRef.current = false;
+      }
     },
-    [activeRepo],
+    [activeRepo, notify, tr, refreshConfig],
   );
 
   const stopRun = useCallback(async (): Promise<boolean> => {

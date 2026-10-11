@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Copy, Plus, Save, Trash2 } from 'lucide-react';
+import { Copy, Save } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { useRepositoryContext, useWorkflowContext } from '@/contexts/AppStateContext';
 import {
@@ -7,33 +7,17 @@ import {
   createEmptyRepositoryRunConfig,
   type RepositoryRunActionId,
   type RepositoryRunConfigDto,
-  type RepositoryRunParser,
-  type RepositoryRunPlatform,
-  type RepositoryRunShell,
   type RepositoryRunStepDto,
   type RepositoryRunTemplateDto,
 } from '@/types/repositoryRun';
 import { repositoryRunClient } from '@/services/repositoryRunClient';
 import { copyTextToClipboard } from '@/utils/clipboard';
 import { buildRepositoryRunAgentPrompt } from '@/utils/repositoryRunAgentPrompt';
-import { COMMON_REPOSITORY_RUN_TEMPLATES, applyRepositoryRunTemplate, type RepositoryRunCommandTemplate } from '@/utils/repositoryRunTemplates';
+import { RepositoryRunActionEditor } from './RepositoryRunActionEditor';
+import { RunPrerequisites } from './RunPrerequisites';
+import { useRunPrerequisiteChecks } from './useRunPrerequisiteChecks';
+import type { RepositoryRunPrerequisitesDto } from '@/shared/repositoryRunPrerequisites';
 import '@/styles/repository-run-settings.css';
-
-const ACTION_LABELS: Record<RepositoryRunActionId, string> = { run: 'Run', test: 'Test', format: 'Format', start: 'Start', build: 'Build' };
-const PLATFORMS: Array<{ id: RepositoryRunPlatform; label: string; shells: RepositoryRunShell[] }> = [
-  { id: 'windows', label: 'Windows', shells: ['powershell', 'cmd'] },
-  { id: 'macos', label: 'macOS', shells: ['zsh'] },
-  { id: 'linux', label: 'Linux', shells: ['bash'] },
-];
-const PARSERS: Array<{ value: RepositoryRunParser; label: string }> = [
-  { value: 'none', label: 'Raw output' },
-  { value: 'vitest-jest', label: 'Vitest / Jest' },
-  { value: 'eslint', label: 'ESLint' },
-  { value: 'typescript', label: 'TypeScript' },
-  { value: 'prettier', label: 'Prettier' },
-  { value: 'diagnostic', label: 'File : line : column' },
-];
-type TemplateOption = RepositoryRunTemplateDto | RepositoryRunCommandTemplate;
 
 type StoredRunConfigDraft = {
   config: RepositoryRunConfigDto;
@@ -72,15 +56,6 @@ const clearRunConfigDraft = (repoPath: string): void => {
   }
 };
 
-const createStep = (label: string): RepositoryRunStepDto => ({
-  id: `step-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-  label,
-  parser: 'none',
-  windows: { shell: 'powershell', command: '' },
-  macos: { shell: 'zsh', command: '' },
-  linux: { shell: 'bash', command: '' },
-});
-
 export const RepositoryRunConfigView: React.FC = () => {
   const { activeRepo: selectedRepo, onToast } = useRepositoryContext();
   const workflow = useWorkflowContext();
@@ -89,11 +64,13 @@ export const RepositoryRunConfigView: React.FC = () => {
   const [persistedConfig, setPersistedConfig] = useState<RepositoryRunConfigDto | null>(null);
   const [configRepositoryPath, setConfigRepositoryPath] = useState<string | null>(null);
   const [configPath, setConfigPath] = useState('');
+  const [initialPrerequisites, setInitialPrerequisites] = useState<RepositoryRunPrerequisitesDto>();
   const [templates, setTemplates] = useState<RepositoryRunTemplateDto[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copyingAgentPrompt, setCopyingAgentPrompt] = useState(false);
+  const prerequisites = useRunPrerequisiteChecks(selectedRepo, config, templates, initialPrerequisites);
   const configIsDirty = useMemo(() => config !== null && JSON.stringify(config) !== JSON.stringify(persistedConfig), [config, persistedConfig]);
   const selectedRepoRef = useRef(selectedRepo);
   const loadRequestIdRef = useRef(0);
@@ -112,6 +89,7 @@ export const RepositoryRunConfigView: React.FC = () => {
     setConfigRepositoryPath(null);
     setConfigPath('');
     setTemplates([]);
+    setInitialPrerequisites(undefined);
     setLoadError(null);
     setSaving(false);
 
@@ -137,6 +115,7 @@ export const RepositoryRunConfigView: React.FC = () => {
         const savedDraft = readRunConfigDraft(repoPath);
         setConfigPath(result.data.configPath);
         setTemplates(result.data.templates);
+        setInitialPrerequisites(result.data.prerequisites);
         setConfig(savedDraft?.config || result.data.config);
         setPersistedConfig(savedDraft ? savedDraft.persistedConfig : result.data.config);
         setConfigRepositoryPath(repoPath);
@@ -259,162 +238,19 @@ export const RepositoryRunConfigView: React.FC = () => {
           {tr('Neue Konfiguration erstellen', 'Create new configuration')}
         </button>
       )}
+      {config && <RunPrerequisites {...prerequisites} onRecheck={prerequisites.recheck} />}
       {config &&
         REPOSITORY_RUN_ACTION_IDS.map((action) => (
-          <ActionCard key={action} action={action} config={config} templates={templates} updateSteps={updateSteps} tr={tr} />
+          <RepositoryRunActionEditor
+            key={action}
+            report={prerequisites.report}
+            action={action}
+            config={config}
+            templates={templates}
+            updateSteps={updateSteps}
+            tr={tr}
+          />
         ))}
     </section>
   );
 };
-
-const ActionCard: React.FC<{
-  action: RepositoryRunActionId;
-  config: RepositoryRunConfigDto;
-  templates: Array<{ id: string; label: string; action: RepositoryRunActionId; step: Omit<RepositoryRunStepDto, 'id'> }>;
-  updateSteps: (action: RepositoryRunActionId, update: (steps: RepositoryRunStepDto[]) => RepositoryRunStepDto[]) => void;
-  tr: (de: string, en: string) => string;
-}> = ({ action, config, templates, updateSteps, tr }) => {
-  const [open, setOpen] = useState(false);
-  const steps = config.actions[action].steps;
-  const detectedTemplates = templates.filter((template) => template.action === action);
-  const actionTemplates: TemplateOption[] = [...detectedTemplates, ...COMMON_REPOSITORY_RUN_TEMPLATES.filter((template) => template.action === action)];
-  return (
-    <div className="repository-run-settings__action">
-      <button className="repository-run-settings__action-header" onClick={() => setOpen((value) => !value)}>
-        <span>
-          <strong>{ACTION_LABELS[action]}</strong>
-          <small>{steps.length ? tr(`${steps.length} Schritt(e)`, `${steps.length} step(s)`) : tr('Nicht konfiguriert', 'Not configured')}</small>
-        </span>
-        {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-      </button>
-      {open && (
-        <div className="repository-run-settings__action-body">
-          <div className="repository-run-settings__templates">
-            {detectedTemplates.map((template) => (
-              <button
-                key={template.id}
-                className="staging-tool-btn"
-                onClick={() => updateSteps(action, (entries) => [...entries, { ...template.step, id: `template-${Date.now()}-${template.id}` }])}
-              >
-                + {template.label}
-              </button>
-            ))}
-            <button className="staging-tool-btn" onClick={() => updateSteps(action, (entries) => [...entries, createStep(ACTION_LABELS[action])])}>
-              <Plus size={13} /> {tr('Schritt', 'Step')}
-            </button>
-          </div>
-          {steps.map((step, index) => (
-            <StepEditor
-              key={step.id}
-              step={step}
-              index={index}
-              onChange={(next) => updateSteps(action, (entries) => entries.map((entry) => (entry.id === step.id ? next : entry)))}
-              onRemove={() => updateSteps(action, (entries) => entries.filter((entry) => entry.id !== step.id))}
-              onMove={(delta) =>
-                updateSteps(action, (entries) => {
-                  const next = [...entries];
-                  const target = index + delta;
-                  if (target < 0 || target >= next.length) return entries;
-                  [next[index], next[target]] = [next[target], next[index]];
-                  return next;
-                })
-              }
-              templates={actionTemplates}
-              tr={tr}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const StepEditor: React.FC<{
-  step: RepositoryRunStepDto;
-  index: number;
-  onChange: (step: RepositoryRunStepDto) => void;
-  onRemove: () => void;
-  onMove: (delta: number) => void;
-  templates: TemplateOption[];
-  tr: (de: string, en: string) => string;
-}> = ({ step, index, onChange, onRemove, onMove, templates, tr }) => (
-  <article className="repository-run-settings__step">
-    <div className="repository-run-settings__step-title">
-      <strong>{index + 1}.</strong>
-      <input value={step.label} onChange={(event) => onChange({ ...step, label: event.target.value })} aria-label={tr('Schrittname', 'Step name')} />
-      <label className="repository-run-settings__select-label">
-        <span>{tr('Befehlsvorlage', 'Command template')}</span>
-        <select
-          defaultValue=""
-          onChange={(event) => {
-            const template = templates.find((entry) => entry.id === event.target.value);
-            if (template) onChange(applyRepositoryRunTemplate(step.id, template));
-            event.currentTarget.value = '';
-          }}
-        >
-          <option value="" disabled>
-            {tr('Vorlage wählen…', 'Choose template…')}
-          </option>
-          {Array.from(
-            new Set(templates.map((template) => ('group' in template ? template.group : tr('Für dieses Repository erkannt', 'Detected for this repository')))),
-          ).map((group) => (
-            <optgroup key={group} label={group}>
-              {templates
-                .filter((template) => ('group' in template ? template.group : tr('Für dieses Repository erkannt', 'Detected for this repository')) === group)
-                .map((template) => (
-                  <option key={template.id} value={template.id}>
-                    {template.label}
-                  </option>
-                ))}
-            </optgroup>
-          ))}
-        </select>
-      </label>
-      <label className="repository-run-settings__select-label">
-        <span>{tr('Ausgabe auswerten', 'Output parser')}</span>
-        <select value={step.parser} onChange={(event) => onChange({ ...step, parser: event.target.value as RepositoryRunParser })}>
-          {PARSERS.map((parser) => (
-            <option key={parser.value} value={parser.value}>
-              {parser.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button className="icon-btn" onClick={() => onMove(-1)} title={tr('Nach oben', 'Move up')}>
-        ↑
-      </button>
-      <button className="icon-btn" onClick={() => onMove(1)} title={tr('Nach unten', 'Move down')}>
-        ↓
-      </button>
-      <button className="icon-btn danger" onClick={onRemove} title={tr('Löschen', 'Delete')}>
-        <Trash2 size={14} />
-      </button>
-    </div>
-    <div className="repository-run-settings__platforms">
-      {PLATFORMS.map((platform) => {
-        const command = step[platform.id] || { shell: platform.shells[0], command: '' };
-        return (
-          <label key={platform.id}>
-            <span>{platform.label}</span>
-            <select
-              value={command.shell}
-              onChange={(event) => onChange({ ...step, [platform.id]: { ...command, shell: event.target.value as RepositoryRunShell } })}
-            >
-              {platform.shells.map((shell) => (
-                <option key={shell} value={shell}>
-                  {shell}
-                </option>
-              ))}
-            </select>
-            <textarea
-              value={command.command}
-              onChange={(event) => onChange({ ...step, [platform.id]: { ...command, command: event.target.value } })}
-              placeholder={tr('Befehl', 'Command')}
-              rows={2}
-            />
-          </label>
-        );
-      })}
-    </div>
-  </article>
-);

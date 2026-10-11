@@ -2,6 +2,7 @@ import React from 'react';
 import { ChevronDown, Play, Square } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { REPOSITORY_RUN_ACTION_IDS, type RepositoryRunActionId, type RepositoryRunConfigStateDto, type RepositoryRunStateDto } from '@/types/repositoryRun';
+import { RUN_PROGRAM_LABELS, getRepositoryRunPrerequisiteIssues } from '@/shared/repositoryRunPrerequisites';
 
 type Props = {
   activeRepo: string | null;
@@ -87,11 +88,21 @@ export const RepositoryRunMenuItems: React.FC<MenuItemsProps> = ({
       {hasCompletedRun && <div className="topbar-dropdown-sep" />}
       {REPOSITORY_RUN_ACTION_IDS.map((action) => {
         const configured = Boolean(activeRunConfig?.availableActions?.[action]);
+        const { missing, unknown } = getRepositoryRunPrerequisiteIssues(activeRunConfig?.config?.actions[action]?.steps ?? [], activeRunConfig?.prerequisites);
         return (
           <button key={action} className="topbar-dropdown-item" disabled={!configured} onClick={() => runAction(action)}>
             <span className="topbar-dropdown-item-label">{actionLabels[action]}</span>
             <span className="topbar-dropdown-item-hint">
-              {configured ? tr('Konfigurierte Aktion ausführen', 'Run configured action') : tr('Noch nicht konfiguriert', 'Not configured yet')}
+              {!configured
+                ? tr('Noch nicht konfiguriert', 'Not configured yet')
+                : missing.length
+                  ? tr(
+                      `Fehlt: ${missing.map((program) => RUN_PROGRAM_LABELS[program]).join(', ')} · beim Start erneut prüfen`,
+                      `Missing: ${missing.map((program) => RUN_PROGRAM_LABELS[program]).join(', ')} · recheck on start`,
+                    )
+                  : unknown.length
+                    ? tr('Benötigte Programme beim Start erneut prüfen', 'Recheck required programs on start')
+                    : tr('Konfigurierte Aktion ausführen', 'Run configured action')}
             </span>
           </button>
         );

@@ -12,6 +12,7 @@ import { RepositoryRunConfigService } from './RepositoryRunConfigService';
 import { RepositoryRunService } from './RepositoryRunService';
 import { createEmptyRepositoryRunConfig } from '../../src/types/repositoryRun';
 import { windowsSystemExecutable } from '../system-tools/windowsSystemExecutable';
+import { RepositoryRunPrerequisites } from './RepositoryRunPrerequisites';
 
 const directories: string[] = [];
 const originalPlatform = process.platform;
@@ -72,6 +73,64 @@ afterEach(() => {
 });
 
 describe('RepositoryRunService', () => {
+  it('blocks all steps before approval or execution when a later known template needs a missing program', async () => {
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));
+    directories.push(repoPath);
+    prepareConfig(repoPath, [0, 0]);
+    const configService = new RepositoryRunConfigService();
+    const config = configService.read(repoPath).config!;
+    for (const platform of ['windows', 'macos', 'linux'] as const) config.actions.test.steps[1][platform]!.command = 'cargo test';
+    configService.write(repoPath, config);
+    const check = new RepositoryRunPrerequisites(vi.fn().mockResolvedValue('OGC_RUN_TOOL cargo missing\n'));
+    const authorize = vi.fn();
+    const service = new RepositoryRunService(configService, undefined, undefined, check);
+    await expect(service.start(repoPath, 'test', authorize)).rejects.toThrow('RUN_PREREQUISITES:{"missing":["cargo"]');
+    expect(authorize).not.toHaveBeenCalled();
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(service.getState()).toBeNull();
+  });
+
+  it('checks afresh on retry and ignores missing programs from a different action', async () => {
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));
+    directories.push(repoPath);
+    prepareConfig(repoPath, [0]);
+    const configService = new RepositoryRunConfigService();
+    const config = configService.read(repoPath).config!;
+    config.actions.build.steps = [{ ...config.actions.test.steps[0], id: 'build' }];
+    for (const platform of ['windows', 'macos', 'linux'] as const) {
+      config.actions.test.steps[0][platform]!.command = 'cargo test';
+      config.actions.build.steps[0][platform] = { ...config.actions.build.steps[0][platform]!, command: 'pytest' };
+    }
+    configService.write(repoPath, config);
+    const probe = vi.fn().mockResolvedValueOnce('OGC_RUN_TOOL cargo missing\n').mockResolvedValueOnce('OGC_RUN_TOOL cargo available\n');
+    const service = new RepositoryRunService(configService, undefined, undefined, new RepositoryRunPrerequisites(probe));
+    await expect(service.start(repoPath, 'test')).rejects.toThrow('RUN_PREREQUISITES:');
+    spawnMock.mockImplementation(() => createChild(0, 'ready'));
+    await service.start(repoPath, 'test');
+    expect((await waitForCompletion(service)).status).toBe('succeeded');
+    expect(probe).toHaveBeenCalledTimes(2);
+    expect(probe.mock.calls.every((call) => !call[2].includes('pytest'))).toBe(true);
+    expect(spawnMock).toHaveBeenCalledOnce();
+  });
+
+  it('does not start known templates when shell discovery fails', async () => {
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));
+    directories.push(repoPath);
+    prepareConfig(repoPath, [0]);
+    const configService = new RepositoryRunConfigService();
+    const config = configService.read(repoPath).config!;
+    for (const platform of ['windows', 'macos', 'linux'] as const) config.actions.test.steps[0][platform]!.command = 'python main.py';
+    configService.write(repoPath, config);
+    const service = new RepositoryRunService(
+      configService,
+      undefined,
+      undefined,
+      new RepositoryRunPrerequisites(vi.fn().mockRejectedValue(new Error('timeout'))),
+    );
+    await expect(service.start(repoPath, 'test')).rejects.toThrow('"unknown":["python"]');
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
   it('captures split Unicode and terminal controls as safe readable output and configures PowerShell UTF-8', async () => {
     setPlatform('win32');
     const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));

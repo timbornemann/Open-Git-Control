@@ -115,7 +115,7 @@ export const useAppState = () => {
     });
   }, [setWorkspaceTab]);
   useRepositorySecretScanAllowlist(workspace.activeRepo, settings.language, setGitActionToast, onOpenSecretScanAllowlist);
-  const repositoryRun = useRepositoryRun({ activeRepo: workspace.activeRepo, triggerRefresh });
+  const repositoryRun = useRepositoryRun({ activeRepo: workspace.activeRepo, triggerRefresh, notify: notifications.publish, tr });
   const { activeGitActionLabel, activeGitCommand, isGitActionRunning, isGitActionRunningRef, runGitCommand, setActiveGitActionLabel } = useGitCommandWorkflow({
     workspace: {
       activeRepo: workspace.activeRepo,

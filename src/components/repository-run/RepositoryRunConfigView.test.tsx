@@ -7,10 +7,11 @@ import { createEmptyRepositoryRunConfig } from '@/types/repositoryRun';
 import { I18nProvider } from '@/i18n';
 import { RepositoryRunConfigView } from './RepositoryRunConfigView';
 
-const { copyMock, getConfigMock, saveConfigMock, refreshMock, toastMock, repository } = vi.hoisted(() => ({
+const { copyMock, getConfigMock, saveConfigMock, checkMock, refreshMock, toastMock, repository } = vi.hoisted(() => ({
   copyMock: vi.fn(),
   getConfigMock: vi.fn(),
   saveConfigMock: vi.fn(),
+  checkMock: vi.fn(),
   refreshMock: vi.fn(),
   toastMock: vi.fn(),
   repository: { activeRepo: 'C:/repos/a' as string | null, onToast: vi.fn() },
@@ -21,7 +22,7 @@ vi.mock('@/contexts/AppStateContext', () => ({
   useWorkflowContext: () => ({ onRefreshRunConfig: refreshMock }),
 }));
 vi.mock('@/services/repositoryRunClient', () => ({
-  repositoryRunClient: { isAvailable: () => true, getConfig: getConfigMock, saveConfig: saveConfigMock },
+  repositoryRunClient: { isAvailable: () => true, getConfig: getConfigMock, saveConfig: saveConfigMock, checkPrerequisites: checkMock },
 }));
 vi.mock('@/utils/clipboard', () => ({ copyTextToClipboard: copyMock }));
 
@@ -55,7 +56,8 @@ beforeEach(() => {
   root = createRoot(host);
   repository.activeRepo = 'C:/repos/a';
   repository.onToast = toastMock;
-  for (const mock of [copyMock, getConfigMock, saveConfigMock, refreshMock, toastMock]) mock.mockReset();
+  for (const mock of [copyMock, getConfigMock, saveConfigMock, checkMock, refreshMock, toastMock]) mock.mockReset();
+  checkMock.mockResolvedValue({ success: true, data: { platform: 'linux', checkedAt: 1, checks: [] } });
   copyMock.mockResolvedValue(true);
   refreshMock.mockResolvedValue(undefined);
   window.sessionStorage.clear();
@@ -65,9 +67,81 @@ afterEach(() => {
   if (root) act(() => root?.unmount());
   root = null;
   host.remove();
+  vi.useRealTimers();
 });
 
 describe('RepositoryRunConfigView', () => {
+  it('shows missing programs alongside detected templates and checks again after installation without discarding the draft', async () => {
+    vi.useFakeTimers();
+    const initial = response('C:/repos/a');
+    const template = {
+      id: 'node-test',
+      label: 'npm run test',
+      action: 'test' as const,
+      step: { label: 'Tests', parser: 'none' as const, linux: { shell: 'bash' as const, command: 'npm run test' } },
+    };
+    const report = {
+      platform: 'linux' as const,
+      checkedAt: 1,
+      checks: [
+        { program: 'node' as const, shell: 'bash' as const, state: 'available' as const },
+        { program: 'npm' as const, shell: 'bash' as const, state: 'missing' as const },
+      ],
+    };
+    getConfigMock.mockResolvedValue({ ...initial, data: { ...initial.data, templates: [template], prerequisites: report } });
+    await render();
+    expect(host.textContent).toContain('Required programs');
+    expect(host.textContent).toContain('npmNot found');
+    expect(checkMock).not.toHaveBeenCalled();
+    act(() => button('Test')?.click());
+    expect(button('+ npm run test')?.textContent).toContain('Required: npm · not found');
+    act(() => button('+ npm run test')?.click());
+    expect(host.textContent).toContain('Unsaved changes');
+    checkMock.mockResolvedValue({ success: true, data: { ...report, checks: report.checks.map((check) => ({ ...check, state: 'available' })) } });
+    act(() => button('Check again')?.click());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(checkMock).toHaveBeenCalledWith(
+      'C:/repos/a',
+      expect.objectContaining({ actions: expect.objectContaining({ test: { steps: [expect.objectContaining({ label: 'Tests' })] } }) }),
+    );
+    expect(host.textContent).not.toContain('not found');
+    expect(host.textContent).toContain('Unsaved changes');
+    expect(saveConfigMock).not.toHaveBeenCalled();
+  });
+
+  it('checks a newly chosen known template and ignores its late result after a repository switch', async () => {
+    vi.useFakeTimers();
+    const initial = response('C:/repos/a');
+    const config = createEmptyRepositoryRunConfig();
+    config.actions.test.steps = [{ id: 'test', label: 'Tests', parser: 'none', linux: { shell: 'bash', command: 'echo ready' } }];
+    getConfigMock.mockImplementation(async (repo: string) => (repo === 'C:/repos/a' ? { ...initial, data: { ...initial.data, config } } : response(repo)));
+    await render();
+    act(() => button('Test')?.click());
+    const picker = host.querySelector('.repository-run-settings__select-label select') as HTMLSelectElement;
+    act(() => {
+      picker.value = 'rust-test';
+      picker.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const pending = deferred<{
+      success: true;
+      data: { platform: 'linux'; checkedAt: number; checks: { program: 'cargo'; shell: 'bash'; state: 'missing' }[] };
+    }>();
+    checkMock.mockReturnValue(pending.promise);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(checkMock.mock.calls[0][1].actions.test.steps[0].linux.command).toBe('cargo test');
+    repository.activeRepo = 'C:/repos/b';
+    await render();
+    await act(async () => {
+      pending.resolve({ success: true, data: { platform: 'linux', checkedAt: 1, checks: [{ program: 'cargo', shell: 'bash', state: 'missing' }] } });
+    });
+    expect(host.textContent).not.toContain('Cargo');
+    expect(host.textContent).toContain('C:/repos/b');
+  });
+
   it('binds the page and agent prompt to the active repository', async () => {
     getConfigMock.mockResolvedValue(response('C:/repos/a'));
     await render();

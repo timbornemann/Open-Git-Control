@@ -186,4 +186,65 @@ describe('useRepositoryRun configuration binding', () => {
     act(() => proceed?.());
     expect(current!.isRunConsoleOpen).toBe(true);
   });
+
+  it('explains missing programs before opening the console and retries the same action after installation', async () => {
+    vi.spyOn(repositoryRunClient, 'getConfig').mockResolvedValue({ success: true, data: null } as any);
+    const start = vi
+      .spyOn(repositoryRunClient, 'start')
+      .mockResolvedValueOnce({ success: false, error: 'RUN_PREREQUISITES:{"missing":["npm"],"unknown":[]}' })
+      .mockResolvedValueOnce({ success: true, data: { runId: 'run-new', repoPath: 'C:/repo-a', action: 'build', status: 'running', output: [] } } as any);
+    const notify = vi.fn().mockReturnValue(1);
+    let current: ReturnType<typeof useRepositoryRun> | null = null;
+    const Harness = () => {
+      current = useRepositoryRun({ activeRepo: 'C:/repo-a', triggerRefresh: vi.fn(), notify });
+      return null;
+    };
+    await act(async () => root.render(createElement(Harness)));
+    await act(async () => {
+      expect(await current!.startRun('build')).toBe(false);
+    });
+    expect(current!.isRunConsoleOpen).toBe(false);
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ msg: expect.stringContaining('Required programs are missing: npm'), errorExplained: true }));
+    await act(async () => {
+      notify.mock.calls[0][0].actions[0].onClick();
+      await Promise.resolve();
+    });
+    expect(start.mock.calls).toEqual([
+      ['C:/repo-a', 'build'],
+      ['C:/repo-a', 'build'],
+    ]);
+    expect(current!.isRunConsoleOpen).toBe(true);
+  });
+
+  it('ignores double clicks and a late prerequisite failure for a repository that was left', async () => {
+    vi.spyOn(repositoryRunClient, 'getConfig').mockResolvedValue({ success: true, data: null } as any);
+    let resolve!: (result: any) => void;
+    const start = vi.spyOn(repositoryRunClient, 'start').mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    const notify = vi.fn().mockReturnValue(1);
+    let current: ReturnType<typeof useRepositoryRun> | null = null;
+    const Harness = ({ activeRepo }: { activeRepo: string }) => {
+      current = useRepositoryRun({ activeRepo, triggerRefresh: vi.fn(), notify });
+      return null;
+    };
+    await act(async () => root.render(createElement(Harness, { activeRepo: 'C:/repo-a' })));
+    let pending!: Promise<boolean>;
+    await act(async () => {
+      pending = current!.startRun('test');
+      expect(await current!.startRun('test')).toBe(false);
+      await Promise.resolve();
+    });
+    expect(start).toHaveBeenCalledOnce();
+    await act(async () => root.render(createElement(Harness, { activeRepo: 'C:/repo-b' })));
+    await act(async () => {
+      resolve({ success: false, error: 'RUN_PREREQUISITES:{"missing":["cargo"],"unknown":[]}' });
+      await pending;
+    });
+    expect(notify).not.toHaveBeenCalled();
+    expect(current!.isRunConsoleOpen).toBe(false);
+  });
 });

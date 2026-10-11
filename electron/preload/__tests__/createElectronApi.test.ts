@@ -195,6 +195,9 @@ describe('createElectronApi', () => {
     const listener = vi.fn();
 
     await api.runs.watchRepositoryRunConfig('C:/repo');
+    const config = { version: 1 as const, actions: {} } as any;
+    await api.runs.checkRepositoryRunPrerequisites('C:/repo', config);
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith(IpcChannel.RepositoryRunCheckPrerequisites, 'C:/repo', config);
     const unsubscribe = api.runs.onRepositoryRunConfigChanged(listener);
     handlers.get(IpcChannel.RepositoryRunConfigChanged)?.({}, 'C:/repo');
 

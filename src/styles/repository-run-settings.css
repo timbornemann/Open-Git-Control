@@ -64,6 +64,57 @@
   padding: 9px;
   border: 1px solid var(--status-danger);
 }
+.repository-run-prerequisites {
+  border-bottom: 1px solid var(--line-subtle);
+  padding: 2px 0 12px;
+  font-size: 0.78rem;
+}
+.repository-run-prerequisites__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.repository-run-prerequisites p {
+  color: var(--text-secondary);
+  margin: 8px 0;
+  line-height: 1.5;
+}
+.repository-run-prerequisites ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.repository-run-prerequisites li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.repository-run-prerequisites li small {
+  color: var(--text-muted);
+}
+.repository-run-prerequisites li[data-state='missing'],
+.repository-run-prerequisite-hint {
+  color: var(--status-warning);
+}
+.repository-run-prerequisite-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  text-align: left;
+}
+.repository-run-settings__templates .staging-tool-btn:has(.repository-run-prerequisite-hint) {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.repository-run-settings__step > .repository-run-prerequisite-hint {
+  margin-top: 9px;
+}
 .repository-run-settings__action {
   align-self: stretch;
   box-sizing: border-box;
@@ -84,7 +135,7 @@
   background: transparent;
   text-align: left;
 }
-.repository-run-settings__action-header span {
+.repository-run-settings__action-header > span {
   display: grid;
   gap: 3px;
 }

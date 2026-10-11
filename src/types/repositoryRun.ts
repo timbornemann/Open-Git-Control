@@ -1,3 +1,5 @@
+import type { RepositoryRunPrerequisitesDto } from '../shared/repositoryRunPrerequisites';
+
 export const REPOSITORY_RUN_ACTION_IDS = ['run', 'test', 'format', 'start', 'build'] as const;
 
 export type RepositoryRunActionId = (typeof REPOSITORY_RUN_ACTION_IDS)[number];
@@ -43,6 +45,7 @@ export type RepositoryRunConfigStateDto = {
   availableActions: Record<RepositoryRunActionId, boolean>;
   error?: string;
   templates: RepositoryRunTemplateDto[];
+  prerequisites?: RepositoryRunPrerequisitesDto;
 };
 
 export type RepositoryRunOutputLineDto = {
@@ -87,7 +90,7 @@ export const getRepositoryRunPlatform = (platform: string): RepositoryRunPlatfor
   return platform === 'darwin' ? 'macos' : 'linux';
 };
 
-export const getRunPlatformCommand = (step: RepositoryRunStepDto, platform: RepositoryRunPlatform): RepositoryRunPlatformCommandDto | null => {
+export const getRunPlatformCommand = (step: Omit<RepositoryRunStepDto, 'id'>, platform: RepositoryRunPlatform): RepositoryRunPlatformCommandDto | null => {
   const candidate = step[platform];
   return candidate?.command.trim() ? candidate : null;
 };

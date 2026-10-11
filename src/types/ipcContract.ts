@@ -170,6 +170,7 @@ export const enum IpcChannel {
   RepositoryRunConfigChanged = 'repositoryRun:configChanged',
   RepositoryRunEvent = 'repositoryRun:event',
   RepositoryRunGetConfig = 'repositoryRun:getConfig',
+  RepositoryRunCheckPrerequisites = 'repositoryRun:checkPrerequisites',
   RepositoryRunGetState = 'repositoryRun:getState',
   RepositoryRunSaveConfig = 'repositoryRun:saveConfig',
   RepositoryRunStart = 'repositoryRun:start',

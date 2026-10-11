@@ -1,4 +1,5 @@
 import type { IpcResult } from '../../../types/ipc';
+import type { RepositoryRunPrerequisitesDto } from '../../repositoryRunPrerequisites';
 import type {
   RepositoryRunActionId,
   RepositoryRunConfigDto,
@@ -9,6 +10,7 @@ import type {
 
 export interface ElectronRepositoryRunAPI {
   getRepositoryRunConfig: (repoPath: string) => Promise<IpcResult<RepositoryRunConfigStateDto>>;
+  checkRepositoryRunPrerequisites: (repoPath: string, config: RepositoryRunConfigDto) => Promise<IpcResult<RepositoryRunPrerequisitesDto>>;
   saveRepositoryRunConfig: (repoPath: string, config: RepositoryRunConfigDto) => Promise<IpcResult<RepositoryRunConfigDto>>;
   watchRepositoryRunConfig: (repoPath: string | null) => Promise<IpcResult<boolean>>;
   startRepositoryRun: (repoPath: string, action: RepositoryRunActionId) => Promise<IpcResult<RepositoryRunStateDto>>;

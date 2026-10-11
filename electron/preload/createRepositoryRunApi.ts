@@ -6,6 +6,8 @@ type PreloadIpcRenderer = Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener'>;
 
 export const createRepositoryRunApi = (ipcRenderer: PreloadIpcRenderer) => ({
   getRepositoryRunConfig: (repoPath: string) => ipcRenderer.invoke(IpcChannel.RepositoryRunGetConfig, repoPath),
+  checkRepositoryRunPrerequisites: (repoPath: string, config: RepositoryRunConfigDto) =>
+    ipcRenderer.invoke(IpcChannel.RepositoryRunCheckPrerequisites, repoPath, config),
   saveRepositoryRunConfig: (repoPath: string, config: RepositoryRunConfigDto) => ipcRenderer.invoke(IpcChannel.RepositoryRunSaveConfig, repoPath, config),
   watchRepositoryRunConfig: (repoPath: string | null) => ipcRenderer.invoke(IpcChannel.RepositoryRunWatchConfig, repoPath),
   startRepositoryRun: (repoPath: string, action: RepositoryRunActionId) => ipcRenderer.invoke(IpcChannel.RepositoryRunStart, repoPath, action),

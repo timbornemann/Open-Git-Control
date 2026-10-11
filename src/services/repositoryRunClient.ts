@@ -9,6 +9,9 @@ export const repositoryRunClient = cachedClient('runs', {
   getConfig(repoPath: string) {
     return requireElectronApi().runs.getRepositoryRunConfig(repoPath);
   },
+  checkPrerequisites(repoPath: string, config: RepositoryRunConfigDto) {
+    return requireElectronApi().runs.checkRepositoryRunPrerequisites(repoPath, config);
+  },
   saveConfig(repoPath: string, config: RepositoryRunConfigDto) {
     return requireElectronApi().runs.saveRepositoryRunConfig(repoPath, config);
   },

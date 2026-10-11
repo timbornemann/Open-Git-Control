@@ -7,7 +7,6 @@ import type {
   RepositoryRunConfigDto,
   RepositoryRunEventDto,
   RepositoryRunOutputLineDto,
-  RepositoryRunShell,
   RepositoryRunStateDto,
   RepositoryRunStepDto,
 } from '../../src/types/repositoryRun';
@@ -16,6 +15,9 @@ import { IpcChannel } from '../../src/types/ipcContract';
 import { normalizeTerminalText, TerminalTextSanitizer } from '../../src/shared/terminalText';
 import { windowsSystemExecutable } from '../system-tools/windowsSystemExecutable';
 import { repositoryPathKey } from './activeRepositoryAuthorization';
+import { getShellInvocation } from './RepositoryRunShell';
+import { RepositoryRunPrerequisites } from './RepositoryRunPrerequisites';
+import { getRepositoryRunPrerequisiteIssues, RUN_PREREQUISITE_ERROR_PREFIX } from '../../src/shared/repositoryRunPrerequisites';
 
 const MAX_OUTPUT_LINES = 4_000;
 const MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
@@ -40,23 +42,6 @@ type ActiveRun = RepositoryRunStateDto & {
   resolveActiveStep: (() => void) | null;
 };
 
-const getShellInvocation = (shell: RepositoryRunShell, command: string): { executable: string; args: string[] } => {
-  if (shell === 'powershell')
-    return {
-      executable: windowsSystemExecutable('WindowsPowerShell', 'v1.0', 'powershell.exe'),
-      args: [
-        '-NoLogo',
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        `[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $OutputEncoding = [Console]::OutputEncoding; ${command}`,
-      ],
-    };
-  if (shell === 'cmd') return { executable: windowsSystemExecutable('cmd.exe'), args: ['/d', '/s', '/c', command] };
-  if (shell === 'zsh') return { executable: '/bin/zsh', args: ['-lc', command] };
-  return { executable: '/usr/bin/env', args: ['bash', '-lc', command] };
-};
-
 export class RepositoryRunService {
   private activeRun: ActiveRun | null = null;
   private terminationUnconfirmedChild: ChildProcessWithoutNullStreams | null = null;
@@ -65,6 +50,7 @@ export class RepositoryRunService {
     private readonly configService: RepositoryRunConfigService,
     private readonly stopGraceMs = DEFAULT_STOP_GRACE_MS,
     private readonly forceStopWaitMs = DEFAULT_FORCE_STOP_WAIT_MS,
+    private readonly prerequisites = new RepositoryRunPrerequisites(),
   ) {}
 
   getState(): RepositoryRunStateDto | null {
@@ -95,6 +81,10 @@ export class RepositoryRunService {
     if (!isRepositoryRunActionConfigured(configState.config, action, getRepositoryRunPlatform(process.platform))) {
       throw new Error(`The ${action} action is not configured for this platform.`);
     }
+    const checks = await this.prerequisites.check(repoPath, configState.config.actions[action].steps);
+    assertCanStart();
+    const issues = getRepositoryRunPrerequisiteIssues(configState.config.actions[action].steps, checks);
+    if (issues.missing.length || issues.unknown.length) throw new Error(`${RUN_PREREQUISITE_ERROR_PREFIX}${JSON.stringify(issues)}`);
     if (authorize) {
       await authorize(configState.config);
       // The approval dialog can stay open while another run starts.

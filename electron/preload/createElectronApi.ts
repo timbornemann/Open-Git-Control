@@ -504,16 +504,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       setRepoPath: flatApi.setRepoPath,
       clearRepoPath: flatApi.clearRepoPath,
     },
-    runs: {
-      getRepositoryRunConfig: flatApi.getRepositoryRunConfig,
-      saveRepositoryRunConfig: flatApi.saveRepositoryRunConfig,
-      watchRepositoryRunConfig: flatApi.watchRepositoryRunConfig,
-      startRepositoryRun: flatApi.startRepositoryRun,
-      stopRepositoryRun: flatApi.stopRepositoryRun,
-      getRepositoryRunState: flatApi.getRepositoryRunState,
-      onRepositoryRunConfigChanged: flatApi.onRepositoryRunConfigChanged,
-      onRepositoryRunEvent: flatApi.onRepositoryRunEvent,
-    },
+    runs: createRepositoryRunApi(ipcRenderer),
   };
   return electronAPI;
 };
