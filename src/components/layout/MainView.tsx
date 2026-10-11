@@ -119,7 +119,10 @@ const MainViewComponent: React.FC = () => {
     !isHostingView &&
     !isLocalReposView &&
     !isAnalyticsView &&
-    !(activeTab === 'repo' && (isRunConfigOpen || isRemoteConfigOpen || isSecretScanAllowlistOpen || isReleaseCreatorOpen || isRepositoryPublicationOpen));
+    !(
+      activeTab === 'repo' &&
+      (showRecoveryCenter || isRunConfigOpen || isRemoteConfigOpen || isSecretScanAllowlistOpen || isReleaseCreatorOpen || isRepositoryPublicationOpen)
+    );
   const showInspectorPane = canShowInspectorPane && isInspectorPaneVisible;
 
   return (

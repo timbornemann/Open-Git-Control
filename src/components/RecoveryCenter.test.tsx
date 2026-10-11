@@ -7,6 +7,7 @@ import { I18nProvider } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import type { AppSettingsDto } from '@/types/appDtos';
 import { RecoveryCenter } from './RecoveryCenter';
+import { resetWorkingDirectoryNavigationGuardForTests, setActiveWorkingDirectoryNavigationGuard } from './working-directory/workingDirectoryNavigationGuard';
 
 const { setToastMock } = vi.hoisted(() => ({
   setToastMock: vi.fn(),
@@ -57,6 +58,7 @@ describe('RecoveryCenter', () => {
     root = null;
     host.remove();
     vi.restoreAllMocks();
+    resetWorkingDirectoryNavigationGuardForTests();
   });
 
   const renderCenter = async (props?: { repoPath?: string; refreshTrigger?: number; onRepoChanged?: () => void }) => {
@@ -96,7 +98,7 @@ describe('RecoveryCenter', () => {
     act(() => historyItems[1]?.click());
 
     expect(host.querySelector('.recovery-center__selection h2')?.textContent).toBe('second restore point');
-    expect(host.querySelector('.recovery-center__selection-meta code')?.textContent).toBe('HEAD@{1}');
+    expect(host.querySelector('.recovery-center__git-details code')?.textContent).toBe('HEAD@{1}');
     expect(historyItems[1]?.getAttribute('aria-pressed')).toBe('true');
   });
 
@@ -108,7 +110,7 @@ describe('RecoveryCenter', () => {
     });
     await renderCenter();
     expect(host.textContent).toContain('Message backup');
-    expect(host.querySelector('.recovery-center__selection-meta code')?.textContent).toBe('refs/ogc/commit-reword/saved');
+    expect(host.querySelector('.recovery-center__git-details code')?.textContent).toBe('refs/ogc/commit-reword/saved');
   });
 
   it('validates the inline branch name and creates the recovery branch from the selected commit', async () => {
@@ -131,9 +133,7 @@ describe('RecoveryCenter', () => {
     expect(runGitCommand.mock.calls.some((call) => call[1] === 'checkout')).toBe(false);
 
     enterText(input, 'recovery/important-work');
-    const createButton = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
-      button.textContent?.includes('Create branch from entry'),
-    );
+    const createButton = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((button) => button.textContent?.includes('Create branch & open'));
     if (!createButton) throw new Error('Missing create branch button.');
 
     await act(async () => {
@@ -208,5 +208,161 @@ describe('RecoveryCenter', () => {
     });
 
     expect(host.querySelectorAll('.recovery-center__history-item')).toHaveLength(2);
+  });
+
+  const clickButton = async (label: string) => {
+    const button = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find((item) => item.textContent?.trim() === label);
+    if (!button) throw new Error(`Missing button: ${label}`);
+    await act(async () => {
+      button.click();
+    });
+  };
+
+  it('keeps advanced actions collapsed and explains destructive recovery before executing it', async () => {
+    const run = vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: reflog });
+    await renderCenter();
+    const advanced = host.querySelector<HTMLDetailsElement>('.recovery-center__advanced');
+    expect(advanced?.open).toBe(false);
+    expect(host.querySelector<HTMLDetailsElement>('.recovery-center__git-details')?.open).toBe(false);
+    act(() => advanced?.querySelector('summary')?.click());
+    expect(advanced?.open).toBe(true);
+    await clickButton('Reset…');
+    expect(run.mock.calls.filter((call) => call[1] === 'reset')).toHaveLength(0);
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('including staged changes');
+    await clickButton('Cancel');
+    expect(run.mock.calls.filter((call) => call[1] === 'reset')).toHaveLength(0);
+    await clickButton('Reset…');
+    await clickButton('Reset branch');
+    expect(run).toHaveBeenCalledWith('C:/repos/demo', 'reset', '--hard', 'a'.repeat(40));
+  });
+
+  it('keeps the selection, branch draft and open advanced options through an unchanged background refresh', async () => {
+    vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: reflog });
+    await renderCenter();
+    const second = host.querySelectorAll<HTMLButtonElement>('.recovery-center__history-item')[1];
+    act(() => second.click());
+    const input = host.querySelector<HTMLInputElement>('#recovery-branch-name')!;
+    enterText(input, 'recovered/draft');
+    act(() => host.querySelector<HTMLDetailsElement>('.recovery-center__advanced')?.querySelector('summary')?.click());
+    await renderCenter({ refreshTrigger: 1 });
+    expect(host.querySelector('.recovery-center__selection h2')?.textContent).toBe('second restore point');
+    expect(host.querySelector<HTMLInputElement>('#recovery-branch-name')?.value).toBe('recovered/draft');
+    expect(host.querySelector<HTMLDetailsElement>('.recovery-center__advanced')?.open).toBe(true);
+    expect(host.querySelectorAll('.recovery-center__skeleton')).toHaveLength(0);
+  });
+
+  it('sorts backups and history together and lets users filter saved backups', async () => {
+    vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: reflog });
+    vi.mocked(gitClient.getCommitMessageEditBackups).mockResolvedValue({
+      success: true,
+      data: [{ ref: 'refs/ogc/commit-reword/old', hash: 'c'.repeat(40), branch: 'refs/heads/main', createdAt: Date.parse('2026-07-28T10:00:00Z') }],
+    });
+    await renderCenter();
+    expect(host.querySelectorAll('.recovery-center__history-item')).toHaveLength(3);
+    expect(host.querySelector('.recovery-center__history-item')?.textContent).toContain('first restore point');
+    const select = host.querySelector<HTMLSelectElement>('select[aria-label="Recovery point source"]')!;
+    act(() => {
+      select.value = 'backup';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(host.querySelectorAll('.recovery-center__history-item')).toHaveLength(1);
+    expect(host.querySelector('.recovery-center__selection h2')?.textContent).toBe('Original commit on main');
+    const search = host.querySelector<HTMLInputElement>('[aria-label="Search recovery points"]')!;
+    enterText(search, 'absent');
+    expect(host.textContent).toContain('No matching entries');
+    await clickButton('Show all entries');
+    expect(search.value).toBe('');
+    expect(select.value).toBe('all');
+    expect(host.querySelectorAll('.recovery-center__history-item')).toHaveLength(3);
+  });
+
+  it('keeps available history when backups fail and exposes the failure with retry and collapsed details', async () => {
+    vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: reflog });
+    vi.mocked(gitClient.getCommitMessageEditBackups).mockResolvedValue({ success: false, error: 'Backup store is locked' });
+    await renderCenter();
+    expect(host.querySelectorAll('.recovery-center__history-item')).toHaveLength(2);
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Git history is still available');
+    expect(host.querySelector<HTMLDetailsElement>('[role="alert"] details')?.open).toBe(false);
+    vi.mocked(gitClient.getCommitMessageEditBackups).mockResolvedValue({ success: true, data: [] });
+    await clickButton('Retry');
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('preserves the last known history when a refresh fails and recovers on retry', async () => {
+    const run = vi
+      .spyOn(gitClient, 'runGitCommandForRepo')
+      .mockResolvedValueOnce({ success: true, data: reflog })
+      .mockResolvedValueOnce({ success: false, error: 'Git unavailable' })
+      .mockResolvedValue({ success: true, data: reflog });
+    await renderCenter();
+    await renderCenter({ refreshTrigger: 1 });
+    expect(host.querySelectorAll('.recovery-center__history-item')).toHaveLength(2);
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Git history could not be refreshed');
+    await clickButton('Retry');
+    expect(run).toHaveBeenCalledTimes(3);
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('respects the editor guard and prevents duplicate submissions while waiting for it', async () => {
+    const run = vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: reflog });
+    await renderCenter();
+    let cancel: (() => void) | undefined;
+    setActiveWorkingDirectoryNavigationGuard((_target, _proceed, decline) => {
+      cancel = decline;
+    });
+    const form = host.querySelector('form')!;
+    act(() => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(run.mock.calls.filter((call) => call[1] === 'checkout')).toHaveLength(0);
+    expect(host.querySelector<HTMLInputElement>('#recovery-branch-name')?.disabled).toBe(true);
+    await act(async () => cancel?.());
+    expect(host.querySelector<HTMLInputElement>('#recovery-branch-name')?.disabled).toBe(false);
+    expect(run.mock.calls.filter((call) => call[1] === 'checkout')).toHaveLength(0);
+  });
+
+  it('clears pending confirmations and drafts when the repository changes', async () => {
+    const run = vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: reflog });
+    await renderCenter();
+    enterText(host.querySelector<HTMLInputElement>('#recovery-branch-name')!, 'old-repo/draft');
+    act(() => host.querySelector('.recovery-center__advanced summary')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    await clickButton('Reset…');
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    await renderCenter({ repoPath: 'C:/repos/other' });
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(host.querySelector<HTMLInputElement>('#recovery-branch-name')?.value).toBe('recovery-aaaaaaa');
+    expect(run.mock.calls.filter((call) => call[1] === 'reset')).toHaveLength(0);
+  });
+
+  it('supports selecting recovery points with the keyboard', async () => {
+    vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: reflog });
+    await renderCenter();
+    const first = host.querySelector<HTMLButtonElement>('.recovery-center__history-item')!;
+    act(() => {
+      first.focus();
+      first.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    });
+    expect(host.querySelector('.recovery-center__selection h2')?.textContent).toBe('second restore point');
+    expect(document.activeElement?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('keeps the chosen state and branch draft when new events renumber reflog positions', async () => {
+    const run = vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: reflog });
+    await renderCenter();
+    act(() => host.querySelectorAll<HTMLButtonElement>('.recovery-center__history-item')[1].click());
+    enterText(host.querySelector<HTMLInputElement>('#recovery-branch-name')!, 'keep/my-recovery');
+    const moved = reflog.replace('HEAD@{1}', 'HEAD@{2}').replace('HEAD@{0}', 'HEAD@{1}');
+    run.mockResolvedValue({
+      success: true,
+      data:
+        buildReflog([{ hash: 'b'.repeat(40), abbrevHash: 'bbbbbbb', selector: 'HEAD@{0}', subject: 'commit: new work', date: '2026-07-31T12:00:00Z' }]) +
+        '\x00' +
+        moved,
+    });
+    await renderCenter({ refreshTrigger: 1 });
+    expect(host.querySelector('.recovery-center__selection h2')?.textContent).toBe('second restore point');
+    expect(host.querySelector('.recovery-center__git-details code')?.textContent).toBe('HEAD@{2}');
+    expect(host.querySelector<HTMLInputElement>('#recovery-branch-name')?.value).toBe('keep/my-recovery');
   });
 });
