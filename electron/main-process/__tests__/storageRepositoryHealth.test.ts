@@ -22,10 +22,23 @@ describe('isolated bounded repository probes', () => {
     expect(await probeRepositoryHealth(repo)).toBe('invalid');
     execFileSync('git', ['-C', repo, 'init'], { windowsHide: true, stdio: 'ignore' });
     expect(await probeRepositoryHealth(repo)).toBe('available');
-    expect(probedCommonDirectory(repo)).toBe(path.join(repo, '.git'));
+    expect(probedCommonDirectory(repo)).toBe(fs.realpathSync(path.join(repo, '.git')));
     fs.writeFileSync(path.join(repo, '.git', 'HEAD'), 'damaged');
     expect(await probeRepositoryHealth(repo)).toBe('invalid');
     expect(await probeRepositoryHealth(path.join(root, 'missing', 'repo'))).toBe('missing');
+  });
+  it('resolves repository path aliases to the same Git common directory', async () => {
+    const repo = path.join(root, 'repo');
+    const alias = path.join(root, 'repo-alias');
+    fs.mkdirSync(repo);
+    execFileSync('git', ['-C', repo, 'init'], { windowsHide: true, stdio: 'ignore' });
+    fs.symlinkSync(repo, alias, process.platform === 'win32' ? 'junction' : 'dir');
+    const commonDirectory = fs.realpathSync(path.join(repo, '.git'));
+    expect(commonDirectory).not.toBe(path.join(alias, '.git'));
+    expect(await probeRepositoryHealth(repo)).toBe('available');
+    expect(await probeRepositoryHealth(alias)).toBe('available');
+    expect(probedCommonDirectory(repo)).toBe(commonDirectory);
+    expect(probedCommonDirectory(alias)).toBe(commonDirectory);
   });
   it('distinguishes missing Git and preserves disconnected drives as ambiguous', async () => {
     vi.spyOn(runtime, 'toolExecutable').mockImplementation(() => {
