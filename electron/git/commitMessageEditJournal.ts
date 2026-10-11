@@ -6,6 +6,8 @@ import { BACKUP_PREFIX, CHECK_PREFIX, OBJECT_ID } from './commitMessageEditInspe
 import { removeCheckRefs } from './commitMessageEditRemotes';
 import { physicalPathKey } from './RepositoryCommonDirectory';
 import { releaseEditLocks } from './commitMessageEditLocks';
+import { assertManagedPath, readStorageJson } from '../main-process/storageSafety';
+import { writeTextFileAtomically } from '../main-process/atomicFile';
 
 export type EditJournal = {
   version: 1;
@@ -26,11 +28,20 @@ export const editWorktree = (id: string) => path.join(editTempRoot(id), 'worktre
 export const backupReference = (journal: EditJournal) => `${BACKUP_PREFIX}${journal.createdAt}-${journal.id}`;
 
 export function writeJournal(journal: EditJournal) {
+  if (!EDIT_ID.test(journal.id)) throw new Error('Invalid recovery ownership.');
   const directory = journalDirectory(journal.commonDir);
+  assertManagedPath(journal.commonDir, directory);
   fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
   const file = path.join(directory, `${journal.id}.json`);
-  fs.writeFileSync(`${file}.tmp`, JSON.stringify(journal), { mode: 0o600 });
-  fs.renameSync(`${file}.tmp`, file);
+  assertManagedPath(journal.commonDir, file);
+  if (
+    fs.existsSync(file) &&
+    !readJournals(journal.commonDir).some(
+      (existing) => existing.id === journal.id && existing.oldHead === journal.oldHead && existing.repoPath === journal.repoPath,
+    )
+  )
+    throw new Error('Existing recovery journal has unsupported format or ownership.');
+  writeTextFileAtomically(file, JSON.stringify(journal), journal.commonDir);
 }
 
 export function createEditWorkspace(journal: EditJournal) {
@@ -42,13 +53,15 @@ export function createEditWorkspace(journal: EditJournal) {
 
 export function readJournals(commonDir: string): EditJournal[] {
   const directory = journalDirectory(commonDir);
+  assertManagedPath(commonDir, directory);
   if (!fs.existsSync(directory)) return [];
   return fs
     .readdirSync(directory)
     .filter((name) => name.endsWith('.json'))
     .flatMap((name) => {
       try {
-        const value = JSON.parse(fs.readFileSync(path.join(directory, name), 'utf8')) as EditJournal;
+        assertManagedPath(commonDir, path.join(directory, name));
+        const value = readStorageJson(commonDir, path.join(directory, name)) as EditJournal;
         if (
           value.version !== 1 ||
           !EDIT_ID.test(value.id) ||
@@ -56,6 +69,10 @@ export function readJournals(commonDir: string): EditJournal[] {
           !OBJECT_ID.test(value.oldHead) ||
           !value.branch.startsWith('refs/heads/') ||
           !Number.isSafeInteger(value.createdAt) ||
+          value.createdAt < 0 ||
+          typeof value.repoPath !== 'string' ||
+          !path.isAbsolute(value.repoPath) ||
+          (value.newHead !== undefined && !OBJECT_ID.test(value.newHead)) ||
           physicalPathKey(value.commonDir) !== physicalPathKey(commonDir)
         )
           return [];

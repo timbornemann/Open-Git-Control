@@ -16,6 +16,7 @@ import { analyzeProject, emptyProject } from './AnalyticsProject';
 import { classifySmallHistoricalBlobs } from './AnalyticsBlobs';
 import { readComparison, buildComparison } from './AnalyticsComparison';
 import type { CommitRecord } from './AnalyticsTypes';
+import { leaseStorage, recordCacheUse } from '../main-process/managedStorage';
 
 type FullReport = {
   snapshot: RepositoryAnalyticsSnapshot;
@@ -37,6 +38,21 @@ export class RepositoryAnalyticsService {
     return value && JSON.stringify(value.filters) === JSON.stringify(filters) ? value : null;
   }
   async refresh(request: AnalyticsRequest, signal: AbortSignal, onProgress: (event: AnalyticsProgress) => void): Promise<RepositoryAnalyticsSnapshot> {
+    const release = leaseStorage(this.cacheRoot);
+    try {
+      return await this.calculate(request, signal, onProgress);
+    } finally {
+      release();
+    }
+  }
+  invalidateCache(): void {
+    this.reports.clear();
+  }
+  private async calculate(
+    request: AnalyticsRequest,
+    signal: AbortSignal,
+    onProgress: (event: AnalyticsProgress) => void,
+  ): Promise<RepositoryAnalyticsSnapshot> {
     const filters = validateAnalyticsFilters(request.filters);
     const initial = new AnalyticsGit(this.gitService, request.repoPath, signal);
     const captured = await captureAnalyticsRefs(initial);
@@ -153,6 +169,7 @@ export class RepositoryAnalyticsService {
       return snapshot;
     } finally {
       cache.flush();
+      cache.compact();
       if (partial && !partial.complete) cache.saveSnapshot(this.cacheRoot, partial);
       rules.dispose();
     }
@@ -165,6 +182,7 @@ export class RepositoryAnalyticsService {
   private reuseReport(request: AnalyticsRequest, key: string, shallow: boolean, signal: AbortSignal, onProgress: (event: AnalyticsProgress) => void) {
     const existing = this.reports.get(key);
     if (shallow || !existing?.snapshot.complete) return;
+    recordCacheUse(AnalyticsCache.snapshotPath(this.cacheRoot, request.repoPath));
     signal.throwIfAborted();
     this.rememberReport(key, existing);
     onProgress({

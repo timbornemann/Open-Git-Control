@@ -1,10 +1,13 @@
 import { app, safeStorage } from 'electron';
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { DISK_CACHE_BYTES, MAX_SNAPSHOT_BYTES, MEMORY_CACHE_BYTES, isPreviewSnapshot, type PreviewSnapshot } from '../../src/shared/cache/resource';
 import { isSecureStorageAvailable } from './secureStore';
 import { repositoryPathKey } from './activeRepositoryAuthorization';
+import { cacheLastUsed, leaseStorage, recordCacheUse } from './managedStorage';
+import { assertManagedPath } from './storageSafety';
+import { mayReplaceCache } from './cacheReplacement';
 
 const cacheDirectory = () => path.join(app.getPath('userData'), 'preview-cache-v1');
 let writeQueue = Promise.resolve();
@@ -118,10 +121,11 @@ export function validatePreview(value: unknown): value is PreviewSnapshot {
   }
 }
 
-export async function readPreviewCache(allowedScope: (snapshot: PreviewSnapshot) => boolean): Promise<PreviewSnapshot[]> {
+async function loadPreviewCache(allowedScope: (snapshot: PreviewSnapshot) => boolean): Promise<PreviewSnapshot[]> {
   const directory = cacheDirectory();
   let names: string[];
   try {
+    assertManagedPath(app.getPath('userData'), directory);
     names = await fs.readdir(directory);
   } catch {
     return [];
@@ -133,9 +137,9 @@ export async function readPreviewCache(allowedScope: (snapshot: PreviewSnapshot)
     if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
     const file = path.join(directory, name);
     try {
+      assertManagedPath(app.getPath('userData'), file);
       const stat = await fs.stat(file);
       if (stat.size > MAX_SNAPSHOT_BYTES * 2) {
-        await fs.unlink(file);
         continue;
       }
       const stored: unknown = JSON.parse(await fs.readFile(file, 'utf8'));
@@ -146,21 +150,38 @@ export async function readPreviewCache(allowedScope: (snapshot: PreviewSnapshot)
             : null
           : stored;
       if (!validatePreview(entry) || (entry.key[1] === 'github' && !(object(stored) && typeof stored.encrypted === 'string'))) {
-        await fs.unlink(file);
         continue;
       }
+      if (name !== `${createHash('sha256').update(JSON.stringify(entry.key)).digest('hex')}.json`) continue;
       if (allowedScope(entry)) {
         const size = JSON.stringify(entry).length * 2;
         if (bytes + size > MEMORY_CACHE_BYTES) continue;
         bytes += size;
         snapshots.push(entry);
-        await fs.utimes(file, new Date(), new Date());
+        // Startup hydration is provisional; only a subsequent live read/write counts as use.
       }
     } catch {
-      await fs.unlink(file).catch(() => {});
+      // Preserve unreadable and future formats for diagnosis.
     }
   }
   return snapshots;
+}
+export function readPreviewCache(allowedScope: (snapshot: PreviewSnapshot) => boolean): Promise<PreviewSnapshot[]> {
+  const request = writeQueue
+    .catch(() => {})
+    .then(async () => {
+      const release = leaseStorage(cacheDirectory());
+      try {
+        return await loadPreviewCache(allowedScope);
+      } finally {
+        release();
+      }
+    });
+  writeQueue = request.then(
+    () => {},
+    () => {},
+  );
+  return request;
 }
 
 export function savePreviewCache(input: unknown[], allowedScope: (snapshot: PreviewSnapshot) => boolean): Promise<void> {
@@ -171,38 +192,74 @@ export function savePreviewCache(input: unknown[], allowedScope: (snapshot: Prev
     .catch(() => {})
     .then(async () => {
       const directory = cacheDirectory();
-      await fs.mkdir(directory, { recursive: true });
-      for (const entry of entries) {
-        let raw = JSON.stringify(entry);
-        if (Buffer.byteLength(raw) > MAX_SNAPSHOT_BYTES) continue;
-        if (entry.key[1] === 'github') {
-          if (!isSecureStorageAvailable()) continue;
-          raw = JSON.stringify({ encrypted: safeStorage.encryptString(raw).toString('base64') });
+      const release = leaseStorage(directory);
+      try {
+        assertManagedPath(app.getPath('userData'), directory);
+        await fs.mkdir(directory, { recursive: true });
+        for (const entry of entries) {
+          let raw = JSON.stringify(entry);
+          if (Buffer.byteLength(raw) > MAX_SNAPSHOT_BYTES) continue;
+          if (entry.key[1] === 'github') {
+            if (!isSecureStorageAvailable()) continue;
+            raw = JSON.stringify({ encrypted: safeStorage.encryptString(raw).toString('base64') });
+          }
+          const file = path.join(directory, `${createHash('sha256').update(JSON.stringify(entry.key)).digest('hex')}.json`);
+          const temporary = `${file}.${randomUUID()}.tmp`;
+          assertManagedPath(app.getPath('userData'), file);
+          assertManagedPath(app.getPath('userData'), temporary);
+          if (!mayReplaceCache(app.getPath('userData'), file, validatePreview)) continue;
+          let prior = 0;
+          try {
+            prior = (await fs.stat(file)).size;
+          } catch {
+            /* New cache entry. */
+          }
+          const bytes = Buffer.byteLength(raw);
+          const retainedBytes = await trimPreviewCache(directory, DISK_CACHE_BYTES - bytes + prior, file);
+          if (retainedBytes - prior + bytes > DISK_CACHE_BYTES) continue;
+          try {
+            const handle = await fs.open(temporary, 'wx', 0o600);
+            try {
+              await handle.writeFile(raw);
+              await handle.sync();
+            } finally {
+              await handle.close();
+            }
+            assertManagedPath(app.getPath('userData'), file);
+            assertManagedPath(app.getPath('userData'), temporary);
+            await fs.rename(temporary, file);
+          } finally {
+            assertManagedPath(app.getPath('userData'), temporary);
+            await fs.rm(temporary, { force: true });
+          }
+          recordCacheUse(file);
         }
-        const file = path.join(directory, `${createHash('sha256').update(JSON.stringify(entry.key)).digest('hex')}.json`);
-        const temporary = `${file}.tmp`;
-        await fs.writeFile(temporary, raw, { mode: 0o600 });
-        await fs.rename(temporary, file);
+        await trimPreviewCache(directory);
+      } finally {
+        release();
       }
-      await trimPreviewCache(directory);
     });
   return writeQueue;
 }
 
-export async function trimPreviewCache(directory = cacheDirectory(), maxBytes = DISK_CACHE_BYTES) {
+export async function trimPreviewCache(directory = cacheDirectory(), maxBytes = DISK_CACHE_BYTES, replacing?: string) {
   const entries = await Promise.all(
     (await fs.readdir(directory))
       .filter((name) => /^[a-f0-9]{64}\.json$/.test(name))
       .map(async (name) => {
         const file = path.join(directory, name);
+        assertManagedPath(app.getPath('userData'), file);
         const stat = await fs.stat(file);
-        return { file, size: stat.size, used: stat.mtimeMs };
+        return { file, size: stat.size, used: cacheLastUsed(file) ?? Date.now(), supported: mayReplaceCache(app.getPath('userData'), file, validatePreview) };
       }),
   );
   let size = entries.reduce((sum, entry) => sum + entry.size, 0);
   for (const entry of entries.sort((a, b) => a.used - b.used)) {
     if (size <= maxBytes) break;
+    if (!entry.supported || entry.file === replacing) continue;
+    assertManagedPath(app.getPath('userData'), entry.file);
     await fs.unlink(entry.file);
     size -= entry.size;
   }
+  return size;
 }

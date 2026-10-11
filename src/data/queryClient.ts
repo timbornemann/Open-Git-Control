@@ -170,5 +170,8 @@ export function hydratePreviews(snapshots: PreviewSnapshot[], startedAt: number)
     )
       continue;
     queryClient.setQueryData(snapshot.key, snapshot.data, { updatedAt: snapshot.complete ? snapshot.savedAt : 1 });
+    // Git previews must refresh their source even for queries otherwise treated as immutable.
+    // Hosting catalogues have a separate account-bound, short refresh policy.
+    if (snapshot.key[1] === 'git') queryClient.getQueryCache().find({ queryKey: snapshot.key, exact: true })?.invalidate();
   }
 }

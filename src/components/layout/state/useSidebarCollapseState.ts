@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { storageClient } from '@/services/storageClient';
+import { isRepositoryUiPreferences } from '@/shared/ipc/repositoryUiPreferences';
 import { onRepositoryLocationChanged } from '@/services/repositoryLocationBus';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 import {
@@ -20,6 +22,8 @@ type UseSidebarCollapseStateParams = {
 export const useSidebarCollapseState = ({ activeRepo }: UseSidebarCollapseStateParams) => {
   const [sidebarCollapseByRepo, setSidebarCollapseByRepo] = useState<SidebarCollapseByRepo>({});
   const [sidebarGeneralCollapseState, setSidebarGeneralCollapseState] = useState<SidebarGeneralCollapseState>(DEFAULT_SIDEBAR_GENERAL_COLLAPSE_STATE);
+  const desktop = storageClient.hasUiPreferences();
+  const generation = useRef(0);
 
   useEffect(
     () =>
@@ -49,12 +53,47 @@ export const useSidebarCollapseState = ({ activeRepo }: UseSidebarCollapseStateP
   }, []);
 
   useEffect(() => {
+    if (!desktop) return;
+    let live = true;
+    const refresh = async () => {
+      const current = generation.current;
+      try {
+        const raw = localStorage.getItem(SIDEBAR_COLLAPSE_STORAGE_KEY) ?? localStorage.getItem(LEGACY_SIDEBAR_COLLAPSE_STORAGE_KEY);
+        let legacy;
+        try {
+          const value = raw ? JSON.parse(raw) : undefined;
+          if (value && typeof value === 'object' && !Array.isArray(value) && Object.values(value).every(isRepositoryUiPreferences)) legacy = value;
+        } catch {
+          /* Unknown legacy data stays in its original storage. */
+        }
+        const result = await storageClient.uiPreferences(legacy);
+        if (!result.success) throw new Error(result.error);
+        if (!live || generation.current !== current) return;
+        setSidebarCollapseByRepo(result.data);
+        if (legacy) {
+          localStorage.removeItem(SIDEBAR_COLLAPSE_STORAGE_KEY);
+          localStorage.removeItem(LEGACY_SIDEBAR_COLLAPSE_STORAGE_KEY);
+        }
+      } catch (error) {
+        console.warn('Repository UI preferences were preserved:', error);
+      }
+    };
+    void refresh();
+    const unsubscribe = storageClient.isAvailable() ? storageClient.subscribe(() => void refresh()) : () => {};
+    return () => {
+      live = false;
+      unsubscribe();
+    };
+  }, [desktop, activeRepo]);
+
+  useEffect(() => {
+    if (desktop) return;
     try {
       localStorage.setItem(SIDEBAR_COLLAPSE_STORAGE_KEY, JSON.stringify(sidebarCollapseByRepo));
     } catch {
       // ignore write errors (e.g. private mode / quota)
     }
-  }, [sidebarCollapseByRepo]);
+  }, [sidebarCollapseByRepo, desktop]);
 
   useEffect(() => {
     try {
@@ -79,25 +118,36 @@ export const useSidebarCollapseState = ({ activeRepo }: UseSidebarCollapseStateP
   }, [sidebarGeneralCollapseState]);
 
   const activeSidebarCollapseState = useMemo(() => {
-    return activeRepo ? { ...DEFAULT_SIDEBAR_COLLAPSE_STATE, ...(sidebarCollapseByRepo[activeRepo] || {}) } : DEFAULT_SIDEBAR_COLLAPSE_STATE;
+    const key = activeRepo && Object.keys(sidebarCollapseByRepo).find((repo) => normalizeRepoPathKey(repo) === normalizeRepoPathKey(activeRepo));
+    return key ? { ...DEFAULT_SIDEBAR_COLLAPSE_STATE, ...sidebarCollapseByRepo[key] } : DEFAULT_SIDEBAR_COLLAPSE_STATE;
   }, [activeRepo, sidebarCollapseByRepo]);
 
   const updateActiveRepoSidebarCollapse = useCallback(
     (partial: Partial<SidebarCollapseState>) => {
       if (!activeRepo) return;
+      const request = ++generation.current;
 
       setSidebarCollapseByRepo((prev) => {
-        const current = { ...DEFAULT_SIDEBAR_COLLAPSE_STATE, ...(prev[activeRepo] || {}) };
+        const key = Object.keys(prev).find((repo) => normalizeRepoPathKey(repo) === normalizeRepoPathKey(activeRepo)) || activeRepo;
+        const current = { ...DEFAULT_SIDEBAR_COLLAPSE_STATE, ...(prev[key] || {}) };
         return {
           ...prev,
-          [activeRepo]: {
+          [key]: {
             ...current,
             ...partial,
           },
         };
       });
+      if (desktop)
+        void storageClient
+          .updateUiPreferences({ repoPath: activeRepo, patch: partial })
+          .then((result) => {
+            if (!result.success) throw new Error(result.error);
+            if (generation.current === request) setSidebarCollapseByRepo(result.data);
+          })
+          .catch((error) => console.warn('Repository UI preferences could not be saved:', error));
     },
-    [activeRepo],
+    [activeRepo, desktop],
   );
 
   const toggleBranchPanelCollapsed = useCallback(() => {

@@ -13,6 +13,22 @@ afterEach(async () => {
   await cleanupAnalyticsFixtures();
 });
 describe('analytics cache recovery and source validity', () => {
+  it('continues full calculations with a saturated cache and does not persist additional results', async () => {
+    const f = await fixture();
+    fs.mkdirSync(f.cache, { recursive: true });
+    const full = path.join(f.cache, 'unknown-preserved-data');
+    const fd = fs.openSync(full, 'w');
+    fs.ftruncateSync(fd, 512 * 1024 ** 2);
+    fs.closeSync(fd);
+    const first = await f.refresh();
+    expect(first.complete).toBe(true);
+    expect(first.totals.commits).toBe(3);
+    expect(first.project.lines).toBe(10);
+    expect(fs.existsSync(AnalyticsCache.snapshotPath(f.cache, f.repo))).toBe(false);
+    const second = await f.refresh();
+    expect(second.totals).toEqual(first.totals);
+    expect(fs.statSync(full).size).toBe(512 * 1024 ** 2);
+  }, 90000);
   it('does not publish an aborted report as complete and resumes captured records after an interrupted append', async () => {
     const f = await fixture();
     const controller = new AbortController();

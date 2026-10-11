@@ -2,6 +2,8 @@ import { createRepositorySecretScanAllowlistApi } from './createRepositorySecret
 import { createRepositoryAnalyticsApi } from './createRepositoryAnalyticsApi';
 import { createRepositoryLocationApi } from './createRepositoryLocationApi';
 import { createSystemToolsApi } from './createSystemToolsApi';
+import { createStorageApi } from './createStorageApi';
+import type { RepositoryMutation } from '../../src/shared/ipc/storageMaintenance';
 import type { PreviewSnapshot, ReadRequest } from '../../src/shared/cache/resource';
 import type { IpcRenderer, IpcRendererEvent } from 'electron';
 import { IpcChannel } from '../../src/types/ipcContract';
@@ -296,6 +298,13 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       return () => ipcRenderer.removeListener(IpcChannel.JobEvent, handler);
     },
     getStoredRepos: () => ipcRenderer.invoke(IpcChannel.ReposGetStored),
+    mutateStoredRepos: (operation: RepositoryMutation) => ipcRenderer.invoke(IpcChannel.ReposMutate, operation),
+    onStoredReposChanged: (callback: (data: StoredRepoData) => void) => {
+      const handler = (_event: unknown, data: StoredRepoData) => callback(data);
+      ipcRenderer.on(IpcChannel.ReposChanged, handler);
+      return () => ipcRenderer.removeListener(IpcChannel.ReposChanged, handler);
+    },
+    ...createStorageApi(ipcRenderer),
     setStoredRepos: (data: StoredRepoData) => ipcRenderer.invoke(IpcChannel.ReposSetStored, data),
     ...createRepositoryRunApi(ipcRenderer),
     plannerGetData: () => ipcRenderer.invoke(IpcChannel.PlannerGetData),
@@ -445,6 +454,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       clearOpenAiApiKey: flatApi.clearOpenAiApiKey,
     },
     app: {
+      ...createStorageApi(ipcRenderer),
       ...createSystemToolsApi(ipcRenderer),
       cancelReadRequest: flatApi.cancelReadRequest,
       getBootstrap: flatApi.getBootstrap,
@@ -485,6 +495,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       selectRepositoryLocation: flatApi.selectRepositoryLocation,
       ...createRepositoryIconApi(ipcRenderer),
       getStoredRepos: flatApi.getStoredRepos,
+      mutateStoredRepos: flatApi.mutateStoredRepos,
+      onStoredReposChanged: flatApi.onStoredReposChanged,
       setStoredRepos: flatApi.setStoredRepos,
       resolveRepoPath: flatApi.resolveRepoPath,
       setRepoPath: flatApi.setRepoPath,

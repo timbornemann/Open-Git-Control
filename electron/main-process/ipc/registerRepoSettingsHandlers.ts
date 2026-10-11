@@ -2,7 +2,8 @@ import { app, ipcMain } from 'electron';
 import type { AppSettings } from '../../settings';
 import { normalizeSettings } from '../../settings';
 import type { StoredData } from '../repoStore';
-import { readStoreData, writeStoreData } from '../repoStore';
+import { readStoreData, writeStoreData, mutateRepositoryStore } from '../repoStore';
+import type { RepositoryMutation } from '../../../src/shared/ipc/storageMaintenance';
 import { IpcChannel } from '../../../src/types/ipcContract';
 import {
   clearSavedGeminiApiKeySecurely,
@@ -21,6 +22,7 @@ import { clearGithubCatalogCache } from '../githubCatalogCache';
 type RegisterRepoSettingsHandlersDeps = {
   updaterManager: UpdaterManager;
   githubService: Pick<GitHubService, 'logout'>;
+  canonicalize?: (operation: Extract<RepositoryMutation, { kind: 'canonicalize' }>) => Promise<StoredData>;
 };
 
 function getEndpointOrigin(value: string): string {
@@ -42,14 +44,23 @@ function getValidOpenAiEndpointOrigin(value: unknown): string | null {
   }
 }
 
-export function registerRepoSettingsHandlers({ updaterManager, githubService }: RegisterRepoSettingsHandlersDeps): void {
+export function registerRepoSettingsHandlers({ updaterManager, githubService, canonicalize }: RegisterRepoSettingsHandlersDeps): void {
   ipcMain.handle(IpcChannel.ReposGetStored, async () => {
     return readStoreData();
   });
 
   ipcMain.handle(IpcChannel.ReposSetStored, async (_event: any, data: StoredData) => {
+    if ((data.revision || 0) !== (readStoreData().revision || 0)) throw new Error('Repository registry changed. Reload it before saving.');
     writeStoreData(data);
     return true;
+  });
+
+  ipcMain.handle(IpcChannel.ReposMutate, async (_event, operation: RepositoryMutation) => {
+    try {
+      return { success: true, data: operation?.kind === 'canonicalize' && canonicalize ? await canonicalize(operation) : mutateRepositoryStore(operation) };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
   });
 
   ipcMain.handle(IpcChannel.SettingsGet, async () => {

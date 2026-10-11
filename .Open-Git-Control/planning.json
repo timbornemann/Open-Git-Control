@@ -120,17 +120,6 @@
       "tags": [],
       "createdAt": 1791462817621,
       "updatedAt": 1791462817621
-    },
-    {
-      "id": "f8cd90bd-fcb3-4639-a76e-1e82b9a210bd",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Readme aktualisieren",
-      "description": "Readme aktualisieren: mittlerweile sind extrem viele Funktionen hinzu gekommen und ich bin mir nicht sicher welche alle in de readme übernommen wurden, prüfe anhand des git verlaufes welche funktionen alles hinzu kamen und was es alles git und ergänze die readme passend mit relevanten informationen",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1791504660702,
-      "updatedAt": 1791649713463
     }
   ]
 }

@@ -26,6 +26,7 @@ const {
   saveOpenAiApiKeySecurelyMock,
   writeSettingsMock,
   writeStoreDataMock,
+  mutateRepositoryStoreMock,
 } = vi.hoisted(() => ({
   clearSavedGeminiApiKeySecurelyMock: vi.fn(),
   clearSavedGithubTokenSecurelyMock: vi.fn(),
@@ -37,11 +38,13 @@ const {
   saveOpenAiApiKeySecurelyMock: vi.fn(),
   writeSettingsMock: vi.fn(),
   writeStoreDataMock: vi.fn(),
+  mutateRepositoryStoreMock: vi.fn(),
 }));
 
 vi.mock('../../repoStore', () => ({
   readStoreData: readStoreDataMock,
   writeStoreData: writeStoreDataMock,
+  mutateRepositoryStore: mutateRepositoryStoreMock,
 }));
 
 vi.mock('../../settingsStore', () => ({
@@ -77,6 +80,7 @@ describe('platform IPC handlers', () => {
     appGetVersionMock.mockReset();
     readStoreDataMock.mockReset();
     writeStoreDataMock.mockReset();
+    mutateRepositoryStoreMock.mockReset();
     readSettingsWithMigrationMock.mockReset();
     writeSettingsMock.mockReset();
     saveGeminiApiKeySecurelyMock.mockReset();
@@ -191,6 +195,36 @@ describe('platform IPC handlers', () => {
     await expect(handlers.get(IpcChannel.AppGetVersion)?.({})).resolves.toBe('9.8.7');
   });
 
+  it('rejects stale snapshots and wraps targeted repository mutations and alias validation', async () => {
+    const { registerRepoSettingsHandlers } = await import('../registerRepoSettingsHandlers');
+    const handlers = getRegisteredHandlers();
+    const canonicalize = vi.fn().mockResolvedValue({ repos: [], revision: 9 });
+    registerRepoSettingsHandlers({ updaterManager: { setAutoUpdatesEnabled: vi.fn() }, githubService: { logout: vi.fn() }, canonicalize } as any);
+    readStoreDataMock.mockReturnValue({ repos: [], revision: 8 });
+    await expect(handlers.get(IpcChannel.ReposSetStored)?.({}, { repos: [{ path: 'C:/removed' }], revision: 7 })).rejects.toThrow('registry changed');
+    expect(writeStoreDataMock).not.toHaveBeenCalled();
+    mutateRepositoryStoreMock.mockReturnValue({ repos: [], revision: 9 });
+    await expect(handlers.get(IpcChannel.ReposMutate)?.({}, { kind: 'remove', path: 'C:/removed' })).resolves.toEqual({
+      success: true,
+      data: { repos: [], revision: 9 },
+    });
+    await expect(handlers.get(IpcChannel.ReposMutate)?.({}, { kind: 'canonicalize', path: 'C:/alias', canonicalPath: 'C:/root' })).resolves.toEqual({
+      success: true,
+      data: { repos: [], revision: 9 },
+    });
+    expect(canonicalize).toHaveBeenCalledWith({ kind: 'canonicalize', path: 'C:/alias', canonicalPath: 'C:/root' });
+    mutateRepositoryStoreMock.mockImplementation(() => {
+      throw new Error('No longer registered');
+    });
+    await expect(handlers.get(IpcChannel.ReposMutate)?.({}, { kind: 'metadata', path: 'C:/removed', pinned: true })).resolves.toEqual({
+      success: false,
+      error: 'No longer registered',
+    });
+    mutateRepositoryStoreMock.mockImplementation(() => {
+      throw 'Invalid operation';
+    });
+    await expect(handlers.get(IpcChannel.ReposMutate)?.({}, null)).resolves.toEqual({ success: false, error: 'Invalid operation' });
+  });
   it('keeps the old GitHub host settings and session when token deletion fails', async () => {
     const { registerRepoSettingsHandlers } = await import('../registerRepoSettingsHandlers');
     const handlers = getRegisteredHandlers();

@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useWorkspaceDomain } from '@/components/layout/hooks/useWorkspaceDomain';
 import { appClient } from '@/services/appClient';
+import { installRepositoryRegistryHarness } from './repositoryRegistryHarness';
 import {
   resetWorkingDirectoryNavigationGuardForTests,
   setActiveWorkingDirectoryNavigationGuard,
@@ -62,6 +63,7 @@ beforeEach(() => {
   vi.spyOn(appClient, 'isAvailable').mockReturnValue(true);
   vi.spyOn(appClient, 'getStoredRepos').mockResolvedValue({ repos: [], activeRepo: null, sortBy: 'lastOpenedDesc' });
   vi.spyOn(appClient, 'setStoredRepos').mockResolvedValue(true);
+  installRepositoryRegistryHarness();
   vi.spyOn(appClient, 'clearRepoPath').mockResolvedValue(true);
   vi.spyOn(appClient, 'resolveRepoPath').mockImplementation(async (repoPath) => repoPath);
 });
@@ -96,7 +98,9 @@ describe('useWorkspaceDomain repository recovery', () => {
     expect(hook.current.repoMeta[missing]).toBeUndefined();
     expect(hook.triggerRefresh).toHaveBeenCalled();
     expect(hook.onRepoActivated).toHaveBeenCalled();
-    expect(appClient.setStoredRepos).toHaveBeenLastCalledWith({ repos: [{ ...record, path: moved }], activeRepo: moved, sortBy: 'nameAsc' });
+    expect(appClient.mutateStoredRepos).toHaveBeenCalledWith({ kind: 'canonicalize', path: missing, canonicalPath: moved });
+    expect(appClient.mutateStoredRepos).toHaveBeenCalledWith({ kind: 'activate', path: moved });
+    expect(appClient.setStoredRepos).not.toHaveBeenCalled();
     hook.unmount();
   });
   it('rechecks and refreshes the same active path without a new-location dialog', async () => {

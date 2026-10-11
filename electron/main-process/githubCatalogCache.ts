@@ -3,6 +3,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { GithubCatalogSnapshotDto, GitHubRepositoryDto } from '../../src/types/githubDtos';
 import { isSecureStorageAvailable } from './secureStore';
+import { assertManagedPath } from './storageSafety';
+import { recordCacheUse } from './managedStorage';
+import { canPersistAuxiliary } from './auxiliaryDiskBudget';
+import { writeTextFileAtomically } from './atomicFile';
+import { mayReplaceCache } from './cacheReplacement';
 
 type StoredSnapshot = Omit<GithubCatalogSnapshotDto, 'repos'> & {
   publicRepos: GitHubRepositoryDto[];
@@ -17,6 +22,13 @@ const sameAccount = (host: string, username: string, snapshot: { host: string; u
 export function clearGithubCatalogCache(): void {
   sessionSnapshot = null;
   try {
+    if (
+      !mayReplaceCache(app.getPath('userData'), cachePath(), (value) =>
+        Boolean(value && typeof value === 'object' && !('version' in value) && Array.isArray((value as StoredSnapshot).publicRepos)),
+      )
+    )
+      return;
+    assertManagedPath(app.getPath('userData'), cachePath());
     fs.rmSync(cachePath(), { force: true });
   } catch {
     // A stale cache is rejected by account binding even if its file cannot be removed.
@@ -29,10 +41,13 @@ export function readGithubCatalogCache(host: string, username?: string | null): 
       clearGithubCatalogCache();
       return null;
     }
+    recordCacheUse(cachePath());
     return sessionSnapshot;
   }
   try {
+    assertManagedPath(app.getPath('userData'), cachePath());
     const stored = JSON.parse(fs.readFileSync(cachePath(), 'utf8')) as StoredSnapshot;
+    if ('version' in stored) return null;
     if (stored.host.toLowerCase() !== host.toLowerCase() || (username && !sameAccount(host, username, stored))) {
       clearGithubCatalogCache();
       return null;
@@ -49,6 +64,7 @@ export function readGithubCatalogCache(host: string, username?: string | null): 
       repos: [...stored.publicRepos, ...privateRepos],
       refreshRequired: stored.refreshRequired || Boolean(stored.encryptedPrivateRepos && !canDecryptPrivateRepos),
     };
+    recordCacheUse(cachePath());
     return sessionSnapshot;
   } catch {
     return null;
@@ -71,6 +87,22 @@ export function saveGithubCatalogCache(host: string, username: string, repos: Gi
     encryptedPrivateRepos,
     refreshRequired: privateRepos.length > 0 && !encryptedPrivateRepos,
   };
-  fs.writeFileSync(cachePath(), JSON.stringify(stored), { mode: 0o600 });
+  const raw = JSON.stringify(stored);
+  if (
+    mayReplaceCache(app.getPath('userData'), cachePath(), (value) =>
+      Boolean(
+        value &&
+        typeof value === 'object' &&
+        !('version' in value) &&
+        Array.isArray((value as StoredSnapshot).publicRepos) &&
+        typeof (value as StoredSnapshot).host === 'string' &&
+        typeof (value as StoredSnapshot).username === 'string' &&
+        typeof (value as StoredSnapshot).savedAt === 'string',
+      ),
+    ) &&
+    canPersistAuxiliary(app.getPath('userData'), cachePath(), Buffer.byteLength(raw))
+  )
+    writeTextFileAtomically(cachePath(), raw);
+  recordCacheUse(cachePath());
   return sessionSnapshot;
 }

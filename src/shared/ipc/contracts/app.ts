@@ -1,6 +1,7 @@
 import type { AppBootstrapDto, PreviewSnapshot } from '../../cache/resource';
 import type { DiagnosticsReportDto, PlanningApiInfoDto, PlanningApiTokenLifetimeDto, UpdaterOneClickResultDto, UpdaterStatusDto } from '../../../types/appDtos';
 import type { IpcResult } from '../../../types/ipc';
+import type { ElectronStorageAPI } from '../storageMaintenance';
 import type { FeedbackReportCapabilityDto, FeedbackReportInputDto, FeedbackReportSubmissionResultDto } from '../../../types/feedbackDtos';
 import type { InstallSystemToolRequest, SystemToolInstallEvent, SystemToolsStatus } from '../systemTools';
 
@@ -14,7 +15,7 @@ export type BasicActionResultDto = {
   error?: string;
 };
 
-export interface ElectronAppAPI {
+export interface ElectronAppAPI extends ElectronStorageAPI {
   getSystemToolsStatus: () => Promise<SystemToolsStatus>;
   recheckSystemTools: () => Promise<SystemToolsStatus>;
   installSystemTool: (request: InstallSystemToolRequest) => Promise<IpcResult<SystemToolInstallEvent>>;

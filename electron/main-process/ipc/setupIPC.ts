@@ -30,6 +30,8 @@ import { registerRepositoryIconHandlers } from './registerRepositoryIconHandlers
 import { registerRepositorySecretScanAllowlistHandlers } from './registerRepositorySecretScanAllowlistHandlers';
 import { registerGitIdentityHandlers } from './registerGitIdentityHandlers';
 import { registerRepositoryLocationHandlers } from './registerRepositoryLocationHandlers';
+import { registerStorageMaintenanceHandlers } from './registerStorageMaintenanceHandlers';
+import { RepositoryLocationService } from '../RepositoryLocationService';
 
 type SetupIpcDeps = {
   gitService: GitService;
@@ -63,7 +65,7 @@ export function setupIPC({
   getGeminiApiKeyFromSecureStore,
   getOpenAiApiKeyFromSecureStore,
   buildDiagnosticsReport,
-}: SetupIpcDeps): { repositoryRunService: RepositoryRunService } {
+}: SetupIpcDeps): { repositoryRunService: RepositoryRunService; disposeStorageMaintenance: () => void } {
   const repositoryRunConfigService = new RepositoryRunConfigService();
   const repositoryRunService = new RepositoryRunService(repositoryRunConfigService);
   registerReadCancellation();
@@ -77,11 +79,21 @@ export function setupIPC({
     readSettingsWithMigration,
     repoJobRegistry,
   });
-  registerRepoSettingsHandlers({ updaterManager, githubService });
-  registerRepositoryIconHandlers();
+  const locationService = new RepositoryLocationService(gitService.runner);
+  registerRepoSettingsHandlers({
+    updaterManager,
+    githubService,
+    canonicalize: async (operation) => {
+      const data = await locationService.canonicalize(operation.path, operation.canonicalPath);
+      await maintenance.service.repositoryRelocated(operation.path).catch((error) => console.warn('[storage-maintenance] Alias cache invalidation:', error));
+      return data;
+    },
+  });
+  const iconService = registerRepositoryIconHandlers();
   registerGitIdentityHandlers(gitService);
-  registerRepositoryAnalyticsHandlers(gitService);
-  registerRepositoryLocationHandlers(gitService);
+  const analyticsService = registerRepositoryAnalyticsHandlers(gitService);
+  const maintenance = registerStorageMaintenanceHandlers({ gitService, commitStatsService, runService: repositoryRunService, iconService, analyticsService });
+  registerRepositoryLocationHandlers(gitService, locationService, (oldPath) => maintenance.service.repositoryRelocated(oldPath));
   registerRepositorySecretScanAllowlistHandlers({ gitService, repoJobRegistry, readSettingsWithMigration });
   registerProjectPlannerHandlers({ gitService });
   registerUpdaterHandlers({ updaterManager });
@@ -124,5 +136,5 @@ export function setupIPC({
     runService: repositoryRunService,
     readStoredRepoPaths: () => readStoreData().repos.map((repo) => repo.path),
   });
-  return { repositoryRunService };
+  return { repositoryRunService, disposeStorageMaintenance: maintenance.dispose };
 }

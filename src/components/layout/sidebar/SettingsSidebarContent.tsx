@@ -1,6 +1,7 @@
 import React from 'react';
 import type { AppSidebarProps } from './AppSidebar.types';
 import { SettingsDiagnosticsSection } from '@/components/layout/settings/SettingsDiagnosticsSection';
+import { SettingsStorageSection } from '@/components/layout/settings/SettingsStorageSection';
 import {
   SettingsAiSection,
   SettingsGeneralSection,
@@ -26,6 +27,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({ 
       <SettingsUpdatesSection settings={settings} onUpdateSettings={onUpdateSettings} variant="sidebar" ai={aiUpdater} locale={locale} />
       <SettingsFeedbackSection settings={settings} onUpdateSettings={onUpdateSettings} variant="sidebar" />
       <SettingsDiagnosticsSection />
+      <SettingsStorageSection settings={settings} onUpdateSettings={onUpdateSettings} variant="sidebar" />
       <SettingsJobsSection jobs={sortedJobs} onClearJobs={onClearJobs} variant="sidebar" locale={locale} />
     </div>
   );

@@ -150,6 +150,16 @@ export const getSettingsGroups = (tr: Translate) =>
       keywords: 'diagnostics report copy diagnose bericht kopieren troubleshooting',
     },
     {
+      id: 'storage',
+      tab: 'system',
+      title: tr('Speicher & Bereinigung', 'Storage & cleanup'),
+      description: tr(
+        'Speicherverbrauch, automatische Datenpflege und Wiederherstellungssicherungen.',
+        'Storage usage, automatic maintenance and recovery backups.',
+      ),
+      keywords: 'storage cleanup cache budget disk speicher bereinigung datenpflege wiederherstellung',
+    },
+    {
       id: 'jobs',
       tab: 'system',
       title: tr('Vorgangsverlauf', 'Operation history'),

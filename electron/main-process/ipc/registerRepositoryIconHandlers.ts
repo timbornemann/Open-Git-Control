@@ -71,6 +71,10 @@ export function registerRepositoryIconHandlers(
   });
   const retain = () => service.retainRepositories(readStoreData().repos.map((repo) => repo.path));
   onRepoStoreChanged(retain);
-  retain();
+  try {
+    retain();
+  } catch (error) {
+    console.warn('[repository-icons] Registry is unreadable; persisted data was preserved.', error);
+  }
   return service;
 }

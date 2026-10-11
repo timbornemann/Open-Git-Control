@@ -35,6 +35,10 @@ export class RepoJobRegistry {
   getGeneration(): number {
     return this.generation;
   }
+  isRepositoryBusy(repoPath: string): boolean {
+    const key = normalizeRepoPathKey(repoPath);
+    return [...this.activeJobs.values()].some((job) => job.repoPathKey === key);
+  }
 
   begin(repoPath: string): RepoJobContext {
     const normalizedPath = String(repoPath || '').trim();

@@ -15,6 +15,7 @@ vi.mock('electron', () => ({
 }));
 vi.mock('../secureStore', () => ({ isSecureStorageAvailable: () => state.encrypted }));
 import { readPreviewCache, savePreviewCache, trimPreviewCache, validatePreview } from '../previewCache';
+import { recordCacheUse } from '../managedStorage';
 
 const preview = (): PreviewSnapshot => ({
   version: 1,
@@ -75,13 +76,13 @@ describe('persistent preview cache', () => {
     await savePreviewCache([{ ...entry, version: 2 }], () => true);
     expect(await readPreviewCache(() => true)).toEqual([]);
   });
-  it('discards a corrupt cache file without affecting valid snapshots', async () => {
+  it('preserves a corrupt cache file without using it or affecting valid snapshots', async () => {
     await savePreviewCache([preview()], () => true);
     const directory = path.join(state.directory, 'preview-cache-v1');
     const damaged = path.join(directory, `${'a'.repeat(64)}.json`);
     await fs.writeFile(damaged, '{partial');
     expect(await readPreviewCache(() => true)).toHaveLength(1);
-    await expect(fs.stat(damaged)).rejects.toThrow();
+    expect(await fs.readFile(damaged, 'utf8')).toBe('{partial');
   });
   it('evicts the least recently used disk snapshots when the budget is exceeded', async () => {
     const entries: PreviewSnapshot[] = [0, 1, 2].map((index) => ({
@@ -92,7 +93,7 @@ describe('persistent preview cache', () => {
     await savePreviewCache(entries, () => true);
     const directory = path.join(state.directory, 'preview-cache-v1');
     const files = entries.map((entry) => path.join(directory, `${createHash('sha256').update(JSON.stringify(entry.key)).digest('hex')}.json`));
-    for (const [index, file] of files.entries()) await fs.utimes(file, new Date(1000 + index * 1000), new Date(1000 + index * 1000));
+    for (const [index, file] of files.entries()) recordCacheUse(file, 1000 + index * 1000);
     const sizes = await Promise.all(files.map(async (file) => (await fs.stat(file)).size));
     await trimPreviewCache(directory, sizes[1] + sizes[2]);
     await expect(fs.stat(files[0])).rejects.toThrow();
@@ -124,7 +125,9 @@ describe('persistent preview cache', () => {
       const raw = JSON.stringify(entry);
       await fs.writeFile(file, encrypted ? JSON.stringify({ encrypted: Buffer.from(raw.split('').reverse().join('')).toString('base64') }) : raw);
       expect(await readPreviewCache(authorize)).toEqual([]);
-      await expect(fs.stat(file)).rejects.toThrow();
+      expect(await fs.readFile(file, 'utf8')).toBe(
+        encrypted ? JSON.stringify({ encrypted: Buffer.from(raw.split('').reverse().join('')).toString('base64') }) : raw,
+      );
     }
     expect(authorize).not.toHaveBeenCalled();
   });

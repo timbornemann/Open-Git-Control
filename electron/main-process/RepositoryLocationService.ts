@@ -4,7 +4,7 @@ import * as path from 'path';
 import type { GitService } from '../GitService';
 import { toolExecutable } from '../system-tools/toolRuntime';
 import { repositoryPathKey } from './activeRepositoryAuthorization';
-import { readStoreData, notifyRepoStoreChanged, type StoredData } from './repoStore';
+import { readStoreData, normalizeStoredData, notifyRepoStoreChanged, notifyRepoStoreWillChange, type StoredData } from './repoStore';
 import { prepareRepositoryLocationMetadata, publishRepositoryLocationMetadata } from './repositoryLocationMetadata';
 import { relocateKnownPlannerRepository } from './projectPlannerStore';
 
@@ -65,14 +65,48 @@ export class RepositoryLocationService {
       throw new Error('The selected repository is already in your list. Its settings were not replaced.');
     const next: StoredData = {
       ...data,
+      revision: (data.revision || 0) + 1,
       repos: data.repos.map((repo) => (repositoryPathKey(repo.path) === repositoryPathKey(saved) ? { ...repo, path: root } : repo)),
       activeRepo: data.activeRepo && repositoryPathKey(data.activeRepo) === repositoryPathKey(saved) ? root : data.activeRepo,
     };
-    const changes = prepareRepositoryLocationMetadata(this.directory(), saved, root, next);
     current();
+    notifyRepoStoreWillChange(data, next);
+    const changes = prepareRepositoryLocationMetadata(this.directory(), saved, root, next);
     publishRepositoryLocationMetadata(changes);
     notifyRepoStoreChanged();
     relocateKnownPlannerRepository(saved, root);
     return root;
+  }
+
+  async canonicalize(repoPath: string, canonicalPath: string): Promise<StoredData> {
+    const initial = readStoreData();
+    if (
+      !initial.repos.some((entry) => repositoryPathKey(entry.path) === repositoryPathKey(repoPath)) &&
+      initial.repos.some((entry) => repositoryPathKey(entry.path) === repositoryPathKey(canonicalPath))
+    )
+      return initial;
+    const saved = this.saved(repoPath, initial);
+    if (typeof canonicalPath !== 'string' || !path.isAbsolute(canonicalPath)) throw new Error('An absolute canonical path is required.');
+    const root = await this.resolve(saved);
+    const target = await this.resolve(canonicalPath);
+    if (
+      repositoryPathKey(fs.realpathSync.native(root)) !== repositoryPathKey(fs.realpathSync.native(target)) ||
+      repositoryPathKey(target) !== repositoryPathKey(canonicalPath)
+    )
+      throw new Error('The canonical path must be the same Git repository root.');
+    if (repositoryPathKey(saved) === repositoryPathKey(target)) return readStoreData();
+    const data = readStoreData();
+    this.saved(saved, data);
+    const next = normalizeStoredData({
+      ...data,
+      revision: (data.revision || 0) + 1,
+      repos: data.repos.map((entry) => (repositoryPathKey(entry.path) === repositoryPathKey(saved) ? { ...entry, path: target } : entry)),
+      activeRepo: data.activeRepo && repositoryPathKey(data.activeRepo) === repositoryPathKey(saved) ? target : data.activeRepo,
+    });
+    notifyRepoStoreWillChange(data, next);
+    publishRepositoryLocationMetadata(prepareRepositoryLocationMetadata(this.directory(), saved, target, next));
+    notifyRepoStoreChanged();
+    relocateKnownPlannerRepository(saved, target);
+    return readStoreData();
   }
 }

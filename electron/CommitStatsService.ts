@@ -2,6 +2,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { createHash } from 'crypto';
 import type { CommitStats, GitService } from './GitService';
+import { assertManagedPath } from './main-process/storageSafety';
+import { recordCacheUse } from './main-process/managedStorage';
+import { writeTextFileAtomically } from './main-process/atomicFile';
+import { cacheFileIdentity } from './main-process/cacheFileIdentity';
+import { readJsonlLines } from './main-process/boundedJsonl';
 
 const CACHE_SCHEMA = 2;
 const MAX_CACHE_ENTRIES = 100_000;
@@ -66,6 +71,10 @@ export class CommitStatsService {
   private objectFormats = new Map<string, string>();
   private namespaces = new Map<string, { shallowFingerprint: string; value: string }>();
   private lastAccessedAt = 0;
+  private writable = true;
+  private fileIdentity: string | null = null;
+  private accessTimer: NodeJS.Timeout | null = null;
+  private dirtyAccess = false;
 
   constructor(
     private readonly gitService: GitService,
@@ -104,6 +113,56 @@ export class CommitStatsService {
   getDiagnostics(): DiagnosticEntry[] {
     return [...this.diagnostics];
   }
+  isRepositoryBusy(repoPath: string): boolean {
+    const key = this.repoPathKey(repoPath);
+    return (
+      [...this.active.values()].some(({ entry }) => this.repoPathKey(entry.repoPath) === key) ||
+      this.queue.some((entry) => this.repoPathKey(entry.repoPath) === key)
+    );
+  }
+  maintain(clear: boolean, cutoff: number): boolean {
+    if (this.active.size || this.queue.length) return false;
+    this.ensureLoaded();
+    if (!this.canWrite()) return false;
+    if (clear) {
+      if (this.accessTimer) clearTimeout(this.accessTimer);
+      this.accessTimer = null;
+      this.dirtyAccess = false;
+      this.cache.clear();
+      assertManagedPath(path.dirname(this.getCachePath()), this.getCachePath());
+      fs.rmSync(this.getCachePath(), { force: true });
+      this.fileIdentity = null;
+      return true;
+    } else for (const [key, entry] of this.cache) if (entry.accessedAt < cutoff) this.cache.delete(key);
+    this.compact();
+    return true;
+  }
+  dispose(): void {
+    if (this.accessTimer) clearTimeout(this.accessTimer);
+    this.accessTimer = null;
+    if (this.dirtyAccess && this.writable)
+      try {
+        this.compact();
+        this.dirtyAccess = false;
+      } catch {
+        /* Existing cache remains intact. */
+      }
+  }
+  private persistAccessSoon() {
+    this.dirtyAccess = true;
+    if (this.accessTimer || !this.writable) return;
+    this.accessTimer = setTimeout(() => {
+      this.accessTimer = null;
+      if (this.writable && fs.existsSync(path.dirname(this.getCachePath())))
+        try {
+          this.compact();
+          this.dirtyAccess = false;
+        } catch {
+          /* Retry on shutdown/maintenance. */
+        }
+    }, 1000);
+    this.accessTimer.unref();
+  }
 
   async requestStats(
     hashes: string[],
@@ -125,7 +184,9 @@ export class CommitStatsService {
       requestedKeys.add(key);
       const cached = this.cache.get(key);
       if (cached) {
+        recordCacheUse(this.getCachePath());
         cached.accessedAt = this.nextAccessedAt();
+        this.persistAccessSoon();
         result[hash] = { state: 'ready', stats: cached.stats };
         this.recordDiagnostic(0, true, false);
         continue;
@@ -161,7 +222,9 @@ export class CommitStatsService {
     for (const hash of hashes) {
       const entry = this.cache.get(this.cacheKey(namespace, objectFormat, hash));
       if (!entry) continue;
+      recordCacheUse(this.getCachePath());
       entry.accessedAt = this.nextAccessedAt();
+      this.persistAccessSoon();
       result[hash] = entry.stats;
     }
     return result;
@@ -213,29 +276,40 @@ export class CommitStatsService {
     if (this.loaded) return;
     this.loaded = true;
     try {
-      const raw = fs.readFileSync(this.getCachePath(), 'utf8');
-      let malformed = false;
-      for (const line of raw.split(/\r?\n/)) {
+      assertManagedPath(path.dirname(this.getCachePath()), this.getCachePath());
+      this.fileIdentity = cacheFileIdentity(this.getCachePath());
+      for (const line of readJsonlLines(this.getCachePath())) {
         if (!line.trim()) continue;
         try {
           const entry = JSON.parse(line) as CacheEntry;
-          if (entry.schema !== CACHE_SCHEMA || !entry.namespace || !/^[0-9a-f]{7,64}$/i.test(entry.hash) || !entry.stats) {
-            malformed = true;
-            break;
+          if (entry.schema !== CACHE_SCHEMA) {
+            this.writable = false;
+            continue;
           }
-          this.cache.set(this.cacheKey(entry.namespace, entry.objectFormat, entry.hash), entry);
+          if (
+            typeof entry.namespace !== 'string' ||
+            !/^[0-9a-f]{64}$/i.test(entry.namespace) ||
+            !['sha1', 'sha256'].includes(entry.objectFormat) ||
+            !/^[0-9a-f]{7,64}$/i.test(entry.hash) ||
+            !entry.stats ||
+            ![entry.stats.files, entry.stats.additions, entry.stats.deletions].every((value) => Number.isSafeInteger(value) && value >= 0) ||
+            !Number.isFinite(entry.accessedAt)
+          )
+            continue;
+          const key = this.cacheKey(entry.namespace, entry.objectFormat, entry.hash);
+          if ((this.cache.get(key)?.accessedAt ?? -1) <= entry.accessedAt) this.cache.set(key, entry);
           this.lastAccessedAt = Math.max(this.lastAccessedAt, entry.accessedAt);
+          if (this.cache.size > MAX_CACHE_ENTRIES) {
+            const newest = [...this.cache.entries()].sort((a, b) => b[1].accessedAt - a[1].accessedAt).slice(0, COMPACTED_CACHE_ENTRIES);
+            this.cache = new Map(newest);
+          }
         } catch {
-          malformed = true;
-          break;
+          // Invalid records can be omitted when the supported JSONL is compacted.
         }
       }
-      if (malformed) {
-        this.cache.clear();
-        fs.rmSync(this.getCachePath(), { force: true });
-      }
-    } catch {
-      // A missing or unreadable cache starts empty.
+      if (cacheFileIdentity(this.getCachePath()) !== this.fileIdentity) this.writable = false;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') this.writable = false;
     }
   }
 
@@ -302,39 +376,49 @@ export class CommitStatsService {
   }
 
   private append(entry: CacheEntry): void {
+    if (!this.canWrite()) return;
     const cachePath = this.getCachePath();
+    assertManagedPath(path.dirname(cachePath), cachePath);
     fs.mkdirSync(path.dirname(cachePath), { recursive: true });
-    fs.appendFileSync(cachePath, `${JSON.stringify(entry)}\n`, 'utf8');
-    let shouldCompact = this.cache.size > (this.limits.maxEntries ?? MAX_CACHE_ENTRIES);
-    try {
-      shouldCompact ||= fs.statSync(cachePath).size > (this.limits.maxBytes ?? MAX_CACHE_BYTES);
-    } catch {
-      // Keep the successful append when stat is unavailable.
+    const raw = `${JSON.stringify(entry)}\n`;
+    const bytes = fs.existsSync(cachePath) ? fs.statSync(cachePath).size : 0;
+    if (this.cache.size > (this.limits.maxEntries ?? MAX_CACHE_ENTRIES) || bytes + Buffer.byteLength(raw) > (this.limits.maxBytes ?? MAX_CACHE_BYTES))
+      this.compact();
+    else {
+      fs.appendFileSync(cachePath, raw, 'utf8');
+      this.fileIdentity = cacheFileIdentity(cachePath);
     }
-    if (shouldCompact) this.compact();
+    recordCacheUse(cachePath);
   }
 
   private compact(): void {
+    if (!this.canWrite()) return;
     const cachePath = this.getCachePath();
-    const retained = [...this.cache.values()].sort((a, b) => b.accessedAt - a.accessedAt).slice(0, this.limits.compactedEntries ?? COMPACTED_CACHE_ENTRIES);
-    const tempPath = `${cachePath}.tmp`;
-    const backupPath = `${cachePath}.bak`;
-    fs.writeFileSync(tempPath, `${retained.map((entry) => JSON.stringify(entry)).join('\n')}\n`, 'utf8');
-    fs.rmSync(backupPath, { force: true });
-    try {
-      if (fs.existsSync(cachePath)) fs.renameSync(cachePath, backupPath);
-      fs.renameSync(tempPath, cachePath);
-      fs.rmSync(backupPath, { force: true });
-    } catch (error) {
-      fs.rmSync(tempPath, { force: true });
-      if (!fs.existsSync(cachePath) && fs.existsSync(backupPath)) {
-        fs.renameSync(backupPath, cachePath);
-      }
-      throw error;
+    assertManagedPath(path.dirname(cachePath), cachePath);
+    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+    const retained: CacheEntry[] = [],
+      lines: string[] = [];
+    let bytes = 0;
+    for (const entry of [...this.cache.values()].sort((a, b) => b.accessedAt - a.accessedAt)) {
+      const raw = `${JSON.stringify(entry)}\n`,
+        size = Buffer.byteLength(raw);
+      if (retained.length >= (this.limits.compactedEntries ?? COMPACTED_CACHE_ENTRIES)) break;
+      if (bytes + size > (this.limits.maxBytes ?? MAX_CACHE_BYTES)) continue;
+      retained.push(entry);
+      lines.push(raw);
+      bytes += size;
     }
+    writeTextFileAtomically(cachePath, lines.join(''));
+    this.fileIdentity = cacheFileIdentity(cachePath);
     this.cache = new Map(retained.map((entry) => [this.cacheKey(entry.namespace, entry.objectFormat, entry.hash), entry]));
   }
 
+  private canWrite(): boolean {
+    const file = this.getCachePath();
+    assertManagedPath(path.dirname(file), file);
+    if (cacheFileIdentity(file) !== this.fileIdentity) this.writable = false;
+    return this.writable;
+  }
   private emit(update: CommitStatsUpdate): void {
     for (const listener of this.listeners) listener(update);
   }

@@ -10,7 +10,11 @@ import { isAllowedAppNavigation, isDevelopmentRuntime } from '../security';
 import { redactGitSensitiveText } from '../../git/GitErrorFormatter';
 import { ensureCommitProtectionIsIdle } from '../RepositoryCommitProtection';
 
-export function registerRepositoryLocationHandlers(gitService: GitService, service = new RepositoryLocationService(gitService.runner)) {
+export function registerRepositoryLocationHandlers(
+  gitService: GitService,
+  service = new RepositoryLocationService(gitService.runner),
+  relocated?: (oldPath: string) => Promise<void>,
+) {
   const handle = (channel: IpcChannel, select: boolean) => {
     ipcMain.handle(channel, async (event, request: RepositoryLocationRequest) => {
       try {
@@ -34,7 +38,10 @@ export function registerRepositoryLocationHandlers(gitService: GitService, servi
         const result = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender)!, { properties: ['openDirectory'] });
         current();
         if (result.canceled || !result.filePaths[0]) return { success: true, data: null };
-        return { success: true, data: await service.relocate(request.repoPath, result.filePaths[0], current) };
+        const root = await service.relocate(request.repoPath, result.filePaths[0], current);
+        if (repositoryPathKey(root) !== repositoryPathKey(request.repoPath))
+          await relocated?.(request.repoPath).catch((error) => console.warn('[storage-maintenance] Relocation cache invalidation:', error));
+        return { success: true, data: root };
       } catch (error) {
         return { success: false, error: redactGitSensitiveText(error instanceof Error ? error.message : String(error)) };
       }

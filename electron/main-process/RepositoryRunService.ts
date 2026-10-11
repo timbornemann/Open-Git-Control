@@ -15,6 +15,7 @@ import type { RepositoryRunConfigService } from './RepositoryRunConfigService';
 import { IpcChannel } from '../../src/types/ipcContract';
 import { normalizeTerminalText, TerminalTextSanitizer } from '../../src/shared/terminalText';
 import { windowsSystemExecutable } from '../system-tools/windowsSystemExecutable';
+import { repositoryPathKey } from './activeRepositoryAuthorization';
 
 const MAX_OUTPUT_LINES = 4_000;
 const MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
@@ -68,6 +69,13 @@ export class RepositoryRunService {
 
   getState(): RepositoryRunStateDto | null {
     return this.activeRun ? this.snapshot(this.activeRun) : null;
+  }
+  isRepositoryBusy(repoPath: string): boolean {
+    return Boolean(
+      this.activeRun &&
+      repositoryPathKey(this.activeRun.repoPath) === repositoryPathKey(repoPath) &&
+      (this.activeRun.status === 'running' || this.terminationUnconfirmedChild),
+    );
   }
 
   /**

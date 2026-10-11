@@ -121,6 +121,13 @@ export const appClient = cachedClient('app', {
     return requireElectronReposApi().setStoredRepos(...args);
   },
 
+  mutateStoredRepos(...args: Parameters<ElectronAPI['mutateStoredRepos']>) {
+    return requireElectronReposApi().mutateStoredRepos(...args);
+  },
+  onStoredReposChanged(...args: Parameters<ElectronAPI['onStoredReposChanged']>) {
+    return requireElectronReposApi().onStoredReposChanged(...args);
+  },
+
   async resolveRepoPath(...args: Parameters<ElectronAPI['resolveRepoPath']>): ReturnType<ElectronAPI['resolveRepoPath']> {
     return requireElectronReposApi().resolveRepoPath(...args);
   },

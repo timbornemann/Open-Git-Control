@@ -10,6 +10,8 @@ Language: **English** | Deutsche Version: [README.de.md](README.de.md)
 
 Git is required; Git LFS and GitHub CLI are optional. The app checks these tools and offers official downloads or installation through an existing package manager under **Settings → App & diagnostics → System tools**. See [tool setup](Docs/SYSTEM_TOOLS.md).
 
+Under **App & diagnostics → Storage & cleanup**, inspect automatic maintenance, cache budgets and protected recovery data. See [storage and retention rules](Docs/STORAGE_MAINTENANCE.md).
+
 ![Atlas workspace in the current repository view: commit graph, branches, file statistics and staging](Docs/screenshots/repository.jpg)
 
 ## Why Open-Git-Control?

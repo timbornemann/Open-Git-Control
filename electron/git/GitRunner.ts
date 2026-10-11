@@ -167,6 +167,9 @@ export class GitRunner {
   ) {
     this.processExecutor = new GitProcessExecutor(execFileAsyncRunner);
   }
+  isRepositoryBusy(repoPath: string, commonDirectory?: string): boolean {
+    return this.scheduler.isRepositoryBusy(repoPath, commonDirectory);
+  }
 
   async run(repoPath: string, args: string[], options: GitRunOptions = {}): Promise<string> {
     this.assertRepoPathAvailable(repoPath);

@@ -121,6 +121,14 @@ export class GitScheduler {
   getDiagnostics(): GitSchedulerDiagnostic[] {
     return [...this.diagnostics];
   }
+  isRepositoryBusy(repoPath: string, commonDirectory?: string): boolean {
+    // Inspect known queues without touching a potentially disconnected filesystem.
+    const resolved = path.resolve(repoPath);
+    const lexical = process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+    const commonKey = commonDirectory && (process.platform === 'win32' ? path.resolve(commonDirectory).toLowerCase() : path.resolve(commonDirectory));
+    const state = this.repos.get(this.repoKeyCache.get(lexical) || commonKey || lexical);
+    return Boolean(state && (state.queue.length || state.activeReads.size || state.activeWrite || state.activeNetwork));
+  }
 
   private getState(repoPath: string): RepoState {
     const key = this.canonicalRepoKey(repoPath);
@@ -145,7 +153,9 @@ export class GitScheduler {
    * two writes to aliases of one repo could run concurrently.
    */
   private canonicalRepoKey(repoPath: string): string {
-    const cached = this.repoKeyCache.get(repoPath);
+    const resolvedPath = path.resolve(repoPath);
+    const lexical = process.platform === 'win32' ? resolvedPath.toLowerCase() : resolvedPath;
+    const cached = this.repoKeyCache.get(lexical);
     if (cached) return cached;
 
     let resolved: string;
@@ -157,7 +167,7 @@ export class GitScheduler {
       resolved = path.resolve(repoPath);
     }
     const key = process.platform === 'win32' ? resolved.toLowerCase() : resolved;
-    this.repoKeyCache.set(repoPath, key);
+    this.repoKeyCache.set(lexical, key);
     return key;
   }
 

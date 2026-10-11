@@ -60,6 +60,24 @@ afterEach(() => {
 const move = () => fs.renameSync(oldPath, newPath);
 
 describe('saved repository relocation with real Git', () => {
+  it('canonicalizes a saved nested folder in the main process and retains its metadata without transferring command approvals', async () => {
+    const nested = path.join(oldPath, 'nested');
+    fs.mkdirSync(nested);
+    writeStoreData({ ...readStoreData(), repos: [{ path: nested, pinned: true, createdAt: 17, lastOpened: 23 }], activeRepo: nested });
+    new RemotePreferencesStore().write(nested, { fetchRemote: 'origin' });
+    const approvals = { version: 1, repositories: { [repositoryPathKey(nested)]: ['keep-at-old-path'] } };
+    json(path.join(state.directory, 'run-approvals.json'), approvals);
+    const result = await service.canonicalize(nested, oldPath);
+    expect(result.repos).toEqual([{ path: oldPath, pinned: true, createdAt: 17, lastOpened: 23 }]);
+    expect(result.activeRepo).toBe(oldPath);
+    expect(new RemotePreferencesStore().read(oldPath)).toMatchObject({ fetchRemote: 'origin' });
+    expect(JSON.parse(fs.readFileSync(path.join(state.directory, 'run-approvals.json'), 'utf8'))).toEqual(approvals);
+    expect(fs.existsSync(nested)).toBe(true);
+    const other = path.join(fixture, 'other');
+    fs.mkdirSync(other);
+    git(other, 'init');
+    await expect(service.canonicalize(oldPath, other)).rejects.toThrow('same Git');
+  });
   it('preserves metadata, remote accounts/profiles, local planning IDs, run settings, icons and pending publication records', async () => {
     const preferences = {
       hostingRemote: 'backup',
@@ -100,7 +118,12 @@ describe('saved repository relocation with real Git', () => {
     move();
     fs.mkdirSync(path.join(newPath, 'nested'));
     expect(await service.relocate(oldPath, path.join(newPath, 'nested'), vi.fn())).toBe(newPath);
-    expect(readStoreData()).toEqual({ repos: [{ path: newPath, pinned: true, createdAt: 17, lastOpened: 23 }], activeRepo: newPath, sortBy: 'nameDesc' });
+    expect(readStoreData()).toEqual({
+      repos: [{ path: newPath, pinned: true, createdAt: 17, lastOpened: 23 }],
+      activeRepo: newPath,
+      sortBy: 'nameDesc',
+      revision: 2,
+    });
     expect(new RemotePreferencesStore().read(newPath)).toEqual(preferences);
     expect(new RemotePreferencesStore().read(oldPath)).toEqual({});
     expect(fs.readFileSync(path.join(newPath, '.Open-Git-Control', 'planning.json'), 'utf8')).toBe(planningText);
@@ -110,7 +133,9 @@ describe('saved repository relocation with real Git', () => {
       repoPath: newPath,
       mode: 'manual',
       manualPath: 'logo.png',
-      thumbnail: { dataUrl: 'preview' },
+      thumbnail: null,
+      candidates: [],
+      scannedAt: 0,
     });
     expect(new RepositoryPublicationStore().get(newPath, 'pending')).toMatchObject({
       id: 'pending',

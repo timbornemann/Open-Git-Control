@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
+import type { CompletedRecoveryBackup } from '../../src/shared/ipc/storageMaintenance';
+import { assertManagedPath } from '../main-process/storageSafety';
 import type { GitRunner } from './GitRunner';
 import type {
   CommitMessageEditBackup,
@@ -185,6 +188,78 @@ export class CommitMessageEditService {
         return journal && OBJECT_ID.test(hash) ? [{ ref, hash, branch: journal.branch, createdAt: journal.createdAt }] : [];
       })
       .sort((a, b) => b.createdAt - a.createdAt);
+  }
+  /** Read-only inventory: showing recovery storage must never run recovery itself. */
+  async completedBackups(repoPath: string): Promise<CompletedRecoveryBackup[]> {
+    const common = repositoryCommonDirectory(repoPath);
+    if (!common) return [];
+    const journals = readJournals(common).filter((journal) => journal.state === 'cleaned');
+    const refs = new Map(
+      (await this.runner.run(repoPath, ['for-each-ref', '--format=%(refname) %(objectname)', BACKUP_PREFIX]))
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+          const [ref, oid] = line.split(' ');
+          return [ref, oid];
+        }),
+    );
+    return journals
+      .filter((journal) => !refs.has(backupReference(journal)) || refs.get(backupReference(journal)) === journal.oldHead)
+      .map((journal) => ({
+        repoPath,
+        id: journal.id,
+        createdAt: journal.createdAt,
+        reference: backupReference(journal),
+        objectId: refs.get(backupReference(journal)) || '',
+      }));
+  }
+  async removeCompletedBackups(repoPath: string, ids: string[]): Promise<number> {
+    if (!Array.isArray(ids) || !ids.length || ids.length > 100 || ids.some((id) => typeof id !== 'string' || !EDIT_ID.test(id)))
+      throw new Error('Choose completed recovery operations.');
+    return this.runner.withExclusiveWrite(repoPath, 'remove-completed-recovery-backups', async (git) => {
+      const common = repositoryCommonDirectory(repoPath);
+      if (!common) throw new Error('Repository is unavailable.');
+      const journals = readJournals(common);
+      const chosen = [...new Set(ids)].flatMap((id) => {
+        const journal = journals.find((entry) => entry.id === id && entry.state === 'cleaned');
+        const file = path.join(journalDirectory(common), `${id}.json`);
+        assertManagedPath(common, file);
+        if (!journal) {
+          if (!fs.existsSync(file)) return []; // Explicit retries after a completed removal are harmless.
+          throw new Error('Recovery operation is no longer completed or its ownership could not be verified.');
+        }
+        return [journal];
+      });
+      const refs = new Map(
+        (await git.run(repoPath, ['for-each-ref', '--format=%(refname) %(objectname)', BACKUP_PREFIX]))
+          .split('\n')
+          .filter(Boolean)
+          .map((line) => {
+            const [ref, oid] = line.split(' ');
+            return [ref, oid];
+          }),
+      );
+      const deletes: string[] = [];
+      const unchanged = (journal: EditJournal) => {
+        const file = path.join(journalDirectory(common), `${journal.id}.json`);
+        assertManagedPath(common, file);
+        const current = readJournals(common).find((entry) => entry.id === journal.id);
+        if (!current || JSON.stringify(current) !== JSON.stringify(journal)) throw new Error('Recovery journal changed. Existing data was preserved.');
+        return file;
+      };
+      for (const journal of chosen) {
+        const ref = backupReference(journal);
+        const oid = refs.get(ref);
+        if (oid && oid !== journal.oldHead) throw new Error('The recovery reference changed. Existing data was preserved.');
+        if (oid) deletes.push(`delete ${ref} ${journal.oldHead}`);
+        unchanged(journal);
+      }
+      if (repositoryCommonDirectory(repoPath) !== common) throw new Error('Repository ownership changed. Existing data was preserved.');
+      if (deletes.length) await git.input(repoPath, ['update-ref', '--stdin'], `start\n${deletes.join('\n')}\nprepare\ncommit\n`);
+      // A crash here leaves completed journals; the next explicit request safely finishes the step.
+      for (const journal of chosen) fs.unlinkSync(unchanged(journal));
+      return chosen.length;
+    });
   }
 
   private async checkGitVersion(run: (repo: string, args: string[]) => Promise<string>, repo: string) {

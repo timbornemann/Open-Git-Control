@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { RepoSortByDto } from '@/types/appDtos';
+import type { RepoSortByDto, StoredRepoData } from '@/types/appDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';
@@ -12,6 +12,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { confirmWorkingDirectoryNavigation, requestWorkingDirectoryNavigation } from '@/components/working-directory/workingDirectoryNavigationGuard';
 import { openSystemTools, useGitAvailable } from '@/app/state/systemToolsStore';
 import { notifyRepositoryLocationChanged } from '@/services/repositoryLocationBus';
+import { useRepositoryRegistry } from './useRepositoryRegistry';
 
 type Params = {
   triggerRefresh: () => void;
@@ -122,9 +123,9 @@ export const useWorkspaceDomain = ({
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
   const [repoMeta, setRepoMeta] = useState<Record<string, RepoMetaEntry>>({});
   const [repoSortBy, setRepoSortBy] = useState<RepoSortByDto>(DEFAULT_REPO_SORT_BY);
-  const [reposLoaded, setReposLoaded] = useState(false);
+  const [, setReposLoaded] = useState(false);
   const [isRestoringRepos, setIsRestoringRepos] = useState(true);
-  const [isRecoveringRepo, setIsRecoveringRepo] = useState(false);
+  const [, setIsRecoveringRepo] = useState(false);
   const repoOperationSequenceRef = useRef(0);
   const repoRestoreSequenceRef = useRef(0);
   const openReposRef = useRef(openRepos);
@@ -153,6 +154,19 @@ export const useWorkspaceDomain = ({
   }, []);
 
   const { t, tr } = useLanguageTranslations(language);
+  const receiveRegistry = useCallback((data: StoredRepoData) => {
+    const paths = data.repos.map((entry) => entry.path),
+      meta = Object.fromEntries(data.repos.map(({ path, ...entry }) => [path, entry]));
+    const sortBy = data.sortBy || DEFAULT_REPO_SORT_BY;
+    openReposRef.current = paths;
+    repoMetaRef.current = meta;
+    repoSortByRef.current = sortBy;
+    setOpenRepos(paths);
+    setRepoMeta(meta);
+    setRepoSortBy(sortBy);
+  }, []);
+  const registryError = useCallback((msg: string) => setGitActionToast({ msg, isError: true }), [setGitActionToast]);
+  const { observe: observeRegistry, mutate: mutateRegistry } = useRepositoryRegistry(receiveRegistry, registryError);
 
   const sortedOpenRepos = useMemo(() => {
     return sortRepoPaths(openRepos, repoMeta, repoSortBy);
@@ -160,6 +174,8 @@ export const useWorkspaceDomain = ({
 
   const touchRepo = (repoPath: string) => {
     const now = Date.now();
+    mutateRegistry({ kind: 'metadata', path: repoPath, lastOpened: now });
+    mutateRegistry({ kind: 'activate', path: repoPath });
     setRepoMeta((prev) => {
       const next = {
         ...prev,
@@ -174,56 +190,61 @@ export const useWorkspaceDomain = ({
     });
   };
 
-  const migrateRepoPathToCanonical = useCallback((requestedPath: string, canonicalPath: string) => {
-    if (!requestedPath || !canonicalPath) return;
-    const requestedKey = normalizeRepoPathKey(requestedPath);
-    const canonicalKey = normalizeRepoPathKey(canonicalPath);
-    setOpenRepos((previous) => {
-      const seen = new Set<string>();
-      const next: string[] = [];
-      let found = false;
-      for (const repoPath of previous) {
-        const pathKey = normalizeRepoPathKey(repoPath);
-        const isAlias = pathKey === requestedKey || pathKey === canonicalKey;
-        if (isAlias) found = true;
-        const candidate = isAlias ? canonicalPath : repoPath;
-        const candidateKey = normalizeRepoPathKey(candidate);
-        if (seen.has(candidateKey)) continue;
-        seen.add(candidateKey);
-        next.push(candidate);
-      }
-      if (!found) return previous;
-      openReposRef.current = next;
-      return next;
-    });
-    setRepoMeta((previous) => {
-      const next: Record<string, RepoMetaEntry> = {};
-      const merged: RepoMetaEntry[] = [];
-      for (const [repoPath, meta] of Object.entries(previous)) {
-        const pathKey = normalizeRepoPathKey(repoPath);
-        if (pathKey === requestedKey || pathKey === canonicalKey) merged.push(meta);
-        else next[repoPath] = meta;
-      }
-      if (merged.length === 0) return previous;
-      const now = Date.now();
-      const lastOpened = Math.max(...merged.map((meta) => normalizeTimestamp(meta.lastOpened, 0)), 0);
-      const createdAt = Math.min(...merged.map((meta) => normalizeTimestamp(meta.createdAt, lastOpened || now)));
-      next[canonicalPath] = {
-        pinned: merged.some((meta) => meta.pinned),
-        lastOpened: lastOpened || now,
-        createdAt: createdAt || lastOpened || now,
-      };
-      repoMetaRef.current = next;
-      return next;
-    });
-    setActiveRepo((previous) => {
-      if (!previous) return previous;
-      const previousKey = normalizeRepoPathKey(previous);
-      if (previousKey !== requestedKey && previousKey !== canonicalKey) return previous;
-      activeRepoRef.current = canonicalPath;
-      return canonicalPath;
-    });
-  }, []);
+  const migrateRepoPathToCanonical = useCallback(
+    (requestedPath: string, canonicalPath: string) => {
+      if (!requestedPath || !canonicalPath) return;
+      const requestedKey = normalizeRepoPathKey(requestedPath);
+      const canonicalKey = normalizeRepoPathKey(canonicalPath);
+      if (requestedPath !== canonicalPath && openReposRef.current.some((repo) => normalizeRepoPathKey(repo) === requestedKey))
+        mutateRegistry({ kind: 'canonicalize', path: requestedPath, canonicalPath });
+      setOpenRepos((previous) => {
+        const seen = new Set<string>();
+        const next: string[] = [];
+        let found = false;
+        for (const repoPath of previous) {
+          const pathKey = normalizeRepoPathKey(repoPath);
+          const isAlias = pathKey === requestedKey || pathKey === canonicalKey;
+          if (isAlias) found = true;
+          const candidate = isAlias ? canonicalPath : repoPath;
+          const candidateKey = normalizeRepoPathKey(candidate);
+          if (seen.has(candidateKey)) continue;
+          seen.add(candidateKey);
+          next.push(candidate);
+        }
+        if (!found) return previous;
+        openReposRef.current = next;
+        return next;
+      });
+      setRepoMeta((previous) => {
+        const next: Record<string, RepoMetaEntry> = {};
+        const merged: RepoMetaEntry[] = [];
+        for (const [repoPath, meta] of Object.entries(previous)) {
+          const pathKey = normalizeRepoPathKey(repoPath);
+          if (pathKey === requestedKey || pathKey === canonicalKey) merged.push(meta);
+          else next[repoPath] = meta;
+        }
+        if (merged.length === 0) return previous;
+        const now = Date.now();
+        const lastOpened = Math.max(...merged.map((meta) => normalizeTimestamp(meta.lastOpened, 0)), 0);
+        const createdAt = Math.min(...merged.map((meta) => normalizeTimestamp(meta.createdAt, lastOpened || now)));
+        next[canonicalPath] = {
+          pinned: merged.some((meta) => meta.pinned),
+          lastOpened: lastOpened || now,
+          createdAt: createdAt || lastOpened || now,
+        };
+        repoMetaRef.current = next;
+        return next;
+      });
+      setActiveRepo((previous) => {
+        if (!previous) return previous;
+        const previousKey = normalizeRepoPathKey(previous);
+        if (previousKey !== requestedKey && previousKey !== canonicalKey) return previous;
+        activeRepoRef.current = canonicalPath;
+        return canonicalPath;
+      });
+    },
+    [mutateRegistry],
+  );
 
   useEffect(() => {
     const loadStored = async () => {
@@ -237,6 +258,7 @@ export const useWorkspaceDomain = ({
       const operationId = ++repoOperationSequenceRef.current;
       try {
         const data = await appClient.getStoredRepos();
+        if (!observeRegistry(data)) return;
         if (repoOperationSequenceRef.current !== operationId) {
           return;
         }
@@ -283,6 +305,7 @@ export const useWorkspaceDomain = ({
               return;
             }
             migrateRepoPathToCanonical(active, canonicalActive);
+            mutateRegistry({ kind: 'activate', path: canonicalActive });
             activeRepoRef.current = canonicalActive;
             setActiveRepo(canonicalActive);
 
@@ -326,25 +349,7 @@ export const useWorkspaceDomain = ({
       }
     };
     loadStored();
-  }, [gitReady, migrateRepoPathToCanonical, onNoActiveRepo]);
-
-  useEffect(() => {
-    if (!gitReady || !restoredWithGit.current || !reposLoaded || isRestoringRepos || isRecoveringRepo || !appClient.isAvailable()) return;
-
-    const now = Date.now();
-    const repos = sortedOpenRepos.map((repoPath) => ({
-      path: repoPath,
-      lastOpened: normalizeTimestamp(repoMeta[repoPath]?.lastOpened, now),
-      pinned: Boolean(repoMeta[repoPath]?.pinned),
-      createdAt: normalizeTimestamp(repoMeta[repoPath]?.createdAt, now),
-    }));
-
-    void appClient.setStoredRepos({
-      repos,
-      activeRepo,
-      sortBy: repoSortBy,
-    });
-  }, [gitReady, sortedOpenRepos, repoMeta, activeRepo, repoSortBy, reposLoaded, isRestoringRepos, isRecoveringRepo]);
+  }, [gitReady, migrateRepoPathToCanonical, mutateRegistry, observeRegistry, onNoActiveRepo]);
 
   const handleRecoverRepo = async (repoPath: string, selectNewLocation: boolean): Promise<boolean> => {
     const matches = () => normalizeRepoPathKey(activeRepoRef.current || '') === normalizeRepoPathKey(repoPath);
@@ -378,6 +383,7 @@ export const useWorkspaceDomain = ({
           await appClient.clearRepoPath();
           if (repoOperationSequenceRef.current === operationId) {
             activeRepoRef.current = null;
+            mutateRegistry({ kind: 'activate', path: null });
             setActiveRepo(null);
             onNoActiveRepo();
             setGitActionToast({
@@ -397,6 +403,7 @@ export const useWorkspaceDomain = ({
       migrateRepoPathToCanonical(result.data, canonical);
       activeRepoRef.current = canonical;
       setActiveRepo(canonical);
+      mutateRegistry({ kind: 'activate', path: canonical });
       setReposLoaded(true);
       onRepoActivated();
       triggerRefresh();
@@ -440,6 +447,7 @@ export const useWorkspaceDomain = ({
     if (closesActiveRepo && !(await confirmWorkingDirectoryNavigation({ kind: 'view', label: 'repository list' }))) return;
 
     const next = currentOpenRepos.filter((candidate) => normalizeRepoPathKey(candidate) !== repoKey);
+    mutateRegistry({ kind: 'remove', path: repoPath });
     const nextMeta = Object.fromEntries(Object.entries(repoMetaRef.current).filter(([candidate]) => normalizeRepoPathKey(candidate) !== repoKey)) as Record<
       string,
       RepoMetaEntry
@@ -488,6 +496,7 @@ export const useWorkspaceDomain = ({
       }
       if (repoOperationSequenceRef.current !== operationId) return;
       activeRepoRef.current = null;
+      mutateRegistry({ kind: 'activate', path: null });
       setActiveRepo(null);
       setReposLoaded(true);
       onNoActiveRepo();
@@ -495,6 +504,8 @@ export const useWorkspaceDomain = ({
   };
 
   const ensureRepoPresent = (repoPath: string) => {
+    mutateRegistry({ kind: 'add', path: repoPath });
+    mutateRegistry({ kind: 'activate', path: repoPath });
     const now = Date.now();
     const repoKey = normalizeRepoPathKey(repoPath);
     const seenRepoKeys = new Set<string>();
@@ -689,6 +700,9 @@ export const useWorkspaceDomain = ({
 
   const setRepoPins = (repoPaths: string[], pinned: boolean) => {
     const keys = new Set(repoPaths.map(normalizeRepoPathKey));
+    for (const repo of openReposRef.current)
+      if (keys.has(normalizeRepoPathKey(repo)) && Boolean(repoMetaRef.current[repo]?.pinned) !== pinned)
+        mutateRegistry({ kind: 'metadata', path: repo, pinned });
     const now = Date.now();
     setRepoMeta((prev) => {
       const next = { ...prev };
@@ -734,6 +748,7 @@ export const useWorkspaceDomain = ({
   };
 
   const handleSetRepoSortBy = (sortBy: RepoSortByDto) => {
+    mutateRegistry({ kind: 'sort', sortBy });
     repoSortByRef.current = sortBy;
     setRepoSortBy(sortBy);
   };

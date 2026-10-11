@@ -150,7 +150,7 @@ describe('CommitStatsService', () => {
     expect(fs.existsSync(`${cachePath}.bak`)).toBe(false);
   });
 
-  it('discards a malformed cache instead of returning partial data', async () => {
+  it('preserves unsupported schemas and keeps calculations available', async () => {
     const cachePath = createTempCache();
     fs.writeFileSync(cachePath, '{"schema":1}\nnot-json\n', 'utf8');
     const gitService = {
@@ -161,7 +161,8 @@ describe('CommitStatsService', () => {
     const service = new CommitStatsService(gitService, () => cachePath);
 
     expect(await service.getCachedStats(['b'.repeat(40)])).toEqual({});
-    expect(fs.existsSync(cachePath)).toBe(false);
+    expect(fs.readFileSync(cachePath, 'utf8')).toBe('{"schema":1}\nnot-json\n');
+    expect(service.maintain(true, Date.now())).toBe(false);
   });
 
   it('promotes selected stats ahead of interrupted background work', async () => {

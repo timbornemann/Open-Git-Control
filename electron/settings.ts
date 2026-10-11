@@ -25,6 +25,7 @@ export interface AppSettings {
   showSecondaryHistory: boolean;
   commitSignoffByDefault: boolean;
   autoUpdateEnabled: boolean;
+  automaticMaintenanceEnabled?: boolean;
   secretScanBeforeCommitEnabled: boolean;
   secretScanBeforePushEnabled: boolean;
   secretScanStrictness: SecretScanStrictness;
@@ -53,6 +54,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showSecondaryHistory: true,
   commitSignoffByDefault: false,
   autoUpdateEnabled: true,
+  automaticMaintenanceEnabled: true,
   secretScanBeforeCommitEnabled: true,
   secretScanBeforePushEnabled: true,
   secretScanStrictness: 'medium',
@@ -261,6 +263,7 @@ export function normalizeSettings(input: Partial<AppSettings> | null | undefined
     showSecondaryHistory: normalizeBoolean(value.showSecondaryHistory, DEFAULT_SETTINGS.showSecondaryHistory),
     commitSignoffByDefault: normalizeBoolean(value.commitSignoffByDefault, DEFAULT_SETTINGS.commitSignoffByDefault),
     autoUpdateEnabled: normalizeBoolean(value.autoUpdateEnabled, DEFAULT_SETTINGS.autoUpdateEnabled),
+    automaticMaintenanceEnabled: normalizeBoolean(value.automaticMaintenanceEnabled, true),
     secretScanBeforeCommitEnabled: normalizeBoolean(value.secretScanBeforeCommitEnabled, DEFAULT_SETTINGS.secretScanBeforeCommitEnabled),
     secretScanBeforePushEnabled: normalizeBoolean(value.secretScanBeforePushEnabled, DEFAULT_SETTINGS.secretScanBeforePushEnabled),
     secretScanStrictness: normalizeSecretScanStrictness(value.secretScanStrictness),

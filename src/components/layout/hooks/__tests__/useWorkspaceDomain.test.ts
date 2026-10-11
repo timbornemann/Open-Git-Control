@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useWorkspaceDomain } from '@/components/layout/hooks/useWorkspaceDomain';
 import { appClient } from '@/services/appClient';
+import { installRepositoryRegistryHarness } from './repositoryRegistryHarness';
 import { gitClient } from '@/services/gitClient';
 import { githubClient } from '@/legacy/github/githubClient';
 import {
@@ -62,6 +63,7 @@ beforeEach(() => {
   vi.spyOn(appClient, 'isAvailable').mockReturnValue(true);
   vi.spyOn(appClient, 'getStoredRepos').mockResolvedValue({ repos: [], activeRepo: null, sortBy: 'lastOpenedDesc' });
   vi.spyOn(appClient, 'setStoredRepos').mockResolvedValue(true);
+  installRepositoryRegistryHarness();
   vi.spyOn(appClient, 'clearRepoPath').mockResolvedValue(true);
   vi.spyOn(appClient, 'resolveRepoPath').mockImplementation(async (repoPath) => repoPath);
 });
@@ -269,14 +271,7 @@ describe('useWorkspaceDomain repository canonicalization', () => {
     await vi.waitFor(() => expect(hook.current.activeRepo).toBe('C:\\Work\\Repo'));
     expect(hook.current.openRepos).toEqual(['C:\\Work\\Repo']);
     expect(hook.current.repoMeta['C:\\Work\\Repo']).toEqual(expect.objectContaining({ pinned: true, createdAt: 5 }));
-    await vi.waitFor(() =>
-      expect(appClient.setStoredRepos).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          activeRepo: 'C:\\Work\\Repo',
-          repos: [expect.objectContaining({ path: 'C:\\Work\\Repo', pinned: true, createdAt: 5 })],
-        }),
-      ),
-    );
+    await vi.waitFor(() => expect(appClient.mutateStoredRepos).toHaveBeenCalledWith({ kind: 'activate', path: 'C:\\Work\\Repo' }));
     hook.unmount();
   });
 
@@ -441,13 +436,7 @@ describe('useWorkspaceDomain repository canonicalization', () => {
 
     expect(hook.current.activeRepo).toBe('C:/repo-b');
     expect(new Set(hook.current.openRepos)).toEqual(new Set(['C:/repo-a', 'C:/repo-b']));
-    await vi.waitFor(() =>
-      expect(appClient.setStoredRepos).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          repos: expect.arrayContaining([expect.objectContaining({ path: 'C:/repo-a' }), expect.objectContaining({ path: 'C:/repo-b' })]),
-        }),
-      ),
-    );
+    await vi.waitFor(() => expect(appClient.mutateStoredRepos).toHaveBeenCalledWith({ kind: 'add', path: 'C:/repo-b' }));
     hook.unmount();
   });
 
@@ -473,11 +462,7 @@ describe('useWorkspaceDomain repository canonicalization', () => {
     });
 
     expect(hook.current.isRestoringRepos).toBe(false);
-    await vi.waitFor(() =>
-      expect(appClient.setStoredRepos).toHaveBeenCalledWith(
-        expect.objectContaining({ activeRepo: 'C:/repo-b', repos: [expect.objectContaining({ path: 'C:/repo-b' })] }),
-      ),
-    );
+    await vi.waitFor(() => expect(appClient.mutateStoredRepos).toHaveBeenCalledWith({ kind: 'activate', path: 'C:/repo-b' }));
     hook.unmount();
   });
 });

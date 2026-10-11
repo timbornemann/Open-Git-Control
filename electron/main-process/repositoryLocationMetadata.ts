@@ -7,14 +7,33 @@ import type { StoredData } from './repoStore';
 import { normalizeRemotePreferences } from '../git/remoteTransferValidation';
 import { parsePlannerData } from './repositoryPlanningFile';
 import type { StoredPublication } from '../hosting/RepositoryPublicationStore';
+import { assertManagedPath } from './storageSafety';
+import { isRepositoryUiPreferences } from '../../src/shared/ipc/repositoryUiPreferences';
 
 interface Change {
   file: string;
   before: string | null;
   after: string;
 }
+function prepareUiMetadata(directory: string, oldKey: string, newKey: string): Change | null {
+  const file = path.join(directory, 'repository-ui-state.json');
+  assertManagedPath(directory, file);
+  const before = read(file);
+  if (before === null) return null;
+  const store = JSON.parse(before);
+  if (store.version !== 1 || !store.repositories || typeof store.repositories !== 'object' || Array.isArray(store.repositories))
+    throw new Error('UI preferences could not be read.');
+  if (!Object.values(store.repositories).every(isRepositoryUiPreferences)) throw new Error('Unsupported UI preferences.');
+  if (!Object.hasOwn(store.repositories, oldKey)) return null;
+  if (Object.hasOwn(store.repositories, newKey)) throw new Error('The new location already has UI preferences.');
+  store.repositories[newKey] = store.repositories[oldKey];
+  delete store.repositories[oldKey];
+  return { file, before, after: `${JSON.stringify(store, null, 2)}\n` };
+}
 const read = (file: string): string | null => {
   try {
+    assertManagedPath(path.dirname(file), file);
+    if (fs.statSync(file).size > 16 * 1024 ** 2) throw new Error('Repository metadata exceeds its read limit.');
     return fs.readFileSync(file, 'utf8');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
@@ -27,7 +46,10 @@ export function prepareRepositoryLocationMetadata(directory: string, oldPath: st
   const changes: Change[] = [];
   const oldKey = repositoryPathKey(oldPath),
     newKey = repositoryPathKey(newPath);
-  const add = (file: string, value: unknown) => changes.push({ file, before: read(file), after: `${JSON.stringify(value, null, 2)}\n` });
+  const add = (file: string, value: unknown) => {
+    assertManagedPath(directory, file);
+    changes.push({ file, before: read(file), after: `${JSON.stringify(value, null, 2)}\n` });
+  };
   const remoteFile = path.join(directory, 'repository-remotes.json');
   const remoteRaw = read(remoteFile);
   if (remoteRaw !== null) {
@@ -44,6 +66,8 @@ export function prepareRepositoryLocationMetadata(directory: string, oldPath: st
   }
 
   const legacyFile = path.join(directory, 'project-planner.json');
+  const uiChange = prepareUiMetadata(directory, oldKey, newKey);
+  if (uiChange) changes.push(uiChange);
   const legacyRaw = read(legacyFile);
   if (legacyRaw !== null) {
     const data = parsePlannerData(legacyRaw, 'Planner data');
@@ -76,13 +100,30 @@ export function prepareRepositoryLocationMetadata(directory: string, oldPath: st
   }
 
   const iconFile = (repo: string) => path.join(directory, 'repository-icons', `${createHash('sha256').update(repositoryPathKey(repo)).digest('hex')}.json`);
+  const migrationFile = path.join(directory, 'secret-scan-allowlist-migration.json');
+  const migrationRaw = read(migrationFile);
+  if (migrationRaw !== null) {
+    const journal = JSON.parse(migrationRaw);
+    if (journal.version !== 1 || !Array.isArray(journal.rules) || !Array.isArray(journal.repositories))
+      throw new Error('Allowlist migration journal could not be read.');
+    const moved = journal.repositories.filter((entry: { path: string }) => repositoryPathKey(entry.path) === oldKey);
+    if (moved.length) {
+      if (journal.repositories.some((entry: { path: string }) => repositoryPathKey(entry.path) === newKey))
+        throw new Error('The new location already has migration metadata.');
+      moved.forEach((entry: { path: string }) => {
+        entry.path = newPath;
+      });
+      add(migrationFile, journal);
+    }
+  }
   const iconRaw = read(iconFile(oldPath));
   if (iconRaw !== null) {
     // A broken preview cache must not prevent finding the repository again.
     try {
       const data = JSON.parse(iconRaw);
       if (data.version === 1 && repositoryPathKey(data.repoPath) === oldKey) {
-        add(iconFile(newPath), { ...data, repoPath: newPath, selectionVersion: randomUUID(), scannedAt: 0 });
+        if (read(iconFile(newPath)) !== null) throw new Error('The new location already has a logo selection.');
+        add(iconFile(newPath), { ...data, repoPath: newPath, thumbnail: null, stamp: null, candidates: [], selectionVersion: randomUUID(), scannedAt: 0 });
       }
     } catch {
       // Logos can be rediscovered; authoritative stores above may not be discarded.

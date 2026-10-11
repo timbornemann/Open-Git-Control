@@ -6,6 +6,7 @@ import { useWorkspaceDomain } from '../useWorkspaceDomain';
 import { appClient } from '@/services/appClient';
 import { receiveSystemTools, useSystemTools } from '@/app/state/systemToolsStore';
 import type { SystemToolState } from '@/shared/ipc/systemTools';
+import { installRepositoryRegistryHarness } from './repositoryRegistryHarness';
 
 afterEach(() => {
   delete (window as Partial<Window>).electronAPI;
@@ -24,6 +25,7 @@ describe('Git availability and repository restoration', () => {
     vi.spyOn(appClient, 'isAvailable').mockReturnValue(true);
     vi.spyOn(appClient, 'getStoredRepos').mockResolvedValue(stored);
     const save = vi.spyOn(appClient, 'setStoredRepos').mockResolvedValue(true);
+    installRepositoryRegistryHarness();
     vi.spyOn(appClient, 'resolveRepoPath').mockImplementation(async (path) => path);
     Object.defineProperty(window, 'electronAPI', { configurable: true, value: { app: { getSystemToolsStatus: vi.fn() } } });
     const tools = (state: SystemToolState) => ({
@@ -63,7 +65,8 @@ describe('Git availability and repository restoration', () => {
     expect(workspace.activeRepo).toBe('C:/repo-b');
     expect(select).toHaveBeenCalledExactlyOnceWith('C:/repo-b');
     expect(workspace.repoMeta['C:/repo-a'].pinned).toBe(true);
-    expect(save).toHaveBeenCalledWith(expect.objectContaining({ activeRepo: 'C:/repo-b' }));
+    expect(appClient.mutateStoredRepos).toHaveBeenCalledWith(expect.objectContaining({ kind: 'activate', path: 'C:/repo-b' }));
+    expect(save).not.toHaveBeenCalled();
     act(() => root.unmount());
   });
 });

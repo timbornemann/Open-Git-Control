@@ -22,6 +22,8 @@ import { registerSystemToolsHandlers } from './system-tools/registerSystemToolsH
 import { IpcChannel } from '../src/types/ipcContract';
 import type { PlanningApiTokenLifetime } from './main-process/planningApiAuth';
 import { clearSavedPlanningApiAuthToken, generateSavedPlanningApiAuthToken, getPlanningApiAuthState } from './main-process/planningApiAuth';
+import { configureBrowserCacheSwitches, configureCodeCache } from './main-process/browserCacheMaintenance';
+import { isHttpCacheWorker } from './main-process/httpCacheWorker';
 
 // A packaged app in "dev mode" would load the localhost dev server, open
 // DevTools and apply the relaxed dev CSP; isDevelopmentRuntime() gates on
@@ -36,9 +38,10 @@ const openMainWindowIfReady = () => {
   }
 };
 
-const isPrimaryInstance = acquireSingleInstanceLock(app, BrowserWindow, openMainWindowIfReady);
+const isPrimaryInstance = !isHttpCacheWorker && acquireSingleInstanceLock(app, BrowserWindow, openMainWindowIfReady);
 
 if (isPrimaryInstance) {
+  configureBrowserCacheSwitches(isDev);
   registerHtmlPreviewScheme();
   installIpcSenderValidation({ isDev, mainProcessDir: __dirname });
   const updaterManager = new UpdaterManager(isDev);
@@ -46,6 +49,7 @@ if (isPrimaryInstance) {
   let planningApiError: string | null = null;
   let repositoryRunService: { dispose: () => void } | null = null;
   let stopSystemTools: (() => void) | undefined;
+  let disposeStorageMaintenance: (() => void) | undefined;
   const preferredPlanningApiPort = (() => {
     const parsed = Number(process.env.OPEN_GIT_CONTROL_API_PORT || '2990');
     return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 2990;
@@ -126,7 +130,8 @@ if (isPrimaryInstance) {
       app.setAppUserModelId(WINDOWS_APP_ID);
     }
 
-    ({ repositoryRunService } = setupIPC({
+    configureCodeCache(isDev);
+    ({ repositoryRunService, disposeStorageMaintenance } = setupIPC({
       gitService,
       githubService,
       aiService,
@@ -164,6 +169,8 @@ if (isPrimaryInstance) {
   });
 
   app.on('before-quit', () => {
+    commitStatsService.dispose();
+    disposeStorageMaintenance?.();
     stopSystemTools?.();
     repositoryRunService?.dispose();
     updaterManager.dispose();

@@ -10,6 +10,7 @@ export interface StoredRepoEntryDto {
 export type RepoSortByDto = 'lastOpenedDesc' | 'nameAsc' | 'nameDesc' | 'createdAtDesc' | 'createdAtAsc';
 
 export interface StoredRepoData {
+  revision?: number;
   repos: StoredRepoEntryDto[];
   activeRepo: string | null;
   sortBy?: RepoSortByDto;
@@ -66,6 +67,7 @@ export interface AppSettingsDto {
   showSecondaryHistory: boolean;
   commitSignoffByDefault: boolean;
   autoUpdateEnabled: boolean;
+  automaticMaintenanceEnabled?: boolean;
   secretScanBeforeCommitEnabled: boolean;
   secretScanBeforePushEnabled: boolean;
   secretScanStrictness: SecretScanStrictnessDto;

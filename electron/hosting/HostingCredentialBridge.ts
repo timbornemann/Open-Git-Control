@@ -1,8 +1,8 @@
 import { randomBytes } from 'crypto';
 import { createServer, type Server } from 'http';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
+import { createPrivateTempDir, cleanupPrivateTempDir } from '../git/PrivateTempFiles';
 
 export type GitCredentialEnvironment = { envOverrides: NodeJS.ProcessEnv; signal?: AbortSignal; dispose: () => void };
 export type GitCredentialRequest = {
@@ -95,7 +95,7 @@ export class HostingCredentialBridge {
     }
     request.signal?.throwIfAborted();
     const key = randomBytes(32).toString('hex');
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-git-auth-'));
+    const directory = createPrivateTempDir('ogc-git-auth-');
     const helperPath = path.join(directory, 'credential-helper.cjs');
     fs.writeFileSync(helperPath, HELPER_SOURCE, { mode: 0o600 });
     const quote = (value: string) => `'${value.replace(/'/g, "'\\''")}'`;
@@ -110,12 +110,7 @@ export class HostingCredentialBridge {
       request.signal?.removeEventListener('abort', dispose);
       server?.closeAllConnections();
       server?.close();
-      try {
-        fs.rmSync(helperPath, { force: true });
-        fs.rmdirSync(directory);
-      } catch {
-        /* The helper contains no secret. */
-      }
+      cleanupPrivateTempDir(directory);
     };
     try {
       server = createServer((incoming, outgoing) => {

@@ -1,0 +1,72 @@
+.storage-table-scroll {
+  overflow-x: auto;
+}
+.storage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.storage-table th,
+.storage-table td {
+  padding: 8px 6px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+.storage-table td {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.storage-hint {
+  font-size: 12px;
+  line-height: 1.6;
+  opacity: 0.8;
+}
+.storage-error {
+  color: var(--error-color, #ef7676);
+  overflow-wrap: anywhere;
+}
+.storage-issues {
+  padding-left: 18px;
+}
+.storage-issues li {
+  margin-bottom: 10px;
+}
+.storage-issues code,
+.storage-recovery code {
+  display: block;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  opacity: 0.8;
+}
+.storage-return {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.storage-return span {
+  flex: 1;
+  min-width: 120px;
+  overflow-wrap: anywhere;
+}
+.storage-return small {
+  display: block;
+  opacity: 0.7;
+}
+.storage-recovery {
+  border: 1px solid var(--border-color, #333);
+  padding: 12px;
+  margin-top: 12px;
+  min-width: 0;
+}
+.storage-recovery legend {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.storage-recovery label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}

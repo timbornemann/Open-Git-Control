@@ -28,7 +28,7 @@ export type SidebarCollapseState = {
   submodulePanelCollapsed: boolean;
 };
 
-export type SidebarCollapseByRepo = Record<string, SidebarCollapseState>;
+export type SidebarCollapseByRepo = Record<string, Partial<SidebarCollapseState>>;
 
 export type SidebarGeneralCollapseState = {
   repoPanelCollapsed: boolean;

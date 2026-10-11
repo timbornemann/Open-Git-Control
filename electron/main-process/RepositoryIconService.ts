@@ -6,6 +6,23 @@ import { repositoryPathKey } from './activeRepositoryAuthorization';
 import { resolveExistingRepositoryPathWithoutSymlinks, normalizeRepositoryRelativePath } from '../git/RepositoryPathSafety';
 import { discoverRepositoryIcons, readRepositoryIconSource } from './repositoryIconDiscovery';
 import type { RepositoryIconCacheRequestDto, RepositoryIconChoiceDto, RepositoryIconStateDto } from '../../src/shared/repositoryIcons';
+import * as syncFs from 'node:fs';
+import { assertManagedPath, readStorageJson } from './storageSafety';
+import { isStorageBusy, leaseStorage, recordCacheUse } from './managedStorage';
+import { canPersistAuxiliary } from './auxiliaryDiskBudget';
+import { mayReplaceCache } from './cacheReplacement';
+
+function supportedIcon(value: unknown, repo: string): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const data = value as { version?: number; repoPath?: string; mode?: string };
+  return (
+    data.version === 1 &&
+    typeof data.repoPath === 'string' &&
+    path.isAbsolute(data.repoPath) &&
+    repositoryPathKey(data.repoPath) === repositoryPathKey(repo) &&
+    ['auto', 'manual', 'initials'].includes(data.mode || '')
+  );
+}
 
 type IconRecord = RepositoryIconStateDto & {
   checkedAt: number;
@@ -70,10 +87,13 @@ export class RepositoryIconService {
   }
   private persist(record: IconRecord) {
     this.current(record);
-    writeTextFileAtomically(
-      this.file(record.repoPath),
-      JSON.stringify({ version: 1, ...this.snapshot(record), stamp: record.stamp, scannedAt: record.scannedAt }),
-    );
+    assertManagedPath(this.deps.directory, this.file(record.repoPath));
+    if (!mayReplaceCache(this.deps.directory, this.file(record.repoPath), (value) => supportedIcon(value, record.repoPath))) return;
+    let data = { version: 1, ...this.snapshot(record), stamp: record.stamp, scannedAt: record.scannedAt };
+    if (!canPersistAuxiliary(path.dirname(this.deps.directory), this.file(record.repoPath), Buffer.byteLength(JSON.stringify(data)))) {
+      data = { ...data, thumbnail: null, candidates: [], stamp: null, scannedAt: 0 };
+    }
+    writeTextFileAtomically(this.file(record.repoPath), JSON.stringify(data));
   }
   private async record(repo: string) {
     const repoPath = this.allowed(repo),
@@ -108,6 +128,7 @@ export class RepositoryIconService {
   private async load(record: IconRecord) {
     try {
       const file = this.file(record.repoPath);
+      assertManagedPath(this.deps.directory, file);
       if ((await fs.stat(file)).size > 2 * 1024 * 1024) return;
       const data = JSON.parse(await fs.readFile(file, 'utf8'));
       this.current(record);
@@ -141,6 +162,7 @@ export class RepositoryIconService {
   }
   async get(repo: string, rescan = false) {
     const record = await this.record(repo);
+    recordCacheUse(this.file(record.repoPath), this.now());
     if (rescan) await this.validate(record, true);
     else if (record.mode !== 'initials' && this.now() - record.checkedAt >= 60_000) void this.validate(record, false);
     return this.snapshot(record);
@@ -157,12 +179,14 @@ export class RepositoryIconService {
   private validate(record: IconRecord, force: boolean): Promise<void> {
     const existing = this.validations.get(record);
     if (existing) return force ? existing.then(() => this.validate(record, true)) : existing;
+    const release = leaseStorage(this.file(record.repoPath));
     const promise = new Promise<void>((resolve) => {
       this.jobs.push(async () => {
         try {
           await this.check(record, force);
         } finally {
           this.validations.delete(record);
+          release();
           resolve();
         }
       });
@@ -229,6 +253,8 @@ export class RepositoryIconService {
   }
   async choose(repo: string, choice: RepositoryIconChoiceDto) {
     const record = await this.record(repo);
+    if (!mayReplaceCache(this.deps.directory, this.file(record.repoPath), (value) => supportedIcon(value, record.repoPath)))
+      throw new Error('The existing logo format is unsupported. Its data was preserved.');
     if (!choice || !['auto', 'manual', 'initials'].includes(choice.mode)) throw new Error('Invalid repository logo selection.');
     const manualPath = choice.mode === 'manual' ? normalizeRepositoryRelativePath(choice.path) : null;
     if (manualPath) await this.readSource(repo, manualPath);
@@ -287,18 +313,24 @@ export class RepositoryIconService {
         record.alive = false;
         this.records.delete(key);
       }
-    // Include unloaded disk entries, so removal before first display also cleans up.
-    const files = new Set(paths.map((repo) => path.basename(this.file(repo))));
-    void fs
-      .readdir(this.deps.directory)
-      .then(async (entries) => {
-        for (const entry of entries)
-          if (/^[a-f0-9]{64}\.json$/.test(entry) && !files.has(entry)) {
-            const target = path.resolve(this.deps.directory, entry);
-            if (path.dirname(target) === path.resolve(this.deps.directory) && !this.deps.storedPaths().some((repo) => path.basename(this.file(repo)) === entry))
-              await fs.rm(target, { force: true });
-          }
-      })
-      .catch(() => {});
+    // Disk selections remain available throughout the centrally managed return period.
+  }
+  clearGenerated(repo: string): boolean {
+    const file = this.file(repo);
+    if (isStorageBusy(file)) return false;
+    const value = readStorageJson(this.deps.directory, file) as Record<string, unknown>;
+    if (value.version !== 1 || typeof value.repoPath !== 'string' || repositoryPathKey(value.repoPath) !== repositoryPathKey(repo)) return false;
+    assertManagedPath(this.deps.directory, file);
+    writeTextFileAtomically(file, JSON.stringify({ ...value, thumbnail: null, candidates: [], stamp: null, scannedAt: 0 }));
+    const record = this.records.get(repositoryPathKey(repo));
+    if (record) {
+      record.thumbnail = null;
+      record.candidates = [];
+      record.stamp = null;
+      record.scannedAt = -Infinity;
+      record.checkedAt = -Infinity;
+      this.changed(record);
+    }
+    return syncFs.existsSync(file);
   }
 }

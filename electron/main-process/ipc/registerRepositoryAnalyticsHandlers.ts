@@ -9,7 +9,7 @@ import { requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
 import { repoJobRegistry } from '../repoJobRegistry';
 import { isAllowedAppNavigation, isDevelopmentRuntime } from '../security';
 
-export function registerRepositoryAnalyticsHandlers(gitService: GitService): void {
+export function registerRepositoryAnalyticsHandlers(gitService: GitService): RepositoryAnalyticsService {
   const service = new RepositoryAnalyticsService(gitService, path.join(app.getPath('userData'), 'repository-analytics'));
   const controllers = new Map<number, AbortController>();
   const authorize = (event: IpcMainInvokeEvent, repoPath: string, channel: string) => {
@@ -69,4 +69,5 @@ export function registerRepositoryAnalyticsHandlers(gitService: GitService): voi
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
+  return service;
 }
