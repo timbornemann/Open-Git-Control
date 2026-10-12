@@ -352,9 +352,13 @@ export class UpdaterManager {
       return;
     }
 
+    // Squirrel.Mac cannot undo native update staging. Defer it until an
+    // explicit install request so disabling updates can still skip the update.
+    autoUpdater.autoInstallOnAppQuit = enabled && process.platform !== 'darwin';
+
     // Availability checks remain active even when automatic downloads are
     // disabled, so the renderer can still advertise a new version. The user
-    // setting controls only background download and automatic promotion.
+    // setting also controls installation on quit where it can be cancelled.
     this.ensureUpdateCheckInterval();
 
     if (enabled && this.updaterStatus.state === 'update-available') {
@@ -381,7 +385,6 @@ export class UpdaterManager {
     }
 
     autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = true;
 
     autoUpdater.on('checking-for-update', () => {
       this.setUpdaterStatus({

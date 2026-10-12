@@ -87,17 +87,6 @@
       "tags": [],
       "createdAt": 1785856977969,
       "updatedAt": 1785856977969
-    },
-    {
-      "id": "20722a1d-0f20-4a43-98c6-cec1542d792a",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Voraussetzungen für Run-Templates prüfen",
-      "description": "Voraussetzungen für Run-Templates prüfen: Templates werden anhand von Projektdateien erkannt. Für bekannte Templates zusätzlich prüfen, ob beispielsweise npm, Python oder Cargo verfügbar ist. Fehlende Programme vor dem Start verständlich anzeigen.",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1791462817621,
-      "updatedAt": 1791751671923
     }
   ]
 }

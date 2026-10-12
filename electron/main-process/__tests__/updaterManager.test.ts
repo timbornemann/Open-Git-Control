@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { autoUpdaterMock, getAllWindowsMock, getVersionMock } = vi.hoisted(() => ({
   autoUpdaterMock: {
+    autoDownload: true,
+    autoInstallOnAppQuit: true,
     checkForUpdates: vi.fn(),
     downloadUpdate: vi.fn(),
     on: vi.fn(),
@@ -23,6 +25,11 @@ vi.mock('electron-updater', () => ({
 import { UpdaterManager } from '../updaterManager';
 import type { UpdaterStatusPayload } from '../updaterManager';
 
+const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')!;
+const setPlatform = (platform: NodeJS.Platform): void => {
+  Object.defineProperty(process, 'platform', { configurable: true, value: platform });
+};
+
 type UpdaterManagerInternals = {
   setUpdaterStatus: (patch: Partial<UpdaterStatusPayload>) => void;
 };
@@ -39,14 +46,19 @@ const missingReleaseMetadataError = (metadataFile = 'latest.yml') =>
 describe('UpdaterManager', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    setPlatform('win32');
     getVersionMock.mockReturnValue('1.0.0');
     getAllWindowsMock.mockReturnValue([]);
+    autoUpdaterMock.autoDownload = true;
+    autoUpdaterMock.autoInstallOnAppQuit = true;
     autoUpdaterMock.checkForUpdates.mockReset();
     autoUpdaterMock.downloadUpdate.mockReset();
     autoUpdaterMock.on.mockReset();
+    autoUpdaterMock.quitAndInstall.mockReset();
   });
 
   afterEach(() => {
+    Object.defineProperty(process, 'platform', originalPlatform);
     vi.useRealTimers();
   });
 
@@ -161,6 +173,7 @@ describe('UpdaterManager', () => {
     manager.configureAutoUpdates(false);
     await Promise.resolve();
 
+    expect(autoUpdaterMock.autoInstallOnAppQuit).toBe(false);
     expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1);
     const updateAvailable = autoUpdaterMock.on.mock.calls.find(([eventName]) => eventName === 'update-available')?.[1];
     expect(updateAvailable).toBeTypeOf('function');
@@ -169,6 +182,50 @@ describe('UpdaterManager', () => {
     expect(manager.getStatus()).toMatchObject({ state: 'update-available', availableVersion: '2.0.0', releaseNotes: 'New release' });
     expect(autoUpdaterMock.downloadUpdate).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { platform: 'win32', downloadState: 'downloading', initiallyInstallsOnQuit: true },
+    { platform: 'win32', downloadState: 'downloaded', initiallyInstallsOnQuit: true },
+    { platform: 'linux', downloadState: 'downloading', initiallyInstallsOnQuit: true },
+    { platform: 'linux', downloadState: 'downloaded', initiallyInstallsOnQuit: true },
+    { platform: 'darwin', downloadState: 'downloading', initiallyInstallsOnQuit: false },
+    { platform: 'darwin', downloadState: 'downloaded', initiallyInstallsOnQuit: false },
+  ] as const)(
+    'disables installation on quit for a $downloadState update on $platform while keeping manual installation available',
+    async ({ platform, downloadState, initiallyInstallsOnQuit }) => {
+      setPlatform(platform);
+      autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined);
+      autoUpdaterMock.downloadUpdate.mockResolvedValue([]);
+      const manager = new UpdaterManager(false);
+      manager.configureAutoUpdates(true);
+
+      const updateAvailable = autoUpdaterMock.on.mock.calls.find(([eventName]) => eventName === 'update-available')?.[1];
+      const updateDownloaded = autoUpdaterMock.on.mock.calls.find(([eventName]) => eventName === 'update-downloaded')?.[1];
+      expect(updateAvailable).toBeTypeOf('function');
+      expect(updateDownloaded).toBeTypeOf('function');
+      updateAvailable?.({ version: '2.0.0', releaseNotes: 'New release' });
+      await Promise.resolve();
+      if (downloadState === 'downloaded') {
+        updateDownloaded?.({ version: '2.0.0', releaseNotes: 'New release' });
+      }
+
+      expect(manager.getStatus().state).toBe(downloadState);
+      expect(autoUpdaterMock.autoInstallOnAppQuit).toBe(initiallyInstallsOnQuit);
+      manager.setAutoUpdatesEnabled(false);
+      if (downloadState === 'downloading') {
+        updateDownloaded?.({ version: '2.0.0', releaseNotes: 'New release' });
+      }
+
+      expect(autoUpdaterMock.autoInstallOnAppQuit).toBe(false);
+      expect(manager.getStatus()).toMatchObject({ state: 'downloaded', downloaded: true, availableVersion: '2.0.0' });
+      expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled();
+
+      expect(manager.installDownloadedUpdate()).toEqual({ success: true });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledExactlyOnceWith(false, true);
+      manager.dispose();
+    },
+  );
 
   it('continues to download an advertised version in the background when automatic updates are enabled', async () => {
     autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined);
@@ -180,6 +237,7 @@ describe('UpdaterManager', () => {
     updateAvailable?.({ version: '2.0.0', releaseNotes: 'New release' });
     await Promise.resolve();
 
+    expect(autoUpdaterMock.autoInstallOnAppQuit).toBe(true);
     expect(autoUpdaterMock.downloadUpdate).toHaveBeenCalledTimes(1);
     expect(manager.getStatus()).toMatchObject({ state: 'downloading', availableVersion: '2.0.0' });
   });
