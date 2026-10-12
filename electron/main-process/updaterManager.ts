@@ -4,6 +4,7 @@ import type { ProgressInfo, UpdateInfo } from 'electron-updater';
 import { CancellationToken } from 'builder-util-runtime';
 import { IpcChannel } from '../../src/types/ipcContract';
 import { formatUpdaterError, normalizeReleaseNotes, pendingReleaseFromError, withTimeout } from './updaterSupport';
+import { assertOfficialUpdateInfo, configureOfficialUpdaterSource } from './updaterSourcePolicy';
 
 export type UpdaterState = 'idle' | 'checking' | 'release-pending' | 'update-available' | 'no-update' | 'downloading' | 'downloaded' | 'error';
 
@@ -35,6 +36,8 @@ export class UpdaterManager {
   private updaterStatus: UpdaterStatusPayload;
 
   private activeDownloadCancellationToken: CancellationToken | null = null;
+
+  private availableUpdateInfo: UpdateInfo | null = null;
 
   constructor(private readonly isDev: boolean) {
     this.updaterStatus = {
@@ -201,6 +204,7 @@ export class UpdaterManager {
       // request performed by checkForUpdates(). Await the real operation
       // instead of reporting a timeout while it continues in the background.
       await autoUpdater.checkForUpdates();
+      if (this.getStatus().state === 'error') return { success: false, error: this.updaterStatus.error || 'Update-Pruefung fehlgeschlagen.' };
       return { success: true };
     } catch (error: unknown) {
       const failure = this.applyUpdaterFailure(error);
@@ -219,6 +223,12 @@ export class UpdaterManager {
 
     if (this.updaterStatus.state !== 'update-available') {
       return { success: false, error: 'Es ist kein herunterladbares Update verfuegbar.' };
+    }
+
+    try {
+      assertOfficialUpdateInfo(this.availableUpdateInfo);
+    } catch (error) {
+      return { success: false, error: this.applyUpdaterFailure(error).error };
     }
 
     this.setUpdaterStatus({
@@ -385,6 +395,7 @@ export class UpdaterManager {
     }
 
     autoUpdater.autoDownload = false;
+    configureOfficialUpdaterSource(autoUpdater);
 
     autoUpdater.on('checking-for-update', () => {
       this.setUpdaterStatus({
@@ -401,6 +412,14 @@ export class UpdaterManager {
     });
 
     autoUpdater.on('update-available', (info: UpdateInfo) => {
+      try {
+        assertOfficialUpdateInfo(info);
+        this.availableUpdateInfo = info;
+      } catch (error) {
+        this.availableUpdateInfo = null;
+        this.applyUpdaterFailure(error);
+        return;
+      }
       this.setUpdaterStatus({
         state: 'update-available',
         availableVersion: info.version || null,

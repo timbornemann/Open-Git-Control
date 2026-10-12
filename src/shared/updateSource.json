@@ -1,0 +1,23 @@
+{
+  "owner": "timbornemann",
+  "repo": "Open-Git-Control",
+  "repositoryId": 1176739168,
+  "productName": "Open-Git-Control",
+  "platforms": {
+    "windows": {
+      "feed": "latest.yml",
+      "artifacts": ["win-x64.exe"],
+      "blockmaps": ["win-x64.exe"]
+    },
+    "linux": {
+      "feed": "latest-linux.yml",
+      "artifacts": ["linux-x86_64.AppImage", "linux-amd64.deb"],
+      "blockmaps": []
+    },
+    "macos": {
+      "feed": "latest-mac.yml",
+      "artifacts": ["mac-x64.zip", "mac-x64.dmg"],
+      "blockmaps": ["mac-x64.zip", "mac-x64.dmg"]
+    }
+  }
+}

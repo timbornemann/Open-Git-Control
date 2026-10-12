@@ -186,14 +186,17 @@ jobs:
           path: release
           merge-multiple: true
 
+      - name: Prepare package version for validation
+        run: node scripts/prepare-release-version.js "${{ needs.prepare.outputs.version }}"
+
+      - name: Generate SHA-256 checksums
+        run: node scripts/generate-release-checksums.js release
+
       - name: Validate complete cross-platform release
         run: |
           node scripts/validate-release-assets.js "${{ needs.prepare.outputs.version }}" windows
           node scripts/validate-release-assets.js "${{ needs.prepare.outputs.version }}" linux
           node scripts/validate-release-assets.js "${{ needs.prepare.outputs.version }}" macos
-
-      - name: Generate SHA-256 checksums
-        run: node scripts/generate-release-checksums.js release
 
       - name: Upload verified assets to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -216,32 +219,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify uploaded release assets
-        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
-          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          EXPECTED_ASSETS=(
-            "latest.yml"
-            "latest-linux.yml"
-            "latest-mac.yml"
-            "Open-Git-Control-${RELEASE_VERSION}-win-x64.exe"
-            "Open-Git-Control-${RELEASE_VERSION}-win-x64.exe.blockmap"
-            "Open-Git-Control-${RELEASE_VERSION}-linux-x86_64.AppImage"
-            "Open-Git-Control-${RELEASE_VERSION}-linux-amd64.deb"
-            "Open-Git-Control-${RELEASE_VERSION}-mac-x64.dmg"
-            "Open-Git-Control-${RELEASE_VERSION}-mac-x64.zip"
-            "Open-Git-Control-${RELEASE_VERSION}-mac-x64.zip.blockmap"
-            "SHA256SUMS.txt"
-          )
-          UPLOADED_ASSETS="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')"
-          for asset in "${EXPECTED_ASSETS[@]}"; do
-            if ! grep -Fqx "$asset" <<<"$UPLOADED_ASSETS"; then
-              echo "Release is missing required asset: $asset"
-              exit 1
-            fi
-          done
+        run: node scripts/verify-published-release.js "${{ needs.prepare.outputs.version }}"
 
   sync-readme-release-links:
     name: Sync README release links
