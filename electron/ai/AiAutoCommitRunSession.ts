@@ -21,6 +21,7 @@ export class AiAutoCommitRunSession {
   private readonly groups: AutoCommitGroupResult[] = [];
   private readonly commits: Array<{ hash: string; subject: string }> = [];
   private snapshot?: AutoCommitSnapshot;
+  private phase: AiProgressUpdate['phase'] = 'snapshot';
   private retries = 0;
   constructor(
     private readonly git: GitService,
@@ -45,7 +46,8 @@ export class AiAutoCommitRunSession {
     const cancellation = setInterval(() => {
       if (this.shouldCancel()) this.control.abort();
     }, 100);
-    const timeout = setTimeout(() => this.control.abort(new Error('AI Auto-Commit run exceeded its time limit.')), 10 * 60 * 1000);
+    const timeoutError = new Error('AI Auto-Commit exceeded the 10-minute time limit. No further commits will be created.');
+    const timeout = setTimeout(() => this.control.abort(timeoutError), 10 * 60 * 1000);
     try {
       this.validateInputs();
       this.emit('snapshot', 'Änderungsstände werden erfasst …', 5);
@@ -98,10 +100,17 @@ export class AiAutoCommitRunSession {
       }
       return this.finish('complete');
     } catch (error) {
-      const cancelled = this.shouldCancel() || this.control.signal.aborted;
-      const message = cancelled ? 'KI Auto-Commit wurde abgebrochen.' : error instanceof Error ? error.message : 'AI Auto-Commit failed.';
+      const timedOut = this.control.signal.aborted && this.control.signal.reason === timeoutError;
+      const cancelled = !timedOut && (this.shouldCancel() || this.control.signal.aborted);
+      let failure = timedOut ? timeoutError : error;
+      if (!cancelled && failure instanceof Error && failure.name === 'AbortError') {
+        failure = new Error(`AI Auto-Commit failed during ${this.phase}: A required Git read was interrupted by another repository request.`, {
+          cause: failure,
+        });
+      }
+      const message = cancelled ? 'KI Auto-Commit wurde abgebrochen.' : failure instanceof Error ? failure.message : 'AI Auto-Commit failed.';
       if (this.commits.length || cancelled) return this.finish(cancelled ? 'cancelled' : 'partial', message);
-      throw error;
+      throw failure;
     } finally {
       clearInterval(cancellation);
       clearTimeout(timeout);
@@ -171,6 +180,7 @@ export class AiAutoCommitRunSession {
   }
 
   private emit(phase: AiProgressUpdate['phase'], message: string, progress?: number, details: Record<string, unknown> = {}): void {
+    this.phase = phase;
     this.onProgress?.({
       phase,
       message,
@@ -228,7 +238,8 @@ export class AiAutoCommitRunSession {
 
   private ensureActive(): void {
     this.verifySecretScanContext?.();
-    if (this.shouldCancel() || this.control.signal.aborted) throw new Error('KI Auto-Commit wurde abgebrochen.');
+    if (this.shouldCancel()) throw new Error('KI Auto-Commit wurde abgebrochen.');
+    this.control.signal.throwIfAborted();
   }
 
   private validateInputs(): void {

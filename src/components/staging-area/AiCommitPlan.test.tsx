@@ -8,6 +8,8 @@ import { AiCommitPlan } from './AiCommitPlan';
 import { useAiCommit } from './useAiCommit';
 import { gitClient } from '@/services/gitClient';
 import type { GitStatusWithConflicts } from './types';
+import { explainGitNotification } from '@/utils/gitFailure';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 
 const mocks = vi.hoisted(() => ({ run: vi.fn(), cancel: vi.fn(), state: vi.fn(), subscribe: vi.fn() }));
 vi.mock('@/services/aiClient', () => ({
@@ -123,7 +125,66 @@ describe('AI commit plan and run controls', () => {
     expect(controls.aiPhase).toBe('failed');
     expect(controls.aiProcessedFiles).toBe(0);
     expect(controls.aiRemainingFiles).toBe(1);
-    expect(toast).toHaveBeenLastCalledWith({ msg: 'One commit created; hook rejected the next.', isError: true });
+    expect(toast).toHaveBeenLastCalledWith({ msg: 'One commit created; hook rejected the next.', isError: true, errorExplained: true });
     expect(updated).toHaveBeenCalled();
+  });
+
+  it.each([
+    'Git operation was aborted.',
+    'AI provider request was cancelled by the server.',
+    'AI Auto-Commit exceeded the 10-minute time limit. No further commits will be created.',
+  ])('keeps a failed AI run visible as an error with its original reason: %s', async (message) => {
+    mocks.run.mockResolvedValue({ success: false, error: message });
+    await act(async () => root.render(createElement(I18nProvider, { language: 'en', children: createElement(Harness) })));
+    await act(async () => controls.handleAiAutoCommit());
+
+    expect(controls.aiPhase).toBe('failed');
+    expect(controls.isAiJobRunning).toBe(false);
+    const notification = toast.mock.calls.at(-1)![0];
+    expect(notification).toMatchObject({ msg: message, isError: true, errorExplained: true });
+    expect(explainGitNotification(notification, (_de, en) => en)).toBe(notification);
+  });
+
+  it('shows a cancellation only when the backend explicitly reports one', async () => {
+    mocks.run.mockResolvedValue({ success: false, cancelled: true, error: 'KI Auto-Commit wurde wegen Repository-Wechsel abgebrochen.' });
+    await act(async () => root.render(createElement(I18nProvider, { language: 'en', children: createElement(Harness) })));
+    await act(async () => controls.handleAiAutoCommit());
+
+    expect(controls.aiPhase).toBe('cancelled');
+    expect(toast).toHaveBeenLastCalledWith(expect.objectContaining({ isError: false, msg: expect.stringContaining('Repository-Wechsel') }));
+  });
+
+  it('preserves AI error context through the actual app notification controller', async () => {
+    const notifications = { publish: vi.fn(), update: vi.fn(), dismiss: vi.fn() };
+    const message = 'Git operation was aborted.';
+    mocks.run.mockResolvedValue({ success: false, error: message });
+    await act(async () =>
+      root.render(
+        createElement(NotificationProvider, {
+          value: notifications,
+          children: createElement(I18nProvider, { language: 'en', children: createElement(Harness) }),
+        }),
+      ),
+    );
+    await act(async () => controls.handleAiAutoCommit());
+
+    expect(notifications.publish).toHaveBeenCalledExactlyOnceWith({ msg: message, isError: true, errorExplained: true });
+    expect(toast).not.toHaveBeenCalled();
+    expect(explainGitNotification(notifications.publish.mock.calls[0][0], (_de, en) => en).isError).toBe(true);
+  });
+
+  it('retains durable partial-result errors even when Git diagnostics contain aborted', async () => {
+    const summary = 'One commit created. Git operation was aborted.';
+    mocks.run.mockResolvedValue({
+      success: true,
+      data: { outcome: 'partial', summary, commits: [{ hash: group.hash, subject: group.title }], groups: [group] },
+    });
+    await act(async () => root.render(createElement(I18nProvider, { language: 'en', children: createElement(Harness) })));
+    await act(async () => controls.handleAiAutoCommit());
+
+    expect(controls.aiGroups).toEqual([group]);
+    const notification = toast.mock.calls.at(-1)![0];
+    expect(notification).toMatchObject({ msg: summary, isError: true, errorExplained: true });
+    expect(explainGitNotification(notification, (_de, en) => en).isError).toBe(true);
   });
 });

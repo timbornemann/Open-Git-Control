@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ToastMessage } from '@/types/git';
+import type { NotificationMessage } from '@/types/notifications';
+import { useOptionalNotifications } from '@/contexts/NotificationContext';
+import { redactGitCredentials } from '@/shared/git/redaction';
 import type { AiAutoCommitGroupDto, AiAutoCommitResultDto } from '@/types/aiDtos';
 import { useI18n } from '@/i18n';
 import { aiClient } from '@/services/aiClient';
@@ -13,7 +15,7 @@ const AI_TERMINAL_CLEAR_DELAY_MS = 4_000;
 type Params = {
   repoPath: string | null;
   status: GitStatusWithConflicts | null;
-  setToast: (msg: ToastMessage | null) => void;
+  setToast: (msg: NotificationMessage | null) => void;
   refresh: () => Promise<void>;
   onRepoChanged?: () => void;
   onCommitsCreated?: () => void;
@@ -40,6 +42,14 @@ const asString = (value: unknown): string | null => (typeof value === 'string' &
 
 export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged, onCommitsCreated }: Params) => {
   const { t, tr } = useI18n();
+  const notifications = useOptionalNotifications();
+  const notifyAiResult = useCallback(
+    (message: NotificationMessage) => {
+      if (notifications) notifications.publish(message);
+      else setToast(message);
+    },
+    [notifications, setToast],
+  );
   const [isAiCommitting, setIsAiCommitting] = useState(false);
   const [isAiJobRunning, setIsAiJobRunning] = useState(false);
   const [aiProgressMessage, setAiProgressMessage] = useState<string | null>(null);
@@ -243,9 +253,8 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
   );
 
   const handleAiRunFailure = useCallback(
-    async (message: string) => {
-      const cancelled = /abgebrochen|cancel/i.test(message);
-      setToast({ msg: message, isError: !cancelled });
+    async (message: string, cancelled = false) => {
+      notifyAiResult({ msg: redactGitCredentials(message), isError: !cancelled, errorExplained: true });
       lastKnownStatusRef.current = cancelled ? 'cancelled' : 'failed';
       setAiPhase(cancelled ? 'cancelled' : 'failed');
       setAiProgressMessage(message);
@@ -253,7 +262,7 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
       await refresh();
       scheduleTerminalClear();
     },
-    [refresh, scheduleTerminalClear, setToast],
+    [refresh, scheduleTerminalClear, notifyAiResult],
   );
 
   const handleAiRunSuccess = useCallback(
@@ -264,7 +273,7 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
       if (data.groups) setAiGroups(data.groups);
 
       if (data.outcome === 'partial' || data.outcome === 'cancelled') {
-        setToast({ msg: data.summary, isError: data.outcome === 'partial' });
+        notifyAiResult({ msg: redactGitCredentials(data.summary), isError: data.outcome === 'partial', errorExplained: true });
       } else if (commits.length === 0) {
         setToast({
           msg: data.summary || t('generated.components.staging_area.useaicommit.ai_did_not_create_commits_fa18e8e4'),
@@ -296,7 +305,7 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
       setIsAiJobRunning(false);
       scheduleTerminalClear();
     },
-    [refreshHistory, refresh, scheduleTerminalClear, setToast, t, tr],
+    [refreshHistory, refresh, scheduleTerminalClear, setToast, notifyAiResult, t, tr],
   );
 
   const handleAiAutoCommit = useCallback(async () => {
@@ -346,7 +355,7 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
       if (generation !== runGenerationRef.current || repoPathRef.current !== repoPath) return;
       if (!result.success) {
         const errorMessage = result.error || t('generated.components.staging_area.useaicommit.ai_auto_commit_failed_f42b2375');
-        await handleAiRunFailure(errorMessage);
+        await handleAiRunFailure(errorMessage, result.cancelled === true);
         return;
       }
 
@@ -357,7 +366,7 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
 
       const message = error instanceof Error ? error.message : t('generated.components.staging_area.useaicommit.ai_auto_commit_failed_f42b2375');
 
-      await handleAiRunFailure(message);
+      await handleAiRunFailure(message, lastKnownStatusRef.current === 'cancelled');
     } finally {
       if (generation === runGenerationRef.current && repoPathRef.current === repoPath) {
         aiStartLockRef.current = false;

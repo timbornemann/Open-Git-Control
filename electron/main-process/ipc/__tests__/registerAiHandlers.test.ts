@@ -122,6 +122,24 @@ describe('registerAiHandlers', () => {
     expect(aiService.runAutoCommitWithOptions).not.toHaveBeenCalled();
   });
 
+  it.each(['Git operation was aborted.', 'AI provider request was cancelled by the server.', 'AI Auto-Commit exceeded the 10-minute time limit.'])(
+    'keeps an unrequested interruption as a failed job: %s',
+    async (message) => {
+      registerAiHandlers({
+        aiService: { runAutoCommitWithOptions: vi.fn().mockRejectedValue(new Error(message)) } as any,
+        readSettingsWithMigration: () => ({}) as any,
+        getGeminiApiKeyFromSecureStore: () => '',
+        getOpenAiApiKeyFromSecureStore: () => '',
+        getActiveRepoPath: () => '/tmp/repo',
+        secretScanService: {} as any,
+      });
+      const send = vi.fn();
+
+      expect(await handlers.get('git:aiAutoCommit')!({ sender: { send } }, { repoPath: '/tmp/repo' })).toEqual({ success: false, error: message });
+      expect(send).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({ status: 'failed', message }));
+    },
+  );
+
   it.each(['scan', 'publication'])('keeps AI commits bound to the repository policy during %s', async (phase) => {
     const publish = vi.fn();
     const scan = vi.fn(async (input) => {

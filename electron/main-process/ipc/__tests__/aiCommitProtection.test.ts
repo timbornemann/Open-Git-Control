@@ -110,7 +110,7 @@ describe('shared AI commit protection', () => {
     await vi.waitFor(() => expect(resolve).toBeTypeOf('function'));
     registry.cancelForRepoChange('/tmp/next');
     resolve();
-    expect((await running).error).toContain('Repository-Wechsel');
+    expect(await running).toMatchObject({ success: false, cancelled: true, error: expect.stringContaining('Repository-Wechsel') });
     expect(() => ensureCommitProtectionIsIdle(repoPath)).not.toThrow();
   });
 });

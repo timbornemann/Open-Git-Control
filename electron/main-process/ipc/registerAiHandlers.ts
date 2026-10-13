@@ -186,7 +186,7 @@ export function registerAiHandlers({
       const message = error instanceof Error ? error.message : 'KI Auto-Commit fehlgeschlagen.';
       const cancelRequested = currentAiAutoCommitJob?.id === jobId && currentAiAutoCommitJob.cancelRequested;
       const wasRepoSwitchCancel = error instanceof RepoJobCancelledError || (repoJob.signal.aborted && !cancelRequested);
-      const wasUserCancel = cancelRequested || (!wasRepoSwitchCancel && /abgebrochen|cancelled/i.test(message));
+      const wasUserCancel = cancelRequested;
       const wasCancelled = wasRepoSwitchCancel || wasUserCancel;
       const cancelMessage = wasRepoSwitchCancel ? 'KI Auto-Commit wurde wegen Repository-Wechsel abgebrochen.' : 'KI Auto-Commit wurde abgebrochen.';
 
@@ -199,7 +199,7 @@ export function registerAiHandlers({
         timestamp: Date.now(),
       });
 
-      return { success: false, error: wasCancelled ? cancelMessage : message };
+      return { success: false, error: wasCancelled ? cancelMessage : message, ...(wasCancelled ? { cancelled: true } : {}) };
     } finally {
       releaseProtection();
       repoJob.complete();

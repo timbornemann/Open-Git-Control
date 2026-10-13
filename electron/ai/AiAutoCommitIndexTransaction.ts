@@ -121,8 +121,9 @@ export class AiAutoCommitIndexTransaction {
 
   async getSnapshot(): Promise<AutoCommitSnapshot> {
     if (!this.initialized || !this.snapshotTree) throw new Error('AI snapshot is unavailable.');
-    const staged = await readSnapshotChanges((args) => this.run(args), this.initialHeadTree, this.initialStagedTree, 'staged');
-    const worktree = await readSnapshotChanges((args) => this.run(args), this.initialStagedTree, this.snapshotTree, 'worktree');
+    // Required snapshot reads must survive interactive refreshes of the commit graph.
+    const staged = await readSnapshotChanges((args) => this.run(args, 'interactive'), this.initialHeadTree, this.initialStagedTree, 'staged');
+    const worktree = await readSnapshotChanges((args) => this.run(args, 'interactive'), this.initialStagedTree, this.snapshotTree, 'worktree');
     this.changeMaps = { staged: new Map(staged.map((change) => [change.path, change])), worktree: new Map(worktree.map((change) => [change.path, change])) };
     return {
       head: this.initialHead,
@@ -449,9 +450,9 @@ export class AiAutoCommitIndexTransaction {
     }
   }
 
-  private async run(args: string[]): Promise<string> {
+  private async run(args: string[], requestedKind?: 'interactive'): Promise<string> {
     if (this.exclusiveGit) return this.exclusiveGit.run(this.repoPath, args, { ignoreAbort: true });
-    return this.git.runCommandAtPath(this.repoPath, args);
+    return this.git.runner.run(this.repoPath, args, { requestedKind, signal: this.options.signal });
   }
 
   private async applySnapshotEntries(index: string, changes: AutoCommitChange[]): Promise<void> {
