@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AnalyticsCoupling } from '@/shared/ipc/repositoryAnalytics';
 import { buildCouplingScene, couplingPairKey, type CouplingPair, type CouplingScene } from './analyticsCouplingGeometry';
-import { relaxCouplingScene, type CouplingForceRequest, type CouplingForceResult } from './analyticsCouplingForce';
+import { relaxCouplingSceneAsync, type CouplingForceRequest, type CouplingForceResult } from './analyticsCouplingForce';
 import { couplingSession } from './analyticsCouplingSession';
 
 export { buildCouplingScene } from './analyticsCouplingGeometry';
@@ -15,6 +15,7 @@ export function useCouplingScene(rows: AnalyticsCoupling[], loading = false, ses
   const locked = useRef(false);
   const completed = useRef(session?.layout?.settled ?? false);
   const worker = useRef<Worker>();
+  const fallbackController = useRef<AbortController>();
   const structure = useMemo(() => JSON.stringify([...new Set(rows.map(couplingPairKey))].sort()), [rows]);
   const graph = useMemo(() => {
     const pairs = (JSON.parse(structure) as string[]).map((key) => {
@@ -36,6 +37,8 @@ export function useCouplingScene(rows: AnalyticsCoupling[], loading = false, ses
     completed.current = true;
     worker.current?.terminate();
     worker.current = undefined;
+    fallbackController.current?.abort();
+    fallbackController.current = undefined;
     setResult((value) => {
       if (session) session.layout = { structure: value.structure, scene: value.scene, settled: true };
       return value.settling ? { ...value, settling: false } : value;
@@ -59,7 +62,20 @@ export function useCouplingScene(rows: AnalyticsCoupling[], loading = false, ses
       if (session) session.layout = { structure, scene, settled: completed.current };
       setResult({ structure, scene, settling: false });
     };
-    const fallback = () => finish(relaxCouplingScene(graph.pairs, graph.seed, graph.anchors));
+    const fallback = () => {
+      worker.current?.terminate();
+      worker.current = undefined;
+      const controller = new AbortController();
+      fallbackController.current = controller;
+      void relaxCouplingSceneAsync(graph.pairs, graph.seed, graph.anchors, controller.signal).then(
+        (scene) => {
+          if (!controller.signal.aborted) finish(scene);
+        },
+        () => {
+          if (!controller.signal.aborted) finish(graph.seed);
+        },
+      );
+    };
     setResult({ structure, scene: graph.seed, settling: !!graph.pairs.length });
     const fixed = new Set(graph.anchors.map((node) => node.path));
     const allFixed = graph.seed.nodes.every((node) => fixed.has(node.path));
@@ -82,11 +98,13 @@ export function useCouplingScene(rows: AnalyticsCoupling[], loading = false, ses
             setResult({ structure, scene: data.scene, settling: true });
           }
         };
-        task.onerror = () => {
+        task.onerror = (event) => {
           if (!active || worker.current !== task) return;
-          task.terminate();
-          worker.current = undefined;
+          event.preventDefault();
           fallback();
+        };
+        task.onmessageerror = () => {
+          if (active && worker.current === task) fallback();
         };
         task.postMessage(graph satisfies CouplingForceRequest);
       } catch {
@@ -97,6 +115,8 @@ export function useCouplingScene(rows: AnalyticsCoupling[], loading = false, ses
       active = false;
       worker.current?.terminate();
       worker.current = undefined;
+      fallbackController.current?.abort();
+      fallbackController.current = undefined;
     };
   }, [graph, structure, session]);
   return { scene, settling: result.structure !== structure || result.settling, lock };

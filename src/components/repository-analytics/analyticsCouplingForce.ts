@@ -57,5 +57,28 @@ export function relaxCouplingScene(pairs: CouplingPair[], seed = buildCouplingSc
   return readCouplingForce(simulation.nodes());
 }
 
+export async function relaxCouplingSceneAsync(
+  pairs: CouplingPair[],
+  seed: CouplingScene,
+  anchors: CouplingNode[] = [],
+  signal?: AbortSignal,
+): Promise<CouplingScene> {
+  signal?.throwIfAborted();
+  const simulation = createCouplingForce(pairs, seed, anchors);
+  let sliceStarted = performance.now();
+  for (let tick = 0; tick < COUPLING_FORCE_TICKS; tick++) {
+    signal?.throwIfAborted();
+    simulation.tick();
+    if (performance.now() - sliceStarted >= 8 && tick + 1 < COUPLING_FORCE_TICKS) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+      sliceStarted = performance.now();
+    }
+  }
+  signal?.throwIfAborted();
+  return readCouplingForce(simulation.nodes());
+}
+
 export type CouplingForceRequest = { pairs: CouplingPair[]; seed: CouplingScene; anchors: CouplingNode[] };
 export type CouplingForceResult = { scene: CouplingScene; done: boolean };

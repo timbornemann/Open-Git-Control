@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildCouplingScene, type CouplingPair } from '../analyticsCouplingGeometry';
-import { relaxCouplingScene } from '../analyticsCouplingForce';
+import { relaxCouplingScene, relaxCouplingSceneAsync } from '../analyticsCouplingForce';
 import { couplingLabelLayout, couplingPairKey } from '../analyticsCouplingLayout';
 
 const pairs = [
@@ -11,6 +11,22 @@ const pairs = [
 const fan = (length: number): CouplingPair[] =>
   Array.from({ length }, (_, index) => ({ first: 'hub.ts', second: `src/peer-${String(index).padStart(4, '0')}.ts` }));
 describe('organic coupling layout', () => {
+  it('preserves all positions and anchors across cooperative fallback slices', async () => {
+    const seed = buildCouplingScene(pairs);
+    const anchors = [seed.nodes[0]];
+    expect(await relaxCouplingSceneAsync(pairs, seed, anchors)).toEqual(relaxCouplingScene(pairs, seed, anchors));
+  });
+  it('allows event-loop cancellation during fallback simulation', async () => {
+    const controller = new AbortController();
+    let time = 0;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => (time += 9));
+    try {
+      setTimeout(() => controller.abort(), 0);
+      await expect(relaxCouplingSceneAsync(pairs, buildCouplingScene(pairs), [], controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    } finally {
+      clock.mockRestore();
+    }
+  });
   it('deduplicates paths and links, does not mutate input, and is deterministic regardless of ordering and metrics', () => {
     const input = pairs.map((pair) => Object.freeze({ ...pair }));
     const value = relaxCouplingScene(input);

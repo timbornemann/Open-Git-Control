@@ -5,13 +5,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '@/i18n';
 import { AnalyticsCoupling } from '../AnalyticsCoupling';
 import { relaxCouplingScene, type CouplingForceRequest, type CouplingForceResult } from '../analyticsCouplingForce';
+import * as couplingForce from '../analyticsCouplingForce';
 import type { AnalyticsCoupling as Pair } from '@/shared/ipc/repositoryAnalytics';
 import { clearCouplingSessions } from '../analyticsCouplingSession';
 
 class LayoutWorker {
   static tasks: LayoutWorker[] = [];
+  static failMessage = false;
   onmessage?: (event: MessageEvent<CouplingForceResult>) => void;
-  onerror?: () => void;
+  onerror?: (event: ErrorEvent) => void;
+  onmessageerror?: () => void;
   request!: CouplingForceRequest;
   private scene?: CouplingForceResult['scene'];
   terminated = false;
@@ -22,6 +25,7 @@ class LayoutWorker {
     LayoutWorker.tasks.push(this);
   }
   postMessage(request: CouplingForceRequest) {
+    if (LayoutWorker.failMessage) throw new Error('Worker message failed');
     this.request = request;
   }
   terminate() {
@@ -47,9 +51,19 @@ const render = (value = rows, loading = false, sessionKey?: string) =>
   );
 const positions = () => [...host.querySelectorAll<HTMLElement>('.analytics-coupling-node')].map((node) => [node.dataset.path, node.style.left, node.style.top]);
 const camera = () => host.querySelector<HTMLElement>('.analytics-coupling-scene')!.style.transform;
+const waitForFallback = () =>
+  vi.waitFor(async () => {
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+    expect(host.querySelector('.analytics-coupling-network')?.getAttribute('aria-busy')).toBe('false');
+  });
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   LayoutWorker.tasks = [];
+  LayoutWorker.failMessage = false;
   clearCouplingSessions();
   vi.stubGlobal('Worker', LayoutWorker);
   host = document.createElement('div');
@@ -60,6 +74,7 @@ afterEach(() => {
   act(() => root.unmount());
   host.remove();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('background coupling force layout', { timeout: 15_000 }, () => {
@@ -138,7 +153,7 @@ describe('background coupling force layout', { timeout: 15_000 }, () => {
     expect(task.terminated).toBe(true);
     root = createRoot(host);
   });
-  it('retains the complete layout if worker creation is unavailable', () => {
+  it('retains the complete layout if worker creation is unavailable', async () => {
     vi.stubGlobal(
       'Worker',
       class {
@@ -149,7 +164,37 @@ describe('background coupling force layout', { timeout: 15_000 }, () => {
     );
     render();
     expect(positions()).toHaveLength(121);
-    expect(host.querySelector('.analytics-coupling-network')?.getAttribute('aria-busy')).toBe('false');
+    await waitForFallback();
+  });
+  it.each(['error', 'messageerror', 'postMessage'] as const)('cleans up a %s failure and settles the complete fallback graph', async (failure) => {
+    LayoutWorker.failMessage = failure === 'postMessage';
+    render();
+    const task = LayoutWorker.tasks[0];
+    act(() => {
+      if (failure === 'error') task.onerror?.({ preventDefault: vi.fn() } as unknown as ErrorEvent);
+      if (failure === 'messageerror') task.onmessageerror?.();
+    });
+    expect(task.terminated).toBe(true);
+    await waitForFallback();
+    expect(positions()).toHaveLength(121);
+  });
+  it('cancels a fallback after user interaction and ignores its late result', async () => {
+    let resolve!: (scene: CouplingForceResult['scene']) => void;
+    let signal: AbortSignal | undefined;
+    vi.spyOn(couplingForce, 'relaxCouplingSceneAsync').mockImplementation((_pairs, _seed, _anchors, control) => {
+      signal = control;
+      return new Promise((done) => {
+        resolve = done;
+      });
+    });
+    render();
+    const task = LayoutWorker.tasks[0];
+    act(() => task.onerror?.({ preventDefault: vi.fn() } as unknown as ErrorEvent));
+    act(() => host.querySelector<HTMLButtonElement>('[aria-label="Zoom in"]')!.click());
+    const stable = positions();
+    expect(signal?.aborted).toBe(true);
+    await act(async () => resolve(relaxCouplingScene(task.request.pairs, task.request.seed, task.request.anchors)));
+    expect(positions()).toEqual(stable);
   });
   it('restores a settled layout and camera on reopening without starting any new force worker', () => {
     render(rows, false, 'repo-and-filter');

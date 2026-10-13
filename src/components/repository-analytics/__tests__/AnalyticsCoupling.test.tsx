@@ -178,7 +178,7 @@ describe('file coupling network', () => {
     render(pairs.map((pair) => ({ ...pair, commits: pair.commits + 1 })));
     expect(camera()).toBe(after);
   });
-  it('fits narrow measured windows and keeps world coordinates and zoom when the window resizes', () => {
+  it('fits narrow measured windows and keeps world coordinates and zoom when the window resizes', async () => {
     let width = 350,
       height = 340,
       resize!: () => void;
@@ -197,6 +197,14 @@ describe('file coupling network', () => {
     );
     try {
       render();
+      await vi.waitFor(async () => {
+        await act(async () => {
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, 0);
+          });
+        });
+        expect(host.querySelector('.analytics-coupling-network')?.getAttribute('aria-busy')).toBe('false');
+      });
       const positions = nodes().map((node) => node.getAttribute('style'));
       act(() => control('Zoom in').click());
       const before = camera();
