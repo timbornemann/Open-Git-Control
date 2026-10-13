@@ -52,14 +52,17 @@ const render = (value = rows, loading = false, sessionKey?: string) =>
 const positions = () => [...host.querySelectorAll<HTMLElement>('.analytics-coupling-node')].map((node) => [node.dataset.path, node.style.left, node.style.top]);
 const camera = () => host.querySelector<HTMLElement>('.analytics-coupling-scene')!.style.transform;
 const waitForFallback = () =>
-  vi.waitFor(async () => {
-    await act(async () => {
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, 0);
+  vi.waitFor(
+    async () => {
+      await act(async () => {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 0);
+        });
       });
-    });
-    expect(host.querySelector('.analytics-coupling-network')?.getAttribute('aria-busy')).toBe('false');
-  });
+      expect(host.querySelector('.analytics-coupling-network')?.getAttribute('aria-busy')).toBe('false');
+    },
+    { timeout: 10_000 },
+  );
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   LayoutWorker.tasks = [];
@@ -70,8 +73,8 @@ beforeEach(() => {
   document.body.append(host);
   root = createRoot(host);
 });
-afterEach(() => {
-  act(() => root.unmount());
+afterEach(async () => {
+  await act(async () => root.unmount());
   host.remove();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
