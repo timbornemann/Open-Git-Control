@@ -10,9 +10,12 @@ vi.mock('node:child_process', () => ({ execFile: execFileMock, spawn: spawnMock 
 const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')!;
 
 class FakeGitProcess extends EventEmitter {
-  stdout = Object.assign(new EventEmitter(), { destroy: vi.fn() });
+  stdout = Object.assign(new EventEmitter(), { destroy: vi.fn(), pause: vi.fn(), resume: vi.fn() });
   stderr = Object.assign(new EventEmitter(), { destroy: vi.fn() });
-  kill = vi.fn(() => true);
+  kill = vi.fn(() => {
+    queueMicrotask(() => this.emit('close', null, 'SIGTERM'));
+    return true;
+  });
 }
 
 describe('GitSpawnOperations stream limits', () => {
@@ -61,6 +64,72 @@ describe('GitSpawnOperations stream limits', () => {
 
     await expect(operation).rejects.toThrow('output exceeded the 8 MB limit');
     expect(process.kill).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves Unicode characters split across line-stream chunks', async () => {
+    const process = new FakeGitProcess();
+    spawnMock.mockReturnValue(process);
+    const lines: string[] = [];
+    const operation = new GitSpawnOperations().streamLines(
+      '/repo',
+      ['show'],
+      (line) => {
+        lines.push(line);
+      },
+      new AbortController().signal,
+      { redactOutput: false },
+    );
+    const bytes = Buffer.from('src/ä😀/日本語.ts\r\nlast ä');
+    for (const byte of bytes) process.stdout.emit('data', Buffer.from([byte]));
+    process.emit('close', 0);
+    await operation;
+    expect(lines).toEqual(['src/ä😀/日本語.ts', 'last ä']);
+  });
+
+  it('waits for asynchronous line consumers after the process exits', async () => {
+    const process = new FakeGitProcess();
+    spawnMock.mockReturnValue(process);
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const lines: string[] = [];
+    let completed = false;
+    const operation = new GitSpawnOperations().streamLines(
+      '/repo',
+      ['show'],
+      async (line) => {
+        lines.push(line);
+        if (line === 'first') await held;
+      },
+      new AbortController().signal,
+    );
+    void operation.then(() => {
+      completed = true;
+    });
+    process.stdout.emit('data', Buffer.from('first\nsecond\nlast'));
+    process.emit('close', 0);
+    await vi.waitFor(() => expect(lines).toEqual(['first']));
+    expect(completed).toBe(false);
+    release();
+    await operation;
+    expect(lines).toEqual(['first', 'second', 'last']);
+  });
+
+  it('reports consumer failures and stops their Git process', async () => {
+    const process = new FakeGitProcess();
+    spawnMock.mockReturnValue(process);
+    const operation = new GitSpawnOperations().streamLines(
+      '/repo',
+      ['show'],
+      async () => {
+        throw new Error('Scanner failed');
+      },
+      new AbortController().signal,
+    );
+    process.stdout.emit('data', Buffer.from('line\n'));
+    await expect(operation).rejects.toThrow('Scanner failed');
+    expect(process.kill).toHaveBeenCalledOnce();
   });
 
   it('assembles clone progress across chunks and split UTF-8 code points', async () => {

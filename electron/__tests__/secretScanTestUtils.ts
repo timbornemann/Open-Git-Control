@@ -10,11 +10,11 @@ export const createGitServiceMock = (outputs: Record<string, string | Error>) =>
     runCommandAtPath: async (_repoPath: string, args: string[]) => resolve(args),
     streamCommandLines: async (args: string[], onLine: (line: string) => void) => {
       const output = await resolve(args);
-      output.split(/\r?\n/).forEach(onLine);
+      for (const line of output.split(/\r?\n/)) await onLine(line);
     },
     streamCommandLinesAtPath: async (_repoPath: string, args: string[], onLine: (line: string) => void) => {
       const output = await resolve(args);
-      output.split(/\r?\n/).forEach(onLine);
+      for (const line of output.split(/\r?\n/)) await onLine(line);
     },
   } as any;
 };

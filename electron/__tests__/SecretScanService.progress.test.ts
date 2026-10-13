@@ -17,7 +17,7 @@ describe('secret scan progress', () => {
       streamCommandLinesAtPath: vi.fn(async (_repo: string, args: string[], line: (text: string) => void) => {
         if (args[0] !== 'show') return;
         expect(events.at(-1)?.processedCommits).toBe(batch * 96);
-        ['diff --git a/app.ts b/app.ts', '+++ b/app.ts', '@@ -0,0 +1 @@', '+const safe = true;'].forEach(line);
+        for (const text of ['diff --git a/app.ts b/app.ts', '+++ b/app.ts', '@@ -0,0 +1 @@', '+const safe = true;']) await line(text);
         // Even when lines arrive, this batch is still running.
         expect(events.at(-1)?.processedCommits).toBe(batch * 96);
         batch++;

@@ -66,25 +66,25 @@ export async function scanLfsSecrets(
       const hash = createHash('sha256');
       let pending = '',
         lineNumber = 1;
-      const consume = (text: string, finish = false) => {
+      const consume = async (text: string, finish = false) => {
         pending += text;
         let end: number;
         while ((end = pending.indexOf('\n')) >= 0) {
           const line = pending.slice(0, end).replace(/\r$/, '');
           if (line.length > MAX_LINE_CHARACTERS) throw new Error('LFS text has a line exceeding the scan limit');
-          for (const filePath of targets) onLine({ filePath, line, lineNumber });
+          for (const filePath of targets) await onLine({ filePath, line, lineNumber });
           lineNumber++;
           pending = pending.slice(end + 1);
         }
         if (pending.length > MAX_LINE_CHARACTERS) throw new Error('LFS text has a line exceeding the scan limit');
-        if (finish && pending) for (const filePath of targets) onLine({ filePath, line: pending, lineNumber });
+        if (finish && pending) for (const filePath of targets) await onLine({ filePath, line: pending, lineNumber });
       };
       for await (const chunk of fs.createReadStream(location)) {
         options.signal?.throwIfAborted();
         hash.update(chunk);
-        consume(decoder.decode(chunk, { stream: true }));
+        await consume(decoder.decode(chunk, { stream: true }));
       }
-      consume(decoder.decode(), true);
+      await consume(decoder.decode(), true);
       if (hash.digest('hex') !== pointer.oid) throw new Error('LFS content failed its integrity check');
       for (const target of targets) seen.add(`${target}:${pointer.oid}`);
     } catch (error) {

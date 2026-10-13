@@ -138,7 +138,7 @@ describe('SecretScanService diff scanning', () => {
       async (_repoPath: string, args: string[], onLine: (line: string) => void, _signal: AbortSignal | undefined, options: any) => {
         expect(args).toEqual(['diff', '--cached', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0']);
         expect(options).toMatchObject({ redactOutput: false });
-        stagedDiff.split(/\r?\n/).forEach(onLine);
+        for (const line of stagedDiff.split(/\r?\n/)) await onLine(line);
       },
     );
     const service = new SecretScanService({ runCommandAtPath, streamCommandLinesAtPath } as any);

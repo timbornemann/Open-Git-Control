@@ -18,7 +18,7 @@ describe('SecretScanService history batching', () => {
         const hashes = args.slice(args.indexOf('--find-copies') + 1);
         showCalls.push(hashes);
         if (showCalls.length === 2) {
-          ['diff --git a/.env b/.env', '+++ b/.env', '@@ -0,0 +1 @@', '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF'].forEach(onLine);
+          for (const line of ['diff --git a/.env b/.env', '+++ b/.env', '@@ -0,0 +1 @@', '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF']) await onLine(line);
         }
       },
     );

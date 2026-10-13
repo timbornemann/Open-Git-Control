@@ -5,6 +5,7 @@ import type { DiffPreviewResult, GitBufferRunOptions, GitCloneProgressResult, Gi
 import { createAbortError } from './GitProcessTypes';
 import { redactGitSensitiveText } from './GitErrorFormatter';
 import { gitProcessTree } from './GitProcessTree';
+import { runGitLineConsumer } from './GitLineConsumer';
 
 const MAX_STREAM_LINE_BYTES = 1024 * 1024;
 const MAX_STREAM_OUTPUT_BYTES = 8 * 1024 * 1024;
@@ -178,72 +179,7 @@ export class GitSpawnOperations {
     signal: AbortSignal,
     options: { redactOutput?: boolean; envOverrides?: NodeJS.ProcessEnv } = {},
   ): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const redactOutput = options.redactOutput !== false;
-      const redactLine = (line: string) => (redactOutput ? redactGitSensitiveText(line) : line);
-      const proc = spawn(toolExecutable('git'), args, {
-        cwd: repoPath,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: toolEnvironment(options.envOverrides),
-      });
-      let pending = '';
-      let stderr = '';
-      let settled = false;
-      const abort = () => proc.kill();
-      signal.addEventListener('abort', abort, { once: true });
-
-      const cleanup = () => signal.removeEventListener('abort', abort);
-      const fail = (error: Error) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        proc.kill();
-        reject(error);
-      };
-
-      proc.stdout.on('data', (chunk: Buffer) => {
-        if (settled) return;
-        const text = chunk.toString('utf8');
-        let start = 0;
-        let newlineIndex = text.indexOf('\n');
-        while (newlineIndex >= 0) {
-          const linePart = text.slice(start, newlineIndex);
-          if (Buffer.byteLength(pending) + Buffer.byteLength(linePart) > MAX_STREAM_LINE_BYTES) {
-            fail(new Error(`Git stream line exceeded the ${MAX_STREAM_LINE_BYTES / 1024 / 1024} MB limit.`));
-            return;
-          }
-          onLine(redactLine(`${pending}${linePart}`.replace(/\r$/, '')));
-          pending = '';
-          start = newlineIndex + 1;
-          newlineIndex = text.indexOf('\n', start);
-        }
-        const remaining = text.slice(start);
-        if (Buffer.byteLength(pending) + Buffer.byteLength(remaining) > MAX_STREAM_LINE_BYTES) {
-          fail(new Error(`Git stream line exceeded the ${MAX_STREAM_LINE_BYTES / 1024 / 1024} MB limit.`));
-          return;
-        }
-        pending += remaining;
-      });
-      proc.stderr.on('data', (chunk: Buffer) => {
-        if (stderr.length < 64 * 1024) stderr += chunk.toString('utf8');
-      });
-      proc.on('error', (error) => fail(error));
-      proc.on('close', (code, closeSignal) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        if (signal.aborted || closeSignal) {
-          reject(createAbortError('Git stream was aborted.'));
-          return;
-        }
-        if (code !== 0) {
-          reject(new Error(redactGitSensitiveText((stderr || `git ${args.join(' ')} exited with code ${code}`).trim())));
-          return;
-        }
-        if (pending) onLine(redactLine(pending.replace(/\r$/, '')));
-        resolve();
-      });
-    });
+    return runGitLineConsumer(repoPath, args, onLine, signal, options);
   }
 
   streamOutput(repoPath: string, args: string[], onLine: (line: string) => void, signal: AbortSignal, envOverrides?: NodeJS.ProcessEnv): Promise<string> {
