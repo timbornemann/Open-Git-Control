@@ -99,12 +99,15 @@ export class GitService {
     return this.resolveRepoRoot(normalizedPath);
   }
 
-  async resolveRepositoryPathAsync(repoPath: string): Promise<string> {
+  async resolveRepositoryPathAsync(repoPath: string, signal?: AbortSignal): Promise<string> {
     const normalizedPath = path.resolve(String(repoPath || '').trim() || '.');
+    signal?.throwIfAborted();
     try {
-      const rootPath = (await this.gitRunner.run(normalizedPath, ['rev-parse', '--show-toplevel'])).trim();
+      const rootPath = (await this.gitRunner.run(normalizedPath, ['rev-parse', '--show-toplevel'], { signal, requestedKind: 'interactive' })).trim();
+      signal?.throwIfAborted();
       return rootPath || normalizedPath;
     } catch {
+      signal?.throwIfAborted();
       return normalizedPath;
     }
   }

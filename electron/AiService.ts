@@ -110,7 +110,7 @@ export class AiService {
     maybeGetOpenAiApiKey?: () => string,
   ): Promise<AiAutoCommitResult> {
     if (typeof repoPathOrSettings === 'string') {
-      const repoPath = this.gitService.resolveRepositoryPath(repoPathOrSettings);
+      const repoPath = await this.gitService.resolveRepositoryPathAsync(repoPathOrSettings);
       return this.autoCommitRunner.run(
         repoPath,
         settingsOrGetGeminiApiKey as AppSettings,
@@ -142,15 +142,9 @@ export class AiService {
     getOpenAiApiKey: () => string,
     options: AiAutoCommitRunOptions,
   ): Promise<AiAutoCommitResult> {
-    return this.autoCommitRunner.run(
-      this.gitService.resolveRepositoryPath(repoPath),
-      settings,
-      getGeminiApiKey,
-      onProgress,
-      shouldCancel,
-      getOpenAiApiKey,
-      options,
-    );
+    const resolvedRepoPath = await this.gitService.resolveRepositoryPathAsync(repoPath, options.signal);
+    options.signal?.throwIfAborted();
+    return this.autoCommitRunner.run(resolvedRepoPath, settings, getGeminiApiKey, onProgress, shouldCancel, getOpenAiApiKey, options);
   }
 }
 

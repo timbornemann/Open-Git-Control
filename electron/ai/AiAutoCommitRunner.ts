@@ -5,6 +5,7 @@ import { AiAutoCommitRunSession } from './AiAutoCommitRunSession';
 import type { AiAutoCommitResult, AiProgressUpdate } from './aiServiceTypes';
 
 export type AiAutoCommitRunOptions = {
+  signal?: AbortSignal;
   verifySecretScanContext?: () => void;
   beforeCommit?: (privateIndexPath: string, baseTree?: string) => Promise<void>;
 };

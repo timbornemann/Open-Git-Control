@@ -140,6 +140,7 @@ export function registerAiHandlers({
         () => repoJob.signal.aborted || (currentAiAutoCommitJob?.id === jobId && currentAiAutoCommitJob.cancelRequested),
         getOpenAiApiKeyFromSecureStore,
         {
+          signal: repoJob.signal,
           verifySecretScanContext,
           beforeCommit: async (privateIndexPath, baseTree) => {
             repoJob.ensureActive();

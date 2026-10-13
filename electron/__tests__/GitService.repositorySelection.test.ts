@@ -10,6 +10,15 @@ const deferred = () => {
 };
 
 describe('asynchronous repository selection', () => {
+  it('does not turn a cancelled root probe into an uncancelled fallback path', async () => {
+    const service = new GitService();
+    const controller = new AbortController();
+    vi.spyOn(service.runner, 'run').mockImplementation(async () => {
+      controller.abort();
+      throw controller.signal.reason;
+    });
+    await expect(service.resolveRepositoryPathAsync('C:/repo', controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+  });
   it('keeps the newest selection when older repository probes finish late', async () => {
     const service = new GitService();
     const first = deferred();
