@@ -27,6 +27,28 @@ afterEach(async () => {
 });
 
 describe('streamed commit statistics cache', () => {
+  it('also bounds memory after a disk write failure without retrying the protected path', async () => {
+    cache = new CommitStatsDiskCache(() => file, { maxEntries: 2, compactedEntries: 1 });
+    await cache.load();
+    const open = vi.spyOn(fs.promises, 'open').mockRejectedValue(Object.assign(new Error('Access denied'), { code: 'EACCES' }));
+    await expect(cache.append(entry(1))).rejects.toThrow('Access denied');
+    await cache.append(entry(2));
+    await cache.append(entry(3));
+    expect(cache.entries.size).toBe(1);
+    expect(cache.entries.get(key(entry(3)))?.stats).toEqual(entry(3).stats);
+    expect(open).toHaveBeenCalledOnce();
+    expect(fs.existsSync(file)).toBe(false);
+  });
+  it('bounds session memory even when an unsupported disk cache remains protected', async () => {
+    const foreign = '{"schema":99,"owner":"preserve"}\n';
+    fs.writeFileSync(file, foreign);
+    cache = new CommitStatsDiskCache(() => file, { maxEntries: 2, compactedEntries: 1 });
+    await cache.load();
+    for (let i = 1; i <= 3; i++) await cache.append(entry(i));
+    expect(cache.entries.size).toBe(1);
+    expect(cache.entries.get(key(entry(3)))?.stats).toEqual(entry(3).stats);
+    expect(fs.readFileSync(file, 'utf8')).toBe(foreign);
+  });
   it('allows other event-loop work while sharing a cold load between requests', async () => {
     fs.writeFileSync(file, Array.from({ length: 4096 }, (_, i) => JSON.stringify(entry(i))).join('\n'));
     let ticked = false;

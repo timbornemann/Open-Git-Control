@@ -112,10 +112,14 @@ export class CommitStatsDiskCache {
   }
   private enqueue(work: () => Promise<void>): Promise<void> {
     const next = this.pending.then(work);
-    this.pending = next.catch(() => undefined);
+    this.pending = next.catch(async () => {
+      this.writable = false;
+      await this.trimReadOnlyMemory();
+    });
     return next;
   }
   private async canWrite(): Promise<boolean> {
+    if (!this.writable) return false;
     const file = this.getPath();
     await assertManagedPathAsync(path.dirname(file), file);
     if ((await cacheFileIdentityAsync(file)) !== this.identity) this.writable = false;
@@ -124,7 +128,10 @@ export class CommitStatsDiskCache {
   append(entry: StatsCacheEntry): Promise<void> {
     this.entries.set(keyFor(entry), entry);
     return this.enqueue(async () => {
-      if (!(await this.canWrite())) return;
+      if (!(await this.canWrite())) {
+        await this.trimReadOnlyMemory();
+        return;
+      }
       if (this.entries.get(keyFor(entry)) !== entry || this.persistedEntries.get(entry) === entry.accessedAt) return;
       const file = this.getPath();
       await fs.promises.mkdir(path.dirname(file), { recursive: true });
@@ -140,6 +147,18 @@ export class CommitStatsDiskCache {
       }
       recordCacheUse(file);
     });
+  }
+  private async trimReadOnlyMemory(): Promise<void> {
+    const limit = this.limits.maxEntries ?? MAX_CACHE_ENTRIES;
+    if (this.entries.size <= limit) return;
+    const snapshot = [...this.entries.values()].map((entry) => ({ entry, accessedAt: entry.accessedAt }));
+    snapshot.sort((a, b) => b.accessedAt - a.accessedAt);
+    const retained = new Set(snapshot.slice(0, Math.min(limit, this.limits.compactedEntries ?? COMPACTED_CACHE_ENTRIES)).map(({ entry }) => entry));
+    let processed = 0;
+    for (const { entry, accessedAt } of snapshot) {
+      if (!retained.has(entry) && this.entries.get(keyFor(entry)) === entry && entry.accessedAt === accessedAt) this.entries.delete(keyFor(entry));
+      if (++processed % 128 === 0) await setImmediate();
+    }
   }
   private async compact(): Promise<void> {
     if (!(await this.canWrite())) return;
