@@ -85,7 +85,7 @@ export class AnalyticsGit {
     if (values.some((value) => !/^[0-9a-f]{40,64}$/.test(value))) throw new Error('Invalid analytics commit list.');
     return values;
   }
-  async commits(hashes: string[], onCommit: (record: CommitRecord) => void): Promise<void> {
+  async commits(hashes: string[], onCommit: (record: CommitRecord) => void, afterChunk?: () => Promise<void>): Promise<void> {
     for (let start = 0; start < hashes.length; start += 128) {
       this.signal.throwIfAborted();
       const parser = new AnalyticsLogParser(onCommit);
@@ -107,10 +107,14 @@ export class AnalyticsGit {
           `--format=${LOG_FORMAT}`,
           '--stdin',
         ],
-        (chunk) => parser.write(chunk),
+        (chunk) => {
+          parser.write(chunk);
+          return afterChunk?.();
+        },
         hashes.slice(start, start + 128).join('\n') + '\n',
       );
       parser.finish();
+      await afterChunk?.();
     }
   }
 }

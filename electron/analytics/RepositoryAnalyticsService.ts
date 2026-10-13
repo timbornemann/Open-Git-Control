@@ -32,9 +32,9 @@ export class RepositoryAnalyticsService {
     private readonly gitService: GitService,
     private readonly cacheRoot: string,
   ) {}
-  snapshot(request: AnalyticsRequest): RepositoryAnalyticsSnapshot | null {
+  async snapshot(request: AnalyticsRequest): Promise<RepositoryAnalyticsSnapshot | null> {
     const filters = validateAnalyticsFilters(request.filters);
-    const value = AnalyticsCache.readSnapshot(this.cacheRoot, request.repoPath);
+    const value = await AnalyticsCache.readSnapshot(this.cacheRoot, request.repoPath);
     return value && JSON.stringify(value.filters) === JSON.stringify(filters) ? value : null;
   }
   async refresh(request: AnalyticsRequest, signal: AbortSignal, onProgress: (event: AnalyticsProgress) => void): Promise<RepositoryAnalyticsSnapshot> {
@@ -65,9 +65,9 @@ export class RepositoryAnalyticsService {
     const shallow = (await git.text(['rev-parse', '--is-shallow-repository'])).trim() === 'true';
     const existing = this.reuseReport(request, key, shallow, signal, onProgress);
     if (existing) return existing;
-    const cache = new AnalyticsCache(this.cacheRoot, request.repoPath, context);
-    await cache.load();
-    cache.data.snapshot = AnalyticsCache.readSnapshot(this.cacheRoot, request.repoPath);
+    const cache = await AnalyticsCache.create(this.cacheRoot, request.repoPath, context);
+    await cache.load(signal);
+    cache.data.snapshot = await AnalyticsCache.readSnapshot(this.cacheRoot, request.repoPath);
     const rules = new AnalyticsRules(git, tree);
     const emit = (phase: AnalyticsProgress['phase'], completed: number, total: number, snapshot?: RepositoryAnalyticsSnapshot) =>
       onProgress({ repoPath: request.repoPath, requestId: request.readRequest?.requestId ?? '', phase, completed, total, ...(snapshot ? { snapshot } : {}) });
@@ -91,10 +91,14 @@ export class RepositoryAnalyticsService {
       const missing = needed.filter((hash) => !cache.data.commits.has(hash));
       let processed = 0;
       emit('history', 0, missing.length);
-      await git.commits(missing, (record) => {
-        cache.put('commit', record);
-        emit('history', ++processed, missing.length);
-      });
+      await git.commits(
+        missing,
+        (record) => {
+          cache.put('commit', record);
+          emit('history', ++processed, missing.length);
+        },
+        () => cache.settleWrites(),
+      );
       if (needed.some((hash) => !cache.data.commits.has(hash))) throw new Error('The local Git history could not be completely read.');
       await classifySmallHistoricalBlobs(git, cache, needed);
       const comparisonRecord = fromOid && toOid ? await readComparison(git, fromOid, toOid) : null;
@@ -152,7 +156,7 @@ export class RepositoryAnalyticsService {
       } else snapshot.sections.push('project');
       snapshot.sections.push('blame');
       if (context !== (await git.signature(tree))) {
-        cache.discardRecords();
+        await cache.discardRecords();
         partial = undefined;
         throw new Error('Repository attributes changed during the analysis. Refresh to capture the current rules.');
       }
@@ -165,13 +169,13 @@ export class RepositoryAnalyticsService {
           [...snapshot.authors, ...snapshot.project.ownership.map(({ lines: _lines, ...author }) => author)].map((author) => [author.id, author]),
         ).values(),
       ];
-      cache.saveSnapshot(this.cacheRoot, snapshot);
+      await cache.saveSnapshot(this.cacheRoot, snapshot);
       return snapshot;
     } finally {
-      cache.flush();
-      cache.compact();
-      if (partial && !partial.complete) cache.saveSnapshot(this.cacheRoot, partial);
-      rules.dispose();
+      await cache.flush();
+      await cache.compact();
+      if (partial && !partial.complete) await cache.saveSnapshot(this.cacheRoot, partial);
+      await rules.dispose();
     }
   }
   private rememberReport(key: string, report: FullReport) {

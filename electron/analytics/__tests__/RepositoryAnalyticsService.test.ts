@@ -50,7 +50,7 @@ describe('offline repository analytics with real Git', () => {
     const f = await fixture();
     const first = await f.refresh();
     const restored = new RepositoryAnalyticsService(f.engine, f.cache);
-    expect(restored.snapshot({ repoPath: f.repo, filters: DEFAULT_ANALYTICS_FILTERS })?.id).toBe(first.id);
+    expect((await restored.snapshot({ repoPath: f.repo, filters: DEFAULT_ANALYTICS_FILTERS }))?.id).toBe(first.id);
     const spy = vi.spyOn(f.engine, 'streamReadAtPath');
     const unchanged = await f.refresh();
     expect(unchanged.savedAt).toBe(first.savedAt);

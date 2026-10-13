@@ -1,17 +1,24 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
+import { promisify } from 'node:util';
+import { setImmediate } from 'node:timers/promises';
 import { streamJsonlLines } from '../main-process/boundedJsonl';
 import type { RepositoryAnalyticsSnapshot } from '../../src/shared/ipc/repositoryAnalytics';
 import type { AnalyticsCacheData, CommitRecord, BlobRecord, BlameRecord } from './AnalyticsTypes';
-import { assertManagedPath } from '../main-process/storageSafety';
+import { assertManagedPathAsync, readStorageJsonAsync } from '../main-process/storageSafety';
 import { recordCacheUse } from '../main-process/managedStorage';
-import { writeTextFileAtomically } from '../main-process/atomicFile';
+import { writeTextFileAtomicallyAsync } from '../main-process/atomicFile';
 import { canPersistAnalytics } from './analyticsDiskBudget';
-import { mayReplaceCache } from '../main-process/cacheReplacement';
+import { mayReplaceCacheAsync } from '../main-process/cacheReplacement';
 import { STORAGE_BUDGETS } from '../../src/shared/ipc/storageMaintenance';
-import { cacheFileIdentity } from '../main-process/cacheFileIdentity';
+import { cacheFileIdentityAsync } from '../main-process/cacheFileIdentity';
 import { isAnalyticsSnapshot } from './analyticsSnapshotFormat';
+import { serializeAnalyticsCacheWrite } from './analyticsCacheWrites';
+
+const nativeRealpath = promisify(fs.realpath.native);
+const snapshotForPhysicalPath = (root: string, physical: string) =>
+  path.join(root, 'v1', digest(process.platform === 'win32' ? physical.toLowerCase() : physical), 'snapshot.json');
 
 export const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 const oid = (value: unknown) => typeof value === 'string' && /^[0-9a-f]{40,64}$/.test(value);
@@ -49,24 +56,27 @@ export class AnalyticsCache {
   private queuedBytes = 0;
   private writable = true;
   private recordsIdentity: string | null = null;
+  private pendingWrite = Promise.resolve();
   constructor(
     private readonly root: string,
     repoPath: string,
     context: string,
+    physicalRepoPath?: string,
   ) {
-    const physical = fs.realpathSync.native(repoPath);
+    const physical = physicalRepoPath ?? fs.realpathSync.native(repoPath);
     this.directory = path.join(root, 'v1', digest(process.platform === 'win32' ? physical.toLowerCase() : physical), digest(context));
+  }
+  static async create(root: string, repoPath: string, context: string): Promise<AnalyticsCache> {
+    return new AnalyticsCache(root, repoPath, context, await nativeRealpath(repoPath));
   }
   static snapshotPath(root: string, repoPath: string): string {
     const physical = fs.realpathSync.native(repoPath);
-    return path.join(root, 'v1', digest(process.platform === 'win32' ? physical.toLowerCase() : physical), 'snapshot.json');
+    return snapshotForPhysicalPath(root, physical);
   }
-  static readSnapshot(root: string, repoPath: string): RepositoryAnalyticsSnapshot | null {
+  static async readSnapshot(root: string, repoPath: string): Promise<RepositoryAnalyticsSnapshot | null> {
     try {
-      const file = this.snapshotPath(root, repoPath);
-      assertManagedPath(root, file);
-      if (fs.statSync(file).size > 8 * 1024 * 1024) return null;
-      const snapshot = JSON.parse(fs.readFileSync(file, 'utf8')) as RepositoryAnalyticsSnapshot;
+      const file = snapshotForPhysicalPath(root, await nativeRealpath(repoPath));
+      const snapshot = (await readStorageJsonAsync(root, file, 8 * 1024 * 1024)) as RepositoryAnalyticsSnapshot;
       const valid = isAnalyticsSnapshot(snapshot, repoPath);
       if (valid) recordCacheUse(file);
       return valid ? snapshot : null;
@@ -74,16 +84,24 @@ export class AnalyticsCache {
       return null;
     }
   }
-  async load(): Promise<void> {
-    assertManagedPath(this.root, this.directory);
-    fs.mkdirSync(this.directory, { recursive: true });
+  async load(signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
+    await this.pendingWrite;
+    await assertManagedPathAsync(this.root, this.directory);
+    await fs.promises.mkdir(this.directory, { recursive: true });
     const file = path.join(this.directory, 'records.jsonl');
-    if (!fs.existsSync(file)) return;
-    assertManagedPath(this.root, file);
-    const originalIdentity = cacheFileIdentity(file);
+    await assertManagedPathAsync(this.root, file);
+    const originalIdentity = await cacheFileIdentityAsync(file);
+    if (!originalIdentity) {
+      this.recordsIdentity = null;
+      return;
+    }
     recordCacheUse(file);
+    let processed = 0;
     try {
       for await (const line of streamJsonlLines(file)) {
+        if (++processed % 128 === 0) await setImmediate();
+        signal?.throwIfAborted();
         try {
           const entry = JSON.parse(line) as { type: string; value: CommitRecord & BlobRecord & BlameRecord };
           if (!['commit', 'classified', 'blob', 'blame'].includes(entry.type) || 'version' in entry) {
@@ -121,17 +139,25 @@ export class AnalyticsCache {
         }
       }
     } catch {
+      signal?.throwIfAborted();
       // Calculations remain available while an unreadable or oversized cache stays untouched.
       this.writable = false;
     }
-    if (cacheFileIdentity(file) !== originalIdentity) this.writable = false;
+    signal?.throwIfAborted();
+    if ((await cacheFileIdentityAsync(file)) !== originalIdentity) this.writable = false;
     this.recordsIdentity = originalIdentity;
   }
-  private canWriteRecords(): boolean {
+  private async canWriteRecords(): Promise<boolean> {
     const file = path.join(this.directory, 'records.jsonl');
-    assertManagedPath(this.root, file);
-    if (cacheFileIdentity(file) !== this.recordsIdentity) this.writable = false;
+    await assertManagedPathAsync(this.root, file);
+    if ((await cacheFileIdentityAsync(file)) !== this.recordsIdentity) this.writable = false;
     return this.writable;
+  }
+  private enqueue(work: () => Promise<void>): Promise<void> {
+    this.pendingWrite = serializeAnalyticsCacheWrite(this.root, work).catch(() => {
+      this.writable = false;
+    });
+    return this.pendingWrite;
   }
   put(type: 'commit', value: CommitRecord): void;
   put(type: 'blob', value: BlobRecord): void;
@@ -150,63 +176,78 @@ export class AnalyticsCache {
     if (bytes > 8 * 1024 ** 2) return;
     this.queued.push(raw);
     this.queuedBytes += bytes;
-    if (this.queued.length >= 128 || this.queuedBytes >= 1024 ** 2) this.flush();
+    if (this.queuedBytes >= 1024 ** 2) void this.flush();
   }
-  flush(): void {
-    if (!this.queued.length) return;
+  settleWrites(): Promise<void> {
+    return this.pendingWrite;
+  }
+  flush(): Promise<void> {
+    if (!this.queued.length) return this.pendingWrite;
     const file = path.join(this.directory, 'records.jsonl');
     const raw = '\n' + this.queued.join('\n') + '\n';
     this.queued = [];
     this.queuedBytes = 0;
-    if (!this.canWriteRecords() || !canPersistAnalytics(this.root, file, Buffer.byteLength(raw))) return;
-    // Begin with a delimiter, so an interrupted last record never consumes the next valid record.
-    fs.appendFileSync(file, raw, { mode: 0o600 });
-    this.recordsIdentity = cacheFileIdentity(file);
-    recordCacheUse(file);
+    return this.enqueue(async () => {
+      if (!(await this.canWriteRecords()) || !(await canPersistAnalytics(this.root, file, Buffer.byteLength(raw)))) return;
+      // The quota traversal yields: check ownership again before appending.
+      if (!(await this.canWriteRecords())) return;
+      // Begin with a delimiter, so an interrupted last record never consumes the next valid record.
+      await fs.promises.appendFile(file, raw, { mode: 0o600, flag: this.recordsIdentity === null ? 'ax' : 'a' });
+      this.recordsIdentity = await cacheFileIdentityAsync(file);
+      recordCacheUse(file);
+    });
   }
-  saveSnapshot(root: string, snapshot: RepositoryAnalyticsSnapshot): void {
-    this.flush();
-    const file = AnalyticsCache.snapshotPath(root, snapshot.repoPath);
+  async saveSnapshot(root: string, snapshot: RepositoryAnalyticsSnapshot): Promise<void> {
+    await this.flush();
+    const file = snapshotForPhysicalPath(root, await nativeRealpath(snapshot.repoPath));
     this.data.snapshot = snapshot;
     const raw = JSON.stringify(snapshot);
-    if (!mayReplaceCache(root, file, (value) => isAnalyticsSnapshot(value, snapshot.repoPath))) return;
-    if (Buffer.byteLength(raw) > 8 * 1024 * 1024 || !canPersistAnalytics(root, file, Buffer.byteLength(raw), true)) return;
-    writeTextFileAtomically(file, raw, root);
-    recordCacheUse(file);
+    await this.enqueue(async () => {
+      const identity = await cacheFileIdentityAsync(file);
+      if (!(await mayReplaceCacheAsync(root, file, (value) => isAnalyticsSnapshot(value, snapshot.repoPath)))) return;
+      if (Buffer.byteLength(raw) > 8 * 1024 * 1024 || !(await canPersistAnalytics(root, file, Buffer.byteLength(raw), true))) return;
+      await writeTextFileAtomicallyAsync(file, raw, root, async () => (await cacheFileIdentityAsync(file)) === identity);
+      recordCacheUse(file);
+    });
   }
-  compact(): void {
-    if (!this.canWriteRecords()) return;
-    this.flush();
-    const records: string[] = [];
-    let bytes = 0;
-    for (const [type, values] of [
-      ['commit', this.data.commits.values()],
-      ['blob', this.data.blobs.values()],
-      ['blame', this.data.blame.values()],
-      ['classified', [...this.data.classified].map((oid) => ({ oid }))],
-    ] as const) {
-      for (const value of values) {
-        const raw = JSON.stringify({ type, value }),
-          size = Buffer.byteLength(raw) + 1;
-        if (size > 8 * 1024 ** 2 || bytes + size > STORAGE_BUDGETS.analytics / 2) continue;
-        records.push(raw);
-        bytes += size;
+  async compact(): Promise<void> {
+    await this.flush();
+    await this.enqueue(async () => {
+      if (!(await this.canWriteRecords())) return;
+      const records: string[] = [];
+      let bytes = 0;
+      let processed = 0;
+      for (const [type, values] of [
+        ['commit', this.data.commits.values()],
+        ['blob', this.data.blobs.values()],
+        ['blame', this.data.blame.values()],
+        ['classified', [...this.data.classified].map((oid) => ({ oid }))],
+      ] as const) {
+        for (const value of values) {
+          if (++processed % 128 === 0) await setImmediate();
+          const raw = JSON.stringify({ type, value }),
+            size = Buffer.byteLength(raw) + 1;
+          if (size > 8 * 1024 ** 2 || bytes + size > STORAGE_BUDGETS.analytics / 2) continue;
+          records.push(raw);
+          bytes += size;
+        }
       }
-    }
-    const file = path.join(this.directory, 'records.jsonl');
-    const raw = records.join('\n') + '\n';
-    if (canPersistAnalytics(this.root, file, Buffer.byteLength(raw), true)) {
-      writeTextFileAtomically(file, raw, this.root);
-      this.recordsIdentity = cacheFileIdentity(file);
-    }
+      const file = path.join(this.directory, 'records.jsonl');
+      const raw = records.join('\n') + '\n';
+      if (await canPersistAnalytics(this.root, file, Buffer.byteLength(raw), true)) {
+        await writeTextFileAtomicallyAsync(file, raw, this.root, () => this.canWriteRecords());
+        this.recordsIdentity = await cacheFileIdentityAsync(file);
+      }
+    });
   }
-  discardRecords(): void {
+  discardRecords(): Promise<void> {
     this.queued = [];
     this.queuedBytes = 0;
     const file = path.join(this.directory, 'records.jsonl');
-    assertManagedPath(this.root, file);
-    if (!this.canWriteRecords()) return;
-    if (fs.existsSync(file)) fs.unlinkSync(file);
-    this.recordsIdentity = null;
+    return this.enqueue(async () => {
+      if (!(await this.canWriteRecords())) return;
+      await fs.promises.rm(file, { force: true });
+      this.recordsIdentity = null;
+    });
   }
 }

@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { assertManagedPath } from './storageSafety';
+import { assertManagedPath, assertManagedPathAsync } from './storageSafety';
 
 /** Writes a complete replacement beside the destination and publishes it with rename. */
 export function writeTextFileAtomically(filePath: string, contents: string, root = path.dirname(filePath)): void {
@@ -35,5 +35,36 @@ export function writeTextFileAtomically(filePath: string, contents: string, root
     } catch {
       // A successfully renamed temporary file no longer exists.
     }
+  }
+}
+
+/** Same durability and replacement boundary, with non-blocking filesystem I/O. */
+export async function writeTextFileAtomicallyAsync(
+  filePath: string,
+  contents: string,
+  root = path.dirname(filePath),
+  mayPublish: () => Promise<boolean> = async () => true,
+): Promise<void> {
+  await assertManagedPathAsync(root, filePath);
+  const directory = path.dirname(filePath);
+  await fs.promises.mkdir(directory, { recursive: true });
+  const temporaryPath = path.join(directory, `.${path.basename(filePath)}.${process.pid}.${randomUUID()}.tmp`);
+  let handle: Awaited<ReturnType<typeof fs.promises.open>> | null = null;
+  try {
+    await assertManagedPathAsync(root, temporaryPath);
+    handle = await fs.promises.open(temporaryPath, 'wx', 0o600);
+    await handle.writeFile(contents, 'utf8');
+    await handle.sync();
+    await handle.close();
+    handle = null;
+    await assertManagedPathAsync(root, filePath);
+    await assertManagedPathAsync(root, temporaryPath);
+    if (!(await mayPublish())) throw new Error('The destination changed while preparing its replacement.');
+    await fs.promises.rename(temporaryPath, filePath);
+  } finally {
+    if (handle) await handle.close().catch(() => undefined);
+    await assertManagedPathAsync(root, temporaryPath)
+      .then(() => fs.promises.rm(temporaryPath, { force: true }))
+      .catch(() => undefined);
   }
 }

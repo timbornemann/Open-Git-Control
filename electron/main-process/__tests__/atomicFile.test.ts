@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { writeTextFileAtomically } from '../atomicFile';
+import { writeTextFileAtomically, writeTextFileAtomicallyAsync } from '../atomicFile';
 
 const temporaryDirectories: string[] = [];
 
@@ -21,6 +21,30 @@ describe('writeTextFileAtomically', () => {
 
     writeTextFileAtomically(target, '{"new":true}');
 
+    expect(fs.readFileSync(target, 'utf8')).toBe('{"new":true}');
+    expect(fs.readdirSync(directory)).toEqual(['settings.json']);
+  });
+
+  it('revalidates before asynchronous publication and cleans up the prepared replacement', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-atomic-file-'));
+    temporaryDirectories.push(directory);
+    const target = path.join(directory, 'settings.json');
+    fs.writeFileSync(target, '{"old":true}');
+    await expect(
+      writeTextFileAtomicallyAsync(target, '{"new":true}', directory, async () => {
+        await fs.promises.writeFile(target, '{"external":true}');
+        return false;
+      }),
+    ).rejects.toThrow(/destination changed/);
+    expect(fs.readFileSync(target, 'utf8')).toBe('{"external":true}');
+    expect(fs.readdirSync(directory)).toEqual(['settings.json']);
+  });
+
+  it('writes the complete asynchronous replacement without exposing a temporary file', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-atomic-file-'));
+    temporaryDirectories.push(directory);
+    const target = path.join(directory, 'settings.json');
+    await writeTextFileAtomicallyAsync(target, '{"new":true}', directory);
     expect(fs.readFileSync(target, 'utf8')).toBe('{"new":true}');
     expect(fs.readdirSync(directory)).toEqual(['settings.json']);
   });

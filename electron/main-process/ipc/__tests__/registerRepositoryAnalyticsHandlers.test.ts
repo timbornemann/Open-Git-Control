@@ -26,7 +26,7 @@ beforeEach(() => {
   const frame = { url: 'http://localhost:5173/' };
   const sender = Object.assign(new EventEmitter(), { id: 1, mainFrame: frame, send: vi.fn(), isDestroyed: () => false });
   event = { sender, senderFrame: frame } as unknown as IpcMainInvokeEvent;
-  vi.spyOn(RepositoryAnalyticsService.prototype, 'snapshot').mockReturnValue(null);
+  vi.spyOn(RepositoryAnalyticsService.prototype, 'snapshot').mockResolvedValue(null);
   vi.spyOn(RepositoryAnalyticsService.prototype, 'details').mockReturnValue({ items: [], total: 0, offset: 0 });
   vi.spyOn(RepositoryAnalyticsService.prototype, 'refresh').mockResolvedValue({ id: 'one' } as any);
   registerRepositoryAnalyticsHandlers({ getRepoPath: () => activeRepo } as GitService);
@@ -70,5 +70,14 @@ describe('context-bound analytics IPC', () => {
       }),
     ).toMatchObject({ success: false });
     expect((event.sender as unknown as EventEmitter).listenerCount('destroyed')).toBe(0);
+  });
+
+  it('drops an asynchronously restored snapshot after an away-and-back repository switch', async () => {
+    vi.mocked(RepositoryAnalyticsService.prototype.snapshot).mockImplementation(async () => {
+      repoJobRegistry.cancelForRepoChange('/other');
+      repoJobRegistry.cancelForRepoChange('/repo');
+      return { id: 'late-snapshot' } as any;
+    });
+    expect(await invoke(IpcChannel.GitAnalyticsSnapshot, { repoPath: '/repo', filters: DEFAULT_ANALYTICS_FILTERS })).toMatchObject({ success: false });
   });
 });

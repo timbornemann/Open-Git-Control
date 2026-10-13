@@ -24,16 +24,27 @@ export function runGitChunkStream(
     const tree = gitProcessTree(child);
     let stderr = '';
     let failure: Error | undefined;
+    let pending = Promise.resolve();
+    const fail = (error: unknown) => {
+      failure = error instanceof Error ? error : new Error(String(error));
+      tree.stop();
+    };
     signal.addEventListener('abort', tree.stop, { once: true });
     if (signal.aborted) tree.stop();
     child.stdout!.on('data', (chunk: Buffer) => {
       if (failure || signal.aborted) return;
-      try {
-        onChunk(chunk);
-      } catch (error) {
-        failure = error instanceof Error ? error : new Error(String(error));
-        tree.stop();
-      }
+      child.stdout!.pause();
+      const current = pending
+        .then(async () => {
+          if (!failure && !signal.aborted) await (onChunk as (value: Buffer) => unknown)(chunk);
+        })
+        .catch(fail);
+      pending = current;
+      void current.then(() => {
+        // Node resumes stdio itself when a child exits. Such final chunks must
+        // still queue behind the consumer already writing the preceding chunk.
+        if (pending === current) child.stdout!.resume();
+      });
     });
     child.stderr!.on('data', (chunk: Buffer) => {
       if (stderr.length < 64 * 1024) stderr += chunk.toString('utf8');
@@ -43,6 +54,7 @@ export function runGitChunkStream(
     });
     child.once('close', async (code) => {
       signal.removeEventListener('abort', tree.stop);
+      await pending;
       await tree.waitForStop();
       if (failure) reject(failure);
       else if (signal.aborted) reject(createAbortError('Git read was aborted.'));

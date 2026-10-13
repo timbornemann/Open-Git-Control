@@ -10,3 +10,14 @@ export function cacheFileIdentity(file: string): string | null {
     throw error;
   }
 }
+
+export async function cacheFileIdentityAsync(file: string): Promise<string | null> {
+  try {
+    const stat = await fs.promises.lstat(file);
+    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('Cache path is not an owned regular file.');
+    return `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+}

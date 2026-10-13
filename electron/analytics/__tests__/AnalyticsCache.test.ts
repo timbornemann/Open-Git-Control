@@ -39,7 +39,7 @@ describe('analytics cache recovery and source validity', () => {
         }),
       ),
     ).rejects.toThrow();
-    expect(f.service.snapshot({ repoPath: f.repo, filters: DEFAULT_ANALYTICS_FILTERS })?.complete).toBe(false);
+    expect((await f.service.snapshot({ repoPath: f.repo, filters: DEFAULT_ANALYTICS_FILTERS }))?.complete).toBe(false);
     const container = path.dirname(AnalyticsCache.snapshotPath(f.cache, f.repo));
     const directory = fs.readdirSync(container).find((entry) => fs.statSync(path.join(container, entry)).isDirectory())!;
     const records = path.join(container, directory, 'records.jsonl');
@@ -53,7 +53,7 @@ describe('analytics cache recovery and source validity', () => {
     expect(spy.mock.calls.some((call) => call[1].includes('log'))).toBe(false);
     expect(fs.readFileSync(records, 'utf8')).not.toContain('one\\ntwo\\nthree');
     fs.writeFileSync(AnalyticsCache.snapshotPath(f.cache, f.repo), '{invalid snapshot');
-    expect(restored.snapshot({ repoPath: f.repo, filters: DEFAULT_ANALYTICS_FILTERS })).toBeNull();
+    expect(await restored.snapshot({ repoPath: f.repo, filters: DEFAULT_ANALYTICS_FILTERS })).toBeNull();
     expect((await f.refresh()).complete).toBe(true);
   }, 90000);
   it('reaggregates changed ignore rules without re-reading historical diffs', async () => {

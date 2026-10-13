@@ -42,8 +42,8 @@ export class AnalyticsRules {
     for (const entry of this.tree.filter((item) => /(^|\/)(\.gitignore|\.mailmap)$/.test(item.path) && item.mode.startsWith('100'))) {
       const target = path.resolve(this.directory, entry.path);
       if (!target.startsWith(this.directory + path.sep)) throw new Error('Invalid analytics rules path.');
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.writeFileSync(target, await this.git.object(entry.oid));
+      await fs.promises.mkdir(path.dirname(target), { recursive: true });
+      await fs.promises.writeFile(target, await this.git.object(entry.oid));
     }
     await this.matchPaths(paths);
     await this.mapAuthors(authors);
@@ -78,9 +78,9 @@ export class AnalyticsRules {
         if (match && unique[index]) this.mappings.set(unique[index].id, identity(match.name, match.email));
       });
   }
-  dispose(): void {
+  async dispose(): Promise<void> {
     const target = path.resolve(this.directory);
     if (path.dirname(target) === path.resolve(os.tmpdir()) && path.basename(target).startsWith('ogc-analytics-rules-'))
-      fs.rmSync(target, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      await fs.promises.rm(target, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 }

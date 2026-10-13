@@ -23,10 +23,21 @@ export function registerRepositoryAnalyticsHandlers(gitService: GitService): Rep
     return requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), channel);
   };
   ipcMain.handle(IpcChannel.GitAnalyticsSnapshot, async (event, request: AnalyticsRequest) => {
+    let read: ReturnType<typeof beginReadRequest> | undefined, job: ReturnType<typeof repoJobRegistry.begin> | undefined;
     try {
-      return { success: true, data: service.snapshot({ ...request, repoPath: authorize(event, request.repoPath, IpcChannel.GitAnalyticsSnapshot) }) };
+      const repoPath = authorize(event, request.repoPath, IpcChannel.GitAnalyticsSnapshot);
+      read = beginReadRequest(event, request.readRequest);
+      job = repoJobRegistry.begin(repoPath);
+      const data = await service.snapshot({ ...request, repoPath });
+      read.signal.throwIfAborted();
+      job.ensureActive();
+      authorize(event, repoPath, IpcChannel.GitAnalyticsSnapshot);
+      return { success: true, data };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      read?.finish();
+      job?.complete();
     }
   });
   ipcMain.handle(IpcChannel.GitAnalyticsRefresh, async (event, request: AnalyticsRequest) => {
