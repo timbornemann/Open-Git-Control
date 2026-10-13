@@ -1,16 +1,17 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import { writeTextFileAtomically } from './atomicFile';
+import { writeTextFileAtomically, writeTextFileAtomicallyAsync } from './atomicFile';
 import { repositoryPathKey } from './activeRepositoryAuthorization';
 import { resolveExistingRepositoryPathWithoutSymlinks, normalizeRepositoryRelativePath } from '../git/RepositoryPathSafety';
 import { discoverRepositoryIcons, readRepositoryIconSource } from './repositoryIconDiscovery';
 import type { RepositoryIconCacheRequestDto, RepositoryIconChoiceDto, RepositoryIconStateDto } from '../../src/shared/repositoryIcons';
 import * as syncFs from 'node:fs';
-import { assertManagedPath, readStorageJson } from './storageSafety';
+import { assertManagedPath, readStorageJson, readStorageJsonAsync } from './storageSafety';
 import { isStorageBusy, leaseStorage, recordCacheUse } from './managedStorage';
-import { canPersistAuxiliary } from './auxiliaryDiskBudget';
-import { mayReplaceCache } from './cacheReplacement';
+import { canPersistAuxiliary, serializeAuxiliaryWrite } from './auxiliaryDiskBudget';
+import { mayReplaceCacheAsync } from './cacheReplacement';
+import { cacheFileIdentityAsync } from './cacheFileIdentity';
 
 function supportedIcon(value: unknown, repo: string): boolean {
   if (!value || typeof value !== 'object') return false;
@@ -85,15 +86,35 @@ export class RepositoryIconService {
       }
     }
   }
-  private persist(record: IconRecord) {
+  private async persist(record: IconRecord) {
     this.current(record);
-    assertManagedPath(this.deps.directory, this.file(record.repoPath));
-    if (!mayReplaceCache(this.deps.directory, this.file(record.repoPath), (value) => supportedIcon(value, record.repoPath))) return;
+    const revision = record.revision;
+    const file = this.file(record.repoPath);
+    const release = leaseStorage(file);
     let data = { version: 1, ...this.snapshot(record), stamp: record.stamp, scannedAt: record.scannedAt };
-    if (!canPersistAuxiliary(path.dirname(this.deps.directory), this.file(record.repoPath), Buffer.byteLength(JSON.stringify(data)))) {
-      data = { ...data, thumbnail: null, candidates: [], stamp: null, scannedAt: 0 };
+    try {
+      await serializeAuxiliaryWrite(path.dirname(this.deps.directory), async () => {
+        this.current(record);
+        if (record.revision !== revision) return;
+        const identity = await cacheFileIdentityAsync(file);
+        if (!(await mayReplaceCacheAsync(this.deps.directory, file, (value) => supportedIcon(value, record.repoPath)))) return;
+        if (!(await canPersistAuxiliary(path.dirname(this.deps.directory), file, Buffer.byteLength(JSON.stringify(data))))) {
+          data = { ...data, thumbnail: null, candidates: [], stamp: null, scannedAt: 0 };
+          if (!(await canPersistAuxiliary(path.dirname(this.deps.directory), file, Buffer.byteLength(JSON.stringify(data)))))
+            throw new Error('Repository logo selection could not be saved because the storage cache limit is reached.');
+        }
+        this.current(record);
+        if (record.revision !== revision) return;
+        await writeTextFileAtomicallyAsync(file, JSON.stringify(data), this.deps.directory, async () => {
+          this.current(record);
+          return record.revision === revision && (await cacheFileIdentityAsync(file)) === identity;
+        });
+      });
+    } catch (error) {
+      if (record.alive && record.revision === revision) throw error;
+    } finally {
+      release();
     }
-    writeTextFileAtomically(this.file(record.repoPath), JSON.stringify(data));
   }
   private async record(repo: string) {
     const repoPath = this.allowed(repo),
@@ -128,9 +149,7 @@ export class RepositoryIconService {
   private async load(record: IconRecord) {
     try {
       const file = this.file(record.repoPath);
-      assertManagedPath(this.deps.directory, file);
-      if ((await fs.stat(file)).size > 2 * 1024 * 1024) return;
-      const data = JSON.parse(await fs.readFile(file, 'utf8'));
+      const data = (await readStorageJsonAsync(this.deps.directory, file, 2 * 1024 * 1024)) as Record<string, any>;
       this.current(record);
       if (data.version !== 1 || repositoryPathKey(String(data.repoPath || '')) !== repositoryPathKey(record.repoPath)) return;
       if (!['auto', 'manual', 'initials'].includes(data.mode)) return;
@@ -232,7 +251,7 @@ export class RepositoryIconService {
       record.error = null;
       record.checkedAt = this.now();
       this.changed(record);
-      this.persist(record);
+      await this.persist(record);
     } catch (error) {
       if (!record.alive || record.selectionVersion !== selectionVersion) return;
       record.status = 'unavailable';
@@ -253,7 +272,7 @@ export class RepositoryIconService {
   }
   async choose(repo: string, choice: RepositoryIconChoiceDto) {
     const record = await this.record(repo);
-    if (!mayReplaceCache(this.deps.directory, this.file(record.repoPath), (value) => supportedIcon(value, record.repoPath)))
+    if (!(await mayReplaceCacheAsync(this.deps.directory, this.file(record.repoPath), (value) => supportedIcon(value, record.repoPath))))
       throw new Error('The existing logo format is unsupported. Its data was preserved.');
     if (!choice || !['auto', 'manual', 'initials'].includes(choice.mode)) throw new Error('Invalid repository logo selection.');
     const manualPath = choice.mode === 'manual' ? normalizeRepositoryRelativePath(choice.path) : null;
@@ -273,15 +292,16 @@ export class RepositoryIconService {
     record.mode = choice.mode;
     record.manualPath = manualPath;
     record.selectionVersion = randomUUID();
+    const selectionVersion = record.selectionVersion;
     record.thumbnail = null;
     record.stamp = null;
     record.checkedAt = -Infinity;
     record.status = 'ready';
     record.error = null;
     try {
-      this.persist(record);
+      await this.persist(record);
     } catch (error) {
-      Object.assign(record, previous);
+      if (record.selectionVersion === selectionVersion) Object.assign(record, previous);
       throw error;
     }
     this.changed(record);
@@ -303,7 +323,7 @@ export class RepositoryIconService {
     record.thumbnail = { path: source.path, version: source.version, dataUrl: png };
     record.stamp = { mtimeMs: source.mtimeMs, bytes: source.bytes };
     this.changed(record);
-    this.persist(record);
+    await this.persist(record);
     return this.snapshot(record);
   }
   retainRepositories(paths: string[]) {

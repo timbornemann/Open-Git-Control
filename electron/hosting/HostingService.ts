@@ -166,21 +166,23 @@ export class HostingService {
     connection = { ...connection, hasCredentials: Boolean(this.credentialStore.get(id)?.accessToken), tokenPersisted: this.credentialStore.isPersisted(id) };
     this.connections.set(id, connection);
     if (snapshot && !this.catalogStore.read(connection))
-      this.catalogStore.write(
-        connection,
-        snapshot.repos.map((repo) => ({
-          ref: { connectionId: id, repositoryId: String(repo.id), fullPath: repo.fullName },
-          name: repo.name,
-          fullName: repo.fullName,
-          private: repo.private,
-          cloneUrl: repo.cloneUrl,
-          htmlUrl: repo.htmlUrl,
-          description: repo.description || null,
-          defaultBranch: 'main',
-          fork: false,
-          updatedAt: repo.updatedAt,
-        })),
-      );
+      void this.catalogStore
+        .write(
+          connection,
+          snapshot.repos.map((repo) => ({
+            ref: { connectionId: id, repositoryId: String(repo.id), fullPath: repo.fullName },
+            name: repo.name,
+            fullName: repo.fullName,
+            private: repo.private,
+            cloneUrl: repo.cloneUrl,
+            htmlUrl: repo.htmlUrl,
+            description: repo.description || null,
+            defaultBranch: 'main',
+            fork: false,
+            updatedAt: repo.updatedAt,
+          })),
+        )
+        .catch(() => undefined);
     if (credentialsMigrated) {
       this.legacyGithubMigrated = true;
       this.persist();
@@ -257,7 +259,7 @@ export class HostingService {
       previous && !previous.userId && connection.userId && previous.username === connection.username ? this.catalogStore.read(previous) : null;
     this.connections.set(connection.id, { ...connection });
     this.persist();
-    if (migratedCatalog) this.catalogStore.write(connection, migratedCatalog);
+    if (migratedCatalog) void this.catalogStore.write(connection, migratedCatalog).catch(() => undefined);
   }
 
   saveConnection(input: HostingConnectionInput): HostingConnection {
@@ -316,15 +318,16 @@ export class HostingService {
     }
   }
 
-  removeConnection(id: string): void {
+  async removeConnection(id: string): Promise<void> {
     this.connection(id);
     this.auth.cancel(id);
     this.preventLegacyCredentialReimport(id);
     this.credentialStore.remove(id);
-    this.catalogStore.remove(id);
+    const removal = this.catalogStore.remove(id);
     this.connections.delete(id);
     this.adapters.delete(id);
     this.persist();
+    await removal;
   }
 
   generation(id: string): number {
@@ -424,7 +427,7 @@ export class HostingService {
     if (operation === 'connections') return this.listConnections();
     if (operation === 'saveConnection') return this.saveConnection(input as HostingConnectionInput);
     if (operation === 'removeConnection') {
-      this.removeConnection(id);
+      await this.removeConnection(id);
       return true;
     }
     if (operation === 'login')
@@ -443,7 +446,7 @@ export class HostingService {
       this.connection(id);
       this.preventLegacyCredentialReimport(id);
       this.auth.logout(id);
-      this.catalogStore.remove(id);
+      await this.catalogStore.remove(id);
       return true;
     }
     if (params.repository) this.validateRepository(params.repository as HostedRepositoryRef);
@@ -473,7 +476,7 @@ export class HostingService {
     if (operation === 'cachedRepositories') return this.catalog.cached(id);
     if (operation === 'repositories') return this.catalog.repositories(input as HostingOperations['repositories']['input']);
     if (operation === 'resolveRepository' && params.cachedOnly === true)
-      return this.adapter(id).resolveCachedRepository(String(params.url || ''), this.catalog.cached(id).items);
+      return this.adapter(id).resolveCachedRepository(String(params.url || ''), (await this.catalog.cached(id)).items);
     const adapter = await this.authenticatedAdapter(id);
     if (operation === 'resolveRepository') return adapter.resolveRepository(String(params.url || ''));
     if (!ADAPTER_OPERATIONS.has(operation)) throw new Error('Unknown hosting operation.');

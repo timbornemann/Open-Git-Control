@@ -34,7 +34,10 @@ beforeEach(() => {
   encryptionAvailableMock.mockReturnValue(true);
   vi.resetModules();
 });
-afterEach(() => {
+afterEach(async () => {
+  await (await import('../githubCatalogCache')).clearGithubCatalogCache();
+  if (path.dirname(path.resolve(directory)) !== path.resolve(os.tmpdir()) || !path.basename(directory).startsWith('ogc-github-cache-'))
+    throw new Error('Unsafe fixture');
   fs.rmSync(directory, { recursive: true, force: true });
   vi.clearAllMocks();
 });
@@ -42,7 +45,7 @@ afterEach(() => {
 describe('GitHub catalog snapshot', () => {
   it('persists private cards only through OS encryption and binds them to the account', async () => {
     const cache = await import('../githubCatalogCache');
-    cache.saveGithubCatalogCache('github.com', 'alice', [repo(1, 'public-demo', false), repo(2, 'private-secret', true)]);
+    await cache.saveGithubCatalogCache('github.com', 'alice', [repo(1, 'public-demo', false), repo(2, 'private-secret', true)]);
     const file = fs.readFileSync(path.join(directory, 'github-catalog.json'), 'utf8');
     expect(file).toContain('public-demo');
     expect(file).not.toContain('private-secret');
@@ -52,13 +55,14 @@ describe('GitHub catalog snapshot', () => {
     expect(afterRestart.readGithubCatalogCache('github.com', 'alice')?.repos).toHaveLength(2);
     expect(afterRestart.readGithubCatalogCache('github.com', 'alice')?.refreshRequired).toBe(false);
     expect(afterRestart.readGithubCatalogCache('github.com', 'bob')).toBeNull();
+    await afterRestart.clearGithubCatalogCache();
     expect(fs.existsSync(path.join(directory, 'github-catalog.json'))).toBe(false);
   });
 
   it('keeps private cards only in session memory when secure storage is unavailable', async () => {
     encryptionAvailableMock.mockReturnValue(false);
     const cache = await import('../githubCatalogCache');
-    cache.saveGithubCatalogCache('ghe.example', 'alice', [repo(1, 'public-demo', false), repo(2, 'private-secret', true)]);
+    await cache.saveGithubCatalogCache('ghe.example', 'alice', [repo(1, 'public-demo', false), repo(2, 'private-secret', true)]);
     expect(cache.readGithubCatalogCache('ghe.example', 'alice')?.repos).toHaveLength(2);
     expect(cache.readGithubCatalogCache('ghe.example', 'alice')?.refreshRequired).toBeUndefined();
 
@@ -71,7 +75,7 @@ describe('GitHub catalog snapshot', () => {
 
   it('refreshes an encrypted snapshot if OS decryption becomes unavailable', async () => {
     const cache = await import('../githubCatalogCache');
-    cache.saveGithubCatalogCache('github.com', 'alice', [repo(1, 'public-demo', false), repo(2, 'private-secret', true)]);
+    await cache.saveGithubCatalogCache('github.com', 'alice', [repo(1, 'public-demo', false), repo(2, 'private-secret', true)]);
 
     encryptionAvailableMock.mockReturnValue(false);
     vi.resetModules();

@@ -116,8 +116,8 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
       const failure = githubService.getLastAuthenticationFailure?.();
       if (failure?.invalidCredentials) {
         clearSavedGithubTokenSecurely();
-        clearGithubCatalogCache();
         githubService.logout();
+        await clearGithubCatalogCache();
       }
       return {
         success: false,
@@ -255,7 +255,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
       persistenceError = toErrorMessage(error, 'Saved GitHub token could not be deleted.');
     }
     githubService.logout();
-    clearGithubCatalogCache();
+    await clearGithubCatalogCache();
     if (persistenceError) {
       return { success: false, error: persistenceError, sessionCleared: true } as const;
     }

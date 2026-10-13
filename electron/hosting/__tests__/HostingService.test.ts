@@ -51,7 +51,8 @@ beforeEach(() => {
   };
   service = new HostingService(factory, { migrate: false });
 });
-afterEach(() => {
+afterEach(async () => {
+  await service.catalogStore.settleWrites();
   if (path.dirname(path.resolve(state.directory)) !== path.resolve(os.tmpdir()) || !path.basename(state.directory).startsWith('ogc-hosting-test-'))
     throw new Error('Invalid test cleanup path.');
   fs.rmSync(state.directory, { recursive: true, force: true });
@@ -73,7 +74,7 @@ describe('independent hosting accounts', () => {
       defaultBranch: 'main',
       fork: false,
     };
-    service.catalogStore.write(service.connection(first.id), [saved]);
+    await service.catalogStore.write(service.connection(first.id), [saved]);
     let finish!: (value: { id: string; username: string }) => void;
     const authenticate = vi.fn(
       () =>
@@ -120,7 +121,7 @@ describe('independent hosting accounts', () => {
     const obsolete = repository('obsolete');
     const current = repository('current');
     const later = repository('later');
-    service.catalogStore.write(service.connection(first.id), [obsolete]);
+    await service.catalogStore.write(service.connection(first.id), [obsolete]);
     const restarted = new HostingService(
       () =>
         ({

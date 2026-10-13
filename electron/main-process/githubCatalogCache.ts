@@ -5,9 +5,11 @@ import type { GithubCatalogSnapshotDto, GitHubRepositoryDto } from '../../src/ty
 import { isSecureStorageAvailable } from './secureStore';
 import { assertManagedPath } from './storageSafety';
 import { recordCacheUse } from './managedStorage';
-import { canPersistAuxiliary } from './auxiliaryDiskBudget';
-import { writeTextFileAtomically } from './atomicFile';
-import { mayReplaceCache } from './cacheReplacement';
+import { canPersistAuxiliary, serializeAuxiliaryWrite } from './auxiliaryDiskBudget';
+import { writeTextFileAtomicallyAsync } from './atomicFile';
+import { mayReplaceCacheAsync } from './cacheReplacement';
+import { cacheFileIdentityAsync } from './cacheFileIdentity';
+import { readBoundedTextFile } from './boundedTextFile';
 
 type StoredSnapshot = Omit<GithubCatalogSnapshotDto, 'repos'> & {
   publicRepos: GitHubRepositoryDto[];
@@ -15,21 +17,27 @@ type StoredSnapshot = Omit<GithubCatalogSnapshotDto, 'repos'> & {
 };
 
 let sessionSnapshot: GithubCatalogSnapshotDto | null = null;
+let revision = 0;
 const cachePath = (): string => path.join(app.getPath('userData'), 'github-catalog.json');
 const sameAccount = (host: string, username: string, snapshot: { host: string; username: string }): boolean =>
   snapshot.host.toLowerCase() === host.toLowerCase() && snapshot.username.toLowerCase() === username.toLowerCase();
 
-export function clearGithubCatalogCache(): void {
+export async function clearGithubCatalogCache(): Promise<void> {
+  revision++;
   sessionSnapshot = null;
   try {
-    if (
-      !mayReplaceCache(app.getPath('userData'), cachePath(), (value) =>
-        Boolean(value && typeof value === 'object' && !('version' in value) && Array.isArray((value as StoredSnapshot).publicRepos)),
+    const root = app.getPath('userData');
+    const file = cachePath();
+    await serializeAuxiliaryWrite(root, async () => {
+      const identity = await cacheFileIdentityAsync(file);
+      if (
+        !(await mayReplaceCacheAsync(root, file, (value) =>
+          Boolean(value && typeof value === 'object' && !('version' in value) && Array.isArray((value as StoredSnapshot).publicRepos)),
+        ))
       )
-    )
-      return;
-    assertManagedPath(app.getPath('userData'), cachePath());
-    fs.rmSync(cachePath(), { force: true });
+        return;
+      if ((await cacheFileIdentityAsync(file)) === identity) await fs.promises.rm(file, { force: true });
+    });
   } catch {
     // A stale cache is rejected by account binding even if its file cannot be removed.
   }
@@ -38,7 +46,7 @@ export function clearGithubCatalogCache(): void {
 export function readGithubCatalogCache(host: string, username?: string | null): GithubCatalogSnapshotDto | null {
   if (sessionSnapshot) {
     if (sessionSnapshot.host.toLowerCase() !== host.toLowerCase() || (username && !sameAccount(host, username, sessionSnapshot))) {
-      clearGithubCatalogCache();
+      void clearGithubCatalogCache();
       return null;
     }
     recordCacheUse(cachePath());
@@ -46,10 +54,10 @@ export function readGithubCatalogCache(host: string, username?: string | null): 
   }
   try {
     assertManagedPath(app.getPath('userData'), cachePath());
-    const stored = JSON.parse(fs.readFileSync(cachePath(), 'utf8')) as StoredSnapshot;
+    const stored = JSON.parse(readBoundedTextFile(cachePath(), 16 * 1024 ** 2, 'GitHub catalogue')) as StoredSnapshot;
     if ('version' in stored) return null;
     if (stored.host.toLowerCase() !== host.toLowerCase() || (username && !sameAccount(host, username, stored))) {
-      clearGithubCatalogCache();
+      void clearGithubCatalogCache();
       return null;
     }
     const canDecryptPrivateRepos = Boolean(stored.encryptedPrivateRepos && isSecureStorageAvailable());
@@ -71,10 +79,13 @@ export function readGithubCatalogCache(host: string, username?: string | null): 
   }
 }
 
-export function saveGithubCatalogCache(host: string, username: string, repos: GitHubRepositoryDto[]): GithubCatalogSnapshotDto {
+export async function saveGithubCatalogCache(host: string, username: string, repos: GitHubRepositoryDto[]): Promise<GithubCatalogSnapshotDto> {
   const savedAt = new Date().toISOString();
   const unique = [...new Map(repos.filter((repo) => Number.isFinite(repo.id)).map((repo) => [repo.id, repo])).values()];
-  sessionSnapshot = { host, username, savedAt, repos: unique };
+  const snapshot = { host, username, savedAt, repos: unique };
+  sessionSnapshot = snapshot;
+  const currentRevision = ++revision;
+  const current = () => revision === currentRevision && sessionSnapshot === snapshot;
   const publicRepos = unique.filter((repo) => !repo.private);
   const privateRepos = unique.filter((repo) => repo.private);
   const encryptedPrivateRepos =
@@ -88,21 +99,28 @@ export function saveGithubCatalogCache(host: string, username: string, repos: Gi
     refreshRequired: privateRepos.length > 0 && !encryptedPrivateRepos,
   };
   const raw = JSON.stringify(stored);
-  if (
-    mayReplaceCache(app.getPath('userData'), cachePath(), (value) =>
-      Boolean(
-        value &&
-        typeof value === 'object' &&
-        !('version' in value) &&
-        Array.isArray((value as StoredSnapshot).publicRepos) &&
-        typeof (value as StoredSnapshot).host === 'string' &&
-        typeof (value as StoredSnapshot).username === 'string' &&
-        typeof (value as StoredSnapshot).savedAt === 'string',
-      ),
-    ) &&
-    canPersistAuxiliary(app.getPath('userData'), cachePath(), Buffer.byteLength(raw))
-  )
-    writeTextFileAtomically(cachePath(), raw);
-  recordCacheUse(cachePath());
-  return sessionSnapshot;
+  const root = app.getPath('userData');
+  const file = cachePath();
+  await serializeAuxiliaryWrite(root, async () => {
+    if (!current()) return;
+    const identity = await cacheFileIdentityAsync(file);
+    if (
+      (await mayReplaceCacheAsync(root, file, (value) =>
+        Boolean(
+          value &&
+          typeof value === 'object' &&
+          !('version' in value) &&
+          Array.isArray((value as StoredSnapshot).publicRepos) &&
+          typeof (value as StoredSnapshot).host === 'string' &&
+          typeof (value as StoredSnapshot).username === 'string' &&
+          typeof (value as StoredSnapshot).savedAt === 'string',
+        ),
+      )) &&
+      (await canPersistAuxiliary(root, file, Buffer.byteLength(raw))) &&
+      current()
+    )
+      await writeTextFileAtomicallyAsync(file, raw, root, async () => current() && (await cacheFileIdentityAsync(file)) === identity);
+  });
+  recordCacheUse(file);
+  return snapshot;
 }

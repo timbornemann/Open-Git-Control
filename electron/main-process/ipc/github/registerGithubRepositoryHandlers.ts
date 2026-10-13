@@ -30,7 +30,7 @@ export function registerGithubRepositoryHandlers({ githubService, readSettingsWi
     if (authError) return authError;
     if (!Array.isArray(repos)) return { success: false, error: 'Invalid repository list.' };
     try {
-      const saved = saveGithubCatalogCache(githubService.getHost(), githubService.getUsername() || '', repos);
+      const saved = await saveGithubCatalogCache(githubService.getHost(), githubService.getUsername() || '', repos);
       return { success: true, data: { savedAt: saved.savedAt } };
     } catch (error) {
       return githubReadFailure(error, 'Repository snapshot could not be saved.');

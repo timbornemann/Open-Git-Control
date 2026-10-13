@@ -39,7 +39,15 @@ export async function directoryBytesAsync(root: string): Promise<number> {
       if (entry.isDirectory()) {
         await assertManagedPathAsync(root, file);
         pending.push(file);
-      } else if (entry.isFile()) bytes += (await fs.promises.lstat(file)).size;
+      } else if (entry.isFile()) {
+        try {
+          const stat = await fs.promises.lstat(file);
+          if (stat.isFile() && !stat.isSymbolicLink()) bytes += stat.size;
+        } catch (error) {
+          // Browser caches may evict files while their storage is counted.
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        }
+      }
     }
   }
   return bytes;

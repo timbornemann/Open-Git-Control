@@ -22,8 +22,8 @@ describe('cache writers preserve unsupported or foreign data', () => {
     repo = path.join(root, 'repo');
     fs.mkdirSync(repo);
   });
-  afterEach(() => {
-    clearGithubCatalogCache();
+  afterEach(async () => {
+    await clearGithubCatalogCache();
     if (path.dirname(root) !== os.tmpdir() || !path.basename(root).startsWith('ogc-cache-format-test-')) throw new Error('Unsafe fixture');
     fs.rmSync(root, { recursive: true, force: true });
   });
@@ -42,16 +42,16 @@ describe('cache writers preserve unsupported or foreign data', () => {
     await expect(service.choose(repo, { mode: 'initials', expectedSelectionVersion: record.selectionVersion })).rejects.toThrow('unsupported');
     expect(fs.readFileSync(target, 'utf8')).toBe(raw);
   });
-  it('does not overwrite unfamiliar catalogues even when JSON is readable', () => {
+  it('does not overwrite unfamiliar catalogues even when JSON is readable', async () => {
     const legacy = path.join(root, 'github-catalog.json');
     const raw = file(legacy, { data: 'unknown catalogue shape' });
-    saveGithubCatalogCache('github.com', 'alice', []);
+    await saveGithubCatalogCache('github.com', 'alice', []);
     expect(fs.readFileSync(legacy, 'utf8')).toBe(raw);
     const directory = path.join(root, 'hosting-catalogs');
     const connection = { id: 'connection', userId: '42', username: 'alice' } as HostingConnection;
     const target = path.join(directory, createHash('sha256').update(connection.id).digest('hex') + '.json');
     const unsupported = file(target, { version: 1, data: 'unknown catalogue shape' });
-    new HostingCatalogStore(() => directory).write(connection, []);
+    await new HostingCatalogStore(() => directory).write(connection, []);
     expect(fs.readFileSync(target, 'utf8')).toBe(unsupported);
   });
   it('preserves an unfamiliar unversioned analytics snapshot when recomputing', async () => {
@@ -60,7 +60,7 @@ describe('cache writers preserve unsupported or foreign data', () => {
     await cache.load();
     const target = AnalyticsCache.snapshotPath(directory, repo);
     const raw = file(target, { repoPath: repo, data: 'unknown snapshot shape' });
-    cache.saveSnapshot(directory, { repoPath: repo } as RepositoryAnalyticsSnapshot);
+    await cache.saveSnapshot(directory, { repoPath: repo } as RepositoryAnalyticsSnapshot);
     expect(fs.readFileSync(target, 'utf8')).toBe(raw);
   });
 });

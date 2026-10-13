@@ -112,7 +112,7 @@ export function registerRepoSettingsHandlers({ updaterManager, githubService, ca
     writeSettings(next);
     if (githubHostChanged) {
       githubService.logout();
-      clearGithubCatalogCache();
+      void clearGithubCatalogCache();
     }
     if (next.autoUpdateEnabled !== current.autoUpdateEnabled) {
       updaterManager.setAutoUpdatesEnabled(next.autoUpdateEnabled);
