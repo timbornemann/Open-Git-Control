@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { StringDecoder } from 'node:string_decoder';
 import type { AnalyticsIdentity } from '../../src/shared/ipc/repositoryAnalytics';
-import type { CommitRecord, TreeEntry } from './AnalyticsTypes';
+import type { CommitRecord, FileChange, TreeEntry } from './AnalyticsTypes';
 
 export const identity = (name: string, email: string, raw = false): AnalyticsIdentity => ({
   id: createHash('sha256')
@@ -19,12 +19,14 @@ export class AnalyticsLogParser {
   private pending = '';
   private tokens: string[] = [];
   private record: CommitRecord | null = null;
+  private changesByPath = new Map<string, FileChange>();
   constructor(private readonly onCommit: (record: CommitRecord) => void) {}
   write(chunk: Buffer): void {
     this.pending += this.decoder.write(chunk);
     const end = this.pending.lastIndexOf('\0');
     if (end < 0) return;
-    this.tokens.push(...this.pending.slice(0, end).split('\0'));
+    // Large buffered diffs can exceed the engine's function-argument limit.
+    this.tokens = this.tokens.concat(this.pending.slice(0, end).split('\0'));
     this.pending = this.pending.slice(end + 1);
     this.consume(false);
   }
@@ -38,6 +40,7 @@ export class AnalyticsLogParser {
   private publish() {
     if (this.record) this.onCommit(this.record);
     this.record = null;
+    this.changesByPath.clear();
   }
   private consume(final: boolean): void {
     let index = 0;
@@ -64,7 +67,7 @@ export class AnalyticsLogParser {
         const rename = raw[5] === 'R' || raw[5] === 'C';
         if (index + (rename ? 2 : 1) >= this.tokens.length) break;
         const first = this.tokens[index + 1];
-        this.record?.changes.push({
+        const change: FileChange = {
           path: rename ? this.tokens[index + 2] : first,
           ...(rename ? { oldPath: first } : {}),
           before: raw[3],
@@ -74,7 +77,12 @@ export class AnalyticsLogParser {
           additions: 0,
           deletions: 0,
           binary: false,
-        });
+        };
+        if (this.record) {
+          this.record.changes.push(change);
+          // Preserve the first-match behavior for duplicate raw paths.
+          if (!this.changesByPath.has(change.path)) this.changesByPath.set(change.path, change);
+        }
         index += rename ? 3 : 2;
         continue;
       }
@@ -82,7 +90,7 @@ export class AnalyticsLogParser {
       if (stat) {
         if (!stat[3] && index + 2 >= this.tokens.length) break;
         const path = stat[3] || this.tokens[index + 2];
-        const change = this.record?.changes.find((entry) => entry.path === path);
+        const change = this.changesByPath.get(path);
         if (change) {
           change.additions = stat[1] === '-' ? 0 : Number(stat[1]);
           change.deletions = stat[2] === '-' ? 0 : Number(stat[2]);

@@ -24,4 +24,35 @@ describe('streamed analytics Git records', () => {
     parser.write(Buffer.from(`\x1e${'a'.repeat(40)}\0parent\0name\0`));
     expect(() => parser.finish()).toThrow(/Incomplete/);
   });
+
+  it('parses large buffered diffs without argument-stack overflow and keeps line counts attached to their paths', () => {
+    const count = 50_000;
+    const records: CommitRecord[] = [];
+    const paths = Array.from({ length: count }, (_, i) => `file-${i}.txt`);
+    const raw = paths.map((path) => `:000000 100644 ${'0'.repeat(40)} ${'b'.repeat(40)} A\0${path}\0`).join('');
+    const stats = paths.map((path, i) => `${i + 1}\t0\t${path}\0`).join('');
+    const parser = new AnalyticsLogParser((record) => records.push(record));
+    parser.write(Buffer.from(`\x1e${'a'.repeat(40)}\0\0Name\0person@test.invalid\x001700000000\0many files\0${raw}${stats}`));
+    parser.finish();
+    expect(records[0].changes).toHaveLength(count);
+    expect(records[0].changes[0]).toMatchObject({ path: paths[0], additions: 1 });
+    expect(records[0].changes.at(-1)).toMatchObject({ path: paths.at(-1), additions: count });
+  });
+
+  it('clears path lookup state between commits', () => {
+    const records: CommitRecord[] = [];
+    const parser = new AnalyticsLogParser((record) => records.push(record));
+    for (const [hash, additions] of [
+      ['a', 1],
+      ['b', 2],
+    ] as const) {
+      parser.write(
+        Buffer.from(
+          `\x1e${hash.repeat(40)}\0\0Name\0person@test.invalid\x001700000000\0subject\0:000000 100644 ${'0'.repeat(40)} ${'c'.repeat(40)} A\0same.txt\0${additions}\t0\tsame.txt\0`,
+        ),
+      );
+    }
+    parser.finish();
+    expect(records.map((record) => record.changes[0].additions)).toEqual([1, 2]);
+  });
 });
