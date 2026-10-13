@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { computeGraphLayout } from '@/utils/graphLayout';
+import { describe, expect, it, vi } from 'vitest';
+import { computeGraphLayout, computeGraphLayoutAsync } from '@/utils/graphLayout';
 import type { GitCommit } from '@/utils/gitParsing';
 
 function commit(hash: string, parentHashes: string[] = [], refs: string[] = []): GitCommit {
@@ -154,5 +154,31 @@ describe('computeGraphLayout', () => {
     const parentEdges = graph.edges.filter((edge) => edge.toRow === 1);
     expect(parentEdges).toHaveLength(2);
     expect(parentEdges.map((edge) => edge.kind).sort()).toEqual(['merge', 'primary']);
+  });
+
+  it('finishes even when a damaged history contains a first-parent cycle', () => {
+    const graph = computeGraphLayout([commit('a', ['b'], ['HEAD -> main']), commit('b', ['a'])]);
+    expect(graph.nodes.map((node) => node.lane)).toEqual([0, 0]);
+    expect(graph.edges).toHaveLength(2);
+  });
+
+  it('produces identical layouts across cooperative slices', async () => {
+    const commits = Array.from({ length: 1024 }, (_, i) => commit(String(i), i < 1023 ? [String(i + 1)] : [], i === 0 ? ['HEAD -> main'] : []));
+    commits[0].parentHashes.push('side');
+    commits.splice(2, 0, commit('side', ['3']));
+    expect(await computeGraphLayoutAsync(commits)).toEqual(computeGraphLayout(commits));
+  });
+
+  it('allows event-loop cancellation between large fallback slices', async () => {
+    const commits = Array.from({ length: 2048 }, (_, i) => commit(String(i), i < 2047 ? [String(i + 1)] : []));
+    const controller = new AbortController();
+    let time = 0;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => (time += 9));
+    try {
+      setTimeout(() => controller.abort(), 0);
+      await expect(computeGraphLayoutAsync(commits, controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    } finally {
+      clock.mockRestore();
+    }
   });
 });

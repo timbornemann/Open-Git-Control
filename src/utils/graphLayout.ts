@@ -50,6 +50,26 @@ function refMatchesTarget(ref: string, target: string): boolean {
   return headArrowMatch[1].trim() === target;
 }
 
+function* graphLayoutMetadata(commits: GitCommit[]) {
+  const visibleHashes = new Set<string>();
+  const commitByHash = new Map<string, GitCommit>();
+  const refCandidates = new Map<string, GitCommit>();
+  let headCommitCandidate: GitCommit | undefined;
+  for (let row = 0; row < commits.length; row++) {
+    const commit = commits[row];
+    visibleHashes.add(commit.hash);
+    commitByHash.set(commit.hash, commit);
+    if (!headCommitCandidate && commit.refs.some((ref) => ref.startsWith('HEAD ->') || ref === 'HEAD')) headCommitCandidate = commit;
+    for (const ref of DEFAULT_TRUNK_REFS) {
+      if (!refCandidates.has(ref) && commit.refs.some((candidate) => refMatchesTarget(candidate, ref))) refCandidates.set(ref, commit);
+    }
+    if (row % 256 === 255) yield;
+  }
+  const anchorRef = DEFAULT_TRUNK_REFS.find((ref) => refCandidates.has(ref));
+  const trunkStartCommit = (anchorRef && refCandidates.get(anchorRef)) || headCommitCandidate || commits[0];
+  return { visibleHashes, commitByHash, trunkStartCommit };
+}
+
 /**
  * Assigns lanes (columns) to commits and computes edges.
  *
@@ -58,7 +78,7 @@ function refMatchesTarget(ref: string, target: string): boolean {
  * - Keep first-parent continuity for side branches.
  * - Avoid immediate lane recycling so unrelated branches do not visually "stack".
  */
-export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
+function* graphLayoutSteps(commits: GitCommit[]): Generator<void, GraphLayout> {
   if (commits.length === 0) {
     return { nodes: [], edges: [], maxLane: 0 };
   }
@@ -67,19 +87,12 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
   const edges: GraphEdge[] = [];
   const activeLanes: (string | null)[] = [];
   const laneFreedAtRow: number[] = [];
-  const visibleHashes = new Set(commits.map((c) => c.hash));
-  const commitByHash = new Map(commits.map((commit) => [commit.hash, commit]));
-
-  const headCommitCandidate = commits.find((commit) => commit.refs.some((ref) => ref.startsWith('HEAD ->') || ref === 'HEAD')) ?? commits[0];
-
-  const anchorRef = DEFAULT_TRUNK_REFS.find((targetRef) => commits.some((commit) => commit.refs.some((ref) => refMatchesTarget(ref, targetRef))));
-  const trunkStartCommit = anchorRef
-    ? (commits.find((commit) => commit.refs.some((ref) => refMatchesTarget(ref, anchorRef))) ?? headCommitCandidate)
-    : headCommitCandidate;
+  const { visibleHashes, commitByHash, trunkStartCommit } = yield* graphLayoutMetadata(commits);
 
   const trunkHashes = new Set<string>();
-  for (let current = trunkStartCommit; current;) {
+  for (let current = trunkStartCommit; current && !trunkHashes.has(current.hash);) {
     trunkHashes.add(current.hash);
+    if (trunkHashes.size % 256 === 0) yield;
     const firstParent = current.parentHashes[0];
     if (!firstParent || !visibleHashes.has(firstParent)) break;
     const nextCommit = commitByHash.get(firstParent);
@@ -151,6 +164,7 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
   };
 
   for (let row = 0; row < commits.length; row++) {
+    if (row % 256 === 255) yield;
     const commit = commits[row];
     const commitOnTrunk = trunkHashes.has(commit.hash);
 
@@ -190,8 +204,15 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
     }
   }
 
-  const nodeByHash = new Map(nodes.map((node) => [node.commit.hash, node]));
+  const nodeByHash = new Map<string, GraphNode>();
+  let maxLane = 0;
   for (const node of nodes) {
+    nodeByHash.set(node.commit.hash, node);
+    maxLane = Math.max(maxLane, node.lane);
+    if (node.row % 256 === 255) yield;
+  }
+  for (const node of nodes) {
+    if (node.row % 256 === 255) yield;
     const parents = node.commit.parentHashes.filter((h) => h.length > 0);
     for (let pi = 0; pi < parents.length; pi++) {
       const parentHash = parents[pi];
@@ -218,6 +239,29 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
     }
   }
 
-  const maxLane = nodes.reduce((max, node) => Math.max(max, node.lane), 0);
   return { nodes, edges, maxLane };
+}
+
+export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
+  const steps = graphLayoutSteps(commits);
+  let step = steps.next();
+  while (!step.done) step = steps.next();
+  return step.value;
+}
+
+/** Worker fallback: let input and paint events run between slices of a large graph. */
+export async function computeGraphLayoutAsync(commits: GitCommit[], signal?: AbortSignal): Promise<GraphLayout> {
+  const steps = graphLayoutSteps(commits);
+  let sliceStarted = performance.now();
+  for (;;) {
+    signal?.throwIfAborted();
+    const step = steps.next();
+    if (step.done) return step.value;
+    if (performance.now() - sliceStarted >= 8) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+      sliceStarted = performance.now();
+    }
+  }
 }
