@@ -339,7 +339,7 @@ export class StorageMaintenanceService {
         assertManagedPath(this.deps.root, file.file);
         if (file.category === 'statistics') {
           const cutoff = startedAt - (this.state.firstSeen[file.relative] ?? startedAt) >= 30 * DAY ? startedAt - 30 * DAY : 0;
-          if (!this.deps.maintainStatistics?.(request.mode === 'all-caches', cutoff)) {
+          if (!(await this.deps.maintainStatistics?.(request.mode === 'all-caches', cutoff))) {
             report.deferred.push({ category: 'statistics', path: file.relative, reason: 'in-use-or-unsupported' });
             continue;
           }

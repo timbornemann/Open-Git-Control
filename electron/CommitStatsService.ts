@@ -1,26 +1,9 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import { createHash } from 'crypto';
 import type { CommitStats, GitService } from './GitService';
-import { assertManagedPath } from './main-process/storageSafety';
 import { recordCacheUse } from './main-process/managedStorage';
-import { writeTextFileAtomically } from './main-process/atomicFile';
-import { cacheFileIdentity } from './main-process/cacheFileIdentity';
-import { readJsonlLines } from './main-process/boundedJsonl';
-
-const CACHE_SCHEMA = 2;
-const MAX_CACHE_ENTRIES = 100_000;
-const COMPACTED_CACHE_ENTRIES = 75_000;
-const MAX_CACHE_BYTES = 25 * 1024 * 1024;
-
-type CacheEntry = {
-  schema: number;
-  namespace: string;
-  objectFormat: string;
-  hash: string;
-  stats: CommitStats;
-  accessedAt: number;
-};
+import { CommitStatsDiskCache, statsCacheKey, type StatsCacheEntry } from './CommitStatsDiskCache';
+import { indexFileHash } from './git/IndexFileIO';
 
 export type CommitStatsUpdate = {
   repoPath: string;
@@ -60,21 +43,21 @@ type ActiveEntry = {
 };
 
 export class CommitStatsService {
-  private loaded = false;
-  private cache = new Map<string, CacheEntry>();
+  private readonly diskCache: CommitStatsDiskCache;
+  private disposed = false;
+  private maintenance: Promise<boolean> | null = null;
+  private repoGeneration = 0;
+  private get cache() {
+    return this.diskCache.entries;
+  }
   private queue: QueueEntry[] = [];
-  private queuedKeys = new Set<string>();
+  private queuedEntries = new Map<string, QueueEntry>();
   private active = new Map<string, ActiveEntry>();
   private interruptedActiveKeys = new Set<string>();
   private listeners = new Set<(update: CommitStatsUpdate) => void>();
   private diagnostics: DiagnosticEntry[] = [];
   private objectFormats = new Map<string, string>();
   private namespaces = new Map<string, { shallowFingerprint: string; value: string }>();
-  private lastAccessedAt = 0;
-  private writable = true;
-  private fileIdentity: string | null = null;
-  private accessTimer: NodeJS.Timeout | null = null;
-  private dirtyAccess = false;
 
   constructor(
     private readonly gitService: GitService,
@@ -85,7 +68,9 @@ export class CommitStatsService {
       maxBytes?: number;
       maxConcurrent?: number;
     } = {},
-  ) {}
+  ) {
+    this.diskCache = new CommitStatsDiskCache(getCachePath, limits);
+  }
 
   onUpdate(listener: (update: CommitStatsUpdate) => void): () => void {
     this.listeners.add(listener);
@@ -100,9 +85,10 @@ export class CommitStatsService {
   }
 
   setActiveRepo(repoPath: string): void {
+    this.repoGeneration++;
     const normalized = this.repoPathKey(repoPath);
     this.queue = this.queue.filter((entry) => this.repoPathKey(entry.repoPath) === normalized);
-    this.queuedKeys = new Set(this.queue.map((entry) => entry.key));
+    this.queuedEntries = new Map(this.queue.map((entry) => [entry.key, entry]));
     for (const active of this.active.values()) {
       if (this.repoPathKey(active.entry.repoPath) !== normalized) {
         active.controller.abort();
@@ -120,48 +106,27 @@ export class CommitStatsService {
       this.queue.some((entry) => this.repoPathKey(entry.repoPath) === key)
     );
   }
-  maintain(clear: boolean, cutoff: number): boolean {
-    if (this.active.size || this.queue.length) return false;
-    this.ensureLoaded();
-    if (!this.canWrite()) return false;
-    if (clear) {
-      if (this.accessTimer) clearTimeout(this.accessTimer);
-      this.accessTimer = null;
-      this.dirtyAccess = false;
-      this.cache.clear();
-      assertManagedPath(path.dirname(this.getCachePath()), this.getCachePath());
-      fs.rmSync(this.getCachePath(), { force: true });
-      this.fileIdentity = null;
-      return true;
-    } else for (const [key, entry] of this.cache) if (entry.accessedAt < cutoff) this.cache.delete(key);
-    this.compact();
-    return true;
+  async maintain(clear: boolean, cutoff: number): Promise<boolean> {
+    if (this.active.size || this.queue.length || this.maintenance) return false;
+    const maintenance = (async () => {
+      await this.diskCache.load();
+      if (this.active.size || this.queue.length) return false;
+      return this.diskCache.maintain(clear, cutoff);
+    })();
+    this.maintenance = maintenance;
+    try {
+      return await maintenance;
+    } finally {
+      if (this.maintenance === maintenance) this.maintenance = null;
+    }
   }
-  dispose(): void {
-    if (this.accessTimer) clearTimeout(this.accessTimer);
-    this.accessTimer = null;
-    if (this.dirtyAccess && this.writable)
-      try {
-        this.compact();
-        this.dirtyAccess = false;
-      } catch {
-        /* Existing cache remains intact. */
-      }
-  }
-  private persistAccessSoon() {
-    this.dirtyAccess = true;
-    if (this.accessTimer || !this.writable) return;
-    this.accessTimer = setTimeout(() => {
-      this.accessTimer = null;
-      if (this.writable && fs.existsSync(path.dirname(this.getCachePath())))
-        try {
-          this.compact();
-          this.dirtyAccess = false;
-        } catch {
-          /* Retry on shutdown/maintenance. */
-        }
-    }, 1000);
-    this.accessTimer.unref();
+  async dispose(): Promise<void> {
+    this.disposed = true;
+    this.queue = [];
+    this.queuedEntries.clear();
+    for (const active of this.active.values()) active.controller.abort();
+    await this.maintenance;
+    await this.diskCache.dispose();
   }
 
   async requestStats(
@@ -169,11 +134,16 @@ export class CommitStatsService {
     priority: CommitStatsPriority = 'background',
     requestedRepoPath?: string,
   ): Promise<Record<string, { state: 'ready' | 'queued'; stats: CommitStats | null }>> {
-    this.ensureLoaded();
+    const generation = this.repoGeneration;
+    await this.maintenance;
+    await this.diskCache.load();
+    if (this.disposed || generation !== this.repoGeneration) return {};
     const repoPath = requestedRepoPath || this.gitService.getRepoPath();
     if (!repoPath) return {};
     const objectFormat = await this.getObjectFormat(repoPath);
     const namespace = await this.getNamespace(repoPath);
+    await this.maintenance;
+    if (this.disposed || generation !== this.repoGeneration) return {};
     const result: Record<string, { state: 'ready' | 'queued'; stats: CommitStats | null }> = {};
     const requestedKeys = new Set<string>();
 
@@ -185,19 +155,19 @@ export class CommitStatsService {
       const cached = this.cache.get(key);
       if (cached) {
         recordCacheUse(this.getCachePath());
-        cached.accessedAt = this.nextAccessedAt();
-        this.persistAccessSoon();
+        this.diskCache.touch(cached);
         result[hash] = { state: 'ready', stats: cached.stats };
         this.recordDiagnostic(0, true, false);
         continue;
       }
       result[hash] = { state: 'queued', stats: null };
-      const queued = this.queue.find((entry) => entry.key === key);
+      const queued = this.queuedEntries.get(key);
       if (queued) {
         if (PRIORITY[priority] < PRIORITY[queued.priority]) queued.priority = priority;
       } else if (!this.active.has(key)) {
-        this.queue.push({ repoPath, namespace, objectFormat, hash, key, priority });
-        this.queuedKeys.add(key);
+        const entry = { repoPath, namespace, objectFormat, hash, key, priority };
+        this.queue.push(entry);
+        this.queuedEntries.set(key, entry);
       }
     }
 
@@ -213,7 +183,9 @@ export class CommitStatsService {
   }
 
   async getCachedStats(hashes: string[], requestedRepoPath?: string): Promise<Record<string, CommitStats>> {
-    this.ensureLoaded();
+    await this.maintenance;
+    await this.diskCache.load();
+    if (this.disposed) return {};
     const repoPath = requestedRepoPath || this.gitService.getRepoPath();
     if (!repoPath || hashes.length === 0) return {};
     const objectFormat = await this.getObjectFormat(repoPath);
@@ -223,8 +195,7 @@ export class CommitStatsService {
       const entry = this.cache.get(this.cacheKey(namespace, objectFormat, hash));
       if (!entry) continue;
       recordCacheUse(this.getCachePath());
-      entry.accessedAt = this.nextAccessedAt();
-      this.persistAccessSoon();
+      this.diskCache.touch(entry);
       result[hash] = entry.stats;
     }
     return result;
@@ -257,7 +228,7 @@ export class CommitStatsService {
     const shallowPath = path.join(commonDir, 'shallow');
     let shallowFingerprint = 'full';
     try {
-      shallowFingerprint = createHash('sha256').update(fs.readFileSync(shallowPath)).digest('hex');
+      shallowFingerprint = (await indexFileHash(shallowPath)) ?? 'full';
     } catch {
       // No shallow boundary means this checkout has full parent information.
     }
@@ -269,48 +240,7 @@ export class CommitStatsService {
   }
 
   private cacheKey(namespace: string, objectFormat: string, hash: string): string {
-    return `${CACHE_SCHEMA}:${namespace}:${objectFormat}:${hash}`;
-  }
-
-  private ensureLoaded(): void {
-    if (this.loaded) return;
-    this.loaded = true;
-    try {
-      assertManagedPath(path.dirname(this.getCachePath()), this.getCachePath());
-      this.fileIdentity = cacheFileIdentity(this.getCachePath());
-      for (const line of readJsonlLines(this.getCachePath())) {
-        if (!line.trim()) continue;
-        try {
-          const entry = JSON.parse(line) as CacheEntry;
-          if (entry.schema !== CACHE_SCHEMA) {
-            this.writable = false;
-            continue;
-          }
-          if (
-            typeof entry.namespace !== 'string' ||
-            !/^[0-9a-f]{64}$/i.test(entry.namespace) ||
-            !['sha1', 'sha256'].includes(entry.objectFormat) ||
-            !/^[0-9a-f]{7,64}$/i.test(entry.hash) ||
-            !entry.stats ||
-            ![entry.stats.files, entry.stats.additions, entry.stats.deletions].every((value) => Number.isSafeInteger(value) && value >= 0) ||
-            !Number.isFinite(entry.accessedAt)
-          )
-            continue;
-          const key = this.cacheKey(entry.namespace, entry.objectFormat, entry.hash);
-          if ((this.cache.get(key)?.accessedAt ?? -1) <= entry.accessedAt) this.cache.set(key, entry);
-          this.lastAccessedAt = Math.max(this.lastAccessedAt, entry.accessedAt);
-          if (this.cache.size > MAX_CACHE_ENTRIES) {
-            const newest = [...this.cache.entries()].sort((a, b) => b[1].accessedAt - a[1].accessedAt).slice(0, COMPACTED_CACHE_ENTRIES);
-            this.cache = new Map(newest);
-          }
-        } catch {
-          // Invalid records can be omitted when the supported JSONL is compacted.
-        }
-      }
-      if (cacheFileIdentity(this.getCachePath()) !== this.fileIdentity) this.writable = false;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') this.writable = false;
-    }
+    return statsCacheKey(namespace, objectFormat, hash);
   }
 
   private maxConcurrent(): number {
@@ -319,10 +249,10 @@ export class CommitStatsService {
   }
 
   private pumpProcessing(): void {
-    while (this.active.size < this.maxConcurrent()) {
+    while (!this.disposed && this.active.size < this.maxConcurrent()) {
       const entry = this.queue.shift();
       if (!entry) return;
-      this.queuedKeys.delete(entry.key);
+      this.queuedEntries.delete(entry.key);
       const controller = new AbortController();
       this.active.set(entry.key, { entry, controller });
       void this.processEntry(entry, controller);
@@ -335,32 +265,35 @@ export class CommitStatsService {
     try {
       this.emit({ repoPath: entry.repoPath, hash: entry.hash, stats: null, state: 'loading' });
       const stats = await this.gitService.getCommitStatsAtPath(entry.repoPath, entry.hash, controller.signal);
-      const cacheEntry: CacheEntry = {
-        schema: CACHE_SCHEMA,
+      controller.signal.throwIfAborted();
+      if (this.disposed) return;
+      const cacheEntry: StatsCacheEntry = {
+        schema: 2,
         namespace: entry.namespace,
         objectFormat: entry.objectFormat,
         hash: entry.hash,
         stats,
-        accessedAt: this.nextAccessedAt(),
+        accessedAt: this.diskCache.nextAccessedAt(),
       };
       this.cache.set(entry.key, cacheEntry);
       this.emit({ repoPath: entry.repoPath, hash: entry.hash, stats, state: 'ready' });
       try {
-        this.append(cacheEntry);
+        await this.diskCache.append(cacheEntry);
       } catch (error) {
         console.warn(`Could not persist commit stats for ${entry.hash}:`, error);
       }
       this.recordDiagnostic(Date.now() - startedAt, false, false);
     } catch (error: any) {
+      if (this.disposed) return;
       const aborted = controller.signal.aborted || error?.name === 'AbortError';
       this.recordDiagnostic(Date.now() - startedAt, false, aborted);
       if (aborted) {
         const wasInterrupted = this.interruptedActiveKeys.delete(entry.key);
         const activeRepo = this.gitService.getRepoPath();
         const isStillActiveRepo = Boolean(activeRepo && this.repoPathKey(activeRepo) === this.repoPathKey(entry.repoPath));
-        if (!wasInterrupted && isStillActiveRepo) {
+        if (!this.disposed && !wasInterrupted && isStillActiveRepo) {
           this.queue.push(entry);
-          this.queuedKeys.add(entry.key);
+          this.queuedEntries.set(entry.key, entry);
           this.sortQueue();
         } else if (isStillActiveRepo) {
           this.emit({ repoPath: entry.repoPath, hash: entry.hash, stats: null, state: 'error' });
@@ -375,61 +308,12 @@ export class CommitStatsService {
     }
   }
 
-  private append(entry: CacheEntry): void {
-    if (!this.canWrite()) return;
-    const cachePath = this.getCachePath();
-    assertManagedPath(path.dirname(cachePath), cachePath);
-    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
-    const raw = `${JSON.stringify(entry)}\n`;
-    const bytes = fs.existsSync(cachePath) ? fs.statSync(cachePath).size : 0;
-    if (this.cache.size > (this.limits.maxEntries ?? MAX_CACHE_ENTRIES) || bytes + Buffer.byteLength(raw) > (this.limits.maxBytes ?? MAX_CACHE_BYTES))
-      this.compact();
-    else {
-      fs.appendFileSync(cachePath, raw, 'utf8');
-      this.fileIdentity = cacheFileIdentity(cachePath);
-    }
-    recordCacheUse(cachePath);
-  }
-
-  private compact(): void {
-    if (!this.canWrite()) return;
-    const cachePath = this.getCachePath();
-    assertManagedPath(path.dirname(cachePath), cachePath);
-    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
-    const retained: CacheEntry[] = [],
-      lines: string[] = [];
-    let bytes = 0;
-    for (const entry of [...this.cache.values()].sort((a, b) => b.accessedAt - a.accessedAt)) {
-      const raw = `${JSON.stringify(entry)}\n`,
-        size = Buffer.byteLength(raw);
-      if (retained.length >= (this.limits.compactedEntries ?? COMPACTED_CACHE_ENTRIES)) break;
-      if (bytes + size > (this.limits.maxBytes ?? MAX_CACHE_BYTES)) continue;
-      retained.push(entry);
-      lines.push(raw);
-      bytes += size;
-    }
-    writeTextFileAtomically(cachePath, lines.join(''));
-    this.fileIdentity = cacheFileIdentity(cachePath);
-    this.cache = new Map(retained.map((entry) => [this.cacheKey(entry.namespace, entry.objectFormat, entry.hash), entry]));
-  }
-
-  private canWrite(): boolean {
-    const file = this.getCachePath();
-    assertManagedPath(path.dirname(file), file);
-    if (cacheFileIdentity(file) !== this.fileIdentity) this.writable = false;
-    return this.writable;
-  }
   private emit(update: CommitStatsUpdate): void {
     for (const listener of this.listeners) listener(update);
   }
 
   private sortQueue(): void {
     this.queue.sort((a, b) => PRIORITY[a.priority] - PRIORITY[b.priority]);
-  }
-
-  private nextAccessedAt(): number {
-    this.lastAccessedAt = Math.max(Date.now(), this.lastAccessedAt + 1);
-    return this.lastAccessedAt;
   }
 
   private recordDiagnostic(durationMs: number, cacheHit: boolean, aborted: boolean): void {

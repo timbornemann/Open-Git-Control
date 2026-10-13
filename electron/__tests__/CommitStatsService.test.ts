@@ -4,6 +4,12 @@ import * as os from 'os';
 import * as path from 'path';
 import { CommitStatsService } from '../CommitStatsService';
 
+const services: CommitStatsService[] = [];
+const createStatsService = (...args: ConstructorParameters<typeof CommitStatsService>) => {
+  const service = new CommitStatsService(...args);
+  services.push(service);
+  return service;
+};
 const tempDirs: string[] = [];
 const createTempCache = () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-commit-stats-'));
@@ -21,7 +27,8 @@ const waitFor = async (predicate: () => boolean) => {
   expect(predicate()).toBe(true);
 };
 
-afterEach(() => {
+afterEach(async () => {
+  await Promise.all(services.splice(0).map((service) => service.dispose()));
   for (const dir of tempDirs.splice(0)) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -37,7 +44,7 @@ describe('CommitStatsService', () => {
       runCommandAtPath: vi.fn(async () => 'sha1'),
       getCommitStatsAtPath,
     } as any;
-    const firstService = new CommitStatsService(gitService, () => cachePath);
+    const firstService = createStatsService(gitService, () => cachePath);
     const updates: any[] = [];
     firstService.onUpdate((update) => {
       if (update.state === 'ready') updates.push(update);
@@ -48,13 +55,14 @@ describe('CommitStatsService', () => {
     });
     await waitFor(() => updates.length === 1);
     expect(getCommitStatsAtPath).toHaveBeenCalledTimes(1);
+    await waitFor(() => !firstService.isRepositoryBusy('C:/repo'));
     expect(fs.readFileSync(cachePath, 'utf8')).toContain(hash);
 
     const secondGitService = {
       ...gitService,
       getCommitStatsAtPath: vi.fn(),
     } as any;
-    const secondService = new CommitStatsService(secondGitService, () => cachePath);
+    const secondService = createStatsService(secondGitService, () => cachePath);
     expect(await secondService.requestStats([hash])).toEqual({
       [hash]: { state: 'ready', stats: { files: 2, additions: 10, deletions: 3 } },
     });
@@ -71,7 +79,7 @@ describe('CommitStatsService', () => {
       runCommandAtPath: vi.fn(async (_repo: string, args: string[]) => (args.includes('--show-object-format') ? 'sha1' : '.git')),
       getCommitStatsAtPath,
     } as any;
-    const service = new CommitStatsService(gitService, () => cachePath);
+    const service = createStatsService(gitService, () => cachePath);
     const ready: any[] = [];
     service.onUpdate((update) => update.state === 'ready' && ready.push(update));
 
@@ -102,7 +110,7 @@ describe('CommitStatsService', () => {
       runCommandAtPath: vi.fn(async (_repo: string, args: string[]) => (args.includes('--show-object-format') ? 'sha1' : '.git')),
       getCommitStatsAtPath,
     } as any;
-    const service = new CommitStatsService(gitService, () => cachePath);
+    const service = createStatsService(gitService, () => cachePath);
     const ready: any[] = [];
     service.onUpdate((update) => update.state === 'ready' && ready.push(update));
 
@@ -129,7 +137,7 @@ describe('CommitStatsService', () => {
         deletions: 0,
       })),
     } as any;
-    const service = new CommitStatsService(gitService, () => cachePath, {
+    const service = createStatsService(gitService, () => cachePath, {
       maxEntries: 2,
       compactedEntries: 1,
       maxBytes: 1024 * 1024,
@@ -143,6 +151,7 @@ describe('CommitStatsService', () => {
       await waitFor(() => updates.length === Number(char));
     }
 
+    await waitFor(() => !service.isRepositoryBusy('C:/repo'));
     const lines = fs.readFileSync(cachePath, 'utf8').trim().split(/\r?\n/);
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain('3'.repeat(40));
@@ -158,11 +167,11 @@ describe('CommitStatsService', () => {
       runCommandAtPath: vi.fn(async () => 'sha1'),
       getCommitStatsAtPath: vi.fn(async () => ({ files: 0, additions: 0, deletions: 0 })),
     } as any;
-    const service = new CommitStatsService(gitService, () => cachePath);
+    const service = createStatsService(gitService, () => cachePath);
 
     expect(await service.getCachedStats(['b'.repeat(40)])).toEqual({});
     expect(fs.readFileSync(cachePath, 'utf8')).toBe('{"schema":1}\nnot-json\n');
-    expect(service.maintain(true, Date.now())).toBe(false);
+    expect(await service.maintain(true, Date.now())).toBe(false);
   });
 
   it('promotes selected stats ahead of interrupted background work', async () => {
@@ -189,7 +198,7 @@ describe('CommitStatsService', () => {
         return { files: 1, additions: hash === selectedHash ? 2 : 1, deletions: 0 };
       }),
     } as any;
-    const service = new CommitStatsService(gitService, () => cachePath, { maxConcurrent: 1 });
+    const service = createStatsService(gitService, () => cachePath, { maxConcurrent: 1 });
     const ready: string[] = [];
     service.onUpdate((update) => {
       if (update.state === 'ready') ready.push(update.hash);
@@ -223,7 +232,7 @@ describe('CommitStatsService', () => {
         return { files: 1, additions: 1, deletions: 0 };
       }),
     } as any;
-    const service = new CommitStatsService(gitService, () => cachePath);
+    const service = createStatsService(gitService, () => cachePath);
     const ready: string[] = [];
     service.onUpdate((update) => {
       if (update.state === 'ready') ready.push(update.hash);
@@ -254,7 +263,7 @@ describe('CommitStatsService', () => {
         return { files: 1, additions: Number.parseInt(hash[0], 16), deletions: 0 };
       }),
     } as any;
-    const service = new CommitStatsService(gitService, () => cachePath);
+    const service = createStatsService(gitService, () => cachePath);
     const ready: string[] = [];
     service.onUpdate((update) => {
       if (update.state === 'ready') ready.push(update.hash);

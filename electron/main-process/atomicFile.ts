@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { assertManagedPath, assertManagedPathAsync } from './storageSafety';
+import { cacheFileIdentityAsync, identityFromStat } from './cacheFileIdentity';
 
 /** Writes a complete replacement beside the destination and publishes it with rename. */
 export function writeTextFileAtomically(filePath: string, contents: string, root = path.dirname(filePath)): void {
@@ -44,6 +45,7 @@ export async function writeTextFileAtomicallyAsync(
   contents: string,
   root = path.dirname(filePath),
   mayPublish: () => Promise<boolean> = async () => true,
+  published?: (identity: string) => void,
 ): Promise<void> {
   await assertManagedPathAsync(root, filePath);
   const directory = path.dirname(filePath);
@@ -55,12 +57,16 @@ export async function writeTextFileAtomicallyAsync(
     handle = await fs.promises.open(temporaryPath, 'wx', 0o600);
     await handle.writeFile(contents, 'utf8');
     await handle.sync();
-    await handle.close();
-    handle = null;
+    const prepared = await handle.stat();
     await assertManagedPathAsync(root, filePath);
     await assertManagedPathAsync(root, temporaryPath);
     if (!(await mayPublish())) throw new Error('The destination changed while preparing its replacement.');
     await fs.promises.rename(temporaryPath, filePath);
+    const actual = await handle.stat();
+    const identity = identityFromStat(actual);
+    if (actual.size !== prepared.size || actual.mtimeMs !== prepared.mtimeMs || (await cacheFileIdentityAsync(filePath)) !== identity)
+      throw new Error('The destination changed after publishing its replacement.');
+    published?.(identity);
   } finally {
     if (handle) await handle.close().catch(() => undefined);
     await assertManagedPathAsync(root, temporaryPath)

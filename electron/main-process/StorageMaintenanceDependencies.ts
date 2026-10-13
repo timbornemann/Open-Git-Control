@@ -10,7 +10,7 @@ export interface MaintenanceDeps {
   now?: () => number;
   clearBrowser?: (categories: string[]) => Promise<void>;
   isBrowserBusy?: () => boolean;
-  maintainStatistics?: (clear: boolean, cutoff: number) => boolean;
+  maintainStatistics?: (clear: boolean, cutoff: number) => boolean | Promise<boolean>;
   clearIcon?: (repo: string) => boolean;
   invalidateAnalytics?: () => void;
   temporary?: () => { directory: string; bytes: number; files: number; eligible: boolean; unclear?: boolean }[];

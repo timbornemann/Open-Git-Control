@@ -9,6 +9,7 @@ import type { AnalyticsCacheData, CommitRecord, BlobRecord, BlameRecord } from '
 import { assertManagedPathAsync, readStorageJsonAsync } from '../main-process/storageSafety';
 import { recordCacheUse } from '../main-process/managedStorage';
 import { writeTextFileAtomicallyAsync } from '../main-process/atomicFile';
+import { appendOwnedCacheFile } from '../main-process/appendOwnedCacheFile';
 import { canPersistAnalytics } from './analyticsDiskBudget';
 import { mayReplaceCacheAsync } from '../main-process/cacheReplacement';
 import { STORAGE_BUDGETS } from '../../src/shared/ipc/storageMaintenance';
@@ -192,8 +193,7 @@ export class AnalyticsCache {
       // The quota traversal yields: check ownership again before appending.
       if (!(await this.canWriteRecords())) return;
       // Begin with a delimiter, so an interrupted last record never consumes the next valid record.
-      await fs.promises.appendFile(file, raw, { mode: 0o600, flag: this.recordsIdentity === null ? 'ax' : 'a' });
-      this.recordsIdentity = await cacheFileIdentityAsync(file);
+      this.recordsIdentity = await appendOwnedCacheFile(this.root, file, raw, this.recordsIdentity);
       recordCacheUse(file);
     });
   }
@@ -235,8 +235,15 @@ export class AnalyticsCache {
       const file = path.join(this.directory, 'records.jsonl');
       const raw = records.join('\n') + '\n';
       if (await canPersistAnalytics(this.root, file, Buffer.byteLength(raw), true)) {
-        await writeTextFileAtomicallyAsync(file, raw, this.root, () => this.canWriteRecords());
-        this.recordsIdentity = await cacheFileIdentityAsync(file);
+        await writeTextFileAtomicallyAsync(
+          file,
+          raw,
+          this.root,
+          () => this.canWriteRecords(),
+          (identity) => {
+            this.recordsIdentity = identity;
+          },
+        );
       }
     });
   }

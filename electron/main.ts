@@ -24,6 +24,7 @@ import type { PlanningApiTokenLifetime } from './main-process/planningApiAuth';
 import { clearSavedPlanningApiAuthToken, generateSavedPlanningApiAuthToken, getPlanningApiAuthState } from './main-process/planningApiAuth';
 import { configureBrowserCacheSwitches, configureCodeCache } from './main-process/browserCacheMaintenance';
 import { isHttpCacheWorker } from './main-process/httpCacheWorker';
+import { finishBeforeQuit } from './main-process/finishBeforeQuit';
 
 // A packaged app in "dev mode" would load the localhost dev server, open
 // DevTools and apply the relaxed dev CSP; isDevelopmentRuntime() gates on
@@ -168,8 +169,7 @@ if (isPrimaryInstance) {
     app.on('activate', openMainWindowIfReady);
   });
 
-  app.on('before-quit', () => {
-    commitStatsService.dispose();
+  finishBeforeQuit(app, async () => {
     disposeStorageMaintenance?.();
     stopSystemTools?.();
     repositoryRunService?.dispose();
@@ -179,6 +179,7 @@ if (isPrimaryInstance) {
         console.error('[planning-api] Failed to stop:', error);
       });
     }
+    await commitStatsService.dispose();
   });
 
   app.on('window-all-closed', () => {

@@ -25,17 +25,17 @@ describe('statistics compaction and safe cache replacement', () => {
     file = path.join(root, 'commit-stats-v1.jsonl');
     service = new CommitStatsService(git, () => file, { maxBytes: 700 });
   });
-  afterEach(() => {
-    service.dispose();
+  afterEach(async () => {
+    await service.dispose();
     if (path.dirname(root) !== os.tmpdir() || !path.basename(root).startsWith('ogc-stats-maintenance-test-')) throw new Error('Unsafe fixture');
     fs.rmSync(root, { recursive: true, force: true });
     vi.clearAllMocks();
   });
-  it('drops invalid and duplicate rows, retains the latest value and applies actual byte limits', () => {
+  it('drops invalid and duplicate rows, retains the latest value and applies actual byte limits', async () => {
     const hash = 'a'.repeat(40);
     const rows = [entry(hash, 1), entry(hash, 4, 8), entry('b'.repeat(40), 3), entry('c'.repeat(40), 2), entry('d'.repeat(40), 9, -1), '{broken'];
     fs.writeFileSync(file, rows.map((row) => (typeof row === 'string' ? row : JSON.stringify(row))).join('\n'));
-    expect(service.maintain(false, 0)).toBe(true);
+    expect(await service.maintain(false, 0)).toBe(true);
     const raw = fs.readFileSync(file, 'utf8');
     expect(Buffer.byteLength(raw)).toBeLessThanOrEqual(700);
     const parsed = raw
@@ -46,7 +46,7 @@ describe('statistics compaction and safe cache replacement', () => {
     expect(parsed.filter((row) => row.hash === hash)).toHaveLength(1);
     expect(parsed.some((row) => row.hash === 'd'.repeat(40))).toBe(false);
     expect(fs.readdirSync(root)).toEqual(['commit-stats-v1.jsonl']);
-    expect(service.maintain(false, 3)).toBe(true);
+    expect(await service.maintain(false, 3)).toBe(true);
     expect(fs.readFileSync(file, 'utf8')).not.toContain('c'.repeat(40));
   });
   it('refuses a changed cache during an asynchronous statistics calculation', async () => {
@@ -62,8 +62,8 @@ describe('statistics compaction and safe cache replacement', () => {
     await service.requestStats(['b'.repeat(40)]);
     await vi.waitFor(() => expect(ready).toHaveBeenCalledOnce());
     expect(ready.mock.lastCall?.[0].stats).toEqual({ files: 2, additions: 4, deletions: 1 });
-    expect(service.maintain(true, Date.now())).toBe(false);
-    service.dispose();
+    expect(await service.maintain(true, Date.now())).toBe(false);
+    await service.dispose();
     expect(fs.readFileSync(file, 'utf8')).toBe(replacement);
   });
   it('preserves oversized damaged lines and continues calculating statistics', async () => {
@@ -77,6 +77,6 @@ describe('statistics compaction and safe cache replacement', () => {
     await service.requestStats(['f'.repeat(40)]);
     await vi.waitFor(() => expect(ready).toHaveBeenCalledOnce());
     expect(fs.statSync(file).size).toBe(64 * 1024 ** 2);
-    expect(service.maintain(false, 0)).toBe(false);
+    expect(await service.maintain(false, 0)).toBe(false);
   });
 });
