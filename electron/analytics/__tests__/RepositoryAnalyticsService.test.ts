@@ -12,6 +12,26 @@ afterEach(async () => {
   await cleanupAnalyticsFixtures();
 });
 describe('offline repository analytics with real Git', () => {
+  it.each([false, true])(
+    'distinguishes a blame failure containing abort from a cancelled read (%s)',
+    async (cancelled) => {
+      const f = await fixture();
+      const original = f.engine.streamReadAtPath.bind(f.engine);
+      const failure = Object.assign(new Error("fatal: could not read 'abort-controller.ts': bad object"), { name: cancelled ? 'AbortError' : 'Error' });
+      vi.spyOn(f.engine, 'streamReadAtPath').mockImplementation((repo, args, onChunk, signal, input, env) => {
+        if (args.includes('blame') && args.at(-1) === 'a.ts') return Promise.reject(failure);
+        return original(repo, args, onChunk, signal, input, env);
+      });
+      if (cancelled) await expect(f.refresh()).rejects.toBe(failure);
+      else {
+        const result = await f.refresh();
+        expect(result.project.unblamedFiles).toBe(1);
+        expect(result.complete).toBe(false);
+        expect(result.project.blamedLines).toBeGreaterThan(0);
+      }
+    },
+    90000,
+  );
   it('counts the complete history, ignores tracked paths, computes actual lines, coupling and release net changes', async () => {
     const f = await fixture();
     const value = await f.refresh();

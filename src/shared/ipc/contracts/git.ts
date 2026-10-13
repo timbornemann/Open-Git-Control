@@ -233,7 +233,7 @@ export type OpenRepositoryPathResultDto = {
 
 export interface ElectronGitAPI extends GitLfsApi, GitIdentityApi, ElectronRepositorySecretScanAllowlistAPI, RepositoryAnalyticsApi {
   inspectCommitMessageEdit: (request: CommitMessageEditRequest) => Promise<IpcResult<CommitMessageEditInspection>>;
-  rewordCommitMessage: (request: RewordCommitMessageRequest) => Promise<IpcResult<CommitMessageEditResult>>;
+  rewordCommitMessage: (request: RewordCommitMessageRequest) => Promise<IpcResult<CommitMessageEditResult> & { cancelled?: boolean }>;
   getCommitMessageEditBackups: (repoPath: string) => Promise<IpcResult<CommitMessageEditBackup[]>>;
   cancelCommitMessageEdit: (operationId: string) => Promise<boolean>;
   setRepoPath: (repoPath: string) => Promise<string>;

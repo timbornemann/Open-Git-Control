@@ -185,6 +185,12 @@ const COMMAND_EXECUTORS: Partial<Record<GitCommandName, GitCommandExecutor>> = {
           : gitService.getStatus(),
   statusPorcelain: async ({ gitService, repoPath }) => (repoPath ? gitService.getStatusPorcelainAtPath(repoPath) : gitService.getStatusPorcelain()),
   log: executeLog,
+  diff: (context) => {
+    if (!context.args.includes('--numstat')) return runInContext(context, ['diff', ...context.args]);
+    const repo = context.repoPath || context.gitService.requireActiveRepoPath();
+    if (context.gitService.isBareRepositoryAtPath?.(repo)) return Promise.resolve('');
+    return context.gitService.runPollingCommandAtPath(repo, ['diff', ...context.args]);
+  },
   branches: async (context) => runInContext(context, ['branch', '-a']),
   commitDetails: executeCommitDetails,
   conflictTakeOurs: async (context) => runInContext(context, ['checkout', '--ours', '--', toLiteralPathspec(context.args[0])]),

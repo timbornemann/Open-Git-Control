@@ -39,7 +39,8 @@ export function commitEditPhaseText(phase: CommitMessageEditPhase, tr: Translate
   return tr(...messages[phase]);
 }
 
-export function commitEditErrorText(message: string, tr: TranslateFn) {
+export function commitEditErrorText(message: string, tr: TranslateFn, cancelled = false) {
+  if (cancelled) return tr('Vorgang abgebrochen. Dein Entwurf bleibt erhalten.', 'Operation cancelled. Your draft has been kept.');
   const reason = message.match(/blocked \(([^)]+)\)/)?.[1] as CommitMessageEditBlock | undefined;
   if (
     reason &&
@@ -47,6 +48,5 @@ export function commitEditErrorText(message: string, tr: TranslateFn) {
   ) {
     return `${commitEditBlockText(reason, tr)}${message.includes(': ') ? ` ${message.split(': ').slice(1).join(': ')}` : ''}`;
   }
-  if (/abort|cancel/i.test(message)) return tr('Vorgang abgebrochen. Dein Entwurf bleibt erhalten.', 'Operation cancelled. Your draft has been kept.');
   return message;
 }

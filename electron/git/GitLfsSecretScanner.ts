@@ -29,6 +29,7 @@ export async function scanLfsSecrets(
     maxBytes: 8 * 1024 * 1024,
     tooLargeMessage: 'Git LFS scan metadata exceeds its limit.',
     envOverrides: options.envOverrides,
+    signal: options.signal,
   });
   const parts = raw.toString().split('\0');
   const paths = new Map<string, string[]>();

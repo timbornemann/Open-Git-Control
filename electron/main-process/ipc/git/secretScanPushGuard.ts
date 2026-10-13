@@ -281,13 +281,15 @@ export function registerSecretScanPushGuard({
 
       return { success: true as const, data: result, stateFingerprint: stateFingerprintAfter };
     } catch (error: any) {
-      const cancelled = controller.signal.aborted || error?.name === 'AbortError';
+      const cancelled = controller.signal.aborted;
       const safeError =
         error?.message === PUSH_STATE_CHANGED_ERROR || error?.message === PUSH_STATE_VERIFICATION_ERROR
           ? error.message
           : cancelled
             ? 'Secret scan cancelled.'
-            : redactGitSensitiveText(error?.message || 'Secret scan failed.');
+            : error?.name === 'AbortError'
+              ? 'Secret scan failed because a required Git read was interrupted.'
+              : redactGitSensitiveText(error?.message || 'Secret scan failed.');
       emitJobEvent(event.sender, {
         id: jobId,
         operation,

@@ -87,6 +87,17 @@
       "tags": [],
       "createdAt": 1785856977969,
       "updatedAt": 1785856977969
+    },
+    {
+      "id": "fbfdba54-88ff-475c-90fd-6d0b3347d042",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Schwarzes Flackern",
+      "description": "Ich habe noch keinen rytmus gefunden wann udn warum das aufrtrit, aber ab und zu flaktert die ganze anwendung schwarz auf, nur für einen frame oder so, ganz kurz, aber der bildschrim wird schwarz, untersuche warum das passiert auch wenn es nur selten ist und kaum auffällt sollte das nicht passieren, sein genau und untersuchese die details",
+      "priority": "medium",
+      "status": "bug",
+      "tags": [],
+      "createdAt": 1791913255033,
+      "updatedAt": 1791913255033
     }
   ]
 }

@@ -264,14 +264,20 @@ export class GitRunner {
   async runBuffer(repoPath: string, args: string[], options: GitBufferRunOptions): Promise<Buffer> {
     this.assertRepoPathAvailable(repoPath);
     const kind = this.classifyCommand(args, options.requestedKind);
-    return this.schedule(repoPath, kind, options.commandName ?? args[0] ?? 'git', (signal) => this.spawnOperations.runBuffer(repoPath, args, options, signal));
+    return this.schedule(repoPath, kind, options.commandName ?? args[0] ?? 'git', (signal) => this.spawnOperations.runBuffer(repoPath, args, options, signal), {
+      signal: options.signal,
+    });
   }
 
   async runWithInput(repoPath: string, args: string[], input: string | Buffer, options: GitInputRunOptions = {}): Promise<string> {
     this.assertRepoPathAvailable(repoPath);
     const kind = this.classifyCommand(args, options.requestedKind);
-    return this.schedule(repoPath, kind, options.commandName ?? args[0] ?? 'git', (signal) =>
-      this.spawnOperations.runWithInput(repoPath, args, input, signal, options.envOverrides),
+    return this.schedule(
+      repoPath,
+      kind,
+      options.commandName ?? args[0] ?? 'git',
+      (signal) => this.spawnOperations.runWithInput(repoPath, args, input, signal, options.envOverrides),
+      { signal: options.signal },
     );
   }
 

@@ -19,6 +19,7 @@ export async function readLfsPointers(
       maxBytes: 65536,
       tooLargeMessage: 'Git LFS object metadata exceeded its limit.',
       envOverrides: options.envOverrides,
+      signal: options.signal,
     });
     const candidates = metadata
       .toString()
@@ -32,6 +33,7 @@ export async function readLfsPointers(
       maxBytes: candidates.length * 1200,
       tooLargeMessage: 'Git LFS pointer data exceeded its limit.',
       envOverrides: options.envOverrides,
+      signal: options.signal,
     });
     let position = 0;
     while (position < data.length) {

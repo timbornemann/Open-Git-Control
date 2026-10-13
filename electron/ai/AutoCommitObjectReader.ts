@@ -21,6 +21,7 @@ export class AutoCommitObjectReader {
     const raw = await this.git.runner.runBuffer(this.repoPath, ['ls-tree', '-r', '-z', tree], {
       maxBytes: 32 * 1024 * 1024,
       tooLargeMessage: 'AI repository inventory exceeds its context budget.',
+      signal: this.signal,
     });
     for (const record of raw.toString('utf8').split('\0')) {
       const match = /^100\d+ blob ([0-9a-f]+)\t([\s\S]+)$/.exec(record);
@@ -38,6 +39,7 @@ export class AutoCommitObjectReader {
       input: `${missing.join('\n')}\n`,
       maxBytes: missing.length * 110 + 1024,
       tooLargeMessage: 'AI blob inventory exceeds its budget.',
+      signal: this.signal,
     });
     let batch: string[] = [];
     let size = 0;
@@ -48,6 +50,7 @@ export class AutoCommitObjectReader {
         input: `${batch.join('\n')}\n`,
         maxBytes: size + batch.length * 110 + 1024,
         tooLargeMessage: 'AI blob batch exceeds its context budget.',
+        signal: this.signal,
       });
       let offset = 0;
       while (offset < buffer.length) {

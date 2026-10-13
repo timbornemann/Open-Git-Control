@@ -162,7 +162,7 @@ export async function analyzeProject(
         cache.put('blame', record);
       } catch (error) {
         git.signal.throwIfAborted();
-        if (/abort/i.test(String(error))) throw error;
+        if ((error as { name?: string } | null)?.name === 'AbortError') throw error;
         project.unblamedFiles++;
         emit('blame', index + 1, text.length);
         continue;

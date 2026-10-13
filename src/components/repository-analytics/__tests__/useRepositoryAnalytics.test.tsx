@@ -190,6 +190,18 @@ describe('analytics background notifications', () => {
       expect.objectContaining({ kind: 'error', technicalDetails: 'Missing Git object', actions: [expect.objectContaining({ label: 'Retry' })] }),
     );
   });
+
+  it('shows a Git failure mentioning an abort filename instead of retrying forever', async () => {
+    vi.useFakeTimers();
+    await render();
+    const error = "fatal: unable to read 'src/abort-controller.ts': bad object";
+    mocks.refresh.mockResolvedValueOnce({ success: false, error });
+    await render(1);
+    expect(mocks.publish).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'error', technicalDetails: error }));
+    const calls = mocks.refresh.mock.calls.length;
+    await act(async () => vi.advanceTimersByTime(1500));
+    expect(mocks.refresh).toHaveBeenCalledTimes(calls);
+  });
   it('ignores delayed progress and completions after switching repositories', async () => {
     const refresh = deferred<{ success: true; data: RepositoryAnalyticsSnapshot }>();
     mocks.refresh.mockReturnValueOnce(refresh.promise);

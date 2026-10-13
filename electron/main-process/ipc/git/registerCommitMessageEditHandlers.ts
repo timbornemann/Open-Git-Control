@@ -55,7 +55,7 @@ export function registerCommitMessageEditHandlers(deps: Dependencies) {
         job.complete();
         active.delete(request.operationId);
       };
-      const emit = (status: 'start' | 'progress' | 'done' | 'failed', message?: string) =>
+      const emit = (status: 'start' | 'progress' | 'done' | 'failed' | 'cancelled', message?: string) =>
         emitJobEvent(event.sender, {
           id: request.operationId,
           operation: IpcChannel.GitRewordCommitMessage,
@@ -80,8 +80,9 @@ export function registerCommitMessageEditHandlers(deps: Dependencies) {
         emit('done');
         return { success: true, data };
       } catch (error) {
-        const result = failure(error);
-        emit('failed', result.error);
+        const cancelled = controller.signal.aborted;
+        const result = { ...failure(error), ...(cancelled ? { cancelled: true } : {}) };
+        emit(cancelled ? 'cancelled' : 'failed', result.error);
         return result;
       }
     } catch (error) {

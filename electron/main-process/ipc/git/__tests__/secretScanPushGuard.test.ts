@@ -88,6 +88,27 @@ const createHarness = (scanPushDiffs: ReturnType<typeof vi.fn>) => {
 };
 
 describe('secret scan push state binding', () => {
+  it('keeps an explicitly requested scan cancellation informational', async () => {
+    const scan = vi.fn(
+      async ({ signal }: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(Object.assign(new Error('Git operation was aborted.'), { name: 'AbortError' })), { once: true });
+        }),
+    );
+    const harness = createHarness(scan);
+    const pending = handlers.get('git:scanPushSecrets')!(harness.event, { repoPath: 'C:/repo', pushArgs: ['origin', 'main'] });
+    await vi.waitFor(() => expect(scan).toHaveBeenCalledOnce());
+    await handlers.get('git:cancelSecretScan')!(harness.event, 'C:/repo');
+    expect(await pending).toEqual({ success: false, error: 'Secret scan cancelled.' });
+    expect(harness.event.sender.send).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({ status: 'cancelled' }));
+  });
+  it('reports an unexpected Git interruption as a failed scan rather than a user cancellation', async () => {
+    const scan = vi.fn().mockRejectedValueOnce(Object.assign(new Error('Git operation was aborted.'), { name: 'AbortError' }));
+    const harness = createHarness(scan);
+    const result = await handlers.get('git:scanPushSecrets')!(harness.event, { repoPath: 'C:/repo', pushArgs: ['origin', 'main'] });
+    expect(result).toEqual({ success: false, error: 'Secret scan failed because a required Git read was interrupted.' });
+    expect(harness.event.sender.send).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({ status: 'failed', message: result.error }));
+  });
   it('prepares the migrated repository policy even when the first scan precedes the settings UI', async () => {
     const scan = vi.fn().mockResolvedValue({ ...findingsResult, findings: [] });
     const harness = createHarness(scan);

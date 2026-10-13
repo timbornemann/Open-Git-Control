@@ -1,10 +1,8 @@
 import { isCancelledError } from '@tanstack/react-query';
+import { isGitCancellation } from '@/utils/gitCancellation';
 
 export const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error || ''));
-export const isGitOperationAborted = (error: unknown): boolean =>
-  isCancelledError(error) ||
-  (typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError') ||
-  /\b(?:operation|read) was (?:aborted|cancelled)\b/i.test(errorMessage(error));
+export const isGitOperationAborted = (error: unknown): boolean => isCancelledError(error) || isGitCancellation(error);
 export const cancelDeferredRetry = (timeoutRef: { current: number | null }): void => {
   if (timeoutRef.current === null) return;
   window.clearTimeout(timeoutRef.current);

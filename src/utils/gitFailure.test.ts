@@ -34,6 +34,14 @@ describe('Git failure explanations', () => {
     );
     expect(describeGitFailure('Command failed: git add "Internal Server Error.txt"\nfatal: disk full', en)?.kind).toBe('unknown');
   });
+
+  it.each(["fatal: could not read 'src/AbortError.ts': bad object", "fatal: could not write 'operation was aborted.txt': Permission denied"])(
+    'does not downgrade a real Git failure containing cancellation words: %s',
+    (message) => {
+      expect(describeGitFailure(message, en)?.kind).toBe('unknown');
+      expect(explainGitNotification({ msg: message, isError: true }, en).isError).toBe(true);
+    },
+  );
   it('leaves unrelated app/hosting errors and active progress unchanged', () => {
     const input = { msg: 'AI provider returned HTTP 503', isError: true };
     expect(explainGitNotification(input, en)).toBe(input);

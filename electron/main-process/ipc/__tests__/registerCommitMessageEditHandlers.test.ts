@@ -73,8 +73,14 @@ describe('commit edit IPC authorization and lifecycle', () => {
     expect(handlers.get(IpcChannel.GitCancelCommitMessageEdit)!({ sender: { id: 2 } }, request.operationId)).toBe(false);
     if (kind === 'switch') switchRepo();
     else expect(handlers.get(IpcChannel.GitCancelCommitMessageEdit)!(event, request.operationId)).toBe(true);
-    expect(await running).toMatchObject({ success: false });
+    expect(await running).toMatchObject({ success: false, cancelled: true });
     expect(isBusy()).toBe(false);
-    expect(event.sender.send.mock.calls.map((call) => call[1].status)).toEqual(['start', 'progress', 'failed']);
+    expect(event.sender.send.mock.calls.map((call) => call[1].status)).toEqual(['start', 'progress', 'cancelled']);
+  });
+  it('keeps an unrequested abort failure distinct from cancellation', async () => {
+    const { service, event, request } = setup();
+    vi.spyOn(service, 'reword').mockRejectedValueOnce(Object.assign(new Error('Git operation was aborted.'), { name: 'AbortError' }));
+    expect(await handlers.get(IpcChannel.GitRewordCommitMessage)!(event, request)).toEqual({ success: false, error: 'Git operation was aborted.' });
+    expect(event.sender.send.mock.calls.at(-1)?.[1].status).toBe('failed');
   });
 });

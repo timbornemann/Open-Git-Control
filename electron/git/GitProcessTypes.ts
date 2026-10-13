@@ -25,6 +25,7 @@ export type GitRunOptions = {
 };
 
 export type GitBufferRunOptions = {
+  signal?: AbortSignal;
   /** Internal bounded sampling; an intentional truncation is a successful read. */
   allowTruncation?: boolean;
   input?: string | Buffer;
@@ -36,6 +37,7 @@ export type GitBufferRunOptions = {
 };
 
 export type GitInputRunOptions = {
+  signal?: AbortSignal;
   requestedKind?: GitJobKind;
   commandName?: string;
   envOverrides?: NodeJS.ProcessEnv;

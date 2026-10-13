@@ -1,5 +1,6 @@
 import { redactGitCredentials } from '@/shared/git/redaction';
 import type { NotificationMessage } from '@/types/notifications';
+import { isGitCancellation } from './gitCancellation';
 
 export type GitFailureKind =
   | 'git-missing'
@@ -43,6 +44,7 @@ export function describeGitFailure(raw: string, tr: Translate, explicitGit = fal
     );
   const looksGit =
     explicitGit ||
+    isGitCancellation(output) ||
     /Git Output:|\bCommand failed:\s*git\b|\bfatal:|\[REPO_UNAVAILABLE\]|Git operation was aborted|CONFLICT \(|could not read (?:Username|Password|from remote repository)|Authentication failed for|\[remote rejected\]|\[rejected\]/i.test(
       raw,
     );
@@ -57,7 +59,7 @@ export function describeGitFailure(raw: string, tr: Translate, explicitGit = fal
       'Remote oder Kontozuordnung wurde geändert. Prüfe die Konfiguration, bevor du die Übertragung erneut startest.',
       'The remote or account binding changed. Review the configuration before retrying the transfer.',
     );
-  if (/Git operation was aborted|AbortError|operation (?:was )?(?:aborted|cancelled)|transfer was cancel(?:led|ed)/i.test(output))
+  if (isGitCancellation(output))
     return result(
       'cancelled',
       'Der Git-Vorgang wurde abgebrochen. Du kannst ihn bei Bedarf erneut starten.',

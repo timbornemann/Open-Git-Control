@@ -7,6 +7,7 @@ import type { AnalyticsFilters, AnalyticsProgress, RepositoryAnalyticsSnapshot }
 import type { NotificationMessage } from '@/types/notifications';
 import { useAnalyticsWorkspace } from './analyticsWorkspaceState';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
+import { isGitCancellation } from '@/utils/gitCancellation';
 
 const reportContent = ({ savedAt: _savedAt, ...snapshot }: RepositoryAnalyticsSnapshot) => JSON.stringify(snapshot);
 
@@ -163,7 +164,7 @@ export function useRepositoryAnalytics(repoPath: string, filters: AnalyticsFilte
       } catch (failure) {
         if (!active || controller.signal.aborted) return;
         const message = failure instanceof Error ? failure.message : String(failure);
-        if (/abort/i.test(message)) {
+        if (isGitCancellation(failure)) {
           if (notifyProgress)
             publish({
               kind: 'progress',

@@ -87,7 +87,7 @@ export function CommitMessageEditDialog({ repoPath, commitHash, onClose, onSaved
       });
       if (generation.current !== current) return;
       if (!result.success) {
-        setError(commitEditErrorText(result.error, tr));
+        setError(commitEditErrorText(result.error, tr, result.cancelled === true));
         return;
       }
       onSaved(result.data);

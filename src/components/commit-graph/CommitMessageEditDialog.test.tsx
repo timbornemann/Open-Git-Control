@@ -120,7 +120,7 @@ describe('commit message editing dialog', () => {
   });
 
   it('cancels an in-flight operation and keeps its draft available', async () => {
-    const pending = deferred<IpcResult<CommitMessageEditResult>>();
+    const pending = deferred<IpcResult<CommitMessageEditResult> & { cancelled?: boolean }>();
     const reword = vi.spyOn(gitClient, 'rewordCommitMessage').mockReturnValue(pending.promise);
     await render();
     enter('input', 'Draft');
@@ -129,10 +129,11 @@ describe('commit message editing dialog', () => {
     expect(gitClient.cancelCommitMessageEdit).toHaveBeenCalledWith(reword.mock.calls[0][0].operationId);
     expect(close).not.toHaveBeenCalled();
     await act(async () => {
-      pending.resolve({ success: false, error: 'Git operation was aborted.' });
+      pending.resolve({ success: false, cancelled: true, error: 'Git operation was aborted.' });
     });
     expect(host.querySelector('input')?.value).toBe('Draft');
     expect(confirm().disabled).toBe(false);
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Your draft has been kept');
   });
 
   it('explains a safety block and ignores a late inspection after leaving the view', async () => {
