@@ -689,7 +689,7 @@ describe('registerGitHandlers', () => {
   it('returns the canonical repository root selected by GitSetRepo', async () => {
     let activeRepo = 'C:/old-repo';
     const gitService = {
-      setRepoPath: vi.fn(() => {
+      setRepoPathAsync: vi.fn(async () => {
         activeRepo = 'C:/work/repo';
       }),
       getRepoPath: vi.fn(() => activeRepo),
@@ -706,7 +706,7 @@ describe('registerGitHandlers', () => {
     });
 
     await expect(handlers.get('git:setRepo')!({}, 'C:/work/repo/packages/app')).resolves.toBe('C:/work/repo');
-    expect(gitService.setRepoPath).toHaveBeenCalledWith('C:/work/repo/packages/app');
+    expect(gitService.setRepoPathAsync).toHaveBeenCalledWith('C:/work/repo/packages/app');
     expect(cancelForRepoChange).toHaveBeenCalledWith('C:/work/repo');
     expect(setActiveRepo).toHaveBeenCalledWith('C:/work/repo');
   });

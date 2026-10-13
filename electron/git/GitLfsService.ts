@@ -45,7 +45,8 @@ export class GitLfsService {
     return {
       run: (cwd, args, options) => this.runner.run(cwd, args, options),
       input: (cwd, args, input, _ignoreAbort, envOverrides) => this.runner.runWithInput(cwd, args, input, { envOverrides }),
-      prefix: (cwd, args, maxBytes) => this.runner.runBuffer(cwd, args, { maxBytes, allowTruncation: true, tooLargeMessage: 'Git sample is too large.' }),
+      prefix: (cwd, args, maxBytes, input) =>
+        this.runner.runBuffer(cwd, args, { maxBytes, input, allowTruncation: true, tooLargeMessage: 'Git sample is too large.' }),
     };
   }
   async getStatus(request: GitLfsStatusRequest): Promise<GitLfsStatus> {

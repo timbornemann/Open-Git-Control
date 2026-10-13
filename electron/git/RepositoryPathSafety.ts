@@ -43,13 +43,13 @@ export function toLiteralPathspec(value: unknown, label = 'Pathspec'): string {
   return `:(literal)${normalizeRepositoryRelativePath(value, label)}`;
 }
 
-const isInside = (rootPath: string, targetPath: string, allowRoot = false): boolean => {
+export const isInside = (rootPath: string, targetPath: string, allowRoot = false): boolean => {
   const relative = path.relative(rootPath, targetPath);
   if (relative === '') return allowRoot;
   return !relative.startsWith('..') && !path.isAbsolute(relative);
 };
 
-const assertOutsideGitMetadata = (relativePath: string, label: string): void => {
+export const assertOutsideGitMetadata = (relativePath: string, label: string): void => {
   const segments = relativePath.replace(/\\/g, '/').split('/');
   // Win32 strips trailing dots/spaces and supports NTFS alternate-stream
   // suffixes. Treat those aliases as `.git` as well so a create operation

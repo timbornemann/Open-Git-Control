@@ -84,8 +84,8 @@ export function registerGitHandlers({
     const requestedRepoPath = String(repoPath || '').trim();
     if (!requestedRepoPath) throw new Error('Repository path is required.');
     commitStatsService.interruptBackgroundWork();
+    await gitService.setRepoPathAsync(requestedRepoPath);
     workingTreeService.setActiveRepo();
-    gitService.setRepoPath(requestedRepoPath);
     const activeRepoPath = gitService.getRepoPath() || requestedRepoPath;
     repoJobRegistry.cancelForRepoChange(activeRepoPath);
     await commitMessageEdits.recover(activeRepoPath);

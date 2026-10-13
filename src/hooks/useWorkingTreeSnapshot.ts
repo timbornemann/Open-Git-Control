@@ -83,10 +83,13 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
             'readRepoFile',
           ]);
         }
+        const sameSnapshot = snapshotRef.current?.snapshotId === nextSnapshot.snapshotId;
         snapshotRef.current = nextSnapshot;
         setSnapshot(nextSnapshot);
         setDataRepoPath(nextSnapshot.repoPath);
-        setStatus(parseGitStatusDetailed(nextSnapshot.statusRaw));
+        // Keep the list identity on unchanged polls. Replacing it also starts
+        // another LFS inspection and sorts every file again in the renderer.
+        setStatus((current) => (sameSnapshot && current ? current : parseGitStatusDetailed(nextSnapshot.statusRaw)));
         publishRepositoryActivity(
           repoPath,
           nextSnapshot.changeCount,

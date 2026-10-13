@@ -1,4 +1,4 @@
-import { spawnSync } from 'child_process';
+import { execFile } from 'child_process';
 import { ipcMain } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -6,8 +6,9 @@ import type { GitService } from '../../../GitService';
 import { requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
 import { IpcChannel } from '../../../../src/types/ipcContract';
 import { windowsSystemExecutable } from '../../../system-tools/windowsSystemExecutable';
+import { withWorkingDirectoryWrite } from './workingDirectoryWrite';
 
-type WorkingDirectoryPathResolver = (repoPath: string, value: unknown, label: string, allowMissing?: boolean) => string;
+type WorkingDirectoryPathResolver = (repoPath: string, value: unknown, label: string, allowMissing?: boolean) => string | Promise<string>;
 
 type RegisterWorkingDirectoryFileCreationHandlerDeps = {
   gitService: GitService;
@@ -17,7 +18,7 @@ type RegisterWorkingDirectoryFileCreationHandlerDeps = {
 
 const asRepositoryFilePath = (value: unknown): string => (typeof value === 'string' ? value : value == null ? '' : String(value));
 
-const createWindowsEntryWithExplicitAccess = (targetPath: string, kind: 'file' | 'folder'): void => {
+const createWindowsEntryWithExplicitAccess = async (targetPath: string, kind: 'file' | 'folder'): Promise<void> => {
   const encodedTargetPath = Buffer.from(targetPath, 'utf16le').toString('base64');
   const encodedScript = Buffer.from(
     `
@@ -141,39 +142,37 @@ try {
 `,
     'utf16le',
   ).toString('base64');
-  const result = spawnSync(
-    windowsSystemExecutable('WindowsPowerShell', 'v1.0', 'powershell.exe'),
-    ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', encodedScript],
-    {
-      encoding: 'utf8',
-      windowsHide: true,
-    },
-  );
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    const stderr = result.stderr?.trim();
-    throw new Error(stderr || 'Could not create the working-directory entry.');
-  }
+  await new Promise<void>((resolve, reject) => {
+    execFile(
+      windowsSystemExecutable('WindowsPowerShell', 'v1.0', 'powershell.exe'),
+      ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', encodedScript],
+      { encoding: 'utf8', windowsHide: true, timeout: 30_000 },
+      (error, _stdout, stderr) => {
+        if (error) reject(new Error(stderr?.trim() || error.message));
+        else resolve();
+      },
+    );
+  });
 };
 
-export const assertWorkingDirectoryEntryAccess = (targetPath: string): void => {
-  fs.accessSync(targetPath, fs.constants.R_OK | fs.constants.W_OK);
+export const assertWorkingDirectoryEntryAccess = async (targetPath: string): Promise<void> => {
+  await fs.promises.access(targetPath, fs.constants.R_OK | fs.constants.W_OK);
 };
 
-export const assertWindowsWorkingDirectoryAccess = (targetPath: string): void => {
-  if (process.platform === 'win32') assertWorkingDirectoryEntryAccess(targetPath);
+export const assertWindowsWorkingDirectoryAccess = async (targetPath: string): Promise<void> => {
+  if (process.platform === 'win32') await assertWorkingDirectoryEntryAccess(targetPath);
 };
 
-export const createWorkingDirectoryEntrySafely = (targetPath: string, kind: 'file' | 'folder'): void => {
-  if (process.platform === 'win32') createWindowsEntryWithExplicitAccess(targetPath, kind);
-  else if (kind === 'file') fs.writeFileSync(targetPath, '', { encoding: 'utf8', flag: 'wx' });
-  else fs.mkdirSync(targetPath);
+export const createWorkingDirectoryEntrySafely = async (targetPath: string, kind: 'file' | 'folder'): Promise<void> => {
+  if (process.platform === 'win32') await createWindowsEntryWithExplicitAccess(targetPath, kind);
+  else if (kind === 'file') await fs.promises.writeFile(targetPath, '', { encoding: 'utf8', flag: 'wx' });
+  else await fs.promises.mkdir(targetPath);
   try {
-    assertWorkingDirectoryEntryAccess(targetPath);
+    await assertWorkingDirectoryEntryAccess(targetPath);
   } catch (permissionError: unknown) {
     try {
-      if (kind === 'file') fs.unlinkSync(targetPath);
-      else fs.rmdirSync(targetPath);
+      if (kind === 'file') await fs.promises.unlink(targetPath);
+      else await fs.promises.rmdir(targetPath);
     } catch {
       // Keep the original permission error; the recovery cleanup is best-effort.
     }
@@ -195,13 +194,16 @@ export function registerWorkingDirectoryFileCreationHandler({
       );
       ensureWriteAllowed(repoPath);
       const relativePath = asRepositoryFilePath(entryPath);
-      const targetPath = workingDirectoryPath(repoPath, relativePath, kind === 'file' ? 'File path' : 'Folder path', true);
-      if (!fs.statSync(path.dirname(targetPath)).isDirectory()) throw new Error('Target folder does not exist.');
+      await withWorkingDirectoryWrite(gitService, repoPath, 'Create working-directory entry', ensureWriteAllowed, async (ensureContext) => {
+        const targetPath = await workingDirectoryPath(repoPath, relativePath, kind === 'file' ? 'File path' : 'Folder path', true);
+        if (!(await fs.promises.stat(path.dirname(targetPath))).isDirectory()) throw new Error('Target folder does not exist.');
+        ensureContext();
 
-      // Windows parent ACLs may not propagate usable access to new children.
-      // Create with an explicit descriptor there so no inaccessible entry
-      // exists even briefly. The native APIs retain exclusive creation.
-      createWorkingDirectoryEntrySafely(targetPath, kind);
+        // Windows parent ACLs may not propagate usable access to new children.
+        // Create with an explicit descriptor there so no inaccessible entry
+        // exists even briefly. The native APIs retain exclusive creation.
+        await createWorkingDirectoryEntrySafely(targetPath, kind);
+      });
       return { success: true, targetPath: relativePath };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };

@@ -8,7 +8,7 @@ import { requireActiveRepositoryPath } from '../../activeRepositoryAuthorization
 import { IpcChannel } from '../../../../src/types/ipcContract';
 import type { GitFileHistoryEntryDto } from '../../../../src/types/git';
 
-type WorkingDirectoryPathResolver = (repoPath: string, value: unknown, label: string) => string;
+type WorkingDirectoryPathResolver = (repoPath: string, value: unknown, label: string) => string | Promise<string>;
 
 type RegisterWorkingDirectoryFileInfoHandlerDeps = {
   gitService: GitService;
@@ -78,8 +78,8 @@ export function registerWorkingDirectoryFileInfoHandler({ gitService, workingDir
     try {
       const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitGetWorkingDirectoryFileInfo);
       const relativePath = asRepositoryFilePath(filePath);
-      const resolvedPath = workingDirectoryPath(repoPath, relativePath, 'File path');
-      const stat = fs.statSync(resolvedPath);
+      const resolvedPath = await workingDirectoryPath(repoPath, relativePath, 'File path');
+      const stat = await fs.promises.stat(resolvedPath);
       if (!stat.isFile()) throw new Error('Target path is not a file.');
 
       const literalPathspec = toLiteralPathspec(relativePath, 'File path');

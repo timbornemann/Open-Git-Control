@@ -34,7 +34,7 @@ export function registerDialogHandlers({ gitService }: RegisterDialogHandlersDep
     try {
       await gitService.runCommandAtPath(selectedPath, ['rev-parse', '--is-inside-work-tree']);
       isRepo = true;
-      repositoryPath = gitService.resolveRepositoryPath(selectedPath);
+      repositoryPath = await gitService.resolveRepositoryPathAsync(selectedPath);
     } catch {
       isRepo = false;
     }

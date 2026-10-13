@@ -26,6 +26,13 @@ export class RepositoryBareState {
     this.activeIsBare = null;
   }
 
+  cachedAtPath(repoPath: string): boolean | undefined {
+    if (this.activePath && repositoryPathKey(repoPath) === repositoryPathKey(this.activePath) && typeof this.activeIsBare === 'boolean') {
+      return this.activeIsBare;
+    }
+    return undefined;
+  }
+
   isBareAtPath(repoPath: string): boolean {
     const normalized = String(repoPath || '').trim();
     if (!normalized) return false;

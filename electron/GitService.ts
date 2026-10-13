@@ -25,6 +25,7 @@ const statusPorcelainZArgs = (): string[] => [...statusPorcelainArgs(), '-z'];
 
 export class GitService {
   private repoPath: string | null = null;
+  private repoSelectionGeneration = 0;
   private readonly bareState = new RepositoryBareState((repoPath) => this.gitRunner.detectIsBareRepositorySync(repoPath));
   private readonly gitRunner: GitRunner;
   private readonly commitService: CommitService;
@@ -66,13 +67,25 @@ export class GitService {
     this.submoduleService = new SubmoduleService((args) => this.runCommand(args));
   }
 
+  /** Synchronous setup compatibility; interactive callers use setRepoPathAsync. */
   setRepoPath(newPath: string) {
+    this.repoSelectionGeneration += 1;
     const resolvedRepoPath = this.resolveRepositoryPath(newPath);
     this.repoPath = resolvedRepoPath;
     this.bareState.setActive(resolvedRepoPath, this.gitRunner.detectIsBareRepositorySync(resolvedRepoPath));
   }
 
+  async setRepoPathAsync(newPath: string): Promise<void> {
+    const generation = ++this.repoSelectionGeneration;
+    const resolvedRepoPath = await this.resolveRepositoryPathAsync(newPath);
+    const isBare = await this.gitRunner.detectIsBareRepository(resolvedRepoPath);
+    if (generation !== this.repoSelectionGeneration) throw new Error('Repository selection changed.');
+    this.repoPath = resolvedRepoPath;
+    this.bareState.setActive(resolvedRepoPath, isBare);
+  }
+
   clearRepoPath() {
+    this.repoSelectionGeneration += 1;
     this.repoPath = null;
     this.bareState.clear();
   }
@@ -144,6 +157,12 @@ export class GitService {
     return this.bareState.isBareAtPath(repoPath);
   }
 
+  async isBareRepositoryAtPathAsync(repoPath: string): Promise<boolean> {
+    const cached = this.bareState.cachedAtPath(repoPath);
+    if (cached !== undefined) return cached;
+    return this.gitRunner.detectIsBareRepository(repoPath);
+  }
+
   private readGitFileBufferAtPath(repoPath: string, revisionSpec: string, maxBytes: number): Promise<Buffer> {
     return this.gitRunner.runBuffer(repoPath, ['show', revisionSpec], {
       maxBytes,
@@ -158,7 +177,7 @@ export class GitService {
    */
   async runCommand(args: string[]): Promise<string> {
     const repoPath = this.ensureRepoPath();
-    if (this.bareState.isBareAtPath(repoPath) && shouldSuppressBareWorkTreeCommand(args)) {
+    if (shouldSuppressBareWorkTreeCommand(args) && (await this.isBareRepositoryAtPathAsync(repoPath))) {
       return '';
     }
     return this.gitRunner.run(repoPath, args);
@@ -245,7 +264,7 @@ export class GitService {
 
   async getStatusPorcelainAtPath(repoPath: string): Promise<string> {
     const normalizedPath = (repoPath || '').trim();
-    if (normalizedPath && this.bareState.isBareAtPath(normalizedPath) && shouldSuppressBareWorkTreeCommand(statusPorcelainArgs())) {
+    if (normalizedPath && (await this.isBareRepositoryAtPathAsync(normalizedPath)) && shouldSuppressBareWorkTreeCommand(statusPorcelainArgs())) {
       return '';
     }
     return this.runCommandAtPath(repoPath, statusPorcelainArgs());
@@ -254,7 +273,7 @@ export class GitService {
   /** Unambiguous NUL-delimited status for backend parsers. */
   async getStatusPorcelainZAtPath(repoPath: string): Promise<string> {
     const normalizedPath = (repoPath || '').trim();
-    if (normalizedPath && this.bareState.isBareAtPath(normalizedPath) && shouldSuppressBareWorkTreeCommand(statusPorcelainZArgs())) {
+    if (normalizedPath && (await this.isBareRepositoryAtPathAsync(normalizedPath)) && shouldSuppressBareWorkTreeCommand(statusPorcelainZArgs())) {
       return '';
     }
     return this.runCommandAtPath(repoPath, statusPorcelainZArgs());

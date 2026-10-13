@@ -8,6 +8,28 @@ import type { GitLfsStatus, TrackWithGitLfsRequest } from '@/shared/ipc/gitLfs';
 
 afterEach(() => vi.restoreAllMocks());
 describe('repository-bound LFS status and checked actions', () => {
+  it('sends a large file list in one bounded request instead of repeatedly loading the index', async () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const inspection = vi.spyOn(gitClient, 'getGitLfsStatus').mockResolvedValue({ success: true, data: { available: true, files: [] } });
+    const status = {
+      staged: Array.from({ length: 2000 }, (_, index) => ({ path: `file-${index}.txt`, status: 'A', x: 'A', y: ' ' })),
+      unstaged: [],
+      untracked: [],
+    };
+    const track = async () => true;
+    const root = createRoot(document.createElement('div'));
+    const Harness = () => {
+      useStagingLfs('C:/repo/bulk', status, track);
+      return null;
+    };
+    try {
+      await act(async () => root.render(createElement(Harness)));
+      expect(inspection).toHaveBeenCalledOnce();
+      expect(inspection.mock.calls[0][0].files).toHaveLength(2000);
+    } finally {
+      act(() => root.unmount());
+    }
+  });
   it('ignores late responses from another repository and tracks the checked source/version', async () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     let resolveOld!: (result: { success: true; data: GitLfsStatus }) => void;

@@ -5,8 +5,9 @@ import type { GitService } from '../../../GitService';
 import { decodeRepositoryFile, detectRepositoryFileEncoding } from '../../../git/RepositoryFileEncoding';
 import { requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
 import { IpcChannel } from '../../../../src/types/ipcContract';
+import { readRepositoryFileBytes } from '../../../git/RepositoryFileRead';
 
-type WorkingDirectoryPathResolver = (repoPath: string, value: unknown, label: string) => string;
+type WorkingDirectoryPathResolver = (repoPath: string, value: unknown, label: string) => string | Promise<string>;
 
 const PREVIEW_LIMIT = 2 * 1024 * 1024;
 const LARGE_IMAGE_PREVIEW_LIMIT = 25 * 1024 * 1024;
@@ -29,8 +30,8 @@ export function registerWorkingDirectoryPreviewHandler(gitService: GitService, w
     async (_event: unknown, filePath: unknown, requestedRepoPath?: unknown, allowLargeImage?: unknown) => {
       try {
         const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitGetWorkingDirectoryPreview);
-        const resolvedPath = workingDirectoryPath(repoPath, filePath, 'File path');
-        const stat = fs.statSync(resolvedPath);
+        const resolvedPath = await workingDirectoryPath(repoPath, filePath, 'File path');
+        const stat = await fs.promises.stat(resolvedPath);
         if (!stat.isFile()) throw new Error('Target path is not a file.');
         const extension = path.extname(resolvedPath).slice(1).toLowerCase();
         const mimeType = IMAGE_MIME_TYPES.get(extension) || null;
@@ -48,7 +49,7 @@ export function registerWorkingDirectoryPreviewHandler(gitService: GitService, w
           };
         }
 
-        const buffer = fs.readFileSync(resolvedPath);
+        const { data: buffer } = await readRepositoryFileBytes(resolvedPath, mimeType && allowLargeImage === true ? LARGE_IMAGE_PREVIEW_LIMIT : PREVIEW_LIMIT);
         if (mimeType) {
           return {
             success: true,

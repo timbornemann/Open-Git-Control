@@ -4,12 +4,7 @@ import { ipcMain, shell } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { GitService, RepositoryFileSource } from '../../../GitService';
-import {
-  resolveExistingRepositoryPath,
-  resolveExistingRepositoryPathWithoutSymlinks,
-  resolveRepositoryPathForCreate,
-  resolveRepositoryPathForCreateWithoutSymlinks,
-} from '../../../git/RepositoryPathSafety';
+import { resolveExistingRepositoryPath, resolveRepositoryPathForCreate } from '../../../git/RepositoryPathSafety';
 import { repositoryPathKey, requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
 import { IpcChannel } from '../../../../src/types/ipcContract';
 import type { RepositoryTextEncoding } from '../../../git/RepositoryFileEncoding';
@@ -20,6 +15,9 @@ import { registerWorkingDirectoryPreviewHandler } from './workingDirectoryPrevie
 import { registerRepositoryFileViewerHandlers } from './repositoryFileViewer';
 import { registerGitLfsHandlers } from './gitLfsHandlers';
 import { windowsSystemExecutable } from '../../../system-tools/windowsSystemExecutable';
+import { createRepositoryPathResolver } from '../../../git/RepositoryPathSafetyAsync';
+import { pathExists } from './workingDirectoryAsyncFs';
+import { withWorkingDirectoryWrite } from './workingDirectoryWrite';
 
 type RegisterGitFileHandlersDeps = {
   gitService: GitService;
@@ -103,32 +101,34 @@ const replaceIgnoreFileAtomically = (targetPath: string, content: string, mode: 
   }
 };
 
-const restoreReplacedTarget = (targetPath: string, backupPath: string | null): boolean => {
-  if (!backupPath || !fs.existsSync(backupPath)) return true;
+const restoreReplacedTarget = async (targetPath: string, backupPath: string | null): Promise<boolean> => {
+  if (!backupPath || !(await pathExists(backupPath))) return true;
   try {
-    if (fs.existsSync(targetPath)) fs.rmSync(targetPath, { recursive: true, force: true });
-    fs.renameSync(backupPath, targetPath);
+    if (await pathExists(targetPath)) await fs.promises.rm(targetPath, { recursive: true, force: true });
+    await fs.promises.rename(backupPath, targetPath);
     return true;
   } catch {
     return false;
   }
 };
 
-const publishReplacement = (preparedPath: string, targetPath: string, overwrite: boolean): void => {
+const publishReplacement = async (preparedPath: string, targetPath: string, overwrite: boolean, ensureContext: () => void): Promise<void> => {
   let backupPath: string | null = null;
   let retainBackup = false;
-  if (fs.existsSync(targetPath)) {
+  if (await pathExists(targetPath)) {
     if (!overwrite) throw new Error('Target already exists.');
     backupPath = createSiblingTemporaryPath(targetPath, 'backup');
-    fs.renameSync(targetPath, backupPath);
+    ensureContext();
+    await fs.promises.rename(targetPath, backupPath);
   }
   try {
-    fs.renameSync(preparedPath, targetPath);
+    ensureContext();
+    await fs.promises.rename(preparedPath, targetPath);
   } catch (error) {
-    retainBackup = !restoreReplacedTarget(targetPath, backupPath);
+    retainBackup = !(await restoreReplacedTarget(targetPath, backupPath));
     throw error;
   } finally {
-    if (!retainBackup && backupPath && fs.existsSync(backupPath)) fs.rmSync(backupPath, { recursive: true, force: true });
+    if (!retainBackup && backupPath) await fs.promises.rm(backupPath, { recursive: true, force: true });
   }
 };
 
@@ -154,22 +154,19 @@ const openWithSystemChooser = async (targetPath: string): Promise<void> => {
 };
 
 export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () => [], ensureWriteAllowed = () => {} }: RegisterGitFileHandlersDeps): void {
-  const workingDirectoryPath = (repoPath: string, value: unknown, label: string, allowMissing = false) => {
-    const relativePath = asRepositoryFilePath(value);
-    if (!relativePath) throw new Error(`${label} is required.`);
-    return allowMissing
-      ? resolveRepositoryPathForCreateWithoutSymlinks(repoPath, relativePath, label)
-      : resolveExistingRepositoryPathWithoutSymlinks(repoPath, relativePath, label);
+  const workingDirectoryPathAsync = async (repoPath: string, value: unknown, label: string, allowMissing = false) => {
+    const resolver = await createRepositoryPathResolver(repoPath);
+    return allowMissing ? resolver.forCreateWithoutSymlinks(value, label) : resolver.existingWithoutSymlinks(value, label);
   };
 
   ipcMain.handle(IpcChannel.GitListWorkingDirectory, async (_event: unknown, requestedRepoPath?: unknown, requestedParentPath?: unknown) => {
     try {
       const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitListWorkingDirectory);
       const parentPath = asRepositoryFilePath(requestedParentPath);
-      const directoryPath = parentPath ? workingDirectoryPath(repoPath, parentPath, 'Directory path') : fs.realpathSync(repoPath);
-      if (!fs.statSync(directoryPath).isDirectory()) throw new Error('Target path is not a directory.');
+      const directoryPath = parentPath ? await workingDirectoryPathAsync(repoPath, parentPath, 'Directory path') : await fs.promises.realpath(repoPath);
+      if (!(await fs.promises.stat(directoryPath)).isDirectory()) throw new Error('Target path is not a directory.');
       const entries: Array<{ path: string; name: string; kind: 'file' | 'directory'; bytes?: number }> = [];
-      for (const item of fs.readdirSync(directoryPath, { withFileTypes: true })) {
+      for (const item of await fs.promises.readdir(directoryPath, { withFileTypes: true })) {
         // Project dotfiles (for example .gitignore and .github) are ordinary
         // working-tree entries. Git metadata remains inaccessible through the
         // path-safety boundary and is not useful to expose in this browser.
@@ -179,7 +176,7 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
         if (item.isDirectory()) {
           entries.push({ path: childRelativePath, name: item.name, kind: 'directory' });
         } else if (item.isFile()) {
-          entries.push({ path: childRelativePath, name: item.name, kind: 'file', bytes: fs.statSync(childAbsolutePath).size });
+          entries.push({ path: childRelativePath, name: item.name, kind: 'file', bytes: (await fs.promises.stat(childAbsolutePath)).size });
         }
       }
       return { success: true, data: entries };
@@ -188,10 +185,10 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
     }
   });
 
-  registerWorkingDirectoryFileInfoHandler({ gitService, workingDirectoryPath });
-  registerWorkingDirectoryFileCreationHandler({ gitService, workingDirectoryPath, ensureWriteAllowed });
-  registerWorkingDirectoryToolsHandlers({ gitService, workingDirectoryPath, ensureWriteAllowed });
-  registerWorkingDirectoryPreviewHandler(gitService, workingDirectoryPath);
+  registerWorkingDirectoryFileInfoHandler({ gitService, workingDirectoryPath: workingDirectoryPathAsync });
+  registerWorkingDirectoryFileCreationHandler({ gitService, workingDirectoryPath: workingDirectoryPathAsync, ensureWriteAllowed });
+  registerWorkingDirectoryToolsHandlers({ gitService, workingDirectoryPath: workingDirectoryPathAsync, ensureWriteAllowed });
+  registerWorkingDirectoryPreviewHandler(gitService, workingDirectoryPathAsync);
   registerRepositoryFileViewerHandlers(gitService, ensureWriteAllowed);
   registerGitLfsHandlers(gitService, ensureWriteAllowed);
 
@@ -205,37 +202,44 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
           operation === 'move' ? IpcChannel.GitMoveWorkingDirectoryEntry : IpcChannel.GitCopyWorkingDirectoryEntry,
         );
         ensureWriteAllowed(repoPath);
-        const sourcePath = workingDirectoryPath(repoPath, params.sourcePath, 'Source path');
-        const targetPath = workingDirectoryPath(repoPath, params.targetPath, 'Target path', true);
-        if (sourcePath === targetPath || targetPath.startsWith(`${sourcePath}${path.sep}`)) throw new Error('A directory cannot be placed inside itself.');
-        if (!fs.existsSync(path.dirname(targetPath))) throw new Error('Target folder does not exist.');
-        const overwrite = params.overwrite === true;
-        if (operation === 'move') {
-          let backupPath: string | null = null;
-          let retainBackup = false;
-          if (fs.existsSync(targetPath)) {
-            if (!overwrite) return { success: false, error: 'Target already exists.' };
-            backupPath = createSiblingTemporaryPath(targetPath, 'backup');
-            fs.renameSync(targetPath, backupPath);
+        return await withWorkingDirectoryWrite(gitService, repoPath, `Working-directory ${operation}`, ensureWriteAllowed, async (ensureContext) => {
+          const sourcePath = await workingDirectoryPathAsync(repoPath, params.sourcePath, 'Source path');
+          const targetPath = await workingDirectoryPathAsync(repoPath, params.targetPath, 'Target path', true);
+          if (sourcePath === targetPath || targetPath.startsWith(`${sourcePath}${path.sep}`)) throw new Error('A directory cannot be placed inside itself.');
+          if (!(await pathExists(path.dirname(targetPath)))) throw new Error('Target folder does not exist.');
+          ensureContext();
+          const overwrite = params.overwrite === true;
+          if (operation === 'move') {
+            let backupPath: string | null = null;
+            let retainBackup = false;
+            if (await pathExists(targetPath)) {
+              if (!overwrite) return { success: false, error: 'Target already exists.' };
+              backupPath = createSiblingTemporaryPath(targetPath, 'backup');
+              ensureContext();
+              await fs.promises.rename(targetPath, backupPath);
+            }
+            try {
+              ensureContext();
+              await fs.promises.rename(sourcePath, targetPath);
+            } catch (error) {
+              retainBackup = !(await restoreReplacedTarget(targetPath, backupPath));
+              throw error;
+            } finally {
+              if (!retainBackup && backupPath) await fs.promises.rm(backupPath, { recursive: true, force: true });
+            }
+          } else {
+            const temporaryTargetPath = createSiblingTemporaryPath(targetPath, 'copy');
+            try {
+              await fs.promises.cp(sourcePath, temporaryTargetPath, { recursive: true, errorOnExist: true, force: false });
+              // Revalidate the create boundary and repository after a long copy.
+              await workingDirectoryPathAsync(repoPath, params.targetPath, 'Target path', true);
+              await publishReplacement(temporaryTargetPath, targetPath, overwrite, ensureContext);
+            } finally {
+              await fs.promises.rm(temporaryTargetPath, { recursive: true, force: true });
+            }
           }
-          try {
-            fs.renameSync(sourcePath, targetPath);
-          } catch (error) {
-            retainBackup = !restoreReplacedTarget(targetPath, backupPath);
-            throw error;
-          } finally {
-            if (!retainBackup && backupPath && fs.existsSync(backupPath)) fs.rmSync(backupPath, { recursive: true, force: true });
-          }
-        } else {
-          const temporaryTargetPath = createSiblingTemporaryPath(targetPath, 'copy');
-          try {
-            fs.cpSync(sourcePath, temporaryTargetPath, { recursive: true, errorOnExist: true });
-            publishReplacement(temporaryTargetPath, targetPath, overwrite);
-          } finally {
-            if (fs.existsSync(temporaryTargetPath)) fs.rmSync(temporaryTargetPath, { recursive: true, force: true });
-          }
-        }
-        return { success: true, targetPath: String(params.targetPath) };
+          return { success: true, targetPath: String(params.targetPath) };
+        });
       } catch (error: unknown) {
         return { success: false, error: error instanceof Error ? error.message : String(error) };
       }
@@ -246,7 +250,11 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
     try {
       const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitDeleteWorkingDirectoryEntry);
       ensureWriteAllowed(repoPath);
-      fs.rmSync(workingDirectoryPath(repoPath, filePath, 'File path'), { recursive: true, force: false });
+      await withWorkingDirectoryWrite(gitService, repoPath, IpcChannel.GitDeleteWorkingDirectoryEntry, ensureWriteAllowed, async (ensureContext) => {
+        const targetPath = await workingDirectoryPathAsync(repoPath, filePath, 'File path');
+        ensureContext();
+        await fs.promises.rm(targetPath, { recursive: true, force: false });
+      });
       return { success: true };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };

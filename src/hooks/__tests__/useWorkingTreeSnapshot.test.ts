@@ -41,6 +41,38 @@ afterEach(() => {
 });
 
 describe('useWorkingTreeSnapshot', () => {
+  it('preserves status identity on unchanged polls but refreshes LFS inputs when contents change', async () => {
+    const repoPath = 'C:/repos/stable';
+    let id = 'first';
+    vi.spyOn(gitClient, 'getWorkingTreeSnapshot').mockImplementation(async () => ({ success: true, data: snapshot(repoPath, id, ' M file.txt') }));
+    vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: ' M file.txt' });
+    vi.spyOn(gitClient, 'getWorkingTreeStats').mockImplementation(
+      async (snapshotId) =>
+        ({
+          success: true,
+          data: { snapshotId, staged: { additions: 0, deletions: 0 }, unstaged: { additions: 1, deletions: 0 } },
+        }) as any,
+    );
+    let current: WorkingTreeState | null = null;
+    const root = createRoot(document.getElementById('root')!);
+    const Harness = () => {
+      current = useWorkingTreeSnapshot(repoPath);
+      return null;
+    };
+    try {
+      await act(async () => root.render(createElement(Harness)));
+      await vi.waitFor(() => expect(current!.loading).toBe(false));
+      const first = current!.status;
+      expect(first).not.toBeNull();
+      await act(async () => current!.refresh());
+      expect(current!.status).toBe(first);
+      id = 'changed-contents';
+      await act(async () => current!.refresh());
+      expect(current!.status).not.toBe(first);
+    } finally {
+      act(() => root.unmount());
+    }
+  });
   it('stops reporting loading immediately when the repository is cleared', async () => {
     const repoA = 'C:\\repos\\a';
     const resultA = deferred<{ success: true; data: WorkingTreeSnapshotDto }>();

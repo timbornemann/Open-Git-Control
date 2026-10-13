@@ -2,7 +2,9 @@ import { createHash } from 'crypto';
 import * as fs from 'fs';
 import type { GitService } from './GitService';
 import { parsePorcelainStatusZ } from '../src/shared/git/porcelainStatus';
-import { resolveExistingRepositoryPath, toLiteralPathspec } from './git/RepositoryPathSafety';
+import { toLiteralPathspec } from './git/RepositoryPathSafety';
+import { createRepositoryPathResolver } from './git/RepositoryPathSafetyAsync';
+import { gitArgumentBatches } from './git/GitArgumentBatches';
 
 export type WorkingTreeSnapshot = {
   snapshotId: string;
@@ -231,17 +233,20 @@ export class WorkingTreeService {
     const promise = (async () => {
       const startedAt = Date.now();
       const bareChecker = this.gitService as {
+        isBareRepositoryAtPathAsync?: (repoPath: string) => Promise<boolean>;
         isBareRepositoryAtPath?: (repoPath: string) => boolean;
         isBareRepository?: () => boolean;
       };
       // Resolve the bare status of THIS snapshot's repository path, not whatever
       // repository happens to be active when the async work runs.
       const isBare =
-        typeof bareChecker.isBareRepositoryAtPath === 'function'
-          ? Boolean(bareChecker.isBareRepositoryAtPath(repoPath))
-          : typeof bareChecker.isBareRepository === 'function'
-            ? Boolean(bareChecker.isBareRepository())
-            : false;
+        typeof bareChecker.isBareRepositoryAtPathAsync === 'function'
+          ? await bareChecker.isBareRepositoryAtPathAsync(repoPath)
+          : typeof bareChecker.isBareRepositoryAtPath === 'function'
+            ? Boolean(bareChecker.isBareRepositoryAtPath(repoPath))
+            : typeof bareChecker.isBareRepository === 'function'
+              ? Boolean(bareChecker.isBareRepository())
+              : false;
       const state = isBare ? { statusRaw: '', statusIdentity: '', changeCount: 0, contentFingerprint: 'bare' } : await this.captureStableState(repoPath);
       const { statusRaw, statusIdentity, changeCount, contentFingerprint } = state;
       const durationMs = Date.now() - startedAt;
@@ -404,16 +409,19 @@ export class WorkingTreeService {
     const sortedPaths = [...paths].sort();
     const batchSize = 64;
     const hash = createHash('sha1');
+    // All path probes must yield, including realpath and the Windows metadata
+    // alias checks. A synchronous resolver per file freezes the main process.
+    const resolver = await createRepositoryPathResolver(repoPath).catch(() => null);
     if (status.hasStagedChanges) {
       // `--numstat` is not an index identity: two different staged blobs can
       // have identical line counts. Stage records include the exact blob IDs,
       // modes and conflict stages, and therefore also cover unmerged entries.
-      for (let offset = 0; offset < sortedPaths.length; offset += batchSize) {
-        const batch = sortedPaths.slice(offset, offset + batchSize);
+      let batchIndex = 0;
+      for (const batch of gitArgumentBatches(sortedPaths.map((filePath) => toLiteralPathspec(filePath)))) {
         const stagedEntries = await this.gitService.runPollingCommandAtPath(
           repoPath,
-          ['ls-files', '--stage', '-z', '--', ...batch.map((filePath) => toLiteralPathspec(filePath))],
-          `working-tree-snapshot:index:${offset}:${batch.join('\0')}`,
+          ['ls-files', '--stage', '-z', '--', ...batch],
+          `working-tree-snapshot:index:${batchIndex++}:${batch.join('\0')}`,
         );
         hash.update('index-stage').update('\0').update(stagedEntries).update('\0');
       }
@@ -424,7 +432,8 @@ export class WorkingTreeService {
       const entries = await Promise.all(
         batch.map(async (filePath) => {
           try {
-            const stat = await fs.promises.stat(resolveExistingRepositoryPath(repoPath, filePath), { bigint: true });
+            if (!resolver) return `${filePath}\0missing`;
+            const stat = await fs.promises.stat(await resolver.existing(filePath), { bigint: true });
             return `${filePath}\0${stat.size}\0${stat.mtimeNs}\0${stat.ctimeNs}\0${stat.mode}`;
           } catch {
             return `${filePath}\0missing`;

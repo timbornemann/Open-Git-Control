@@ -270,8 +270,9 @@ export function registerHostingHandlers({ gitService, pushGuard, hostingService:
         releaseSafety.authorizeUpload(event.sender.id, params);
         const file = getAuthorizedSelectedFile(event.sender.id, params.filePath);
         if (!file) throw new Error('Select the asset through the file picker before uploading.');
-        if (fs.statSync(file).size > MAX_TRANSFER_BYTES) throw new Error('This asset exceeds the 512 MiB upload limit.');
-        const bytes = fs.readFileSync(file);
+        if ((await fs.promises.stat(file)).size > MAX_TRANSFER_BYTES) throw new Error('This asset exceeds the 512 MiB upload limit.');
+        const bytes = await fs.promises.readFile(file);
+        if (bytes.length > MAX_TRANSFER_BYTES) throw new Error('This asset exceeds the 512 MiB upload limit.');
         releaseSafety.authorizeUpload(event.sender.id, params);
         data = await (await service.authenticatedAdapter(params.repository.connectionId)).uploadAsset({ ...params, filePath: file }, bytes);
       } else data = await service.request(operation, input as HostingOperations[typeof operation]['input']);

@@ -8,8 +8,10 @@ import { IpcChannel } from '../../../../src/types/ipcContract';
 import { createZipArchive, type ZipArchiveEntry } from '../../zipArchive';
 import { assertWindowsWorkingDirectoryAccess, createWorkingDirectoryEntrySafely } from './workingDirectoryFileCreation';
 import { registerWorkingDirectorySearchHandlers } from './workingDirectorySearch';
+import { assertIndependentPaths, pathExists, pathKey } from './workingDirectoryAsyncFs';
+import { withWorkingDirectoryWrite } from './workingDirectoryWrite';
 
-type WorkingDirectoryPathResolver = (repoPath: string, value: unknown, label: string, allowMissing?: boolean) => string;
+type WorkingDirectoryPathResolver = (repoPath: string, value: unknown, label: string, allowMissing?: boolean) => string | Promise<string>;
 type RegisterWorkingDirectoryToolsHandlersDeps = {
   gitService: GitService;
   workingDirectoryPath: WorkingDirectoryPathResolver;
@@ -24,7 +26,6 @@ type ResolvedMove = {
 };
 
 const asPath = (value: unknown): string => (typeof value === 'string' ? value : value == null ? '' : String(value));
-const pathKey = (value: string): string => (process.platform === 'win32' ? path.resolve(value).toLowerCase() : path.resolve(value));
 const isSameOrWithin = (candidate: string, parent: string): boolean => {
   const relative = path.relative(parent, candidate);
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
@@ -32,44 +33,51 @@ const isSameOrWithin = (candidate: string, parent: string): boolean => {
 const temporarySibling = (value: string, purpose: string): string =>
   path.join(path.dirname(value), `.${path.basename(value)}.ogc-${purpose}-${process.pid}-${randomUUID()}`);
 
-const removeCreatedFolders = (createdFolders: string[]): void => {
+const removeCreatedFolders = async (createdFolders: string[]): Promise<void> => {
   for (const folderPath of [...createdFolders].reverse()) {
     try {
-      fs.rmdirSync(folderPath);
+      await fs.promises.rmdir(folderPath);
     } catch {
       // A non-empty folder must never be removed during rollback.
     }
   }
 };
 
-const rollbackMoves = (moves: ResolvedMove[], publishedCount: number): void => {
+const rollbackMoves = async (moves: ResolvedMove[], publishedCount: number): Promise<void> => {
   for (let index = publishedCount - 1; index >= 0; index -= 1) {
     const move = moves[index];
-    if (fs.existsSync(move.targetPath) && !fs.existsSync(move.sourcePath)) fs.renameSync(move.targetPath, move.sourcePath);
+    if ((await pathExists(move.targetPath)) && !(await pathExists(move.sourcePath))) await fs.promises.rename(move.targetPath, move.sourcePath);
   }
   for (let index = moves.length - 1; index >= publishedCount; index -= 1) {
     const move = moves[index];
-    if (fs.existsSync(move.temporaryPath) && !fs.existsSync(move.sourcePath)) fs.renameSync(move.temporaryPath, move.sourcePath);
+    if ((await pathExists(move.temporaryPath)) && !(await pathExists(move.sourcePath))) await fs.promises.rename(move.temporaryPath, move.sourcePath);
   }
 };
 
-const applyMoves = (repoPath: string, rawMoves: unknown, createParentFolders: boolean, workingDirectoryPath: WorkingDirectoryPathResolver): void => {
+const applyMoves = async (
+  repoPath: string,
+  rawMoves: unknown,
+  createParentFolders: boolean,
+  workingDirectoryPath: WorkingDirectoryPathResolver,
+  ensureContext: () => void,
+): Promise<void> => {
   if (!Array.isArray(rawMoves) || rawMoves.length === 0) throw new Error('At least one move is required.');
   if (rawMoves.length > 5000) throw new Error('Too many entries were selected.');
-  const moves = rawMoves.map((rawMove, index) => {
+  const moves: ResolvedMove[] = [];
+  for (const [index, rawMove] of rawMoves.entries()) {
     const candidate = rawMove && typeof rawMove === 'object' ? (rawMove as Record<string, unknown>) : {};
-    const sourcePath = workingDirectoryPath(repoPath, candidate.sourcePath, `Source path ${index + 1}`);
-    const targetPath = workingDirectoryPath(repoPath, candidate.targetPath, `Target path ${index + 1}`, true);
-    const sourceStats = fs.lstatSync(sourcePath);
+    const sourcePath = await workingDirectoryPath(repoPath, candidate.sourcePath, `Source path ${index + 1}`);
+    const targetPath = await workingDirectoryPath(repoPath, candidate.targetPath, `Target path ${index + 1}`, true);
+    const sourceStats = await fs.promises.lstat(sourcePath);
     if (sourceStats.isSymbolicLink()) throw new Error('Symbolic links cannot be moved with batch tools.');
-    assertWindowsWorkingDirectoryAccess(sourcePath);
-    return {
+    await assertWindowsWorkingDirectoryAccess(sourcePath);
+    moves.push({
       sourcePath,
       targetPath,
       sourceIsDirectory: sourceStats.isDirectory(),
       temporaryPath: temporarySibling(sourcePath, 'move'),
-    };
-  });
+    });
+  }
 
   const sourceKeys = new Set<string>();
   const targetKeys = new Set<string>();
@@ -82,66 +90,69 @@ const applyMoves = (repoPath: string, rawMoves: unknown, createParentFolders: bo
     targetKeys.add(target);
     if (move.sourceIsDirectory && isSameOrWithin(move.targetPath, move.sourcePath)) throw new Error('A folder cannot be moved inside itself.');
   }
-  for (let left = 0; left < moves.length; left += 1) {
-    for (let right = left + 1; right < moves.length; right += 1) {
-      if (isSameOrWithin(moves[left].sourcePath, moves[right].sourcePath) || isSameOrWithin(moves[right].sourcePath, moves[left].sourcePath)) {
-        throw new Error('Select either a folder or entries inside it, not both.');
-      }
-    }
-  }
+  assertIndependentPaths(moves.map((move) => move.sourcePath));
+  const movedDirectories = new Set(moves.filter((move) => move.sourceIsDirectory).map((move) => pathKey(move.sourcePath)));
   for (const move of moves) {
-    if (fs.existsSync(move.targetPath) && !sourceKeys.has(pathKey(move.targetPath)))
+    if ((await pathExists(move.targetPath)) && !sourceKeys.has(pathKey(move.targetPath)))
       throw new Error(`Target already exists: ${path.basename(move.targetPath)}`);
-    if (moves.some((candidate) => candidate.sourceIsDirectory && isSameOrWithin(path.dirname(move.targetPath), candidate.sourcePath))) {
-      throw new Error('A target folder cannot be moved as part of the same operation.');
+    let parent = path.dirname(move.targetPath);
+    while (true) {
+      if (movedDirectories.has(pathKey(parent))) throw new Error('A target folder cannot be moved as part of the same operation.');
+      const next = path.dirname(parent);
+      if (next === parent) break;
+      parent = next;
     }
   }
 
   const createdFolders: string[] = [];
   try {
     for (const parentFolder of [...new Set(moves.map((move) => path.dirname(move.targetPath)))]) {
-      if (fs.existsSync(parentFolder)) {
-        if (!fs.statSync(parentFolder).isDirectory()) throw new Error('A target parent is not a folder.');
-        assertWindowsWorkingDirectoryAccess(parentFolder);
+      if (await pathExists(parentFolder)) {
+        if (!(await fs.promises.stat(parentFolder)).isDirectory()) throw new Error('A target parent is not a folder.');
+        await assertWindowsWorkingDirectoryAccess(parentFolder);
         continue;
       }
-      if (!createParentFolders || !fs.existsSync(path.dirname(parentFolder))) throw new Error('Target folder does not exist.');
-      createWorkingDirectoryEntrySafely(parentFolder, 'folder');
+      if (!createParentFolders || !(await pathExists(path.dirname(parentFolder)))) throw new Error('Target folder does not exist.');
+      ensureContext();
+      await createWorkingDirectoryEntrySafely(parentFolder, 'folder');
       createdFolders.push(parentFolder);
     }
 
     let stagedCount = 0;
     try {
       for (const move of moves) {
-        fs.renameSync(move.sourcePath, move.temporaryPath);
+        ensureContext();
+        await fs.promises.rename(move.sourcePath, move.temporaryPath);
         stagedCount += 1;
       }
     } catch (error) {
-      rollbackMoves(moves.slice(0, stagedCount), 0);
+      await rollbackMoves(moves.slice(0, stagedCount), 0);
       throw error;
     }
 
     let publishedCount = 0;
     try {
       for (const move of moves) {
-        fs.renameSync(move.temporaryPath, move.targetPath);
+        ensureContext();
+        await fs.promises.rename(move.temporaryPath, move.targetPath);
         publishedCount += 1;
-        assertWindowsWorkingDirectoryAccess(move.targetPath);
+        await assertWindowsWorkingDirectoryAccess(move.targetPath);
       }
     } catch (error) {
-      rollbackMoves(moves, publishedCount);
+      await rollbackMoves(moves, publishedCount);
       throw error;
     }
   } catch (error) {
-    removeCreatedFolders(createdFolders);
+    await removeCreatedFolders(createdFolders);
     throw error;
   }
 };
 
-const scanEmptyFolder = (folderPath: string, relativePath: string, includeSelf: boolean): { empty: boolean; paths: string[] } => {
+const scanEmptyFolder = async (folderPath: string, relativePath: string, includeSelf: boolean): Promise<{ empty: boolean; paths: string[] }> => {
   const nestedPaths: string[] = [];
   let containsContent = false;
-  for (const entry of fs.readdirSync(folderPath, { withFileTypes: true })) {
+  if ((await fs.promises.lstat(folderPath)).isSymbolicLink()) throw new Error('Symbolic links cannot be scanned as folders.');
+  for (const entry of await fs.promises.readdir(folderPath, { withFileTypes: true })) {
     if (entry.name.toLowerCase() === '.git') {
       containsContent = true;
       continue;
@@ -152,7 +163,7 @@ const scanEmptyFolder = (folderPath: string, relativePath: string, includeSelf: 
       continue;
     }
     const childRelativePath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
-    const child = scanEmptyFolder(childPath, childRelativePath, true);
+    const child = await scanEmptyFolder(childPath, childRelativePath, true);
     if (!child.empty) containsContent = true;
     nestedPaths.push(...child.paths);
   }
@@ -160,15 +171,17 @@ const scanEmptyFolder = (folderPath: string, relativePath: string, includeSelf: 
   return { empty: false, paths: nestedPaths };
 };
 
-const deleteEmptyFolderTree = (folderPath: string): void => {
-  for (const entry of fs.readdirSync(folderPath, { withFileTypes: true })) {
+const deleteEmptyFolderTree = async (folderPath: string, ensureContext: () => void): Promise<void> => {
+  if ((await fs.promises.lstat(folderPath)).isSymbolicLink()) throw new Error('Symbolic links cannot be deleted as empty folders.');
+  for (const entry of await fs.promises.readdir(folderPath, { withFileTypes: true })) {
     const childPath = path.join(folderPath, entry.name);
     if (!entry.isDirectory() || entry.isSymbolicLink() || entry.name.toLowerCase() === '.git') {
       throw new Error(`Folder is no longer empty: ${path.basename(folderPath)}`);
     }
-    deleteEmptyFolderTree(childPath);
+    await deleteEmptyFolderTree(childPath, ensureContext);
   }
-  fs.rmdirSync(folderPath);
+  ensureContext();
+  await fs.promises.rmdir(folderPath);
 };
 
 const commonParent = (paths: string[]): string => {
@@ -181,18 +194,20 @@ const commonParent = (paths: string[]): string => {
   return current;
 };
 
-const collectZipEntries = (sourcePath: string, archivePath: string, entries: ZipArchiveEntry[]): void => {
-  const stats = fs.lstatSync(sourcePath);
+const collectZipEntries = async (sourcePath: string, archivePath: string, entries: ZipArchiveEntry[]): Promise<void> => {
+  const stats = await fs.promises.lstat(sourcePath);
   if (stats.isSymbolicLink()) throw new Error('Symbolic links cannot be added to an archive.');
   if (stats.isFile()) {
     entries.push({ sourcePath, archivePath, kind: 'file', modifiedAt: stats.mtime });
+    if (entries.length > 65535) throw new Error('The selection contains too many files for a ZIP archive.');
     return;
   }
   if (!stats.isDirectory()) throw new Error('Only files and folders can be archived.');
   entries.push({ sourcePath: null, archivePath, kind: 'directory', modifiedAt: stats.mtime });
-  for (const item of fs.readdirSync(sourcePath, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
+  if (entries.length > 65535) throw new Error('The selection contains too many files for a ZIP archive.');
+  for (const item of (await fs.promises.readdir(sourcePath, { withFileTypes: true })).sort((left, right) => left.name.localeCompare(right.name))) {
     if (item.name.toLowerCase() === '.git') continue;
-    collectZipEntries(path.join(sourcePath, item.name), `${archivePath}/${item.name}`, entries);
+    await collectZipEntries(path.join(sourcePath, item.name), `${archivePath}/${item.name}`, entries);
   }
 };
 
@@ -208,7 +223,9 @@ export function registerWorkingDirectoryToolsHandlers({
       try {
         const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitApplyWorkingDirectoryMoves);
         ensureWriteAllowed(repoPath);
-        applyMoves(repoPath, params.moves, params.createParentFolders === true, workingDirectoryPath);
+        await withWorkingDirectoryWrite(gitService, repoPath, IpcChannel.GitApplyWorkingDirectoryMoves, ensureWriteAllowed, (ensureContext) =>
+          applyMoves(repoPath, params.moves, params.createParentFolders === true, workingDirectoryPath, ensureContext),
+        );
         return { success: true };
       } catch (error: unknown) {
         return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -220,21 +237,19 @@ export function registerWorkingDirectoryToolsHandlers({
     try {
       const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitListWorkingDirectoryFolders);
       const relativeParentPath = asPath(rawParentPath);
-      const folderPath = relativeParentPath ? workingDirectoryPath(repoPath, relativeParentPath, 'Parent folder') : fs.realpathSync(repoPath);
-      if (!fs.statSync(folderPath).isDirectory()) throw new Error('Parent path is not a folder.');
-      const folders = fs
-        .readdirSync(folderPath, { withFileTypes: true })
-        .filter((entry) => {
-          if (entry.name.toLowerCase() === '.git' || !entry.isDirectory() || entry.isSymbolicLink()) return false;
-          try {
-            assertWindowsWorkingDirectoryAccess(path.join(folderPath, entry.name));
-            return true;
-          } catch {
-            return false;
-          }
-        })
-        .map((entry) => (relativeParentPath ? `${relativeParentPath}/${entry.name}` : entry.name))
-        .sort((left, right) => left.localeCompare(right));
+      const folderPath = relativeParentPath ? await workingDirectoryPath(repoPath, relativeParentPath, 'Parent folder') : await fs.promises.realpath(repoPath);
+      if (!(await fs.promises.stat(folderPath)).isDirectory()) throw new Error('Parent path is not a folder.');
+      const folders: string[] = [];
+      for (const entry of await fs.promises.readdir(folderPath, { withFileTypes: true })) {
+        if (entry.name.toLowerCase() === '.git' || !entry.isDirectory() || entry.isSymbolicLink()) continue;
+        try {
+          await assertWindowsWorkingDirectoryAccess(path.join(folderPath, entry.name));
+          folders.push(relativeParentPath ? `${relativeParentPath}/${entry.name}` : entry.name);
+        } catch {
+          // Inaccessible destinations cannot be offered as move targets.
+        }
+      }
+      folders.sort((left, right) => left.localeCompare(right));
       return { success: true, data: folders };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -246,14 +261,14 @@ export function registerWorkingDirectoryToolsHandlers({
       const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitFindEmptyWorkingDirectoryFolders);
       if (!Array.isArray(rawFolderPaths)) throw new Error('Folder paths must be an array.');
       const folderPaths = rawFolderPaths.map(asPath);
-      const results =
-        folderPaths.length === 0
-          ? scanEmptyFolder(fs.realpathSync(repoPath), '', false).paths
-          : folderPaths.flatMap((relativePath) => {
-              const folderPath = workingDirectoryPath(repoPath, relativePath, 'Folder path');
-              if (!fs.statSync(folderPath).isDirectory()) throw new Error('Only folders can be checked for emptiness.');
-              return scanEmptyFolder(folderPath, relativePath, true).paths;
-            });
+      const results: string[] = [];
+      if (folderPaths.length === 0) results.push(...(await scanEmptyFolder(await fs.promises.realpath(repoPath), '', false)).paths);
+      else
+        for (const relativePath of folderPaths) {
+          const folderPath = await workingDirectoryPath(repoPath, relativePath, 'Folder path');
+          if (!(await fs.promises.stat(folderPath)).isDirectory()) throw new Error('Only folders can be checked for emptiness.');
+          results.push(...(await scanEmptyFolder(folderPath, relativePath, true)).paths);
+        }
       return { success: true, data: [...new Set(results)].filter(Boolean) };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -265,8 +280,11 @@ export function registerWorkingDirectoryToolsHandlers({
       const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitDeleteEmptyWorkingDirectoryFolders);
       ensureWriteAllowed(repoPath);
       if (!Array.isArray(rawFolderPaths) || rawFolderPaths.length === 0) throw new Error('At least one empty folder is required.');
-      const paths = rawFolderPaths.map((relativePath) => workingDirectoryPath(repoPath, relativePath, 'Folder path'));
-      for (const folderPath of paths.sort((left, right) => right.length - left.length)) deleteEmptyFolderTree(folderPath);
+      await withWorkingDirectoryWrite(gitService, repoPath, IpcChannel.GitDeleteEmptyWorkingDirectoryFolders, ensureWriteAllowed, async (ensureContext) => {
+        const paths: string[] = [];
+        for (const relativePath of rawFolderPaths) paths.push(await workingDirectoryPath(repoPath, relativePath, 'Folder path'));
+        for (const folderPath of paths.sort((left, right) => right.length - left.length)) await deleteEmptyFolderTree(folderPath, ensureContext);
+      });
       return { success: true };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -280,43 +298,43 @@ export function registerWorkingDirectoryToolsHandlers({
       try {
         const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitCreateWorkingDirectoryArchive);
         ensureWriteAllowed(repoPath);
-        if (!Array.isArray(params.sourcePaths) || params.sourcePaths.length === 0) throw new Error('At least one archive source is required.');
-        const sourcePaths = params.sourcePaths.map((sourcePath) => workingDirectoryPath(repoPath, sourcePath, 'Archive source'));
-        const targetPath = workingDirectoryPath(repoPath, params.targetPath, 'Archive path', true);
-        if (fs.existsSync(targetPath)) throw new Error('Archive target already exists.');
-        if (!fs.existsSync(path.dirname(targetPath))) throw new Error('Archive target folder does not exist.');
-        if (sourcePaths.some((sourcePath) => path.basename(sourcePath).toLowerCase() === '.git')) throw new Error('Git metadata cannot be archived.');
-        if (sourcePaths.some((sourcePath) => fs.statSync(sourcePath).isDirectory() && isSameOrWithin(targetPath, sourcePath))) {
-          throw new Error('The archive cannot be created inside a selected folder.');
-        }
-        for (let left = 0; left < sourcePaths.length; left += 1) {
-          for (let right = left + 1; right < sourcePaths.length; right += 1) {
-            if (isSameOrWithin(sourcePaths[left], sourcePaths[right]) || isSameOrWithin(sourcePaths[right], sourcePaths[left])) {
-              throw new Error('Select either a folder or entries inside it, not both.');
-            }
+        return await withWorkingDirectoryWrite(gitService, repoPath, IpcChannel.GitCreateWorkingDirectoryArchive, ensureWriteAllowed, async (ensureContext) => {
+          if (!Array.isArray(params.sourcePaths) || params.sourcePaths.length === 0) throw new Error('At least one archive source is required.');
+          const sourcePaths: string[] = [];
+          for (const sourcePath of params.sourcePaths) sourcePaths.push(await workingDirectoryPath(repoPath, sourcePath, 'Archive source'));
+          const targetPath = await workingDirectoryPath(repoPath, params.targetPath, 'Archive path', true);
+          if (await pathExists(targetPath)) throw new Error('Archive target already exists.');
+          if (!(await pathExists(path.dirname(targetPath)))) throw new Error('Archive target folder does not exist.');
+          if (sourcePaths.some((sourcePath) => path.basename(sourcePath).toLowerCase() === '.git')) throw new Error('Git metadata cannot be archived.');
+          for (const sourcePath of sourcePaths) {
+            if ((await fs.promises.stat(sourcePath)).isDirectory() && isSameOrWithin(targetPath, sourcePath))
+              throw new Error('The archive cannot be created inside a selected folder.');
           }
-        }
-        const basePath = commonParent(sourcePaths);
-        const entries: ZipArchiveEntry[] = [];
-        for (const sourcePath of sourcePaths) collectZipEntries(sourcePath, path.relative(basePath, sourcePath).replace(/\\/g, '/'), entries);
-        temporaryPath = temporarySibling(targetPath, 'archive');
-        await createZipArchive(temporaryPath, entries);
-        requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), IpcChannel.GitCreateWorkingDirectoryArchive);
-        ensureWriteAllowed(repoPath);
-        // Publishing must remain exclusive after the asynchronous ZIP work.
-        // rename would replace a file created since the initial existence check.
-        try {
-          fs.linkSync(temporaryPath, targetPath);
-        } catch (publishError: unknown) {
-          if ((publishError as NodeJS.ErrnoException).code === 'EEXIST') throw publishError;
-          // FAT/exFAT and some network filesystems do not support hard links.
-          await fs.promises.copyFile(temporaryPath, targetPath, fs.constants.COPYFILE_EXCL);
-        }
-        fs.unlinkSync(temporaryPath);
-        temporaryPath = null;
-        return { success: true, targetPath: asPath(params.targetPath) };
+          if (new Set(sourcePaths.map(pathKey)).size !== sourcePaths.length) throw new Error('Select each archive source only once.');
+          assertIndependentPaths(sourcePaths);
+          const basePath = commonParent(sourcePaths);
+          const entries: ZipArchiveEntry[] = [];
+          for (const sourcePath of sourcePaths) await collectZipEntries(sourcePath, path.relative(basePath, sourcePath).replace(/\\/g, '/'), entries);
+          ensureContext();
+          temporaryPath = temporarySibling(targetPath, 'archive');
+          await createZipArchive(temporaryPath, entries);
+          await workingDirectoryPath(repoPath, params.targetPath, 'Archive path', true);
+          ensureContext();
+          // Publishing must remain exclusive after the asynchronous ZIP work.
+          // rename would replace a file created since the initial existence check.
+          try {
+            await fs.promises.link(temporaryPath, targetPath);
+          } catch (publishError: unknown) {
+            if ((publishError as NodeJS.ErrnoException).code === 'EEXIST') throw publishError;
+            // FAT/exFAT and some network filesystems do not support hard links.
+            await fs.promises.copyFile(temporaryPath, targetPath, fs.constants.COPYFILE_EXCL);
+          }
+          await fs.promises.unlink(temporaryPath);
+          temporaryPath = null;
+          return { success: true, targetPath: asPath(params.targetPath) };
+        });
       } catch (error: unknown) {
-        if (temporaryPath && fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
+        if (temporaryPath) await fs.promises.rm(temporaryPath, { force: true }).catch(() => undefined);
         return { success: false, error: error instanceof Error ? error.message : String(error) };
       }
     },

@@ -1,10 +1,10 @@
 import * as fs from 'fs';
-import { spawnSync } from 'child_process';
+import { execFile } from 'child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createWorkingDirectoryEntrySafely } from '../workingDirectoryFileCreation';
 
 vi.mock('electron', () => ({ ipcMain: { handle: vi.fn() } }));
-vi.mock('child_process', () => ({ spawnSync: vi.fn(() => ({ status: 0 })) }));
+vi.mock('child_process', () => ({ execFile: vi.fn((_file, _args, _options, callback) => callback(null, '', '')) }));
 vi.mock('fs', async (importOriginal) => ({ ...(await importOriginal<typeof fs>()) }));
 afterEach(() => {
   vi.restoreAllMocks();
@@ -12,17 +12,18 @@ afterEach(() => {
 });
 
 describe('Windows working-directory entry creation', () => {
-  it.runIf(process.platform === 'win32')('launches the system PowerShell even with an untrusted PATH', () => {
+  it.runIf(process.platform === 'win32')('launches the system PowerShell asynchronously even with an untrusted PATH', async () => {
     vi.stubEnv('SystemRoot', 'C:\\Windows');
     vi.stubEnv('PATH', 'C:\\untrusted-repository');
-    vi.spyOn(fs, 'accessSync').mockImplementation(() => {});
+    vi.spyOn(fs.promises, 'access').mockResolvedValue();
 
-    createWorkingDirectoryEntrySafely('C:\\repository\\new.txt', 'file');
+    await createWorkingDirectoryEntrySafely('C:\\repository\\new.txt', 'file');
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(execFile).toHaveBeenCalledWith(
       'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
       ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', expect.any(String)],
-      { encoding: 'utf8', windowsHide: true },
+      { encoding: 'utf8', windowsHide: true, timeout: 30_000 },
+      expect.any(Function),
     );
   });
 });

@@ -222,8 +222,8 @@ export class GitRunner {
         const uninterrupted = new AbortController().signal;
         const git: CommitEditGit = {
           signal: activeSignal,
-          prefix: (cwd, args, maxBytes) =>
-            this.spawnOperations.runBuffer(cwd, args, { maxBytes, tooLargeMessage: 'Git sample is too large.', allowTruncation: true }, activeSignal),
+          prefix: (cwd, args, maxBytes, input) =>
+            this.spawnOperations.runBuffer(cwd, args, { maxBytes, input, tooLargeMessage: 'Git sample is too large.', allowTruncation: true }, activeSignal),
           run: (cwd, args, options = {}) => {
             const commandSignal = options.ignoreAbort ? undefined : (options.signal ?? activeSignal);
             commandSignal?.throwIfAborted();
@@ -259,6 +259,10 @@ export class GitRunner {
 
   detectIsBareRepositorySync(candidatePath: string): boolean {
     return this.repositoryProbe.detectIsBareRepositorySync(candidatePath);
+  }
+
+  detectIsBareRepository(candidatePath: string): Promise<boolean> {
+    return this.repositoryProbe.detectIsBareRepository(candidatePath);
   }
 
   async runBuffer(repoPath: string, args: string[], options: GitBufferRunOptions): Promise<Buffer> {

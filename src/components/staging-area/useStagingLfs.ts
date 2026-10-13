@@ -24,9 +24,11 @@ export function useStagingLfs(repoPath: string | null, status: Status, track: (r
       const states: GitLfsFileState[] = [];
       let available = true;
       let error: string | undefined;
-      for (let offset = 0; offset < unique.length; offset += 256) {
+      // The backend bounds its I/O and batches blob reads. Small IPC batches
+      // otherwise reread the entire index and repository configuration each time.
+      for (let offset = 0; offset < unique.length; offset += 10_000) {
         if (!active) return;
-        const result = await freshRead(() => gitClient.getGitLfsStatus({ repoPath, files: unique.slice(offset, offset + 256) }));
+        const result = await freshRead(() => gitClient.getGitLfsStatus({ repoPath, files: unique.slice(offset, offset + 10_000) }));
         if (!result.success || !result.data) throw new Error(result.error || 'Git LFS inspection failed.');
         states.push(...result.data.files);
         available = result.data.available;

@@ -1,9 +1,12 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
+import { setImmediate } from 'node:timers/promises';
 import { parseGitLfsPointer, type GitLfsFileRequest, type GitLfsFileState } from '../../src/shared/ipc/gitLfs';
 import type { CommitEditGit } from './CommitEditGit';
-import { normalizeRepositoryRelativePath, resolveExistingRepositoryPathWithoutSymlinks, toLiteralPathspec } from './RepositoryPathSafety';
+import { normalizeRepositoryRelativePath, toLiteralPathspec } from './RepositoryPathSafety';
+import { createRepositoryPathResolver } from './RepositoryPathSafetyAsync';
+import { readRepositoryFileBytes } from './RepositoryFileRead';
+import { readStagedLfsSamples } from './GitLfsBlobSamples';
 import { LFS_SAMPLE_BYTES, lfsRecommendation } from './GitLfsRules';
 
 export type LfsReader = Pick<CommitEditGit, 'run' | 'input'> & { prefix: NonNullable<CommitEditGit['prefix']> };
@@ -37,19 +40,12 @@ export async function lfsAttributes(repoPath: string, files: string[], git: LfsR
   return result;
 }
 
-function workingAttributes(repoPath: string, filePath: string): string[] {
+async function workingAttributes(filePath: string, read: (name: string) => Promise<string>): Promise<string[]> {
   const result: string[] = [];
   let parent = path.posix.dirname(filePath);
   while (true) {
     const name = parent === '.' ? '.gitattributes' : `${parent}/.gitattributes`;
-    try {
-      const target = resolveExistingRepositoryPathWithoutSymlinks(repoPath, name);
-      if (fs.statSync(target).size > 2 * 1024 * 1024) throw new Error('Git attributes file is too large.');
-      result.push(lfsDigest(fs.readFileSync(target).toString('base64')));
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-      result.push('missing');
-    }
+    result.push(await read(name));
     if (parent === '.') break;
     parent = path.posix.dirname(parent);
   }
@@ -76,9 +72,43 @@ export async function inspectLfsFiles(repoPath: string, input: GitLfsFileRequest
     records.set(match[5], values);
   }
   const attributesIndex = [...records].filter(([name]) => path.posix.basename(name) === '.gitattributes');
-  const identity = [fs.realpathSync(repoPath), head.trim(), branch.trim(), config, attributesIndex];
+  const resolver = await createRepositoryPathResolver(repoPath);
+  const identity = [resolver.rootPath, head.trim(), branch.trim(), config, lfsDigest(attributesIndex)];
+  const attributes = new Map<string, Promise<string>>();
+  const readAttributes = (name: string) => {
+    let pending = attributes.get(name);
+    if (!pending) {
+      pending = (async () => {
+        try {
+          const target = await resolver.existingWithoutSymlinks(name);
+          return lfsDigest((await readRepositoryFileBytes(target, 2 * 1024 * 1024)).data.toString('base64'));
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+          return 'missing';
+        }
+      })();
+      attributes.set(name, pending);
+    }
+    return pending;
+  };
+  const stagedSamples = await readStagedLfsSamples(
+    repoPath,
+    files
+      .filter((file) => file.source === 'staged')
+      .flatMap(
+        (file) =>
+          records
+            .get(file.path)
+            ?.filter((entry) => entry.stage === '0' && /^100(?:644|755)$/.test(entry.mode))
+            .map((entry) => entry.oid) ?? [],
+      ),
+    git,
+  );
   const result: LfsInspection[] = [];
-  for (const file of files) {
+  for (const [index, file] of files.entries()) {
+    // Cached attribute reads resolve as microtasks. Yield during staged-only
+    // batches too, so they cannot monopolize the event loop with hashing.
+    if (index > 0 && index % 64 === 0) await setImmediate();
     const values = records.get(file.path) ?? [];
     const entry = values.find((value) => value.stage === '0');
     let mode = entry?.mode ?? '100644';
@@ -94,22 +124,16 @@ export async function inspectLfsFiles(repoPath: string, input: GitLfsFileRequest
       if (entry && !['100644', '100755'].includes(entry.mode)) throw new Error('Symlinks and submodules cannot be converted to Git LFS.');
       if (file.source === 'staged') {
         if (!entry) throw new Error('The selected staged file no longer exists.');
-        bytes = Number((await git.run(repoPath, ['cat-file', '-s', entry.oid])).trim());
-        if (bytes <= 1024 || bytes >= 10 * 1024 * 1024) sample = await git.prefix(repoPath, ['cat-file', 'blob', entry.oid], LFS_SAMPLE_BYTES);
+        const blob = stagedSamples.get(entry.oid);
+        if (!blob) throw new Error('The selected staged blob cannot be read.');
+        ({ bytes, sample } = blob);
       } else {
-        diskPath = resolveExistingRepositoryPathWithoutSymlinks(repoPath, file.path);
-        const stat = fs.statSync(diskPath);
-        if (!stat.isFile()) throw new Error('Only regular files can be stored in Git LFS.');
+        diskPath = await resolver.existingWithoutSymlinks(file.path);
+        const { data, stat } = await readRepositoryFileBytes(diskPath, LFS_SAMPLE_BYTES, true);
         bytes = stat.size;
         mode = workingFileMode(mode, stat.mode, config);
         diskVersion = [stat.size, stat.mode, stat.mtimeMs, stat.ctimeMs, stat.ino];
-        const descriptor = fs.openSync(diskPath, 'r');
-        try {
-          sample = Buffer.alloc(Math.min(bytes, LFS_SAMPLE_BYTES));
-          sample = sample.subarray(0, fs.readSync(descriptor, sample, 0, sample.length, 0));
-        } finally {
-          fs.closeSync(descriptor);
-        }
+        sample = data;
       }
       if (!Number.isSafeInteger(bytes) || bytes < 0) throw new Error('Invalid file size.');
     } catch (error) {
@@ -118,7 +142,7 @@ export async function inspectLfsFiles(repoPath: string, input: GitLfsFileRequest
     const pointer = bytes <= 1024 ? parseGitLfsPointer(sample.toString()) : null;
     const configured = working.get(file.path) === 'lfs' || cached.get(file.path) === 'lfs';
     const contentVersion = lfsDigest([identity.slice(0, 3), file, entry, diskVersion, sample.toString('base64')]);
-    const version = lfsDigest([...identity, contentVersion, working.get(file.path), cached.get(file.path), workingAttributes(repoPath, file.path)]);
+    const version = lfsDigest([...identity, contentVersion, working.get(file.path), cached.get(file.path), await workingAttributes(file.path, readAttributes)]);
     result.push({
       contentVersion,
       oid: entry?.oid,

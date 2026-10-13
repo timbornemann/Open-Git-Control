@@ -149,6 +149,24 @@ describe('working-directory tool handlers', () => {
     expect(fs.existsSync(path.join(repoPath, 'target.txt'))).toBe(false);
   });
 
+  it('rejects a destination within a folder that is moved in the same batch', async () => {
+    fs.mkdirSync(path.join(repoPath, 'source', 'nested'), { recursive: true });
+    fs.writeFileSync(path.join(repoPath, 'file.txt'), 'preserved');
+    const result = await handlers.get(IpcChannel.GitApplyWorkingDirectoryMoves)?.(
+      {},
+      {
+        moves: [
+          { sourcePath: 'source', targetPath: 'renamed' },
+          { sourcePath: 'file.txt', targetPath: 'source/nested/file.txt' },
+        ],
+      },
+      repoPath,
+    );
+    expect(result).toEqual({ success: false, error: 'A target folder cannot be moved as part of the same operation.' });
+    expect(fs.readFileSync(path.join(repoPath, 'file.txt'), 'utf8')).toBe('preserved');
+    expect(fs.existsSync(path.join(repoPath, 'renamed'))).toBe(false);
+  });
+
   it('rolls back a move if the published target loses usable access', async () => {
     fs.writeFileSync(path.join(repoPath, 'source.txt'), 'source');
     assertEntryAccessMock.mockImplementation((targetPath: string) => {
@@ -246,5 +264,21 @@ describe('working-directory tool handlers', () => {
     expect(result).toMatchObject({ success: false });
     expect(fs.readFileSync(path.join(repoPath, 'bundle.zip'), 'utf8')).toBe('new file from another operation');
     expect(fs.readdirSync(repoPath).sort()).toEqual(['bundle.zip', 'source.txt']);
+  });
+
+  it('continues handling event-loop work during a recursive empty-folder scan', async () => {
+    for (let index = 0; index < 128; index++) fs.mkdirSync(path.join(repoPath, `folder-${index}`, 'nested'), { recursive: true });
+    let ticked = false;
+    const timer = setTimeout(() => {
+      ticked = true;
+    }, 0);
+    try {
+      const result = await handlers.get(IpcChannel.GitFindEmptyWorkingDirectoryFolders)?.({}, [], repoPath);
+      expect(result.success).toBe(true);
+      expect(result.data).toHaveLength(128);
+      expect(ticked).toBe(true);
+    } finally {
+      clearTimeout(timer);
+    }
   });
 });
