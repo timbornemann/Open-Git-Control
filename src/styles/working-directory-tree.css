@@ -1,10 +1,17 @@
 .working-directory-tree {
   height: 100%;
   min-height: 0;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: transparent;
   border-top: 1px solid var(--border-color);
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
+}
+
+.working-tree-list {
+  flex: 1;
+  min-height: 0;
 }
 
 .working-tree-root {

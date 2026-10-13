@@ -11,8 +11,16 @@ export const basename = (value: string) => value.split('/').pop() || value;
 export const parentPath = (value: string) => (value.includes('/') ? value.slice(0, value.lastIndexOf('/')) : '');
 export const isSameOrDescendantPath = (candidatePath: string, parent: string) => candidatePath === parent || candidatePath.startsWith(`${parent}/`);
 export const isEntryName = (value: string) => value.length > 0 && value !== '.' && value !== '..' && !/[\\/]/.test(value);
-export const getTopLevelEntries = (entries: WorkingDirectoryEntryDto[]) =>
-  entries.filter((entry) => !entries.some((candidate) => candidate.path !== entry.path && isSameOrDescendantPath(entry.path, candidate.path)));
+export const getTopLevelEntries = (entries: WorkingDirectoryEntryDto[]) => {
+  const selected = new Set(entries.map((entry) => entry.path));
+  return entries.filter((entry) => {
+    for (let slash = entry.path.lastIndexOf('/'); slash >= 0; slash = entry.path.lastIndexOf('/', slash - 1)) {
+      if (selected.has(entry.path.slice(0, slash))) return false;
+      if (slash === 0) break;
+    }
+    return true;
+  });
+};
 export const hasNestedSelection = (entries: WorkingDirectoryEntryDto[]) => getTopLevelEntries(entries).length !== entries.length;
 
 const joinPath = (parent: string, name: string) => (parent ? `${parent}/${name}` : name);

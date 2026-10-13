@@ -9,6 +9,7 @@ type VirtualListProps<T> = {
   renderItem: (item: T, index: number) => React.ReactNode;
   className?: string;
   fillAvailableHeight?: boolean;
+  focusRequest?: { index: number; id: number };
 };
 
 export const calculateVirtualRange = (itemCount: number, scrollTop: number, viewportHeight: number, rowHeight: number, overscan: number) => {
@@ -29,10 +30,13 @@ export function VirtualList<T>({
   renderItem,
   className,
   fillAvailableHeight = false,
+  focusRequest,
 }: VirtualListProps<T>) {
   const [scrollTop, setScrollTop] = useState(0);
   const [availableHeight, setAvailableHeight] = useState(rowHeight);
   const listRef = useRef<HTMLDivElement>(null);
+  const acceptedFocus = useRef<number | null>(null);
+  const pendingFocus = useRef<number | null>(null);
   const viewportHeight = fillAvailableHeight ? Math.max(1, availableHeight) : Math.min(maxHeight, Math.max(rowHeight, items.length * rowHeight));
 
   useEffect(() => {
@@ -70,6 +74,34 @@ export function VirtualList<T>({
   const { startIndex, endIndex } = calculateVirtualRange(items.length, scrollTop, viewportHeight, rowHeight, overscan);
   const visibleItems = useMemo(() => items.slice(startIndex, endIndex), [endIndex, items, startIndex]);
 
+  useEffect(() => {
+    if (!focusRequest) {
+      pendingFocus.current = null;
+      return;
+    }
+    if (acceptedFocus.current === focusRequest.id || !listRef.current) return;
+    acceptedFocus.current = focusRequest.id;
+    if (focusRequest.index < 0 || focusRequest.index >= items.length) {
+      pendingFocus.current = null;
+      return;
+    }
+    pendingFocus.current = focusRequest.index;
+    const rowTop = focusRequest.index * rowHeight;
+    const nextTop = rowTop < scrollTop ? rowTop : rowTop + rowHeight > scrollTop + viewportHeight ? rowTop + rowHeight - viewportHeight : scrollTop;
+    listRef.current.scrollTop = nextTop;
+    setScrollTop(nextTop);
+  }, [focusRequest, items.length, rowHeight, scrollTop, viewportHeight]);
+
+  useEffect(() => {
+    const index = pendingFocus.current;
+    if (index === null) return;
+    const target = listRef.current?.querySelector<HTMLElement>(`[data-virtual-row="${index}"] button, [data-virtual-row="${index}"] [tabindex]`);
+    if (target) {
+      pendingFocus.current = null;
+      target.focus({ preventScroll: true });
+    }
+  }, [startIndex, endIndex, focusRequest, items]);
+
   return (
     <div
       ref={listRef}
@@ -83,6 +115,7 @@ export function VirtualList<T>({
           return (
             <div
               key={getKey(item, index)}
+              data-virtual-row={index}
               style={{
                 position: 'absolute',
                 left: 0,

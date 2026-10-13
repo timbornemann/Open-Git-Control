@@ -1,7 +1,7 @@
 import { usePreloadIntent } from '@/data/usePreloadIntent';
 import { peekResource } from '@/data/clientCache';
 import type { IpcResult } from '@/types/ipc';
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ClipboardPaste, Copy, ExternalLink, File, FilePlus, Folder, FolderOpen, FolderPlus, Info, Pencil, Scissors, Search, Trash2, X } from 'lucide-react';
 import { useUIContext } from '@/contexts/AppStateContext';
 import { useAppToastSetter } from '@/hooks/useAppToast';
@@ -13,6 +13,8 @@ import { WorkingDirectorySearchPanel } from './WorkingDirectorySearchPanel';
 import { createWorkingDirectoryToolActions } from './workingDirectoryToolActions';
 import { basename, getTopLevelEntries, isEntryName, isSameOrDescendantPath } from './workingDirectoryToolTransforms';
 import { WorkingDirectoryToolsMenu } from './WorkingDirectoryToolsMenu';
+import { VirtualList } from '@/components/VirtualList';
+import { workingDirectoryRows, type WorkingDirectoryRow } from './workingDirectoryRows';
 import '@/styles/working-directory-tree.css';
 
 type ClipboardEntry = { path: string; kind: WorkingDirectoryEntryDto['kind']; cut: boolean } | null;
@@ -64,17 +66,6 @@ const WorkingDirectoryTreeContent: React.FC<{
   }
   return <>{renderTree()}</>;
 };
-
-const sortEntries = (entries: WorkingDirectoryEntryDto[]) =>
-  entries.slice().sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'directory' ? -1 : 1));
-const getVisibleEntries = (
-  entriesByParent: Record<string, WorkingDirectoryEntryDto[]>,
-  expandedPaths: Set<string>,
-  parentPath = '',
-): WorkingDirectoryEntryDto[] =>
-  sortEntries(entriesByParent[parentPath] || []).flatMap((entry) =>
-    entry.kind === 'directory' && expandedPaths.has(entry.path) ? [entry, ...getVisibleEntries(entriesByParent, expandedPaths, entry.path)] : [entry],
-  );
 
 export const WorkingDirectoryTree: React.FC<Props> = ({
   repoPath,
@@ -185,6 +176,7 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
       setFileInfoPath(null);
       setSearchOpen(false);
       setSelectedPaths(new Set());
+      setFocusRequest(undefined);
       selectionAnchorPathRef.current = null;
       if (repoPath) {
         void loadDirectory('');
@@ -350,7 +342,9 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
     runMutation,
     loadDirectory,
   });
-  const visibleEntries = getVisibleEntries(entriesByParent, expandedPaths);
+  const rows = useMemo(() => workingDirectoryRows(entriesByParent, expandedPaths), [entriesByParent, expandedPaths]);
+  const visibleEntries = useMemo(() => rows.map((row) => row.entry), [rows]);
+  const [focusRequest, setFocusRequest] = useState<{ index: number; id: number }>();
   const selectEntry = (entry: WorkingDirectoryEntryDto, event: React.MouseEvent<HTMLButtonElement>) => {
     const additive = event.ctrlKey || event.metaKey;
     const anchorPath = selectionAnchorPathRef.current;
@@ -417,73 +411,71 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
         );
       },
     });
-  const render = (parent: string, ancestorIsLast: boolean[] = []): React.ReactNode =>
-    sortEntries(entriesByParent[parent] || []).map((entry, index, siblings) => {
-      const open = expandedPaths.has(entry.path);
-      const isLast = index === siblings.length - 1;
-      const loading = loadingDirectories.has(entry.path);
-      return (
-        <React.Fragment key={entry.path}>
-          <button
-            type="button"
-            onMouseEnter={() =>
-              intent.hover(() =>
-                entry.kind === 'directory'
-                  ? gitClient.listWorkingDirectory(repoPath!, entry.path)
-                  : gitClient.getWorkingDirectoryPreview(entry.path, repoPath!),
-              )
-            }
-            onMouseLeave={intent.cancel}
-            onFocus={() =>
-              intent.focus(() =>
-                entry.kind === 'directory'
-                  ? gitClient.listWorkingDirectory(repoPath!, entry.path)
-                  : gitClient.getWorkingDirectoryPreview(entry.path, repoPath!),
-              )
-            }
-            className={`working-tree-row${selectedPaths.has(entry.path) ? ' working-tree-row--selected' : ''}${activeFilePath === entry.path ? ' working-tree-row--active' : ''}${context?.entry.path === entry.path ? ' working-tree-row--context' : ''}`}
-            onClick={(event) => {
-              if (event.ctrlKey || event.metaKey || event.shiftKey) {
-                selectEntry(entry, event);
-                return;
-              }
-              setSelectedPaths(new Set([entry.path]));
-              selectionAnchorPathRef.current = entry.path;
-              if (entry.kind !== 'directory') {
-                onOpenFile(entry.path);
-                return;
-              }
-              if (!open && !loadedDirectoryPathsRef.current.has(entry.path)) void loadDirectory(entry.path);
-              onExpandedPathsChange((current) => {
-                const next = new Set(current);
-                open ? next.delete(entry.path) : next.add(entry.path);
-                return next;
-              });
-            }}
-            onContextMenu={(event) => openContextMenu(entry, event)}
-          >
-            <span className="working-tree-row__guide" aria-hidden>
-              {ancestorIsLast.map((ancestorLast, ancestorIndex) => (
-                <span key={ancestorIndex}>{ancestorLast ? '    ' : '│   '}</span>
-              ))}
-              {isLast ? '└──' : '├──'}
-            </span>
-            {entry.kind === 'directory' ? (
-              open ? (
-                <FolderOpen className="working-tree-row__icon working-tree-row__icon--directory" size={15} strokeWidth={1.8} />
-              ) : (
-                <Folder className="working-tree-row__icon working-tree-row__icon--directory" size={15} strokeWidth={1.8} />
-              )
-            ) : (
-              <File className="working-tree-row__icon working-tree-row__icon--file" size={15} strokeWidth={1.8} />
-            )}
-            <span className="working-tree-row__label">{entry.name}</span>
-            {loading && <span className="working-tree-row__loading">…</span>}
-          </button>
-          {entry.kind === 'directory' && open && render(entry.path, [...ancestorIsLast, isLast])}
-        </React.Fragment>
-      );
-    });
+  const renderRow = ({ entry, isLast, ancestorIsLast }: WorkingDirectoryRow, index: number): React.ReactNode => {
+    const open = expandedPaths.has(entry.path);
+    const loading = loadingDirectories.has(entry.path);
+    return (
+      <button
+        type="button"
+        onKeyDown={(event) => {
+          if (event.key !== 'Tab' || event.ctrlKey || event.altKey || event.metaKey) return;
+          const nextIndex = index + (event.shiftKey ? -1 : 1);
+          if (nextIndex < 0 || nextIndex >= rows.length) return;
+          event.preventDefault();
+          setFocusRequest((previous) => ({ index: nextIndex, id: (previous?.id ?? 0) + 1 }));
+        }}
+        onMouseEnter={() =>
+          intent.hover(() =>
+            entry.kind === 'directory' ? gitClient.listWorkingDirectory(repoPath!, entry.path) : gitClient.getWorkingDirectoryPreview(entry.path, repoPath!),
+          )
+        }
+        onMouseLeave={intent.cancel}
+        onFocus={() =>
+          intent.focus(() =>
+            entry.kind === 'directory' ? gitClient.listWorkingDirectory(repoPath!, entry.path) : gitClient.getWorkingDirectoryPreview(entry.path, repoPath!),
+          )
+        }
+        className={`working-tree-row${selectedPaths.has(entry.path) ? ' working-tree-row--selected' : ''}${activeFilePath === entry.path ? ' working-tree-row--active' : ''}${context?.entry.path === entry.path ? ' working-tree-row--context' : ''}`}
+        onClick={(event) => {
+          if (event.ctrlKey || event.metaKey || event.shiftKey) {
+            selectEntry(entry, event);
+            return;
+          }
+          setSelectedPaths(new Set([entry.path]));
+          selectionAnchorPathRef.current = entry.path;
+          if (entry.kind !== 'directory') {
+            onOpenFile(entry.path);
+            return;
+          }
+          if (!open && !loadedDirectoryPathsRef.current.has(entry.path)) void loadDirectory(entry.path);
+          onExpandedPathsChange((current) => {
+            const next = new Set(current);
+            open ? next.delete(entry.path) : next.add(entry.path);
+            return next;
+          });
+        }}
+        onContextMenu={(event) => openContextMenu(entry, event)}
+      >
+        <span className="working-tree-row__guide" aria-hidden>
+          {ancestorIsLast.map((ancestorLast, ancestorIndex) => (
+            <span key={ancestorIndex}>{ancestorLast ? '    ' : '│   '}</span>
+          ))}
+          {isLast ? '└──' : '├──'}
+        </span>
+        {entry.kind === 'directory' ? (
+          open ? (
+            <FolderOpen className="working-tree-row__icon working-tree-row__icon--directory" size={15} strokeWidth={1.8} />
+          ) : (
+            <Folder className="working-tree-row__icon working-tree-row__icon--directory" size={15} strokeWidth={1.8} />
+          )
+        ) : (
+          <File className="working-tree-row__icon working-tree-row__icon--file" size={15} strokeWidth={1.8} />
+        )}
+        <span className="working-tree-row__label">{entry.name}</span>
+        {loading && <span className="working-tree-row__loading">…</span>}
+      </button>
+    );
+  };
   const targetFolder =
     context?.entry.kind === 'directory'
       ? context.entry.path
@@ -522,7 +514,17 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
       <WorkingDirectoryTreeContent
         searchOpen={searchOpen}
         repoPath={repoPath}
-        renderTree={() => render('')}
+        renderTree={() => (
+          <VirtualList
+            className="working-tree-list"
+            items={rows}
+            rowHeight={25}
+            fillAvailableHeight
+            getKey={(row) => row.entry.path}
+            renderItem={renderRow}
+            focusRequest={focusRequest}
+          />
+        )}
         onOpenFile={onOpenFile}
         onFilesChanged={handleSearchFilesChanged}
         activeFilePath={activeFilePath}
