@@ -78,4 +78,11 @@ describe('CsvTableEditor', () => {
     expect(document.body.textContent).toContain('CSV could not be read as a table.');
     expect(document.body.textContent).toContain('unterminated quoted field');
   });
+
+  it('keeps rendering bounded for a CSV with more rows than the JavaScript argument limit', () => {
+    renderEditor('x\n'.repeat(200_000), vi.fn());
+    expect(document.querySelector('table')).not.toBeNull();
+    expect(document.querySelectorAll('tbody tr')).toHaveLength(500);
+    expect(document.body.textContent).toContain('Remaining data is preserved');
+  }, 30_000);
 });

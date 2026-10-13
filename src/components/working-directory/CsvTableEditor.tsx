@@ -48,7 +48,7 @@ export const CsvTableEditor: React.FC<Props> = ({ value, onChange, readOnly = fa
   }
 
   const document = parsed.document;
-  const columnCount = Math.max(1, ...document.rows.map((row) => row.length));
+  const columnCount = document.rows.reduce((maximum, row) => Math.max(maximum, row.length), 1);
   const visibleColumnCount = Math.min(columnCount, MAX_VISIBLE_COLUMNS);
   const cellLimitedRows = Math.max(1, Math.floor(MAX_VISIBLE_CELLS / visibleColumnCount));
   const visibleRowCount = Math.min(document.rows.length, MAX_VISIBLE_ROWS, cellLimitedRows);
