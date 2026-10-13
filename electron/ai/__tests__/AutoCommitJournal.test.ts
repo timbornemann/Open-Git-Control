@@ -21,7 +21,7 @@ describe('AI commit crash recovery', { timeout: 15000 }, () => {
     const tree = await isolated(['write-tree']);
     fs.copyFileSync(privateIndex, `${index}.lock`);
     const journal = new AutoCommitJournal(index);
-    journal.prepare({ head, ref, tree, action: 'open-git-control-ai-test-journal' });
+    await journal.prepare({ head, ref, tree, action: 'open-git-control-ai-test-journal' });
     return { ...repo, index, head, isolated, journal, tree };
   }
 
@@ -57,5 +57,14 @@ describe('AI commit crash recovery', { timeout: 15000 }, () => {
     await expect(repo.journal.recover(repo.run)).rejects.toThrow('needs inspection');
     expect(fs.readFileSync(`${repo.index}.lock`, 'utf8')).toBe('unrelated lock');
     expect(await repo.run(['rev-parse', 'HEAD'])).toBe(repo.head);
+  });
+
+  it('bounds recovery reads and preserves an oversized journal for inspection', async () => {
+    const repo = await repository();
+    const journalPath = path.join(repo.repoPath, '.git', 'ogc-ai-autocommit.json');
+    fs.writeFileSync(journalPath, ' '.repeat(128 * 1024));
+    const journal = new AutoCommitJournal(path.join(repo.repoPath, '.git', 'index'));
+    await expect(journal.recover(repo.run)).rejects.toThrow('needs inspection');
+    expect(fs.statSync(journalPath).size).toBe(128 * 1024);
   });
 });

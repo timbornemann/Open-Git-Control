@@ -14,9 +14,9 @@ export async function fingerprintIndex(run: IndexRun, index: string): Promise<st
   return createHash('sha256').update(entries).update('\0').update(flags).digest('hex');
 }
 
-export function acquireRealIndexLock(indexLockPath: string): void {
+export async function acquireRealIndexLock(indexLockPath: string): Promise<void> {
   try {
-    acquireIndexLock(indexLockPath);
+    await acquireIndexLock(indexLockPath);
   } catch (error) {
     throw new Error(`Git index is busy. AI Auto-Commit did not modify it: ${error instanceof Error ? error.message : String(error)}`);
   }

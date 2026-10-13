@@ -3,7 +3,14 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { createPrivateTempDir, cleanupPrivateTempDir, inspectPrivateTempFiles, cleanPrivateTempFiles, writePrivateTempFile } from '../PrivateTempFiles';
+import {
+  createPrivateTempDir,
+  cleanupPrivateTempDir,
+  cleanupPrivateTempDirAsync,
+  inspectPrivateTempFiles,
+  cleanPrivateTempFiles,
+  writePrivateTempFile,
+} from '../PrivateTempFiles';
 
 describe('owned temporary workspaces', () => {
   let root: string;
@@ -49,6 +56,23 @@ describe('owned temporary workspaces', () => {
     expect(fs.existsSync(young)).toBe(true);
     expect(fs.existsSync(alive)).toBe(true);
     expect(cleanPrivateTempFiles(now, root).files).toBe(0);
+  });
+  it('cleans completed work asynchronously while preserving redirected descendants', async () => {
+    const directory = createPrivateTempDir('test-', root);
+    const outside = path.join(root, 'outside');
+    fs.mkdirSync(outside);
+    fs.writeFileSync(path.join(outside, 'sentinel'), 'preserved');
+    const link = path.join(directory, 'linked');
+    fs.symlinkSync(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
+    await cleanupPrivateTempDirAsync(directory, root);
+    expect(fs.existsSync(directory)).toBe(true);
+    expect(fs.readFileSync(path.join(outside, 'sentinel'), 'utf8')).toBe('preserved');
+    fs.unlinkSync(link);
+    fs.mkdirSync(path.join(directory, 'nested'));
+    fs.writeFileSync(path.join(directory, 'nested', 'index'), 'private');
+    await cleanupPrivateTempDirAsync(directory, root);
+    expect(fs.existsSync(directory)).toBe(false);
+    expect(fs.existsSync(outside)).toBe(true);
   });
   it('preserves unknown provenance, invalid PIDs and redirected descendants', () => {
     const unknown = leftover('unknown', 200, { version: 99 }),

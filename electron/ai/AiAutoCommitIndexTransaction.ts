@@ -1,7 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { GitService } from '../GitService';
-import { cleanupPrivateTempDir, createPrivateTempDir, writePrivateTempFile } from '../git/PrivateTempFiles';
+import { cleanupPrivateTempDirAsync, createPrivateTempDir, writePrivateTempFile } from '../git/PrivateTempFiles';
+import { copyIndexIfPresent } from '../git/IndexFileIO';
 import { toLiteralPathspec } from '../git/RepositoryPathSafety';
 import type { CommitMessage, SnapshotFile } from './aiServiceTypes';
 import type { StatusEntry } from './gitStatusSnapshot';
@@ -192,7 +193,7 @@ export class AiAutoCommitIndexTransaction {
     }
 
     const indexLockPath = `${this.realIndexPath!}.lock`;
-    acquireRealIndexLock(indexLockPath);
+    await acquireRealIndexLock(indexLockPath);
     const targetRef = this.expectedHeadRef || 'HEAD';
     const reflogAction = `open-git-control-ai-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     let commitAttempted = false;
@@ -232,7 +233,8 @@ export class AiAutoCommitIndexTransaction {
       // entire commit chain from an unrelated ref update. Enabling reflogs for
       // this command also covers repositories that disabled them globally.
       this.options.ensureActive?.();
-      this.journal!.prepare({ head: this.expectedHead, ref: this.expectedHeadRef, tree: expectedCommitTree, action: reflogAction });
+      await this.journal!.prepare({ head: this.expectedHead, ref: this.expectedHeadRef, tree: expectedCommitTree, action: reflogAction });
+      this.options.ensureActive?.();
       commitAttempted = true;
       const args = ['-c', 'core.logAllRefUpdates=true', 'commit', '--cleanup=verbatim', ...(this.options.signoff ? ['--signoff'] : []), '-F', messageFile];
       await this.exclusiveGit!.run(this.repoPath, args, {
@@ -266,7 +268,7 @@ export class AiAutoCommitIndexTransaction {
       }
 
       try {
-        fs.renameSync(indexLockPath, this.realIndexPath!);
+        await fs.promises.rename(indexLockPath, this.realIndexPath!);
       } catch (error) {
         throw new Error(`AI commit index could not be finalized: ${error instanceof Error ? error.message : String(error)}`);
       }
@@ -295,7 +297,7 @@ export class AiAutoCommitIndexTransaction {
       // exact original index again. After promotion this path no longer exists.
       if (!preserveRecovery) {
         try {
-          this.journal?.clear();
+          await this.journal?.clear();
         } catch {
           // The durable commit must still be reported. A leftover journal is
           // recognized on recovery; it prevents any following commit here.
@@ -308,8 +310,8 @@ export class AiAutoCommitIndexTransaction {
     }
   }
 
-  dispose(): void {
-    cleanupPrivateTempDir(this.tempDir);
+  async dispose(): Promise<void> {
+    await cleanupPrivateTempDirAsync(this.tempDir);
   }
 
   private collectStatusPaths(entries: StatusEntry[]): string[] {
@@ -376,15 +378,10 @@ export class AiAutoCommitIndexTransaction {
 
   private async seedLockedIndex(indexLockPath: string): Promise<boolean> {
     if (!this.realIndexPath) throw new Error('Git index path is unavailable.');
-    if (fs.existsSync(this.realIndexPath)) {
-      fs.copyFileSync(this.realIndexPath, indexLockPath);
-      return true;
-    }
+    if (await copyIndexIfPresent(this.realIndexPath, indexLockPath)) return true;
     const emptyIndex = path.join(this.tempDir, 'empty.index');
-    if (!fs.existsSync(emptyIndex)) {
-      await this.initializePrivateIndex(emptyIndex, null);
-    }
-    fs.copyFileSync(emptyIndex, indexLockPath);
+    await this.initializePrivateIndex(emptyIndex, null);
+    await fs.promises.copyFile(emptyIndex, indexLockPath);
     return false;
   }
 
@@ -396,9 +393,8 @@ export class AiAutoCommitIndexTransaction {
   }
 
   private async readRealIndexState(): Promise<{ tree: string; fingerprint: string | null }> {
-    if (this.realIndexPath && fs.existsSync(this.realIndexPath)) {
-      const baselineIndex = path.join(this.tempDir, 'baseline.index');
-      fs.copyFileSync(this.realIndexPath, baselineIndex);
+    const baselineIndex = path.join(this.tempDir, 'baseline.index');
+    if (this.realIndexPath && (await copyIndexIfPresent(this.realIndexPath, baselineIndex))) {
       return {
         tree: (await this.runWithIndex(baselineIndex, ['write-tree'])).trim(),
         fingerprint: await this.fingerprintIndex(baselineIndex),

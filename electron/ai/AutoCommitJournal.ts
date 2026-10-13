@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createHash } from 'node:crypto';
+import { indexFileHash, syncIndexFile } from '../git/IndexFileIO';
+import { readRepositoryFileBytes } from '../git/RepositoryFileRead';
 import type { AutoCommitGitRead } from './AutoCommitSnapshot';
 import type { GitService } from '../GitService';
 
@@ -13,7 +14,6 @@ type Journal = {
   originalIndexHash: string | null;
   preparedIndexHash: string;
 };
-const fileHash = (file: string): string | null => (fs.existsSync(file) ? createHash('sha256').update(fs.readFileSync(file)).digest('hex') : null);
 
 /** Stored beside the worktree's index; no renderer-supplied paths are trusted. */
 export class AutoCommitJournal {
@@ -21,33 +21,31 @@ export class AutoCommitJournal {
   constructor(private readonly indexPath: string) {
     this.journalPath = path.join(path.dirname(indexPath), 'ogc-ai-autocommit.json');
   }
-  prepare(value: Pick<Journal, 'head' | 'ref' | 'tree' | 'action'>): void {
-    const indexFd = fs.openSync(`${this.indexPath}.lock`, 'r+');
+  async prepare(value: Pick<Journal, 'head' | 'ref' | 'tree' | 'action'>): Promise<void> {
+    await syncIndexFile(`${this.indexPath}.lock`);
+    const originalIndexHash = await indexFileHash(this.indexPath);
+    const preparedIndexHash = await indexFileHash(`${this.indexPath}.lock`);
+    if (!preparedIndexHash) throw new Error('The prepared Git index is missing.');
+    const record: Journal = { ...value, version: 1, originalIndexHash, preparedIndexHash };
+    const handle = await fs.promises.open(this.journalPath, 'wx', 0o600);
     try {
-      fs.fsyncSync(indexFd);
+      await handle.writeFile(JSON.stringify(record));
+      await handle.sync();
     } finally {
-      fs.closeSync(indexFd);
-    }
-    const record: Journal = { ...value, version: 1, originalIndexHash: fileHash(this.indexPath), preparedIndexHash: fileHash(`${this.indexPath}.lock`)! };
-    const fd = fs.openSync(this.journalPath, 'wx', 0o600);
-    try {
-      fs.writeFileSync(fd, JSON.stringify(record));
-      fs.fsyncSync(fd);
-    } finally {
-      fs.closeSync(fd);
+      await handle.close();
     }
   }
-  clear(): void {
-    fs.rmSync(this.journalPath, { force: true });
+  async clear(): Promise<void> {
+    await fs.promises.rm(this.journalPath, { force: true });
   }
 
   async recover(run: AutoCommitGitRead): Promise<boolean> {
-    if (!fs.existsSync(this.journalPath)) return false;
     const blocked = () => new Error(`An interrupted AI commit needs inspection. HEAD/index differ from ${this.journalPath}; no files or refs were changed.`);
     let record: Journal;
     try {
-      record = JSON.parse(fs.readFileSync(this.journalPath, 'utf8'));
-    } catch {
+      record = JSON.parse((await readRepositoryFileBytes(this.journalPath, 64 * 1024)).data.toString('utf8'));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
       throw blocked();
     }
     if (
@@ -69,11 +67,12 @@ export class AutoCommitJournal {
     const ref = await read(['symbolic-ref', '-q', 'HEAD']);
     if (ref !== record.ref) throw blocked();
     const lock = `${this.indexPath}.lock`;
-    const ownsLock = fileHash(lock) === record.preparedIndexHash;
+    const lockHash = await indexFileHash(lock);
+    const ownsLock = lockHash === record.preparedIndexHash;
     if (head === record.head) {
-      if (fileHash(this.indexPath) !== record.originalIndexHash || (fs.existsSync(lock) && !ownsLock)) throw blocked();
-      if (ownsLock) fs.rmSync(lock);
-      this.clear();
+      if ((await indexFileHash(this.indexPath)) !== record.originalIndexHash || (lockHash !== null && !ownsLock)) throw blocked();
+      if (ownsLock) await fs.promises.rm(lock);
+      await this.clear();
       return true;
     }
     if (!head) throw blocked();
@@ -87,9 +86,9 @@ export class AutoCommitJournal {
       !(action === record.action || action?.startsWith(`${record.action}:`))
     )
       throw blocked();
-    if (ownsLock && fileHash(this.indexPath) === record.originalIndexHash) fs.renameSync(lock, this.indexPath);
-    else if (fs.existsSync(lock) || fileHash(this.indexPath) !== record.preparedIndexHash) throw blocked();
-    this.clear();
+    if (ownsLock && (await indexFileHash(this.indexPath)) === record.originalIndexHash) await fs.promises.rename(lock, this.indexPath);
+    else if ((await indexFileHash(lock)) !== null || (await indexFileHash(this.indexPath)) !== record.preparedIndexHash) throw blocked();
+    await this.clear();
     return true;
   }
 }

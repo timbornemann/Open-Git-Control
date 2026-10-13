@@ -162,7 +162,7 @@ describe('AI auto-commit isolated index transaction', () => {
       expect(transaction.isStatusEntryCommittable(mixedEntries.find((entry) => entry.path === 'nested-module')!)).toBe(false);
       expect(transaction.isStatusEntryCommittable(mixedEntries.find((entry) => entry.path === 'example.txt')!)).toBe(true);
     } finally {
-      transaction.dispose();
+      await transaction.dispose();
     }
   });
 
@@ -244,7 +244,7 @@ describe('AI auto-commit isolated index transaction', () => {
         { title: 'test: commit immutable snapshot', description: '' },
       );
     } finally {
-      transaction.dispose();
+      await transaction.dispose();
     }
 
     expect(await git.runCommandAtPath(repoPath, ['show', 'HEAD:example.txt'])).toBe('staged-one\nsnapshot-two');
@@ -348,7 +348,7 @@ describe('AI auto-commit isolated index transaction', () => {
         ),
       ).rejects.toThrow(/hook rejected|commit/i);
     } finally {
-      transaction.dispose();
+      await transaction.dispose();
     }
 
     expect(await git.runCommandAtPath(repoPath, ['show', ':example.txt'])).toBe(stagedBefore);
@@ -379,7 +379,7 @@ fi`,
       await transaction.initialize(entries);
       await expect(transaction.commit(exampleBatch(), { title: 'test: outer AI commit', description: '' })).rejects.toThrow(/HEAD changed|AI commit/i);
     } finally {
-      transaction.dispose();
+      await transaction.dispose();
     }
 
     expect(await git.runCommandAtPath(repoPath, ['rev-parse', 'HEAD'])).toBe(headBefore);
@@ -413,7 +413,7 @@ exit 1`,
         /commit-msg rejected|commit/i,
       );
     } finally {
-      transaction.dispose();
+      await transaction.dispose();
     }
 
     expect(await git.runCommandAtPath(repoPath, ['rev-parse', 'HEAD'])).toBe(headBefore);
@@ -445,7 +445,7 @@ fi`,
       await transaction.initialize(entries);
       await expect(transaction.commit(exampleBatch(), { title: 'test: immutable hook snapshot', description: '' })).rejects.toThrow(/hook changed|snapshot/i);
     } finally {
-      transaction.dispose();
+      await transaction.dispose();
     }
 
     expect(await git.runCommandAtPath(repoPath, ['rev-parse', 'HEAD'])).toBe(headBefore);
@@ -475,7 +475,7 @@ fi`,
       await transaction.initialize(entries);
       await expect(transaction.commit(exampleBatch(), { title: 'test: AI parent', description: '' })).rejects.toThrow(/no foreign commit was removed/i);
     } finally {
-      transaction.dispose();
+      await transaction.dispose();
     }
 
     expect(await git.runCommandAtPath(repoPath, ['show', '-s', '--format=%s', 'HEAD'])).toBe('external: preserve me');
@@ -499,7 +499,7 @@ fi`,
       await transaction.initialize(entries);
       await expect(transaction.commit(exampleBatch(), { title: 'test: branch switch hook', description: '' })).rejects.toThrow(/HEAD changed/i);
     } finally {
-      transaction.dispose();
+      await transaction.dispose();
     }
 
     expect(await git.runCommandAtPath(repoPath, ['symbolic-ref', '--short', 'HEAD'])).toBe('side');
@@ -524,7 +524,7 @@ fi`,
       await transaction.initialize(entries);
       await expect(transaction.commit(exampleBatch(), { title: 'test: signed AI commit', description: '' })).rejects.toThrow(/sign|gpg|commit/i);
     } finally {
-      transaction.dispose();
+      await transaction.dispose();
     }
 
     expect(await git.runCommandAtPath(repoPath, ['rev-parse', 'HEAD'])).toBe(headBefore);
@@ -546,7 +546,7 @@ fi`,
       await transaction.initialize(entries);
       await expect(transaction.commit(exampleBatch(), { title: 'test: missing identity', description: '' })).rejects.toThrow(/ident|name|email|commit/i);
     } finally {
-      transaction.dispose();
+      await transaction.dispose();
     }
 
     expect(await git.runCommandAtPath(repoPath, ['rev-parse', 'HEAD'])).toBe(headBefore);
@@ -569,7 +569,7 @@ fi`,
       await expect(transaction.commit(exampleBatch(), { title: 'test: stale index must abort', description: '' })).rejects.toThrow(/index changed/i);
       expect(await git.runCommandAtPath(repoPath, ['write-tree'])).toBe(externalTree);
     } finally {
-      transaction.dispose();
+      await transaction.dispose();
     }
 
     expect(await git.runCommandAtPath(repoPath, ['rev-parse', 'HEAD'])).toBe(headBefore);
@@ -592,7 +592,7 @@ fi`,
       expect(await git.runCommandAtPath(repoPath, ['show', '-s', '--format=%s', 'HEAD'])).toBe('external: branch moved');
       expect(await git.runCommandAtPath(repoPath, ['write-tree'])).toBe(stagedTreeBefore);
     } finally {
-      transaction.dispose();
+      await transaction.dispose();
     }
   });
 
@@ -629,7 +629,7 @@ fi`,
       await transaction.initialize(entries);
       await expect(transaction.commit(exampleBatch(), { title: 'test: unborn AI commit', description: '' })).rejects.toThrow(/HEAD changed|AI commit/i);
     } finally {
-      transaction.dispose();
+      await transaction.dispose();
     }
 
     await expect(git.runCommandAtPath(repoPath, ['rev-parse', '--verify', 'HEAD'])).rejects.toThrow();
@@ -669,7 +669,7 @@ fi`,
         { title: 'test: rename arrow file', description: '' },
       );
     } finally {
-      transaction.dispose();
+      await transaction.dispose();
     }
 
     expect(await git.runCommandAtPath(repoPath, ['show', `HEAD:${renamedName}`])).toBe('base-one\nbase-two');

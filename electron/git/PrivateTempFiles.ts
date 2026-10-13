@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { randomUUID } from 'node:crypto';
-import { assertManagedPath } from '../main-process/storageSafety';
+import { assertManagedPath, assertManagedPathAsync, readStorageJsonAsync } from '../main-process/storageSafety';
 
 export const privateTempRoot = () => path.join(os.tmpdir(), 'open-git-control-workspaces');
 const active = new Set<string>();
@@ -67,6 +67,30 @@ export const cleanupPrivateTempDir = (tempDir: string | null, root = privateTemp
     // Best-effort cleanup: the directory is private and will be retried by the OS temp cleaner.
   }
 };
+
+export async function cleanupPrivateTempDirAsync(tempDir: string | null, root = privateTempRoot()): Promise<void> {
+  if (!tempDir) return;
+  try {
+    await assertManagedPathAsync(root, tempDir);
+    if (!active.has(tempDir)) return;
+    const owner = (await readStorageJsonAsync(root, path.join(tempDir, MARKER), 64 * 1024)) as Record<string, unknown>;
+    if (owner.application !== 'Open-Git-Control' || owner.pid !== process.pid || owner.directory !== path.basename(tempDir)) return;
+    const pending = [tempDir];
+    while (pending.length) {
+      const current = pending.pop()!;
+      for (const entry of await fs.promises.readdir(current, { withFileTypes: true })) {
+        const file = path.join(current, entry.name);
+        await assertManagedPathAsync(root, file);
+        if (entry.isDirectory()) pending.push(file);
+      }
+    }
+    await assertManagedPathAsync(root, tempDir);
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
+    active.delete(tempDir);
+  } catch {
+    // Preserve unrecognized or redirected files, as in synchronous cleanup.
+  }
+}
 
 export function inspectPrivateTempFiles(now = Date.now(), root = privateTempRoot()): PrivateTempWorkspace[] {
   let entries: fs.Dirent[];

@@ -120,7 +120,7 @@ export class AiAutoCommitRunSession {
         this.commits.length,
         this.groups.some((group) => group.messageSource === 'fallback'),
       );
-      this.transaction.dispose();
+      await this.transaction.dispose();
     }
   }
 

@@ -1,13 +1,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createHash } from 'node:crypto';
 import type { CommitEditGit } from './CommitEditGit';
-import { createPrivateTempDir, cleanupPrivateTempDir } from './PrivateTempFiles';
+import { createPrivateTempDir, cleanupPrivateTempDirAsync } from './PrivateTempFiles';
+import { copyIndexIfPresent, indexFileHash, syncIndexFile } from './IndexFileIO';
 
-export function acquireRealIndexLock(indexLockPath: string): void {
-  fs.mkdirSync(path.dirname(indexLockPath), { recursive: true });
-  const descriptor = fs.openSync(indexLockPath, 'wx', 0o600);
-  fs.closeSync(descriptor);
+export async function acquireRealIndexLock(indexLockPath: string): Promise<void> {
+  await fs.promises.mkdir(path.dirname(indexLockPath), { recursive: true });
+  const handle = await fs.promises.open(indexLockPath, 'wx', 0o600);
+  await handle.close();
 }
 
 /** Copy the actual worktree index under its lock; publish only after validation. */
@@ -19,7 +19,7 @@ export async function withPrivateIndex<T>(
   const actualIndex = path.resolve(repoPath, (await git.run(repoPath, ['rev-parse', '--git-path', 'index'])).trim());
   const lock = `${actualIndex}.lock`;
   try {
-    acquireRealIndexLock(lock);
+    await acquireRealIndexLock(lock);
   } catch (error) {
     throw new Error(`The Git index is busy. Close the other Git operation and try again. ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -28,31 +28,30 @@ export async function withPrivateIndex<T>(
   try {
     tempDir = createPrivateTempDir('ogc-file-index');
     const index = path.join(tempDir, 'index');
-    const original = fs.existsSync(actualIndex) ? fs.readFileSync(actualIndex) : null;
-    const fingerprint = original ? createHash('sha256').update(original).digest('hex') : null;
-    const mode = original ? fs.statSync(actualIndex).mode & 0o777 : 0o644;
-    if (original) fs.writeFileSync(index, original, { mode: 0o600 });
+    const original = await copyIndexIfPresent(actualIndex, index);
+    const fingerprint = original ? await indexFileHash(index) : null;
+    const mode = original ? original.mode & 0o777 : 0o644;
+    if (original) await fs.promises.chmod(index, 0o600);
     else await git.run(repoPath, ['read-tree', '--empty'], { envOverrides: { GIT_INDEX_FILE: index } });
     // Split-index links are relative to the real Git directory. Materialize a
     // full private index before moving it out of that directory.
     await git.run(repoPath, ['update-index', '--no-split-index'], { envOverrides: { GIT_INDEX_FILE: index } });
     return await work(index, async (validate) => {
       await validate();
-      const current = fs.existsSync(actualIndex) ? createHash('sha256').update(fs.readFileSync(actualIndex)).digest('hex') : null;
+      await fs.promises.copyFile(index, lock);
+      await fs.promises.chmod(lock, mode);
+      await syncIndexFile(lock);
+      // Preparation can take time on a large index. Validate again after I/O,
+      // retaining the lock and checking for foreign changes before promotion.
+      await validate();
+      const current = await indexFileHash(actualIndex);
       if (current !== fingerprint) throw new Error('The Git index changed outside the lock. Your draft was kept.');
-      fs.copyFileSync(index, lock);
-      fs.chmodSync(lock, mode);
-      const descriptor = fs.openSync(lock, 'r+');
-      try {
-        fs.fsyncSync(descriptor);
-      } finally {
-        fs.closeSync(descriptor);
-      }
-      fs.renameSync(lock, actualIndex);
+      git.signal?.throwIfAborted();
+      await fs.promises.rename(lock, actualIndex);
       ownsLock = false;
     });
   } finally {
-    if (ownsLock) fs.rmSync(lock, { force: true });
-    cleanupPrivateTempDir(tempDir);
+    if (ownsLock) await fs.promises.rm(lock, { force: true });
+    await cleanupPrivateTempDirAsync(tempDir);
   }
 }
