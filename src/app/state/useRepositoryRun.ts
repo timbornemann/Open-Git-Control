@@ -32,11 +32,11 @@ const truncateUtf8End = (text: string, maxBytes: number): string => {
   return utf8Decoder.decode(bytes.subarray(start));
 };
 
-export const trimRepositoryRunOutput = (state: RepositoryRunStateDto): RepositoryRunStateDto => {
+const trimRunLines = (output: RepositoryRunStateDto['output']): RepositoryRunStateDto['output'] => {
   const retained = [] as RepositoryRunStateDto['output'];
   let retainedBytes = 0;
-  for (let index = state.output.length - 1; index >= 0 && retained.length < MAX_RUN_OUTPUT_LINES; index -= 1) {
-    const line = state.output[index];
+  for (let index = output.length - 1; index >= 0 && retained.length < MAX_RUN_OUTPUT_LINES; index -= 1) {
+    const line = output[index];
     const availableBytes = MAX_RUN_OUTPUT_BYTES - retainedBytes;
     if (availableBytes <= 0) break;
     const bytes = lineBytes(line);
@@ -45,7 +45,13 @@ export const trimRepositoryRunOutput = (state: RepositoryRunStateDto): Repositor
     retainedBytes += retainedLine === line ? bytes : lineBytes(retainedLine);
   }
   retained.reverse();
-  return { ...state, output: retained };
+  return retained;
+};
+export const trimRepositoryRunOutput = (state: RepositoryRunStateDto): RepositoryRunStateDto => ({ ...state, output: trimRunLines(state.output) });
+const appendRunOutput = (state: RepositoryRunStateDto, lines: RepositoryRunStateDto['output']): RepositoryRunStateDto => {
+  const last = state.output.at(-1)?.sequence ?? Number.NEGATIVE_INFINITY;
+  const newer = lines.filter((line) => line.sequence > last);
+  return newer.length ? { ...state, output: trimRunLines(state.output.concat(newer)) } : state;
 };
 
 export const useRepositoryRun = ({
@@ -134,18 +140,36 @@ export const useRepositoryRun = ({
     if (!repositoryRunClient.isAvailable()) return;
     let active = true;
     let receivedState = false;
+    let initialReadPending = true;
+    let earlyOutput: { runId: string; lines: RepositoryRunStateDto['output'] } | null = null;
     void repositoryRunClient
       .getState()
       .then((result) => {
-        if (active && !receivedState && result.success) setRunState(result.data ? trimRepositoryRunOutput(result.data) : null);
+        if (!active || receivedState || !result.success) return;
+        const buffered = earlyOutput;
+        const snapshot = result.data ? trimRepositoryRunOutput(result.data) : null;
+        setRunState((previous) => {
+          if (!snapshot) return null;
+          let state = snapshot;
+          if (previous?.runId === snapshot.runId) {
+            if (previous.status !== 'running' && snapshot.status === 'running') state = previous;
+            state = appendRunOutput(state, previous.output);
+          }
+          return buffered?.runId === state.runId ? appendRunOutput(state, buffered.lines) : state;
+        });
       })
       .catch(() => {
         /* A newer run event can supersede this initial read. */
+      })
+      .finally(() => {
+        initialReadPending = false;
+        earlyOutput = null;
       });
     const unsubscribe = repositoryRunClient.onEvent((event) => {
       if (!active) return;
       if (event.type === 'state') {
         receivedState = true;
+        earlyOutput = null;
         const state = event.state ? trimRepositoryRunOutput(event.state) : null;
         updateResource(resourceKey('runs', 'getState'), { success: true, data: state });
         setRunState(state);
@@ -158,10 +182,14 @@ export const useRepositoryRun = ({
         }
         return;
       }
+      const lines = event.type === 'output-batch' ? event.lines : [event.line];
+      if (initialReadPending && !receivedState) {
+        const prior = earlyOutput?.runId === event.runId ? earlyOutput.lines : [];
+        earlyOutput = { runId: event.runId, lines: trimRunLines(prior.concat(lines)) };
+      }
       setRunState((previous) => {
         if (!previous || previous.runId !== event.runId) return previous;
-        const lines = event.type === 'output-batch' ? event.lines : [event.line];
-        return trimRepositoryRunOutput({ ...previous, output: previous.output.concat(lines) });
+        return appendRunOutput(previous, lines);
       });
     });
     return () => {

@@ -246,6 +246,38 @@ describe('useRepositoryRun configuration binding', () => {
     expect(current!.runState!.runId).toBe('new');
   });
 
+  it.each([true, false])('merges streamed lines with the initial snapshot without duplicates (early output: %s)', async (early) => {
+    const line = (sequence: number) => ({ sequence, text: `line-${sequence}`, stream: 'stdout' as const, timestamp: 0, stepIndex: 0 });
+    const snapshot = { runId: 'run-1', status: 'running', repoPath: 'C:/repo-a', output: [line(1)] } as any;
+    let resolve!: (value: any) => void;
+    if (early)
+      vi.mocked(repositoryRunClient.getState).mockImplementation(
+        () =>
+          new Promise((done) => {
+            resolve = done;
+          }),
+      );
+    else vi.mocked(repositoryRunClient.getState).mockResolvedValue({ success: true, data: snapshot });
+    vi.spyOn(repositoryRunClient, 'getConfig').mockResolvedValue({ success: true, data: null } as any);
+    let handler!: Parameters<typeof repositoryRunClient.onEvent>[0];
+    vi.mocked(repositoryRunClient.onEvent).mockImplementation((callback) => {
+      handler = callback;
+      return vi.fn();
+    });
+    let current: ReturnType<typeof useRepositoryRun> | null = null;
+    const triggerRefresh = vi.fn();
+    const Harness = () => {
+      current = useRepositoryRun({ activeRepo: 'C:/repo-a', triggerRefresh });
+      return null;
+    };
+    await act(async () => root.render(createElement(Harness)));
+    await act(async () => handler({ type: 'output-batch', runId: 'run-1', lines: [line(1), line(2)] }));
+    if (early) await act(async () => resolve({ success: true, data: snapshot }));
+    expect(current!.runState!.output.map((line) => line.sequence)).toEqual([1, 2]);
+    await act(async () => handler({ type: 'output', runId: 'run-1', line: line(2) }));
+    expect(current!.runState!.output.map((line) => line.sequence)).toEqual([1, 2]);
+  });
+
   it('keeps a completed run when its start response arrives after the completion event', async () => {
     vi.spyOn(repositoryRunClient, 'getConfig').mockResolvedValue({ success: true, data: null } as any);
     let resolve!: (value: any) => void;
