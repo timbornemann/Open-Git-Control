@@ -95,10 +95,20 @@ const getDownloadRows = (release) => {
   ];
 };
 
+// This script also runs in the release metadata job without npm dependencies.
+const buildMarkdownTable = (headers, rows) => {
+  const widths = headers.map((header, column) => rows.reduce((width, row) => Math.max(width, row[column].length), Math.max(3, header.length)));
+  const render = (cells) => `| ${cells.map((cell, column) => cell.padEnd(widths[column])).join(' | ')} |`;
+  return [render(headers), render(widths.map((width) => '-'.repeat(width))), ...rows.map(render)].join('\n');
+};
+
 const buildEnglishDownloadsSection = (release, rows) => {
   const published = formatDate(release.published_at);
   const releaseLine = `Current latest release: [${release.tag_name}](${release.html_url})${published ? `, published ${published}` : ''}.`;
-  const tableRows = rows.map((row) => `| ${row.platformEn} | ${row.packageEn} | [${row.asset.name}](${row.asset.url}) |`).join('\n');
+  const table = buildMarkdownTable(
+    ['Platform', 'Package', 'Direct GitHub download'],
+    rows.map((row) => [row.platformEn, row.packageEn, `[${row.asset.name}](${row.asset.url})`]),
+  );
 
   return `## Downloads
 
@@ -110,9 +120,7 @@ ${releaseLine}
 
 The badge and latest release page stay current automatically. The direct binary links below are versioned by GitHub asset name and are refreshed by the release workflow after a new stable release is published.
 
-| Platform | Package | Direct GitHub download |
-| --- | --- | --- |
-${tableRows}
+${table}
 
 The \`latest*.yml\` and \`.blockmap\` files in GitHub Releases are update metadata for the auto-updater. Most users should download one of the installers above.
 `;
@@ -121,7 +129,10 @@ The \`latest*.yml\` and \`.blockmap\` files in GitHub Releases are update metada
 const buildGermanDownloadsSection = (release, rows) => {
   const published = formatDate(release.published_at);
   const releaseLine = `Aktuell neuestes Release: [${release.tag_name}](${release.html_url})${published ? `, veroeffentlicht am ${published}` : ''}.`;
-  const tableRows = rows.map((row) => `| ${row.platformDe} | ${row.packageDe} | [${row.asset.name}](${row.asset.url}) |`).join('\n');
+  const table = buildMarkdownTable(
+    ['Plattform', 'Paket', 'Direkter GitHub-Download'],
+    rows.map((row) => [row.platformDe, row.packageDe, `[${row.asset.name}](${row.asset.url})`]),
+  );
 
   return `## Downloads
 
@@ -133,15 +144,13 @@ ${releaseLine}
 
 Badge und Latest-Release-Seite bleiben automatisch aktuell. Die direkten Binary-Links unten sind durch die GitHub-Asset-Namen versioniert und werden vom Release-Workflow nach einem neuen stabilen Release aktualisiert.
 
-| Plattform | Paket | Direkter GitHub-Download |
-| --- | --- | --- |
-${tableRows}
+${table}
 
 Die Dateien \`latest*.yml\` und \`.blockmap\` in GitHub Releases sind Update-Metadaten fuer den Auto-Updater. Normale Nutzer sollten einen der Installer oben herunterladen.
 `;
 };
 
-const replaceSection = (content, startHeading, endHeading, replacement) => {
+const replaceSection = (content, startHeading, endHeading, replacement, newline = '\n') => {
   const startIndex = content.indexOf(startHeading);
   if (startIndex < 0) {
     throw new Error(`Could not find section start "${startHeading}".`);
@@ -150,12 +159,13 @@ const replaceSection = (content, startHeading, endHeading, replacement) => {
   if (endIndex < 0) {
     throw new Error(`Could not find section end "${endHeading}".`);
   }
-  return `${content.slice(0, startIndex)}${replacement}\n${content.slice(endIndex)}`;
+  return `${content.slice(0, startIndex)}${replacement}${newline}${content.slice(endIndex)}`;
 };
 
 const updateFile = (filePath, startHeading, endHeading, replacement) => {
   const original = fs.readFileSync(filePath, 'utf8');
-  const updated = replaceSection(original, startHeading, endHeading, replacement);
+  const newline = original.match(/\r?\n/)?.[0] || '\n';
+  const updated = replaceSection(original, startHeading, endHeading, replacement.replace(/\r?\n/g, newline), newline);
   if (updated !== original) {
     fs.writeFileSync(filePath, updated, 'utf8');
     return true;
