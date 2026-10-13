@@ -187,6 +187,101 @@ describe('useRepositoryRun configuration binding', () => {
     expect(current!.isRunConsoleOpen).toBe(true);
   });
 
+  it('retains batched output in order, applies the log limit and ignores other runs', async () => {
+    vi.spyOn(repositoryRunClient, 'getConfig').mockResolvedValue({ success: true, data: null } as any);
+    let handler!: Parameters<typeof repositoryRunClient.onEvent>[0];
+    vi.mocked(repositoryRunClient.onEvent).mockImplementation((callback) => {
+      handler = callback;
+      return vi.fn();
+    });
+    let current: ReturnType<typeof useRepositoryRun> | null = null;
+    const triggerRefresh = vi.fn();
+    const Harness = () => {
+      current = useRepositoryRun({ activeRepo: 'C:/repo-a', triggerRefresh });
+      return null;
+    };
+    await act(async () => root.render(createElement(Harness)));
+    const state = {
+      runId: 'run-1',
+      repoPath: 'C:/repo-a',
+      action: 'build',
+      status: 'running',
+      startedAt: 0,
+      activeStepIndex: 0,
+      stepCount: 1,
+      steps: [],
+      output: [],
+    } as const;
+    await act(async () => handler({ type: 'state', state: { ...state, steps: [], output: [] } }));
+    const lines = Array.from({ length: 5_000 }, (_, i) => ({ sequence: i + 1, stream: 'stdout' as const, text: `line-${i}`, timestamp: 0, stepIndex: 0 }));
+    await act(async () => handler({ type: 'output-batch', runId: 'run-1', lines }));
+    expect(current!.runState!.output.map((line) => line.sequence)).toEqual(Array.from({ length: 4_000 }, (_, i) => i + 1001));
+    await act(async () => handler({ type: 'output-batch', runId: 'old-run', lines }));
+    expect(current!.runState!.output.at(-1)?.text).toBe('line-4999');
+  });
+
+  it('does not overwrite a newer run event with a late initial state read', async () => {
+    let resolve!: (value: any) => void;
+    vi.mocked(repositoryRunClient.getState).mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    vi.spyOn(repositoryRunClient, 'getConfig').mockResolvedValue({ success: true, data: null } as any);
+    let handler!: Parameters<typeof repositoryRunClient.onEvent>[0];
+    vi.mocked(repositoryRunClient.onEvent).mockImplementation((callback) => {
+      handler = callback;
+      return vi.fn();
+    });
+    let current: ReturnType<typeof useRepositoryRun> | null = null;
+    const triggerRefresh = vi.fn();
+    const Harness = () => {
+      current = useRepositoryRun({ activeRepo: 'C:/repo-a', triggerRefresh });
+      return null;
+    };
+    await act(async () => root.render(createElement(Harness)));
+    await act(async () => handler({ type: 'state', state: { runId: 'new', status: 'running', repoPath: 'C:/repo-a', output: [] } as any }));
+    await act(async () => resolve({ success: true, data: null }));
+    expect(current!.runState!.runId).toBe('new');
+  });
+
+  it('keeps a completed run when its start response arrives after the completion event', async () => {
+    vi.spyOn(repositoryRunClient, 'getConfig').mockResolvedValue({ success: true, data: null } as any);
+    let resolve!: (value: any) => void;
+    vi.spyOn(repositoryRunClient, 'start').mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    let handler!: Parameters<typeof repositoryRunClient.onEvent>[0];
+    vi.mocked(repositoryRunClient.onEvent).mockImplementation((callback) => {
+      handler = callback;
+      return vi.fn();
+    });
+    let current: ReturnType<typeof useRepositoryRun> | null = null;
+    const triggerRefresh = vi.fn();
+    const Harness = () => {
+      current = useRepositoryRun({ activeRepo: 'C:/repo-a', triggerRefresh });
+      return null;
+    };
+    await act(async () => root.render(createElement(Harness)));
+    let start!: Promise<boolean>;
+    await act(async () => {
+      start = current!.startRun('build');
+      await Promise.resolve();
+    });
+    const state = { runId: 'run-1', repoPath: 'C:/repo-a', status: 'succeeded', output: [] };
+    await act(async () => handler({ type: 'state', state: state as any }));
+    await act(async () => {
+      resolve({ success: true, data: { ...state, status: 'running' } });
+      await start;
+    });
+    expect(current!.runState!.status).toBe('succeeded');
+    expect(triggerRefresh).toHaveBeenCalledOnce();
+  });
+
   it('explains missing programs before opening the console and retries the same action after installation', async () => {
     vi.spyOn(repositoryRunClient, 'getConfig').mockResolvedValue({ success: true, data: null } as any);
     const start = vi

@@ -22,6 +22,8 @@ import { getRepositoryRunPrerequisiteIssues, RUN_PREREQUISITE_ERROR_PREFIX } fro
 const MAX_OUTPUT_LINES = 4_000;
 const MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
 const MAX_OUTPUT_LINE_BYTES = 64 * 1024;
+const OUTPUT_BATCH_LINES = 256;
+const OUTPUT_BATCH_BYTES = 64 * 1024;
 const DEFAULT_STOP_GRACE_MS = 2_000;
 const DEFAULT_FORCE_STOP_WAIT_MS = 2_000;
 const ignoreLateChildError = (): void => undefined;
@@ -31,6 +33,11 @@ type ActiveRun = RepositoryRunStateDto & {
   child: ChildProcessWithoutNullStreams | null;
   cancelled: boolean;
   outputBytes: number;
+  outputStart: number;
+  discardedOutputBytes: number;
+  pendingOutput: RepositoryRunOutputLineDto[];
+  pendingOutputBytes: number;
+  outputTimer: NodeJS.Timeout | null;
   sequence: number;
   streamRemainders: Record<'stdout' | 'stderr', Buffer>;
   streamLineOpen: Record<'stdout' | 'stderr', boolean>;
@@ -105,6 +112,11 @@ export class RepositoryRunService {
       child: null,
       cancelled: false,
       outputBytes: 0,
+      outputStart: 0,
+      discardedOutputBytes: 0,
+      pendingOutput: [],
+      pendingOutputBytes: 0,
+      outputTimer: null,
       sequence: 0,
       streamRemainders: { stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) },
       streamLineOpen: { stdout: false, stderr: false },
@@ -141,6 +153,7 @@ export class RepositoryRunService {
 
   dispose(): void {
     this.stop();
+    if (this.activeRun) this.flushOutput(this.activeRun);
   }
 
   private async execute(run: ActiveRun): Promise<void> {
@@ -385,14 +398,38 @@ export class RepositoryRunService {
     if (original && !text) return;
     const line: RepositoryRunOutputLineDto = { sequence: ++run.sequence, stream, text, timestamp: Date.now(), stepIndex };
     const lineBytes = Buffer.byteLength(text, 'utf8');
-    while (run.output.length >= MAX_OUTPUT_LINES || run.outputBytes + lineBytes > MAX_OUTPUT_BYTES) {
-      const removed = run.output.shift();
-      if (removed) run.outputBytes -= Buffer.byteLength(removed.text, 'utf8');
-      else break;
+    while (run.output.length - run.outputStart >= MAX_OUTPUT_LINES || run.outputBytes + lineBytes > MAX_OUTPUT_BYTES) {
+      const removed = run.output[run.outputStart++];
+      if (removed) {
+        const removedBytes = Buffer.byteLength(removed.text, 'utf8');
+        run.outputBytes -= removedBytes;
+        run.discardedOutputBytes += removedBytes;
+      } else break;
+    }
+    if ((run.outputStart >= 1024 && run.outputStart >= run.output.length / 2) || run.discardedOutputBytes >= MAX_OUTPUT_BYTES) {
+      run.output = run.output.slice(run.outputStart);
+      run.outputStart = 0;
+      run.discardedOutputBytes = 0;
     }
     run.output.push(line);
     run.outputBytes += lineBytes;
-    this.broadcast({ type: 'output', runId: run.runId, line });
+    run.pendingOutput.push(line);
+    run.pendingOutputBytes += lineBytes;
+    if (run.pendingOutput.length >= OUTPUT_BATCH_LINES || run.pendingOutputBytes >= OUTPUT_BATCH_BYTES) this.flushOutput(run);
+    else if (!run.outputTimer) {
+      run.outputTimer = setTimeout(() => this.flushOutput(run), 16);
+      run.outputTimer.unref?.();
+    }
+  }
+
+  private flushOutput(run: ActiveRun): void {
+    if (run.outputTimer) clearTimeout(run.outputTimer);
+    run.outputTimer = null;
+    const lines = run.pendingOutput;
+    run.pendingOutput = [];
+    run.pendingOutputBytes = 0;
+    if (lines.length === 1) this.broadcast({ type: 'output', runId: run.runId, line: lines[0] });
+    else if (lines.length > 1) this.broadcast({ type: 'output-batch', runId: run.runId, lines });
   }
 
   private snapshot(run: ActiveRun): RepositoryRunStateDto {
@@ -401,6 +438,11 @@ export class RepositoryRunService {
       child: _child,
       cancelled: _cancelled,
       outputBytes: _outputBytes,
+      outputStart: _outputStart,
+      discardedOutputBytes: _discardedOutputBytes,
+      pendingOutput: _pendingOutput,
+      pendingOutputBytes: _pendingOutputBytes,
+      outputTimer: _outputTimer,
       sequence: _sequence,
       streamRemainders: _streamRemainders,
       streamLineOpen: _streamLineOpen,
@@ -412,10 +454,11 @@ export class RepositoryRunService {
       resolveActiveStep: _resolveActiveStep,
       ...state
     } = run;
-    return { ...state, output: [...state.output] };
+    return { ...state, output: state.output.slice(run.outputStart) };
   }
 
   private emitState(): void {
+    if (this.activeRun) this.flushOutput(this.activeRun);
     this.broadcast({ type: 'state', state: this.getState() });
   }
 

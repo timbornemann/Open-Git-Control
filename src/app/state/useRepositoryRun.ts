@@ -14,6 +14,15 @@ const MAX_RUN_OUTPUT_BYTES = 2 * 1024 * 1024;
 
 const utf8Encoder = new TextEncoder();
 const utf8Decoder = new TextDecoder();
+const outputLineBytes = new WeakMap<RepositoryRunStateDto['output'][number], number>();
+const lineBytes = (line: RepositoryRunStateDto['output'][number]) => {
+  let bytes = outputLineBytes.get(line);
+  if (bytes === undefined) {
+    bytes = utf8Encoder.encode(line.text).length;
+    outputLineBytes.set(line, bytes);
+  }
+  return bytes;
+};
 
 const truncateUtf8End = (text: string, maxBytes: number): string => {
   const bytes = utf8Encoder.encode(text);
@@ -30,10 +39,10 @@ export const trimRepositoryRunOutput = (state: RepositoryRunStateDto): Repositor
     const line = state.output[index];
     const availableBytes = MAX_RUN_OUTPUT_BYTES - retainedBytes;
     if (availableBytes <= 0) break;
-    const text = truncateUtf8End(line.text, availableBytes);
-    const textBytes = utf8Encoder.encode(text).length;
-    retained.push(text === line.text ? line : { ...line, text });
-    retainedBytes += textBytes;
+    const bytes = lineBytes(line);
+    const retainedLine = bytes <= availableBytes ? line : { ...line, text: truncateUtf8End(line.text, availableBytes) };
+    retained.push(retainedLine);
+    retainedBytes += retainedLine === line ? bytes : lineBytes(retainedLine);
   }
   retained.reverse();
   return { ...state, output: retained };
@@ -124,10 +133,11 @@ export const useRepositoryRun = ({
   useEffect(() => {
     if (!repositoryRunClient.isAvailable()) return;
     let active = true;
+    let receivedState = false;
     void repositoryRunClient
       .getState()
       .then((result) => {
-        if (active && result.success) setRunState(result.data ? trimRepositoryRunOutput(result.data) : null);
+        if (active && !receivedState && result.success) setRunState(result.data ? trimRepositoryRunOutput(result.data) : null);
       })
       .catch(() => {
         /* A newer run event can supersede this initial read. */
@@ -135,8 +145,10 @@ export const useRepositoryRun = ({
     const unsubscribe = repositoryRunClient.onEvent((event) => {
       if (!active) return;
       if (event.type === 'state') {
-        updateResource(resourceKey('runs', 'getState'), { success: true, data: event.state ? trimRepositoryRunOutput(event.state) : null });
-        setRunState(event.state ? trimRepositoryRunOutput(event.state) : null);
+        receivedState = true;
+        const state = event.state ? trimRepositoryRunOutput(event.state) : null;
+        updateResource(resourceKey('runs', 'getState'), { success: true, data: state });
+        setRunState(state);
         if (event.state && event.state.status !== 'running' && !refreshedRunIds.current.has(event.state.runId)) {
           if (isConsoleOpenRef.current && event.state.repoPath === activeRepoRef.current) setLastViewedRunId(event.state.runId);
           refreshedRunIds.current.add(event.state.runId);
@@ -148,7 +160,8 @@ export const useRepositoryRun = ({
       }
       setRunState((previous) => {
         if (!previous || previous.runId !== event.runId) return previous;
-        return trimRepositoryRunOutput({ ...previous, output: [...previous.output, event.line] });
+        const lines = event.type === 'output-batch' ? event.lines : [event.line];
+        return trimRepositoryRunOutput({ ...previous, output: previous.output.concat(lines) });
       });
     });
     return () => {
@@ -188,7 +201,7 @@ export const useRepositoryRun = ({
           void refreshConfig(activeRepo);
           return false;
         }
-        setRunState(trimRepositoryRunOutput(result.data));
+        setRunState((previous) => (previous?.runId === result.data.runId ? previous : trimRepositoryRunOutput(result.data)));
         if (activeRepo !== activeRepoRef.current) return false;
         isConsoleOpenRef.current = true;
         setConsoleOpen(true);

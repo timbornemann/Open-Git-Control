@@ -5,8 +5,11 @@ import * as path from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const spawnMock = vi.hoisted(() => vi.fn());
+const sendMock = vi.hoisted(() => vi.fn());
 vi.mock('child_process', () => ({ spawn: spawnMock }));
-vi.mock('electron', () => ({ BrowserWindow: { getAllWindows: () => [] } }));
+vi.mock('electron', () => ({
+  BrowserWindow: { getAllWindows: () => [{ isDestroyed: () => false, webContents: { isDestroyed: () => false, send: sendMock } }] },
+}));
 
 import { RepositoryRunConfigService } from './RepositoryRunConfigService';
 import { RepositoryRunService } from './RepositoryRunService';
@@ -69,6 +72,7 @@ afterEach(() => {
   setPlatform(originalPlatform);
   vi.restoreAllMocks();
   spawnMock.mockReset();
+  sendMock.mockClear();
   for (const directory of directories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
 });
 
@@ -231,6 +235,48 @@ describe('RepositoryRunService', () => {
     expect(state.status).toBe('succeeded');
     expect(retainedBytes).toBeLessThanOrEqual(2 * 1024 * 1024);
     expect(state.output.every((line) => Buffer.byteLength(line.text, 'utf8') <= 64 * 1024)).toBe(true);
+  });
+
+  it('batches a log flood without losing order or the final partial batch', async () => {
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));
+    directories.push(repoPath);
+    prepareConfig(repoPath, [0]);
+    spawnMock.mockImplementation(() => createChild(0, Array.from({ length: 10_000 }, (_, i) => `line-${i}`).join('\n')));
+    const service = new RepositoryRunService(new RepositoryRunConfigService());
+    await service.start(repoPath, 'test');
+    const state = await waitForCompletion(service);
+    const events = sendMock.mock.calls.map(([, event]) => event);
+    const outputEvents = events.filter((event) => event.type !== 'state');
+    const lines = outputEvents.flatMap((event) => (event.type === 'output-batch' ? event.lines : [event.line]));
+    expect(outputEvents.length).toBeLessThan(50);
+    expect(lines.filter((line) => line.stream === 'stdout').map((line) => line.text)).toEqual(Array.from({ length: 10_000 }, (_, i) => `line-${i}`));
+    expect(lines.map((line) => line.sequence)).toEqual(Array.from({ length: lines.length }, (_, i) => i + 1));
+    expect(events.at(-1)).toMatchObject({ type: 'state', state: { status: 'succeeded' } });
+    expect(state.output).toHaveLength(4_000);
+    expect(state.output.at(-2)?.text).toBe('line-9999');
+    expect(state).not.toHaveProperty('pendingOutput');
+    service.dispose();
+  });
+
+  it('publishes quiet output promptly while the command remains running', async () => {
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));
+    directories.push(repoPath);
+    prepareConfig(repoPath, [0]);
+    const child = createHangingChild();
+    spawnMock.mockReturnValue(child);
+    const service = new RepositoryRunService(new RepositoryRunConfigService());
+    await service.start(repoPath, 'test');
+    child.stdout.emit('data', Buffer.from('still working\n'));
+    await vi.waitFor(() =>
+      expect(sendMock).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ type: 'output', line: expect.objectContaining({ text: 'still working' }) }),
+      ),
+    );
+    expect(service.getState()?.status).toBe('running');
+    child.emit('close', 0);
+    await waitForCompletion(service);
+    service.dispose();
   });
 
   it('escalates from SIGTERM to SIGKILL and reaches a terminal cancelled state', async () => {

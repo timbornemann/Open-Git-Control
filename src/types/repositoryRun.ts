@@ -72,7 +72,9 @@ export type RepositoryRunStateDto = {
 };
 
 export type RepositoryRunEventDto =
-  { type: 'state'; state: RepositoryRunStateDto | null } | { type: 'output'; runId: string; line: RepositoryRunOutputLineDto };
+  | { type: 'state'; state: RepositoryRunStateDto | null }
+  | { type: 'output'; runId: string; line: RepositoryRunOutputLineDto }
+  | { type: 'output-batch'; runId: string; lines: RepositoryRunOutputLineDto[] };
 
 export const createEmptyRepositoryRunConfig = (): RepositoryRunConfigDto => ({
   version: 1,
