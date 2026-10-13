@@ -71,16 +71,24 @@ describe('AI auto-commit during repository refreshes', { timeout: 30000 }, () =>
   it('reports the run deadline as an error rather than a user cancellation', async () => {
     const repo = await repository();
     const provider = vi.fn(repo.provider);
+    vi.spyOn(repo.git, 'resolveRepositoryPathAsync').mockResolvedValue(repo.repoPath);
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
     let resolveStatus!: (status: string) => void;
-    vi.spyOn(repo.git, 'getStatusPorcelainZAtPath').mockReturnValueOnce(
-      new Promise((resolve) => {
-        resolveStatus = resolve;
-      }),
-    );
+    const status = new Promise<string>((resolve) => {
+      resolveStatus = resolve;
+    });
+    vi.spyOn(repo.git, 'getStatusPorcelainZAtPath').mockImplementationOnce(() => {
+      entered();
+      return status;
+    });
     vi.useFakeTimers();
     const pending = repo.service(provider).runAutoCommit(repo.repoPath, policy, () => 'test-key');
     const failure = expect(pending).rejects.toThrow('10-minute time limit');
 
+    await started;
     await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
     resolveStatus(' M base.txt\0');
     await failure;
