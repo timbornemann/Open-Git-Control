@@ -4,7 +4,9 @@ import type { App } from 'electron';
 export function finishBeforeQuit(application: Pick<App, 'on' | 'quit'>, cleanup: () => Promise<void>): void {
   let closing = false,
     completed = false;
-  application.on('before-quit', (event) => {
+  // before-quit precedes window close guards. A cancelled close must leave
+  // services alive; will-quit runs only after window closure was confirmed.
+  application.on('will-quit', (event) => {
     if (completed) return;
     event.preventDefault();
     if (closing) return;

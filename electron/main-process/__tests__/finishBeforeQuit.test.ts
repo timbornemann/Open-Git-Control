@@ -16,7 +16,11 @@ describe('durable shutdown', () => {
     finishBeforeQuit(application as unknown as App, cleanup);
     const event = { preventDefault: vi.fn() };
     application.emit('before-quit', event);
-    application.emit('before-quit', event);
+    await Promise.resolve();
+    expect(cleanup).not.toHaveBeenCalled();
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    application.emit('will-quit', event);
+    application.emit('will-quit', event);
     await Promise.resolve();
     expect(cleanup).toHaveBeenCalledOnce();
     expect(event.preventDefault).toHaveBeenCalledTimes(2);
@@ -24,7 +28,7 @@ describe('durable shutdown', () => {
     finish();
     await vi.waitFor(() => expect(application.quit).toHaveBeenCalledOnce());
     event.preventDefault.mockClear();
-    application.emit('before-quit', event);
+    application.emit('will-quit', event);
     expect(event.preventDefault).not.toHaveBeenCalled();
   });
 
@@ -35,7 +39,7 @@ describe('durable shutdown', () => {
       finishBeforeQuit(application as unknown as App, async () => {
         throw new Error('Disk unavailable');
       });
-      application.emit('before-quit', { preventDefault: vi.fn() });
+      application.emit('will-quit', { preventDefault: vi.fn() });
       await vi.waitFor(() => expect(application.quit).toHaveBeenCalledOnce());
       expect(log).toHaveBeenCalledOnce();
     } finally {
