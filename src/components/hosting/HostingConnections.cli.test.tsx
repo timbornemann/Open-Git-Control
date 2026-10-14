@@ -42,6 +42,7 @@ describe('GitHub CLI account preview', () => {
   };
   const openCli = async () => {
     await click(button('Edit'));
+    await click(button('Browser (OAuth)'));
     await click(button('GitHub CLI'));
   };
   const render = () => act(async () => root.render(createElement(HostingConnections)));
@@ -124,6 +125,30 @@ describe('GitHub CLI account preview', () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(useHostingState.getState().connections[0]).toMatchObject({ username: identity.username, authenticated: true });
     expect(mocks.request.mock.calls.some(([operation]) => operation === 'cancelAuth')).toBe(false);
+  });
+
+  it('keeps device login when its method is reselected and stops polling when switching to token', async () => {
+    vi.useFakeTimers();
+    accounts = [{ ...account, oauth: { clientId: 'desktop-client', redirectUri: '' } }];
+    const normal = mocks.request.getMockImplementation()!;
+    mocks.request.mockImplementation(async (operation, input) => {
+      if (operation === 'startDeviceLogin')
+        return { deviceCode: 'device-code', userCode: 'ABCD-1234', verificationUri: account.baseUrl + '/login/device', interval: 5, expiresIn: 600 };
+      return normal(operation, input);
+    });
+    await render();
+    await click(button('Edit'));
+    await click(button('Sign in in browser'));
+    await click(button('Browser (OAuth)'));
+    expect(document.body.textContent).toContain('ABCD-1234');
+    expect(mocks.request.mock.calls.some(([operation]) => operation === 'cancelAuth')).toBe(false);
+    await click(button('Token'));
+    expect(mocks.request).toHaveBeenCalledWith('cancelAuth', { connectionId: account.id });
+    expect(document.body.textContent).not.toContain('ABCD-1234');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(mocks.request.mock.calls.some(([operation]) => operation === 'pollDeviceLogin')).toBe(false);
   });
 
   it('cancels a displayed preview and invalidates its main-process authorization', async () => {

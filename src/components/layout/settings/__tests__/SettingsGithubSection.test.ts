@@ -92,6 +92,10 @@ describe('SettingsGithubSection', () => {
     await act(async () => {
       form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
     });
+    expect(request).not.toHaveBeenCalledWith('saveConnection', expect.anything());
+    const save = [...dialog.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Save without signing in');
+    if (!save) throw new Error('Missing explicit connection save action.');
+    await act(async () => save.click());
     expect(request).toHaveBeenCalledWith('saveConnection', expect.objectContaining({ provider: 'github', baseUrl: 'https://github.enterprise.local' }));
     expect(onUpdateSettings).not.toHaveBeenCalled();
     expect(document.querySelector('[role="dialog"]')).toBeNull();

@@ -24,7 +24,11 @@ describe('sign-in prerequisites', () => {
   let root: Root;
   let host: HTMLDivElement;
   const button = (label: string) => [...document.body.querySelectorAll<HTMLButtonElement>('button')].find((element) => element.textContent?.trim() === label)!;
-  const render = (connection = account) => act(() => root.render(createElement(HostingConnectionEditor, { connection, onClose: vi.fn() })));
+  const render = (connection = account) =>
+    act(() => {
+      root.render(createElement(HostingConnectionEditor, { connection, onClose: vi.fn() }));
+    });
+  const chooseBrowser = () => act(() => button('Browser (OAuth)').click());
   const change = (field: HTMLInputElement, value: string) =>
     act(() => {
       Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!.call(field, value);
@@ -46,6 +50,7 @@ describe('sign-in prerequisites', () => {
   });
   it('opens and focuses the OAuth client field without starting or saving an authentication', () => {
     render();
+    chooseBrowser();
     const login = button('Sign in in browser');
     expect(login.disabled).toBe(true);
     expect(document.body.textContent).toContain('Browser sign-in requires an OAuth client ID / consumer key.');
@@ -53,9 +58,9 @@ describe('sign-in prerequisites', () => {
       login.click();
       button('Configure OAuth').click();
     });
-    const details = document.querySelector('details')!;
-    const field = [...details.querySelectorAll('label')].find((label) => label.textContent?.includes('OAuth Client ID'))!.querySelector('input')!;
-    expect(details.open).toBe(true);
+    const panel = document.querySelector('section[aria-label="Browser sign-in"]')!;
+    const field = [...panel.querySelectorAll('label')].find((label) => label.textContent?.includes('OAuth Client ID'))!.querySelector('input')!;
+    expect(panel).not.toBeNull();
     expect(document.activeElement).toBe(field);
     change(field, '   ');
     expect(button('Sign in in browser').disabled).toBe(true);
@@ -106,7 +111,7 @@ describe('sign-in prerequisites', () => {
   });
   it('keeps operation locks without presenting unavailable configuration actions while busy', () => {
     task.busy = true;
-    render();
+    render({ ...account, oauth: { clientId: '', redirectUri: '' } });
     expect(button('Sign in in browser').disabled).toBe(true);
     expect(button('Configure OAuth')).toBeUndefined();
     expect(document.body.textContent).toContain('Preparing connection');

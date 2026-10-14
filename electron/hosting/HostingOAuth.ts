@@ -5,6 +5,7 @@ import type { HostingConnection } from '../../src/types/hostingDtos';
 import type { HostingCredential } from './HostingCredentialStore';
 import { hostingUrl } from './hostingUrls';
 import { hostingFetch } from './HostingNetwork';
+import { oauthExchangeError } from './HostingOAuthErrors';
 
 const OAUTH_TIMEOUT_MS = 5 * 60_000;
 type OAuthTokenResponse = { access_token?: string; refresh_token?: string; expires_in?: number; error?: string };
@@ -68,7 +69,7 @@ async function postToken(connection: HostingConnection, params: URLSearchParams,
     redirect: 'error',
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),
   });
-  if (!response.ok) throw new Error(`OAuth token exchange failed (${response.status}). Verify the application registration and callback URL.`);
+  if (!response.ok) throw await oauthExchangeError(connection, response);
   const payload = (await response.json()) as OAuthTokenResponse;
   if (payload.error || typeof payload.access_token !== 'string' || !payload.access_token) throw new Error('The OAuth provider did not return an access token.');
   return {

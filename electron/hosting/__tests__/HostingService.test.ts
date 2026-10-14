@@ -60,6 +60,24 @@ afterEach(async () => {
 const add = (baseUrl = 'https://forge.example.test') => service.saveConnection({ provider: 'forgejo', label: 'Test forge', baseUrl });
 
 describe('independent hosting accounts', () => {
+  it('stores a confidential Forgejo application secret privately and preserves it when saving or using token login', async () => {
+    const input = {
+      provider: 'forgejo' as const,
+      label: 'Confidential Forgejo',
+      baseUrl: 'https://forge.example.test',
+      oauth: { clientId: 'confidential-client', redirectUri: 'http://127.0.0.1:42873/callback' },
+    };
+    const connection = service.saveConnection({ ...input, clientSecret: 'private-application-secret' });
+    expect(connection).not.toHaveProperty('clientSecret');
+    expect(connection.oauth).not.toHaveProperty('clientSecret');
+    service.saveConnection({ ...input, id: connection.id });
+    expect(service.credentialStore.get(connection.id)?.clientSecret).toBe('private-application-secret');
+    await service.request('login', { connectionId: connection.id, token: 'personal-access' });
+    expect(service.credentialStore.get(connection.id)?.clientSecret).toBe('private-application-secret');
+    expect(new HostingCredentialStore().get(connection.id)?.clientSecret).toBe('private-application-secret');
+    expect(fs.readFileSync(path.join(state.directory, 'hosting-credentials.json'), 'utf8')).not.toContain('private-application-secret');
+  });
+
   it('reads the saved private catalog and resolves its local URL without waiting for startup authentication', async () => {
     const first = add();
     await service.request('login', { connectionId: first.id, token: 'saved-account' });

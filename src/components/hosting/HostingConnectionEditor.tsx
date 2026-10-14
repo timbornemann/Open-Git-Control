@@ -2,8 +2,10 @@ import { openSystemTools } from '@/app/state/systemToolsStore';
 import { isSystemToolAvailable } from '@/services/systemToolsAvailability';
 import { Button } from '@/components/ui/Button';
 import { HostingAuthenticationActions } from './HostingAuthenticationActions';
+import { HostingBrowserLoginFields } from './HostingBrowserLoginFields';
 import { browserSignInRequirement } from './hostingConnectionRequirements';
 import { TextField } from '@/components/ui/TextField';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { HostingDialog } from './HostingDialog';
 import { hostingClient } from '@/services/hostingClient';
@@ -37,7 +39,8 @@ export function HostingConnectionEditor({ connection, onClose }: { connection: H
   const [clientSecret, setClientSecret] = useState('');
   const [redirectUri, setRedirectUri] = useState(connection?.oauth?.redirectUri ?? 'http://127.0.0.1:42873/oauth/callback');
   const [allowHttpLoopback, setAllowHttpLoopback] = useState(connection?.oauth?.allowHttpLoopback ?? false);
-  const oauthSettings = useRef<HTMLDetailsElement>(null);
+  const [signInMethod, setSignInMethod] = useState<'token' | 'browser'>(connection?.oauth ? 'browser' : 'token');
+  const savedOAuth = useRef(connection?.oauth);
   const clientIdField = useRef<HTMLInputElement>(null);
   const serverField = useRef<HTMLInputElement>(null);
   const callbackField = useRef<HTMLInputElement>(null);
@@ -48,7 +51,6 @@ export function HostingConnectionEditor({ connection, onClose }: { connection: H
   );
   const configureBrowser = () => {
     if (!browserRequirement) return;
-    if (oauthSettings.current && browserRequirement.field !== 'server') oauthSettings.current.open = true;
     const field = { clientId: clientIdField, server: serverField, callback: callbackField, loopback: loopbackField }[browserRequirement.field];
     field.current?.focus();
     field.current?.scrollIntoView?.({ block: 'nearest' });
@@ -132,8 +134,9 @@ export function HostingConnectionEditor({ connection, onClose }: { connection: H
       clearInterval(timer);
     };
   }, [device, reload, setError, finish]);
-  const save = () =>
-    hostingClient.request('saveConnection', {
+  const save = async (withOAuth: boolean) => {
+    const oauth = withOAuth ? (clientId ? { clientId, redirectUri, allowHttpLoopback } : undefined) : savedOAuth.current;
+    const saved = await hostingClient.request('saveConnection', {
       id: editing,
       provider,
       label: label || providerLabels[provider],
@@ -147,9 +150,12 @@ export function HostingConnectionEditor({ connection, onClose }: { connection: H
               ? 'https://bitbucket.org'
               : ''),
       ...(apiBaseUrl ? { apiBaseUrl } : {}),
-      ...(clientId ? { oauth: { clientId, redirectUri, allowHttpLoopback } } : {}),
-      ...(clientSecret ? { clientSecret } : {}),
+      ...(oauth ? { oauth } : {}),
+      ...(withOAuth && clientSecret ? { clientSecret } : {}),
     });
+    savedOAuth.current = saved.oauth;
+    return saved;
+  };
   const authenticate = (method: 'token' | 'browser' | 'device' | 'cli' | 'save') =>
     void task.run(async () => {
       if (method === 'cli' && !isSystemToolAvailable('github-cli')) {
@@ -159,7 +165,7 @@ export function HostingConnectionEditor({ connection, onClose }: { connection: H
       const generation = ++auth.current.generation;
       setCliPreview(null);
       setDevice(null);
-      const connection = await save();
+      const connection = await save(method === 'browser' || (method === 'save' && signInMethod === 'browser'));
       if (generation !== auth.current.generation) return;
       auth.current.connectionId = connection.id;
       setEditing(connection.id);
@@ -201,113 +207,143 @@ export function HostingConnectionEditor({ connection, onClose }: { connection: H
         className="hosting-form"
         onSubmit={(event) => {
           event.preventDefault();
-          authenticate(token ? 'token' : 'save');
+          if (task.busy) return;
+          if (signInMethod === 'browser' && browserRequirement) return configureBrowser();
+          if (signInMethod === 'token' && !token.trim()) return;
+          authenticate(signInMethod === 'browser' ? (provider === 'github' ? 'device' : 'browser') : 'token');
         }}
       >
-        <p className="hosting-help">
-          {tr(
-            'Wähle Anbieter und Server. Melde dich mit einem Token oder über den Browser an.',
-            'Choose a provider and server. Sign in with a token or through your browser.',
-          )}
-        </p>
-        <label>
-          {tr('Anbieter', 'Provider')}
-          <select
-            value={provider}
-            disabled={Boolean(editing)}
-            onChange={(event) => {
-              setProvider(event.target.value as HostingProvider);
-              setBaseUrl('');
-              setApiBaseUrl('');
-            }}
-          >
-            {Object.entries(providerLabels).map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          {tr('Name', 'Name')}
-          <TextField value={label} onChange={(event) => setLabel(event.target.value)} placeholder={providerLabels[provider]} />
-        </label>
-        <label>
-          {tr('Server-URL', 'Server URL')}
-          <TextField
-            ref={serverField}
-            value={baseUrl}
-            onChange={(event) => setBaseUrl(event.target.value)}
-            placeholder={defaultServerUrls[provider] || 'https://git.example.com'}
-          />
-        </label>
-        <details ref={oauthSettings}>
-          <summary>{tr('API-Adresse und Browser-Anmeldung', 'API address and browser sign-in')}</summary>
-          <div className="hosting-form hosting-form--nested">
+        <div className="hosting-form hosting-connection-fields">
+          <p className="hosting-help">
+            {tr(
+              'Wähle Anbieter und Server. Melde dich mit einem Token oder über den Browser an.',
+              'Choose a provider and server. Sign in with a token or through your browser.',
+            )}
+          </p>
+          <div className="hosting-form-grid">
             <label>
-              API URL
-              <TextField
-                value={apiBaseUrl}
-                onChange={(event) => setApiBaseUrl(event.target.value)}
-                placeholder={tr('Automatisch vom Anbieter', 'Provider default')}
-              />
+              {tr('Anbieter', 'Provider')}
+              <select
+                value={provider}
+                disabled={Boolean(editing)}
+                onChange={(event) => {
+                  setProvider(event.target.value as HostingProvider);
+                  setBaseUrl('');
+                  setApiBaseUrl('');
+                  setClientId('');
+                  setClientSecret('');
+                  setToken('');
+                  setUsername('');
+                  setEmail('');
+                  setAllowHttpLoopback(false);
+                }}
+              >
+                {Object.entries(providerLabels).map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
-              OAuth Client ID / Consumer Key
-              <TextField ref={clientIdField} value={clientId} onChange={(event) => setClientId(event.target.value)} />
+              {tr('Name', 'Name')}
+              <TextField value={label} onChange={(event) => setLabel(event.target.value)} placeholder={providerLabels[provider]} />
             </label>
-            {(provider === 'bitbucket-cloud' || provider === 'bitbucket-data-center') && (
+          </div>
+          <label>
+            {tr('Server-URL', 'Server URL')}
+            <TextField
+              ref={serverField}
+              value={baseUrl}
+              onChange={(event) => setBaseUrl(event.target.value)}
+              placeholder={defaultServerUrls[provider] || 'https://git.example.com'}
+            />
+          </label>
+          <details>
+            <summary>{tr('Erweiterte Servereinstellungen', 'Advanced server settings')}</summary>
+            <div className="hosting-form hosting-form--nested">
               <label>
-                Client Secret
+                API URL
                 <TextField
-                  type="password"
-                  autoComplete="off"
-                  value={clientSecret}
-                  onChange={(event) => setClientSecret(event.target.value)}
-                  placeholder={editing ? tr('Leer lassen zum Beibehalten', 'Leave blank to keep') : ''}
+                  value={apiBaseUrl}
+                  onChange={(event) => setApiBaseUrl(event.target.value)}
+                  placeholder={tr('Automatisch vom Anbieter', 'Provider default')}
                 />
               </label>
+            </div>
+          </details>
+          <SegmentedControl
+            ariaLabel={tr('Anmeldemethode', 'Sign-in method')}
+            value={signInMethod}
+            disabled={task.busy}
+            options={[
+              { value: 'token', label: tr('Token', 'Token') },
+              { value: 'browser', label: tr('Browser (OAuth)', 'Browser (OAuth)') },
+            ]}
+            onChange={(next) => {
+              if (next === signInMethod) return;
+              cancelAuth();
+              task.cancel();
+              setDevice(null);
+              setCliPreview(null);
+              setSignInMethod(next);
+            }}
+          />
+          <section
+            className="hosting-form hosting-auth-fields"
+            aria-label={signInMethod === 'token' ? tr('Token-Anmeldung', 'Token sign-in') : tr('Browser-Anmeldung', 'Browser sign-in')}
+          >
+            {signInMethod === 'token' ? (
+              <>
+                <p className="hosting-help">
+                  {tr(
+                    'Füge einen persönlichen Zugriffstoken dieses Servers ein. OAuth-Zugangsdaten werden für diesen Weg nicht benötigt.',
+                    'Enter a personal access token from this server. OAuth application credentials are not needed for this method.',
+                  )}
+                </p>
+                <label>
+                  {tr('Token', 'Token')}
+                  <TextField type="password" value={token} autoComplete="off" onChange={(event) => setToken(event.target.value)} />
+                </label>
+                <label>
+                  {tr('Benutzername (optional, für Git/CLI)', 'Username (optional, for Git/CLI)')}
+                  <TextField value={username} onChange={(event) => setUsername(event.target.value)} />
+                </label>
+                {provider === 'bitbucket-cloud' && (
+                  <label>
+                    {tr('Atlassian-E-Mail (optional)', 'Atlassian email (optional)')}
+                    <TextField type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+                  </label>
+                )}
+              </>
+            ) : (
+              <HostingBrowserLoginFields
+                provider={provider}
+                editing={Boolean(editing)}
+                clientId={clientId}
+                setClientId={setClientId}
+                clientIdRef={clientIdField}
+                clientSecret={clientSecret}
+                setClientSecret={setClientSecret}
+                redirectUri={redirectUri}
+                setRedirectUri={setRedirectUri}
+                callbackRef={callbackField}
+                allowHttpLoopback={allowHttpLoopback}
+                setAllowHttpLoopback={setAllowHttpLoopback}
+                loopbackRef={loopbackField}
+              />
             )}
-            <label>
-              {tr('Registrierte Callback-URL', 'Registered callback URL')}
-              <TextField ref={callbackField} value={redirectUri} onChange={(event) => setRedirectUri(event.target.value)} />
-            </label>
-            {provider === 'bitbucket-data-center' && (
-              <label className="hosting-checkbox">
-                <input ref={loopbackField} type="checkbox" checked={allowHttpLoopback} onChange={(event) => setAllowHttpLoopback(event.target.checked)} />
-                {tr('Administrator erlaubt diesen HTTP-Loopback-Callback', 'Administrator permits this HTTP loopback callback')}
-              </label>
-            )}
-            <p>
-              {tr(
-                'OAuth-Anwendung auf diesem Server registrieren. Forgejo und GitLab verwenden PKCE; Bitbucket benötigt eigene Client-Zugangsdaten.',
-                'Register an OAuth application on this server. Forgejo and GitLab use PKCE; Bitbucket requires your own client credentials.',
-              )}
-            </p>
-          </div>
-        </details>
-        <label>
-          {tr('Token', 'Token')}
-          <TextField type="password" value={token} autoComplete="off" onChange={(event) => setToken(event.target.value)} />
-        </label>
-        <label>
-          {tr('Benutzername (optional, für Git/CLI)', 'Username (optional, for Git/CLI)')}
-          <TextField value={username} onChange={(event) => setUsername(event.target.value)} />
-        </label>
-        {provider === 'bitbucket-cloud' && (
-          <label>
-            {tr('Atlassian-E-Mail (optional)', 'Atlassian email (optional)')}
-            <TextField type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
-          </label>
-        )}
-        <HostingAuthenticationActions
-          busy={task.busy}
-          token={Boolean(token)}
-          requirement={browserRequirement}
-          configure={configureBrowser}
-          signIn={() => authenticate(provider === 'github' ? 'device' : 'browser')}
-          signInWithCli={provider === 'github' ? () => authenticate('cli') : undefined}
-        />
+          </section>
+          <HostingAuthenticationActions
+            busy={task.busy}
+            method={signInMethod}
+            token={Boolean(token.trim())}
+            requirement={browserRequirement}
+            configure={configureBrowser}
+            save={() => authenticate('save')}
+            signInWithCli={provider === 'github' ? () => authenticate('cli') : undefined}
+          />
+        </div>
       </form>
       {device && (
         <p>

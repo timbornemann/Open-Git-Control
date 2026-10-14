@@ -7,16 +7,18 @@ import type { BrowserRequirement } from './hostingConnectionRequirements';
 export function HostingAuthenticationActions({
   busy,
   token,
+  method,
   requirement,
   configure,
-  signIn,
+  save,
   signInWithCli,
 }: {
   busy: boolean;
   token: boolean;
+  method: 'token' | 'browser';
   requirement: BrowserRequirement | null;
   configure: () => void;
-  signIn: () => void;
+  save: () => void;
   signInWithCli?: () => void;
 }) {
   const { tr } = useI18n();
@@ -24,15 +26,21 @@ export function HostingAuthenticationActions({
   const cliUnavailable = cliState === 'missing' || cliState === 'unusable';
   return (
     <div className="hosting-actions">
-      <Button type="submit" variant="primary" disabled={busy}>
-        {token ? tr('Mit Token anmelden', 'Sign in with token') : tr('Speichern', 'Save')}
-      </Button>
-      <ActionRequirement reason={!busy ? requirement?.reason : null} remedy={{ label: tr('OAuth einrichten', 'Configure OAuth'), onClick: configure }}>
-        <Button type="button" disabled={busy || Boolean(requirement)} onClick={signIn}>
-          {tr('Im Browser anmelden', 'Sign in in browser')}
+      {method === 'token' ? (
+        <Button type="submit" variant="primary" disabled={busy || !token}>
+          {tr('Mit Token anmelden', 'Sign in with token')}
         </Button>
-      </ActionRequirement>
-      {signInWithCli && (
+      ) : (
+        <ActionRequirement reason={!busy ? requirement?.reason : null} remedy={{ label: tr('OAuth einrichten', 'Configure OAuth'), onClick: configure }}>
+          <Button type="submit" variant="primary" disabled={busy || Boolean(requirement)}>
+            {tr('Im Browser anmelden', 'Sign in in browser')}
+          </Button>
+        </ActionRequirement>
+      )}
+      <Button type="button" disabled={busy} onClick={save}>
+        {tr('Nur speichern', 'Save without signing in')}
+      </Button>
+      {method === 'browser' && signInWithCli && (
         <ActionRequirement
           reason={!busy && cliUnavailable ? tr('GitHub CLI ist nicht verfügbar.', 'GitHub CLI is unavailable.') : null}
           remedy={{ label: tr('Werkzeuge öffnen', 'Open tools'), onClick: () => openSystemTools('github-cli') }}

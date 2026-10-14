@@ -20,6 +20,30 @@
 .hosting-dialog .hosting-form {
   margin: 0;
 }
+.hosting-dialog .dialog-content:has(.hosting-connection-fields) {
+  padding-bottom: 0;
+}
+.hosting-connection-fields {
+  padding: 0;
+  border: 0;
+}
+.hosting-connection-fields input {
+  scroll-margin-block: 12px 110px;
+}
+.hosting-connection-fields > .hosting-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  padding-block: 10px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-panel);
+}
+.hosting-auth-fields {
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-dark);
+}
 .hosting-form label {
   display: flex;
   flex-direction: column;

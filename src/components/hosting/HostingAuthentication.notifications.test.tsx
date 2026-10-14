@@ -29,6 +29,7 @@ const button = (label: string) => [...document.querySelectorAll<HTMLButtonElemen
 const start = async (method: 'token' | 'browser') => {
   if (method === 'browser') await act(async () => button('Sign in in browser').click());
   else {
+    await act(async () => button('Token').click());
     const token = document.querySelector<HTMLInputElement>('input[type="password"]')!;
     act(() => {
       Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!.call(token, 'private-token');
