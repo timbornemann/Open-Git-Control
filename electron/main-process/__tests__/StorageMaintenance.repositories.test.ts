@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { maintenanceFixture } from './maintenanceFixture';
 import { repositoryPathKey } from '../activeRepositoryAuthorization';
 
-describe('repository retention and return periods', () => {
+// Real inventories and fsync-backed state writes need headroom on shared CI disks.
+describe('repository retention and return periods', { timeout: 30_000 }, () => {
   let fixture: ReturnType<typeof maintenanceFixture>;
   beforeEach(() => {
     fixture = maintenanceFixture();

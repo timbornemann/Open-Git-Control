@@ -7,7 +7,8 @@ const state = vi.hoisted(() => ({ root: '' }));
 vi.mock('electron', () => ({ app: { getPath: () => state.root } }));
 import { readRepositoryUiPreferences, updateRepositoryUiPreferences } from '../repositoryUiPreferences';
 
-describe('shared per-repository UI metadata', () => {
+// Real inventories and fsync-backed state writes need headroom on shared CI disks.
+describe('shared per-repository UI metadata', { timeout: 30_000 }, () => {
   let fixture: ReturnType<typeof maintenanceFixture>;
   beforeEach(() => {
     fixture = maintenanceFixture();

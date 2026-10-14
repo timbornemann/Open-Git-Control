@@ -8,7 +8,8 @@ import { inventoryRecovery } from '../storageRecoveryInventory';
 import { repositoryPathKey } from '../activeRepositoryAuthorization';
 import { writeJournal, journalDirectory, backupReference, type EditJournal } from '../../git/commitMessageEditJournal';
 
-describe('recovery ownership across missing worktrees and restarts', () => {
+// Real inventories and fsync-backed state writes need headroom on shared CI disks.
+describe('recovery ownership across missing worktrees and restarts', { timeout: 30_000 }, () => {
   let fixture: ReturnType<typeof maintenanceFixture>;
   let common: string;
   let journal: EditJournal;
