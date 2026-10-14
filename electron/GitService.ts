@@ -274,12 +274,15 @@ export class GitService {
   }
 
   /** Unambiguous NUL-delimited status for backend parsers. */
-  async getStatusPorcelainZAtPath(repoPath: string): Promise<string> {
+  async getStatusPorcelainZAtPath(repoPath: string, signal?: AbortSignal): Promise<string> {
+    signal?.throwIfAborted();
     const normalizedPath = (repoPath || '').trim();
     if (normalizedPath && (await this.isBareRepositoryAtPathAsync(normalizedPath)) && shouldSuppressBareWorkTreeCommand(statusPorcelainZArgs())) {
       return '';
     }
-    return this.runCommandAtPath(repoPath, statusPorcelainZArgs());
+    return signal
+      ? this.runCommandAtPathWithSignal(repoPath, statusPorcelainZArgs(), signal, 'interactive')
+      : this.runCommandAtPath(repoPath, statusPorcelainZArgs());
   }
 
   /**

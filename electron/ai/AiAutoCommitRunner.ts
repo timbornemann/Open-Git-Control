@@ -36,6 +36,7 @@ export class AiAutoCommitRunner {
       getOpenAiApiKey,
       options.beforeCommit,
       options.verifySecretScanContext,
+      options.signal,
     ).run();
   }
 }

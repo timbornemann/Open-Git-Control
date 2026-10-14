@@ -34,6 +34,7 @@ export class AiAutoCommitRunSession {
     private readonly getOpenAiApiKey: () => string = () => '',
     private readonly beforeCommit?: (privateIndexPath: string, baseTree?: string) => Promise<void>,
     private readonly verifySecretScanContext?: () => void,
+    private readonly parentSignal?: AbortSignal,
   ) {
     this.transaction = new AiAutoCommitIndexTransaction(git, repoPath, beforeCommit, {
       signoff: settings.commitSignoffByDefault,
@@ -43,6 +44,9 @@ export class AiAutoCommitRunSession {
   }
 
   async run(): Promise<AiAutoCommitResult> {
+    const abort = () => this.control.abort(this.parentSignal?.reason);
+    this.parentSignal?.addEventListener('abort', abort, { once: true });
+    if (this.parentSignal?.aborted) abort();
     const cancellation = setInterval(() => {
       if (this.shouldCancel()) this.control.abort();
     }, 100);
@@ -52,7 +56,7 @@ export class AiAutoCommitRunSession {
       this.validateInputs();
       this.emit('snapshot', 'Änderungsstände werden erfasst …', 5);
       const started = Date.now();
-      const entries = parseStatusPorcelain(await this.git.getStatusPorcelainZAtPath(this.repoPath));
+      const entries = parseStatusPorcelain(await this.git.getStatusPorcelainZAtPath(this.repoPath, this.control.signal));
       if (entries.some((entry) => /^(UU|AA|DD|AU|UA|DU|UD)$/.test(entry.code))) throw new Error('Repository hat Konflikte. Bitte zuerst auflösen.');
       if (!entries.length) throw new Error('Working Tree ist sauber. Keine Commits nötig.');
       await this.transaction.initialize(entries);
@@ -112,6 +116,7 @@ export class AiAutoCommitRunSession {
       if (this.commits.length || cancelled) return this.finish(cancelled ? 'cancelled' : 'partial', message);
       throw failure;
     } finally {
+      this.parentSignal?.removeEventListener('abort', abort);
       clearInterval(cancellation);
       clearTimeout(timeout);
       recordAutoCommitDiagnostic(
@@ -199,7 +204,9 @@ export class AiAutoCommitRunSession {
   private async finish(outcome: 'complete' | 'partial' | 'cancelled', error?: string): Promise<AiAutoCommitResult> {
     let remainingFiles = this.counts().remainingFiles;
     try {
-      remainingFiles = new Set(parseStatusPorcelain(await this.git.getStatusPorcelainZAtPath(this.repoPath)).map((entry) => entry.path)).size;
+      if (!this.control.signal.aborted)
+        remainingFiles = new Set(parseStatusPorcelain(await this.git.getStatusPorcelainZAtPath(this.repoPath, this.control.signal)).map((entry) => entry.path))
+          .size;
     } catch {
       /* Known snapshot count remains available. */
     }

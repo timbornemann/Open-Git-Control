@@ -483,13 +483,14 @@ export class AiAutoCommitIndexTransaction {
   }
 
   private async exclusive<T>(work: () => Promise<T>): Promise<T> {
-    return this.git.runner.withExclusiveWrite(this.repoPath, 'AI commit transaction', async (git) => {
+    const execute = async (git: CommitEditGit) => {
       this.exclusiveGit = git;
       try {
         return await work();
       } finally {
         this.exclusiveGit = undefined;
       }
-    });
+    };
+    return this.git.runner.withExclusiveWrite(this.repoPath, 'AI commit transaction', execute, this.options.signal);
   }
 }
