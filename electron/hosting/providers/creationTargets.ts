@@ -26,6 +26,11 @@ const nextLink = (headers: Headers) =>
     .split(',')
     .find((p) => /rel="next"/.test(p))
     ?.match(/<([^>]+)>/)?.[1] || null;
+const organizationTarget = (provider: HostingConnection['provider'], value: Row) => {
+  // Forgejo's Organization schema uses name; username is its deprecated alias.
+  const namespace = validIdentifier(provider === 'forgejo' ? value.name || value.username : value.login);
+  return target(namespace, namespace, text(value.full_name || value.name || namespace), 'organization');
+};
 
 /** Each provider owns namespace syntax, paging and required project information. */
 export async function listCreationTargets(
@@ -38,7 +43,7 @@ export async function listCreationTargets(
   let nextCursor: string | null = null;
   if (provider === 'github' || provider === 'forgejo') {
     const response = await http.json(input.cursor || 'user/orgs', { query: input.cursor ? undefined : { per_page: 50, limit: 50 } });
-    items = rows(response.data).map((v) => target(v.login, text(v.login), text(v.full_name || v.name || v.login), 'organization'));
+    items = rows(response.data).map((v) => organizationTarget(provider, v));
     nextCursor = nextLink(response.headers);
     if (provider === 'forgejo' && !nextCursor && items.length === 50) {
       const current = input.cursor ? new URL(http.url(input.cursor)).searchParams.get('page') || '1' : '1';
@@ -86,7 +91,9 @@ export async function verifyCreationTarget(
       return target(v.login, text(v.login), text(v.login), 'personal');
     }
     const v = row((await http.json(`orgs/${enc(namespace)}`)).data);
-    const result = target(v.login, text(v.login), text(v.name || v.login), 'organization');
+    const result = organizationTarget(connection.provider, v);
+    if (result.namespace.toLowerCase() !== namespace.toLowerCase())
+      throw new HostingHttpError(0, 'invalid_target', 'The organization returned by the server does not match the selected target.');
     // Creation is still subject to server policy; do not claim that membership grants administration.
     if (connection.provider === 'github' && (v.members_can_create_private_repositories === false || v.members_can_create_public_repositories === false)) {
       const membership = row((await http.json(`user/memberships/orgs/${enc(namespace)}`)).data);

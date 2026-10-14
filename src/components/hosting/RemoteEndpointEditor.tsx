@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Network, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
@@ -11,6 +11,7 @@ import { RemoteEndpointAuthentication } from './RemoteEndpointAuthentication';
 
 type Props = {
   repoPath: string;
+  addRequest?: number;
   snapshot: GitRemoteSnapshotDto;
   preferences: RemotePreferences;
   connections: HostingConnection[];
@@ -24,16 +25,24 @@ type Props = {
 };
 
 export function RemoteEndpointEditor(props: Props) {
-  const { snapshot, task, request, repoPath, reload } = props;
+  const { snapshot, task, request, repoPath, reload, addRequest } = props;
   const { tr } = useI18n();
-  const suggestedName = () => {
-    const base = snapshot.remotes.length ? 'backup' : 'origin';
+  const suggestedName = (remotes: GitRemoteDto[]) => {
+    const base = remotes.length ? 'backup' : 'origin';
     let name = base;
-    for (let suffix = 2; snapshot.remotes.some((remote) => remote.name === name); suffix++) name = base + suffix;
+    for (let suffix = 2; remotes.some((remote) => remote.name === name); suffix++) name = base + suffix;
     return name;
   };
-  const [newName, setNewName] = useState(suggestedName);
+  const [newName, setNewName] = useState(() => suggestedName(snapshot.remotes));
   const [newUrl, setNewUrl] = useState('');
+  const addForm = useRef<HTMLDetailsElement>(null);
+  const nameField = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!addRequest || !addForm.current) return;
+    addForm.current.open = true;
+    addForm.current.scrollIntoView?.({ block: 'nearest' });
+    nameField.current?.focus({ preventScroll: true });
+  }, [addRequest]);
   return (
     <>
       <div className="remote-configuration__remote-list">
@@ -41,10 +50,10 @@ export function RemoteEndpointEditor(props: Props) {
           <RemoteEndpointRow key={remote.name} {...props} remote={remote} />
         ))}
       </div>
-      <details className="remote-configuration__advanced" open={snapshot.remotes.length === 0 ? true : undefined}>
+      <details ref={addForm} className="remote-configuration__advanced" open={snapshot.remotes.length === 0 ? true : undefined}>
         <summary>
           <Plus size={14} aria-hidden="true" />
-          {tr('Vorhandenes Repository verbinden', 'Connect existing repository')}
+          {tr('Remote hinzufügen', 'Add remote')}
         </summary>
         <p>
           {tr(
@@ -56,9 +65,11 @@ export function RemoteEndpointEditor(props: Props) {
           className="remote-configuration__form"
           onSubmit={(event) => {
             event.preventDefault();
+            if (task.busy || !newName.trim() || !newUrl.trim()) return;
             void task.run(async () => {
-              await request('editRemote', { repoPath, mutation: { action: 'add', name: newName.trim(), url: newUrl.trim() } });
+              const updated = await request('editRemote', { repoPath, mutation: { action: 'add', name: newName.trim(), url: newUrl.trim() } });
               setNewUrl('');
+              setNewName(suggestedName(updated.remotes));
               await reload();
             });
           }}
@@ -66,13 +77,22 @@ export function RemoteEndpointEditor(props: Props) {
           <div className="remote-configuration__fields">
             <label>
               {tr('Remote-Name', 'Remote name')}
-              <TextField required value={newName} disabled={task.busy} onChange={(event) => setNewName(event.target.value)} placeholder="origin" />
+              <TextField
+                ref={nameField}
+                aria-label={tr('Name des neuen Remotes', 'New remote name')}
+                required
+                value={newName}
+                disabled={task.busy}
+                onChange={(event) => setNewName(event.target.value)}
+                placeholder="origin"
+              />
               <small>{tr('Ein lokaler Name, zum Beispiel origin oder backup.', 'A local name, for example origin or backup.')}</small>
             </label>
             <label>
               {tr('Git-URL des vorhandenen Repositorys', 'Git URL of the existing repository')}
               <TextField
                 required
+                aria-label={tr('Adresse des neuen Remotes', 'New remote URL')}
                 value={newUrl}
                 disabled={task.busy}
                 onChange={(event) => setNewUrl(event.target.value)}
@@ -81,7 +101,7 @@ export function RemoteEndpointEditor(props: Props) {
             </label>
           </div>
           <div className="hosting-actions">
-            <Button type="submit" icon={<Plus size={14} />} disabled={task.busy}>
+            <Button type="submit" icon={<Plus size={14} />} disabled={task.busy || !newName.trim() || !newUrl.trim()}>
               {tr('Remote hinzufügen', 'Add remote')}
             </Button>
             <small>
@@ -101,7 +121,6 @@ function RemoteEndpointRow({ remote, ...props }: Props & { remote: GitRemoteDto 
   const { tr } = useI18n();
   const { task, edit, repoPath, request, reload, preferences } = props;
   const [name, setName] = useState(remote.name);
-  const [fetchUrl, setFetchUrl] = useState(remote.fetchUrls[0] ?? '');
   const [confirmRemoval, setConfirmRemoval] = useState(false);
   return (
     <article className="remote-configuration__remote">
@@ -116,18 +135,21 @@ function RemoteEndpointRow({ remote, ...props }: Props & { remote: GitRemoteDto 
             : tr('Git-Verbindung', 'Git connection')}
         </small>
       </header>
+      <RemoteFetchUrlEditor key={JSON.stringify(remote.fetchUrls)} remote={remote} busy={task.busy} edit={edit} />
       <dl className="remote-configuration__urls">
-        <div>
-          <dt>{tr('Abrufen & Pull', 'Fetch & pull')}</dt>
-          <dd>{remote.fetchUrls.join('\n')}</dd>
-        </div>
+        {remote.fetchUrls.length > 1 && (
+          <div>
+            <dt>{tr('Weitere Fetch-URLs', 'Additional fetch URLs')}</dt>
+            <dd>{remote.fetchUrls.slice(1).join('\n')}</dd>
+          </div>
+        )}
         <div>
           <dt>{tr('Push', 'Push')}</dt>
           <dd>{remote.pushUrls.join('\n')}</dd>
         </div>
       </dl>
       <details className="remote-configuration__advanced">
-        <summary>{tr('Name und Adressen bearbeiten', 'Edit name and addresses')}</summary>
+        <summary>{tr('Weitere Remote-Einstellungen', 'More remote settings')}</summary>
         <p>
           {tr(
             'Diese Aktionen ändern die Git-Verbindung sofort. Bereits hochgeladene Repositorys bleiben bestehen.',
@@ -154,30 +176,6 @@ function RemoteEndpointRow({ remote, ...props }: Props & { remote: GitRemoteDto 
             </label>
             <Button type="submit" disabled={task.busy || !name.trim() || name.trim() === remote.name}>
               {tr('Umbenennen', 'Rename')}
-            </Button>
-          </form>
-          <form
-            className="remote-configuration__form"
-            key={remote.fetchUrls.join('|')}
-            onSubmit={(event) => {
-              event.preventDefault();
-              const value = String(new FormData(event.currentTarget).get('fetchUrl') ?? '').trim();
-              edit('set-url', remote.name, value);
-            }}
-          >
-            <label>
-              {tr('Fetch-URL', 'Fetch URL')}
-              <TextField
-                name="fetchUrl"
-                required
-                aria-label={tr('Fetch-URL für ', 'Fetch URL for ') + remote.name}
-                defaultValue={remote.fetchUrls[0]}
-                disabled={task.busy}
-                onChange={(event) => setFetchUrl(event.target.value)}
-              />
-            </label>
-            <Button type="submit" disabled={task.busy || !fetchUrl.trim() || fetchUrl.trim() === remote.fetchUrls[0]}>
-              {tr('Fetch-URL übernehmen', 'Apply fetch URL')}
             </Button>
           </form>
         </div>
@@ -261,5 +259,42 @@ function RemoteEndpointRow({ remote, ...props }: Props & { remote: GitRemoteDto 
         unbind={props.unbind}
       />
     </article>
+  );
+}
+
+function RemoteFetchUrlEditor({ remote, busy, edit }: { remote: GitRemoteDto; busy: boolean; edit: Props['edit'] }) {
+  const { tr } = useI18n();
+  const original = remote.fetchUrls[0] ?? '';
+  const [value, setValue] = useState(original);
+  const changed = Boolean(value.trim() && value.trim() !== original);
+  return (
+    <form
+      className="remote-configuration__form"
+      aria-label={tr('Adresse für ', 'Address for ') + remote.name}
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!busy && changed) edit('set-url', remote.name, value.trim());
+      }}
+    >
+      <label>
+        {tr('Remote-Adresse (Fetch & Pull)', 'Remote URL (fetch & pull)')}
+        <TextField
+          required
+          aria-label={tr('Fetch-URL für ', 'Fetch URL for ') + remote.name}
+          value={value}
+          disabled={busy}
+          onChange={(event) => setValue(event.target.value)}
+        />
+        <small>
+          {tr(
+            'Push nutzt diese Adresse, sofern keine eigenen Push-Adressen eingerichtet sind.',
+            'Push uses this address unless separate push URLs are configured.',
+          )}
+        </small>
+      </label>
+      <Button type="submit" disabled={busy || !changed}>
+        {tr('Adresse übernehmen', 'Apply URL')}
+      </Button>
+    </form>
   );
 }

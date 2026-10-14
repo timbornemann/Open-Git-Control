@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowDownUp, GitBranch, Network, RotateCcw, Save } from 'lucide-react';
+import { ArrowDownUp, GitBranch, Network, Plus, RotateCcw, Save } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { RemoteEndpointEditor } from './RemoteEndpointEditor';
 import { RemoteConfigurationSelection } from './RemoteConfigurationSelection';
@@ -19,8 +19,14 @@ export function RemoteConfigurationView({ repoPath }: { repoPath: string | null 
   const editor = useRemoteConfiguration(repoPath);
   const onPublish = useOptionalUIContext()?.onOpenRepositoryPublication;
   const [section, setSection] = useState<'transfers' | 'connections'>('transfers');
+  const [addRequest, setAddRequest] = useState<{ repoPath: string; id: number } | null>(null);
   const snapshot = editor.snapshot;
   const issue = snapshot ? remoteConfigurationIssue(snapshot, editor.preferences, tr) : null;
+  const addRemote = () => {
+    if (!repoPath || !snapshot || editor.task.busy) return;
+    setSection('connections');
+    setAddRequest((previous) => ({ repoPath, id: (previous?.id ?? 0) + 1 }));
+  };
   if (!repoPath) return <p className="hosting-empty">{tr('Zuerst ein lokales Repository öffnen.', 'Open a local repository first.')}</p>;
   return (
     <main className="remote-configuration hosting-workspace" aria-label={tr('Remote-Konfiguration', 'Remote configuration')}>
@@ -41,6 +47,9 @@ export function RemoteConfigurationView({ repoPath }: { repoPath: string | null 
                 ? tr('1 Verbindung', '1 connection')
                 : tr(`${snapshot.remotes.length} Verbindungen`, `${snapshot.remotes.length} connections`)}
             </span>
+            <Button icon={<Plus size={14} />} disabled={editor.task.busy} onClick={addRemote}>
+              {tr('Remote hinzufügen', 'Add remote')}
+            </Button>
           </div>
         )}
       </header>
@@ -96,7 +105,7 @@ export function RemoteConfigurationView({ repoPath }: { repoPath: string | null 
                     )}
                   </p>
                   <div className="hosting-actions">
-                    <Button variant="primary" onClick={() => setSection('connections')}>
+                    <Button variant="primary" onClick={addRemote}>
                       {tr('Vorhandenes Repository verbinden', 'Connect existing repository')}
                     </Button>
                     {onPublish && (
@@ -138,6 +147,7 @@ export function RemoteConfigurationView({ repoPath }: { repoPath: string | null 
                 <RemoteEndpointEditor
                   key={repoPath}
                   repoPath={repoPath}
+                  addRequest={addRequest?.repoPath === repoPath ? addRequest.id : 0}
                   snapshot={snapshot}
                   preferences={editor.preferences}
                   connections={editor.connections}

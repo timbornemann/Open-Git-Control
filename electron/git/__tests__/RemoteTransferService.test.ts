@@ -27,6 +27,41 @@ afterEach(async () => {
 }, 60_000);
 
 describe('RemoteTransferService with real Git', () => {
+  integrationTest('adds and edits remote addresses while preserving push URLs, tracking and transfer selections', async (lifecycle) => {
+    const f = fixture(lifecycle);
+    const originalUrl = 'https://forge.example/team/original.git';
+    const pushUrl = 'ssh://git@push.example/team/original.git';
+    git(f.repo, 'remote', 'add', 'origin', originalUrl);
+    git(f.repo, 'config', '--add', 'remote.origin.pushurl', pushUrl);
+    git(f.repo, 'config', 'branch.main.remote', 'origin');
+    git(f.repo, 'config', 'branch.main.merge', 'refs/heads/main');
+    git(f.repo, 'config', 'remote.pushDefault', 'origin');
+    git(f.repo, 'config', 'url.https://forge.example/.insteadOf', 'forge:');
+    f.store.write(f.repo, {
+      fetchRemote: 'origin',
+      pullRemote: 'origin',
+      pushRemotes: ['origin'],
+      bindings: [{ remoteName: 'origin', url: originalUrl, repository: { connectionId: 'account', repositoryId: '42', fullPath: 'team/original' } }],
+    });
+    const commands = vi.spyOn(lifecycle.runner, 'runResult');
+    const added = await f.service.editRemote(f.repo, { action: 'add', name: 'backup', url: 'https://backup.example/team/repo.git' }, f.context);
+    expect(added.remotes.map((remote) => remote.name)).toEqual(['backup', 'origin']);
+    expect(f.service.getPreferences(f.repo).bindings).toHaveLength(1);
+    const updated = await f.service.editRemote(f.repo, { action: 'set-url', name: 'origin', url: 'forge:team/renamed.git' }, f.context);
+    expect(updated).toMatchObject({ branch: 'main', upstream: { remote: 'origin', branch: 'main' }, defaultPushRemote: 'origin' });
+    expect(updated.remotes.find((remote) => remote.name === 'origin')).toEqual({
+      name: 'origin',
+      fetchUrls: ['https://forge.example/team/renamed.git'],
+      pushUrls: [pushUrl],
+    });
+    expect(f.service.getPreferences(f.repo)).toMatchObject({ fetchRemote: 'origin', pullRemote: 'origin', pushRemotes: ['origin'], bindings: [] });
+    expect(git(f.repo, 'rev-parse', 'HEAD')).toBe(f.initial);
+    expect(git(f.repo, 'config', '--get', 'remote.origin.url')).toBe('forge:team/renamed.git');
+    expect(git(f.repo, 'config', '--get-all', 'remote.origin.pushurl')).toBe(pushUrl);
+    expect(commands.mock.calls.some(([, args]) => ['fetch', 'pull', 'push', 'ls-remote'].includes(args[0]))).toBe(false);
+    expect(f.context.authorizePush).not.toHaveBeenCalled();
+  });
+
   integrationTest('publishes a different release branch only to its selected endpoint without checkout, backup push or upstream changes', async (lifecycle) => {
     const f = fixture(lifecycle);
     const selected = f.bare('release-source');

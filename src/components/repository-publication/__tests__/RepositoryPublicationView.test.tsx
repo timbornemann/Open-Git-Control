@@ -146,6 +146,44 @@ afterEach(async () => {
 });
 
 describe('shared publication wizard', () => {
+  it('selects a Forgejo organization by its namespace and prepares publication for that organization', async () => {
+    const forgejo = {
+      ...connection,
+      id: 'forgejo',
+      provider: 'forgejo' as const,
+      baseUrl: 'https://forge.example',
+      apiBaseUrl: 'https://forge.example/api/v1',
+    };
+    useHostingState.setState({ connections: [forgejo] });
+    const request = mocks.request.getMockImplementation()!;
+    mocks.request.mockImplementation(async (operation, input) => {
+      if (operation === 'creationTargets')
+        return {
+          items: [{ id: 'team', namespace: 'team', label: 'Team display name', kind: 'organization', visibility: ['private', 'public'] }],
+          nextCursor: null,
+          requiresProject: false,
+          allowsManual: true,
+        };
+      return request(operation, input);
+    });
+    await render('C:/project', forgejo.id);
+    await flush();
+    const option = container.querySelector<HTMLOptionElement>('select[aria-label="Account, organization or namespace"] option[value="team"]')!;
+    expect(option.textContent).toContain('Team display name');
+    expect(option.disabled).toBe(false);
+    await setSelect('Account, organization or namespace', 'team');
+    expect(button('Next').disabled).toBe(false);
+    await click('Next');
+    await click('Review selection');
+    expect(mocks.request).toHaveBeenCalledWith(
+      'preparePublication',
+      expect.objectContaining({ selection: expect.objectContaining({ creation: expect.objectContaining({ connectionId: 'forgejo', namespace: 'team' }) }) }),
+    );
+    expect(saved?.selection.creation.namespace).toBe('team');
+    expect(mocks.request.mock.calls.some(([operation]) => operation === 'connectPublication')).toBe(false);
+    expect(mocks.transfer).not.toHaveBeenCalled();
+  });
+
   it('reviews before creating and sends only captured branches, tags and the new endpoint to the coordinator', async () => {
     await render();
     await flush();

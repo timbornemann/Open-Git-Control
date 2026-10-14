@@ -22,10 +22,12 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('provider creation targets', () => {
   it.each(['github', 'forgejo'] as const)('%s lists personal and paginated organization destinations', async (provider) => {
+    const organization = (name: string) =>
+      provider === 'forgejo' ? { name, full_name: name === 'team' ? 'Team' : 'Next' } : { login: name, full_name: name === 'team' ? 'Team' : 'Next' };
     const request = vi
       .fn()
-      .mockResolvedValueOnce(json([{ login: 'team', full_name: 'Team' }], { Link: '<https://forge.invalid/team/api/user/orgs?page=2>; rel="next"' }))
-      .mockResolvedValueOnce(json([{ login: 'next', full_name: 'Next' }]));
+      .mockResolvedValueOnce(json([organization('team')], { Link: '<https://forge.invalid/team/api/user/orgs?page=2>; rel="next"' }))
+      .mockResolvedValueOnce(json([organization('next')]));
     vi.stubGlobal('fetch', request);
     const service = adapter(provider),
       first = await service.creationTargets({ connectionId: provider });
@@ -35,12 +37,49 @@ describe('provider creation targets', () => {
     ]);
     expect((await service.creationTargets({ connectionId: provider, cursor: first.nextCursor! })).items.map((v) => v.namespace)).toEqual(['next']);
   });
+  it.each([
+    { name: 'team', username: 'deprecated-name', full_name: 'Team display name' },
+    { username: 'team', full_name: 'Team display name' },
+  ])('verifies a Forgejo organization and creates in its canonical namespace: %j', async (organization) => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(json(organization))
+      .mockResolvedValueOnce(json({ id: 42, name: 'demo', full_name: 'team/demo', clone_url: 'https://forge.invalid/team/demo.git' }));
+    vi.stubGlobal('fetch', request);
+    const service = adapter('forgejo');
+    const verified = await service.verifyCreationTarget({ connectionId: 'forgejo', namespace: 'team', name: 'demo', private: true });
+    expect(verified).toMatchObject({ id: 'team', namespace: 'team', label: 'Team display name', kind: 'organization' });
+    const created = await service.createRepository({ connectionId: 'forgejo', namespace: verified.namespace, name: 'demo', private: true });
+    expect(created.fullName).toBe('team/demo');
+    expect(String(request.mock.calls[1][0])).toBe('https://forge.invalid/team/api/orgs/team/repos');
+    expect(request.mock.calls[1][1].method).toBe('POST');
+  });
   it.each(['github', 'forgejo'] as const)('%s verifies a personal account before creation', async (provider) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ id: 7, login: 'alice' })));
     expect(await adapter(provider).verifyCreationTarget({ connectionId: provider, namespace: 'alice', name: 'demo', private: true })).toMatchObject({
       namespace: 'alice',
       kind: 'personal',
     });
+  });
+  it.each([{ id: 8, full_name: 'Display name only' }, { name: 'another-organization' }])(
+    'rejects unusable Forgejo organization metadata: %j',
+    async (organization) => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(organization)));
+      await expect(adapter('forgejo').verifyCreationTarget({ connectionId: 'forgejo', namespace: 'team', name: 'demo', private: true })).rejects.toMatchObject({
+        code: 'invalid_target',
+      });
+    },
+  );
+  it('keeps Forgejo creation subject to the server permission check', async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(json({ name: 'team', full_name: 'Team' }))
+      .mockResolvedValueOnce(new Response('', { status: 403 }));
+    vi.stubGlobal('fetch', request);
+    const service = adapter('forgejo');
+    const creation = { connectionId: 'forgejo', namespace: 'team', name: 'demo', private: true };
+    await service.verifyCreationTarget(creation);
+    await expect(service.createRepository(creation)).rejects.toMatchObject({ status: 403, code: 'permission_denied' });
   });
   it('respects GitHub organization visibility policy for a non-owner', async () => {
     vi.stubGlobal(
