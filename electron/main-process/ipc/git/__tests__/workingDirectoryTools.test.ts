@@ -200,19 +200,25 @@ describe('working-directory tool handlers', () => {
     });
   });
 
-  it('omits destination folders that do not have usable Windows access', async () => {
-    fs.mkdirSync(path.join(repoPath, 'accessible'));
-    fs.mkdirSync(path.join(repoPath, 'blocked'));
-    const blockedPath = fs.realpathSync(path.join(repoPath, 'blocked'));
-    assertEntryAccessMock.mockImplementation((targetPath: string) => {
-      if (path.resolve(targetPath) === blockedPath) throw new Error('Access denied.');
-    });
+  it.each(process.platform === 'win32' ? ['original', 'lowercase'] : ['original'])(
+    'omits destination folders that do not have usable Windows access (%s path casing)',
+    async (pathCasing) => {
+      if (pathCasing === 'lowercase') repoPath = repoPath.toLowerCase();
+      fs.mkdirSync(path.join(repoPath, 'accessible'));
+      fs.mkdirSync(path.join(repoPath, 'blocked'));
+      // Match the native realpath used by the handler, including Windows short-name expansion and casing.
+      const blockedPath = await fs.promises.realpath(path.join(repoPath, 'blocked'));
+      assertEntryAccessMock.mockImplementation(async (targetPath: string) => {
+        if (path.resolve(targetPath) === blockedPath) throw new Error('Access denied.');
+      });
 
-    await expect(handlers.get(IpcChannel.GitListWorkingDirectoryFolders)?.({}, repoPath, '')).resolves.toEqual({
-      success: true,
-      data: ['accessible'],
-    });
-  });
+      await expect(handlers.get(IpcChannel.GitListWorkingDirectoryFolders)?.({}, repoPath, '')).resolves.toEqual({
+        success: true,
+        data: ['accessible'],
+      });
+      expect(assertEntryAccessMock).toHaveBeenCalledWith(blockedPath);
+    },
+  );
 
   it('finds top-level empty trees and deletes only folders that are still empty', async () => {
     fs.mkdirSync(path.join(repoPath, 'empty', 'nested'), { recursive: true });

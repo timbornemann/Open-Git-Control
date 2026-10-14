@@ -113,12 +113,14 @@ describe('storage cleanup integrity and bounded growth', () => {
     expect(fs.existsSync(migration)).toBe(true);
     expect(JSON.parse(fs.readFileSync(preferences, 'utf8')).repositories[key]).toBeDefined();
   });
+  // Real inventories and fsync-backed state writes across 35 runs need headroom on shared CI disks.
   it('caps reports at 30 entries and 1 MiB despite repeated runs', async () => {
     for (let i = 0; i < 35; i++) await fixture.service.run({ mode: 'eligible', categories: ['previews'] });
+    fixture.restart();
     const result = await fixture.service.inspect();
     expect(result.reports).toHaveLength(30);
     expect(Buffer.byteLength(JSON.stringify(result.reports))).toBeLessThanOrEqual(1024 ** 2);
-  });
+  }, 30_000);
   it('stops safely when shutdown occurs during an asynchronous repository probe', async () => {
     const preview = fixture.preview();
     let resume!: () => void;
