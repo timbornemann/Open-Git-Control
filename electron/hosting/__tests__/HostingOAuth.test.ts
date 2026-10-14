@@ -5,7 +5,7 @@ import type { HostingConnection } from '../../../src/types/hostingDtos';
 import { browserOAuthLogin, refreshOAuthCredential } from '../HostingOAuth';
 
 const state = vi.hoisted(() => ({ open: vi.fn<(url: string) => Promise<void>>() }));
-vi.mock('electron', () => ({ shell: { openExternal: state.open } }));
+vi.mock('electron', () => ({ shell: { openExternal: state.open }, net: { fetch: (...args: Parameters<typeof fetch>) => fetch(...args) } }));
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
@@ -32,11 +32,11 @@ function callback(url: string): Promise<number> {
 }
 
 describe('desktop browser OAuth', () => {
-  it('uses PKCE, rejects a forged callback state, and completes only the bound callback', async () => {
+  it.each(['gitlab', 'forgejo'] as const)('uses PKCE for %s, rejects forged callback states, and completes only the bound callback', async (provider) => {
     const port = await freePort();
     const connection: HostingConnection = {
       id: 'one',
-      provider: 'gitlab',
+      provider,
       label: 'GitLab',
       baseUrl: 'https://git.example.test/nested',
       apiBaseUrl: 'https://git.example.test/nested/api/v4',
@@ -73,7 +73,7 @@ describe('desktop browser OAuth', () => {
     expect(result).toMatchObject({ accessToken: 'oauth-access-secret', refreshToken: 'rotating-refresh-secret', authType: 'oauth' });
     const [tokenUrl, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     const params = new URLSearchParams(String(init.body));
-    expect(tokenUrl).toBe('https://git.example.test/nested/oauth/token');
+    expect(tokenUrl).toBe(`https://git.example.test/nested/${provider === 'forgejo' ? 'login/oauth/access_token' : 'oauth/token'}`);
     expect(params.get('code')).toBe('valid-code');
     expect(params.has('client_secret')).toBe(false);
     expect(authorization.searchParams.get('code_challenge_method')).toBe('S256');
@@ -99,6 +99,42 @@ describe('desktop browser OAuth', () => {
     state.open.mockImplementation(async () => controller.abort());
     await expect(browserOAuthLogin(connection, undefined, controller.signal)).rejects.toThrow('cancelled');
     await expect(callback(connection.oauth!.redirectUri)).rejects.toThrow();
+  });
+
+  it('reports an untrusted Forgejo certificate after the browser callback without claiming the account is signed in', async () => {
+    const port = await freePort();
+    const connection: HostingConnection = {
+      id: 'local-forgejo',
+      provider: 'forgejo',
+      label: 'Local Forgejo',
+      baseUrl: 'https://172.24.3.20',
+      apiBaseUrl: 'https://172.24.3.20/api/v1',
+      username: null,
+      userId: null,
+      authenticated: false,
+      hasCredentials: false,
+      oauth: { clientId: 'desktop', redirectUri: `http://127.0.0.1:${port}/callback` },
+    };
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed', { cause: new Error('net::ERR_CERT_AUTHORITY_INVALID') })));
+    let message = '';
+    state.open.mockImplementation(async (url) => {
+      const authorization = new URL(url);
+      const redirect = `${connection.oauth!.redirectUri}?state=${authorization.searchParams.get('state')}&code=private-code`;
+      await new Promise<void>((resolve, reject) => {
+        get(redirect, (response) => {
+          response.setEncoding('utf8');
+          response.on('data', (chunk: string) => {
+            message += chunk;
+          });
+          response.on('end', resolve);
+        }).on('error', reject);
+      });
+    });
+    await expect(browserOAuthLogin(connection, undefined, new AbortController().signal)).rejects.toMatchObject({ code: 'certificate_untrusted' });
+    await state.open.mock.results[0].value;
+    expect(message).toContain('completing sign-in');
+    expect(message).not.toContain('Signed in');
+    await expect(callback(connection.oauth!.redirectUri!)).rejects.toThrow();
   });
 
   it('retains the previous refresh token when the provider does not rotate it', async () => {

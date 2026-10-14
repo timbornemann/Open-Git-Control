@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createHostingAdapter } from '../index';
 import type { HostedRepository, HostingConnection } from '../../../../src/types/hostingDtos';
 
+vi.mock('../../HostingNetwork', () => ({ hostingFetch: (...args: Parameters<typeof fetch>) => fetch(...args) }));
+
 afterEach(() => vi.unstubAllGlobals());
 const connection: HostingConnection = {
   id: 'private-server',

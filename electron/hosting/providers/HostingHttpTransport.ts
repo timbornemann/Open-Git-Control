@@ -1,3 +1,5 @@
+import { hostingFetch } from '../HostingNetwork';
+
 export type HostingTokenGetter = () => string | Promise<string>;
 export type HostingFetch = typeof fetch;
 
@@ -40,7 +42,7 @@ export class HostingHttpTransport {
   constructor(private readonly options: HostingHttpOptions) {
     this.baseUrl = this.validateUrl(options.baseUrl);
     this.baseUrl.pathname = this.baseUrl.pathname.replace(/\/$/, '') + '/';
-    this.fetchImpl = options.fetch ?? fetch;
+    this.fetchImpl = options.fetch ?? hostingFetch;
   }
 
   private validateUrl(value: string): URL {

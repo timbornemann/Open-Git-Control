@@ -8,12 +8,18 @@ import type { HostingConnection } from '@/types/hostingDtos';
 import { providerLabels, useHostingState } from './hostingState';
 import { useHostingTask } from './useHostingTask';
 import { HostingConnectionEditor } from './HostingConnectionEditor';
+import { useAppToast } from '@/hooks/useAppToast';
 
 export function HostingConnections({ headingId }: { headingId?: string } = {}) {
   const { tr } = useI18n();
   const { connections, setConnections, refresh } = useHostingState();
   const [editor, setEditor] = useState<{ connection: HostingConnection | null } | null>(null);
-  const task = useHostingTask('connections');
+  const showToast = useAppToast();
+  const reportError = useCallback(
+    (message: string) => showToast(`${tr('Hosting-Aktion fehlgeschlagen', 'Hosting operation failed')}: ${message}`, true),
+    [showToast, tr],
+  );
+  const task = useHostingTask('connections', reportError);
   const { run } = task;
   const reload = useCallback(() => hostingClient.request('connections', undefined), []);
   const updated = (values: HostingConnection[]) => {
@@ -134,11 +140,6 @@ export function HostingConnections({ headingId }: { headingId?: string } = {}) {
       {task.busy && (
         <p className="hosting-notice" role="status">
           {tr('Verbindungen werden geladen …', 'Loading connections …')}
-        </p>
-      )}
-      {task.error && (
-        <p className="hosting-error" role="alert">
-          {task.error}
         </p>
       )}
       {editor && <HostingConnectionEditor connection={editor.connection} onClose={() => setEditor(null)} />}

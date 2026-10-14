@@ -3,6 +3,8 @@ import type { HostedRepositoryRef, HostingConnection, HostingProvider } from '..
 import { createHostingAdapter, HostingHttpTransport } from '../index';
 import { safeCloneUrl, zipLogs } from '../providerUtils';
 
+vi.mock('../../HostingNetwork', () => ({ hostingFetch: (...args: Parameters<typeof fetch>) => fetch(...args) }));
+
 const connection = (provider: HostingProvider, id: string = provider, version?: string): HostingConnection => ({
   id,
   provider,

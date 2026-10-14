@@ -1,9 +1,17 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 
 /** Each pane pins async results to the account/repository that initiated them. */
-export function useHostingTask(scope: string) {
+export function useHostingTask(scope: string, onError?: (message: string) => void) {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setTaskError] = useState<string | null>(null);
+  const errorHandler = useRef(onError);
+  useLayoutEffect(() => {
+    errorHandler.current = onError;
+  }, [onError]);
+  const setError = useCallback((message: string | null) => {
+    setTaskError(message);
+    if (message) errorHandler.current?.(message);
+  }, []);
   const lifecycle = useRef({ generation: 0, pending: 0 }).current;
   useLayoutEffect(() => {
     lifecycle.generation++;
@@ -14,7 +22,7 @@ export function useHostingTask(scope: string) {
       lifecycle.generation++;
       lifecycle.pending = 0;
     };
-  }, [scope, lifecycle]);
+  }, [scope, lifecycle, setError]);
   const run = useCallback(
     async <T>(operation: () => Promise<T>, apply?: (result: T) => void): Promise<T | undefined> => {
       const started = lifecycle.generation;
@@ -37,13 +45,13 @@ export function useHostingTask(scope: string) {
       }
       return undefined;
     },
-    [lifecycle],
+    [lifecycle, setError],
   );
   const cancel = useCallback(() => {
     lifecycle.generation++;
     lifecycle.pending = 0;
     setBusy(false);
     setError(null);
-  }, [lifecycle]);
+  }, [lifecycle, setError]);
   return { busy, error, run, setError, cancel };
 }

@@ -4,6 +4,7 @@ import { shell } from 'electron';
 import type { HostingConnection } from '../../src/types/hostingDtos';
 import type { HostingCredential } from './HostingCredentialStore';
 import { hostingUrl } from './hostingUrls';
+import { hostingFetch } from './HostingNetwork';
 
 const OAUTH_TIMEOUT_MS = 5 * 60_000;
 type OAuthTokenResponse = { access_token?: string; refresh_token?: string; expires_in?: number; error?: string };
@@ -60,7 +61,7 @@ async function postToken(connection: HostingConnection, params: URLSearchParams,
     params.set('client_id', clientId);
     if (clientSecret) params.set('client_secret', clientSecret);
   }
-  const response = await fetch(endpoints.token, {
+  const response = await hostingFetch(endpoints.token, {
     method: 'POST',
     headers,
     body: params.toString(),
@@ -145,7 +146,7 @@ export async function browserOAuthLogin(connection: HostingConnection, clientSec
           response.end('Authorization code missing.');
           return;
         }
-        response.end('Signed in. You can return to Open-Git-Control.');
+        response.end('Authorization received. Open-Git-Control is completing sign-in. Return to the app to see the result.');
         finish(undefined, authorizationCode);
       });
       server.once('error', () => finish(new Error('The configured OAuth callback port is unavailable.')));

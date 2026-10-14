@@ -12,6 +12,7 @@ import { useI18n } from '@/i18n';
 import type { HostingConnection, HostingProvider } from '@/types/hostingDtos';
 import { providerLabels, useHostingState } from './hostingState';
 import { useHostingTask } from './useHostingTask';
+import { useAppToast } from '@/hooks/useAppToast';
 
 const defaultServerUrls: Record<HostingProvider, string> = {
   github: 'https://github.com',
@@ -54,7 +55,12 @@ export function HostingConnectionEditor({ connection, onClose }: { connection: H
   };
   const [device, setDevice] = useState<{ connectionId: string; code: string; userCode: string; url: string; interval: number; expires: number } | null>(null);
   const [cliPreview, setCliPreview] = useState<{ connectionId: string; username: string; host: string } | null>(null);
-  const task = useHostingTask('connections');
+  const showToast = useAppToast();
+  const reportError = useCallback(
+    (message: string) => showToast(`${tr('Hosting-Anmeldung fehlgeschlagen', 'Hosting sign-in failed')}: ${message}`, true),
+    [showToast, tr],
+  );
+  const task = useHostingTask('connections', reportError);
   const auth = useRef({ generation: 0, connectionId: undefined as string | undefined });
   const { setError } = task;
   const cancelAuth = useCallback(() => {
@@ -332,11 +338,6 @@ export function HostingConnectionEditor({ connection, onClose }: { connection: H
         </div>
       )}
       {task.busy && <p role="status">{tr('Verbindung wird vorbereitet …', 'Preparing connection …')}</p>}
-      {task.error && (
-        <p className="hosting-error" role="alert">
-          {task.error}
-        </p>
-      )}
     </HostingDialog>
   );
 }
