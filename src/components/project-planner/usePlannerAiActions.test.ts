@@ -148,6 +148,7 @@ describe('usePlannerAiActions', () => {
     expect(getCommitFormDraft(project.repoPath, '')).toEqual({
       commitMsg: 'fix(git): support copied paths',
       commitDescription: 'Keeps copied paths aligned.',
+      subject: { type: 'fix', scope: 'git', message: 'support copied paths' },
     });
     expect(openStagingCommitArea).toHaveBeenCalledOnce();
     expect(markItemsDone).toHaveBeenCalledWith([item]);
@@ -176,8 +177,12 @@ describe('usePlannerAiActions', () => {
     expect(markItemsDone).not.toHaveBeenCalled();
   });
 
-  it('requires confirmation before replacing a non-empty commit draft', async () => {
-    updateCommitFormDraft(project.repoPath, { commitMsg: 'existing draft' });
+  it.each([
+    { commitMsg: 'existing draft' },
+    { subject: { type: 'fix' as const, scope: '', message: '' } },
+    { subject: { type: 'fix' as const, scope: 'backend', message: '' } },
+  ])('requires confirmation before replacing a non-empty or unfinished draft: %j', async (patch) => {
+    const original = updateCommitFormDraft(project.repoPath, patch);
     render();
 
     act(() => actions!.generateCommitMessageForItem(item));
@@ -185,6 +190,7 @@ describe('usePlannerAiActions', () => {
     expect(aiClient.generateCommitMessage).not.toHaveBeenCalled();
     const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
     expect(dialog.title).toBe('Commit-Entwurf ersetzen?');
+    expect(getCommitFormDraft(project.repoPath, '')).toEqual(original);
     await dialog.onConfirm();
     await flush();
     expect(aiClient.generateCommitMessage).toHaveBeenCalledOnce();

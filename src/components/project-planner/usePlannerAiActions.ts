@@ -86,7 +86,7 @@ export const usePlannerAiActions = ({ project, settings, activateRepositoryProje
       };
 
       const draft = getCommitFormDraft(repoPath, settings.commitTemplate);
-      if (!draft.commitMsg.trim() && !draft.commitDescription.trim()) {
+      if (!draft.commitMsg.trim() && !draft.commitDescription.trim() && !draft.subject.type && !draft.subject.scope.trim()) {
         void run();
         return;
       }
@@ -98,7 +98,16 @@ export const usePlannerAiActions = ({ project, settings, activateRepositoryProje
           'In der Staging-Ansicht gibt es bereits einen Commit-Entwurf. Die KI-Nachricht ersetzt Titel und Beschreibung erst nach deiner Bestaetigung.',
           'The staging view already contains a commit draft. The AI message will replace its title and description after confirmation.',
         ),
-        contextItems: [{ label: tr('Aktueller Titel', 'Current title'), value: draft.commitMsg || tr('(nur Beschreibung)', '(description only)') }],
+        contextItems: [
+          {
+            label: tr('Aktueller Titel', 'Current title'),
+            value:
+              draft.commitMsg ||
+              (draft.subject.type
+                ? `${draft.subject.type}${draft.subject.scope ? `(${draft.subject.scope})` : ''}: …`
+                : tr('(nur Beschreibung)', '(description only)')),
+          },
+        ],
         irreversible: false,
         consequences: tr('Der bisherige Entwurf wird nur in dieser App-Sitzung ersetzt.', 'The existing draft is replaced only in this app session.'),
         confirmLabel: tr('KI-Nachricht erstellen', 'Create AI message'),

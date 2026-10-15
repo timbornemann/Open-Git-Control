@@ -8,7 +8,7 @@ import { addSecretScanFindingPaths } from '@/services/repositorySecretScanAllowl
 import { SECRET_SCAN_ALLOWLIST_PATH } from '@/types/repositorySecretScanAllowlist';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import type { GitStatusWithConflicts } from './types';
-import { getCommitFormDraft, resetCommitFormDraft, updateCommitFormDraft } from './commitFormDraft';
+import { useCommitMessageDraft } from './useCommitMessageDraft';
 import type { SettingsUpdateHandler } from '@/components/layout/settings/SettingsSectionPrimitives';
 
 type Params = {
@@ -25,8 +25,10 @@ type Params = {
 
 export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChanged, onCommitsCreated, settings, setConfirmDialog }: Params) => {
   const { t, tr } = useI18n();
-  const [commitMsg, setCommitMsgState] = useState(() => getCommitFormDraft(repoPath, settings.commitTemplate).commitMsg);
-  const [commitDescription, setCommitDescriptionState] = useState(() => getCommitFormDraft(repoPath, settings.commitTemplate).commitDescription);
+  const { commitMsg, commitDescription, commitSubject, setCommitMsg, setCommitDescription, setCommitSubject, clearCommittedDraft } = useCommitMessageDraft(
+    repoPath,
+    settings.commitTemplate,
+  );
   const [amendCommit, setAmendCommit] = useState(false);
   const [signoffCommit, setSignoffCommit] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
@@ -48,41 +50,9 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
     setAmendCommit(false);
   }, [repoPath]);
 
-  const setCommitMsg = useCallback(
-    (value: string) => {
-      setCommitMsgState(value);
-      updateCommitFormDraft(repoPath, { commitMsg: value }, settings.commitTemplate);
-    },
-    [repoPath, settings.commitTemplate],
-  );
-
-  const setCommitDescription = useCallback(
-    (value: string) => {
-      setCommitDescriptionState(value);
-      updateCommitFormDraft(repoPath, { commitDescription: value }, settings.commitTemplate);
-    },
-    [repoPath, settings.commitTemplate],
-  );
-
-  useEffect(() => {
-    const draft = getCommitFormDraft(repoPath, settings.commitTemplate);
-    setCommitMsgState(draft.commitMsg);
-    setCommitDescriptionState(draft.commitDescription);
-  }, [repoPath, settings.commitTemplate]);
-
   useEffect(() => {
     setSignoffCommit(Boolean(settings.commitSignoffByDefault));
   }, [settings.commitSignoffByDefault]);
-
-  useEffect(() => {
-    if (settings.commitTemplate) {
-      setCommitMsgState((current) => {
-        if (current.trim()) return current;
-        updateCommitFormDraft(repoPath, { commitMsg: settings.commitTemplate }, settings.commitTemplate);
-        return settings.commitTemplate;
-      });
-    }
-  }, [repoPath, settings.commitTemplate]);
 
   useEffect(() => {
     if (!amendCommit || !repoPath || !gitClient.isAvailable()) return;
@@ -134,10 +104,8 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
         signoff: signoffCommit,
       });
       if (r.success) {
-        const nextDraft = resetCommitFormDraft(repoAtStart, settings.commitTemplate || '');
+        clearCommittedDraft(repoAtStart, isCurrentOperation());
         if (!isCurrentOperation()) return;
-        setCommitMsgState(nextDraft.commitMsg);
-        setCommitDescriptionState(nextDraft.commitDescription);
         setAmendCommit(false);
         if (onCommitsCreated) onCommitsCreated();
         else if (onRepoChanged) onRepoChanged();
@@ -156,20 +124,7 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
         if (repoGenerationRef.current === repoGeneration) setIsCommitting(false);
       }
     }
-  }, [
-    commitMsg,
-    status,
-    amendCommit,
-    setToast,
-    t,
-    commitDescription,
-    signoffCommit,
-    repoPath,
-    settings.commitTemplate,
-    onCommitsCreated,
-    onRepoChanged,
-    refresh,
-  ]);
+  }, [commitMsg, status, amendCommit, setToast, t, commitDescription, signoffCommit, repoPath, clearCommittedDraft, onCommitsCreated, onRepoChanged, refresh]);
 
   const addFindingsToAllowlist = useCallback(
     async (findings: { filePath: string }[], isCurrent: () => boolean = () => true) => {
@@ -318,6 +273,8 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
   return {
     commitMsg,
     setCommitMsg,
+    commitSubject,
+    setCommitSubject,
     commitDescription,
     setCommitDescription,
     amendCommit,

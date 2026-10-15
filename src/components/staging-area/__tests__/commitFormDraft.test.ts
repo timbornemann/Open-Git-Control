@@ -15,6 +15,7 @@ describe('commitFormDraft', () => {
     expect(getCommitFormDraft('c:/repos/open-git-control/', '')).toEqual({
       commitMsg: 'fix(staging): keep draft message',
       commitDescription: 'Preserve notes while inspecting files.',
+      subject: { type: 'fix', scope: 'staging', message: 'keep draft message' },
     });
   });
 
@@ -26,15 +27,30 @@ describe('commitFormDraft', () => {
     expect(getCommitFormDraft('C:/Repos/two', '').commitMsg).toBe('second repo');
   });
 
-  it('resets a committed draft back to the current template', () => {
+  it('clears every field after a commit even when a template is configured', () => {
     updateCommitFormDraft('C:/Repos/one', {
       commitMsg: 'temporary title',
       commitDescription: 'temporary notes',
     });
 
-    expect(resetCommitFormDraft('C:/Repos/one', 'docs: template')).toEqual({
-      commitMsg: 'docs: template',
+    expect(resetCommitFormDraft('C:/Repos/one')).toEqual({
+      commitMsg: '',
       commitDescription: '',
+      subject: { type: '', scope: '', message: '' },
     });
+    expect(getCommitFormDraft('C:/Repos/one', 'docs: template').commitMsg).toBe('');
+  });
+
+  it('keeps an unfinished type and scope without making a committable title', () => {
+    updateCommitFormDraft('C:/Repos/one', { subject: { type: 'fix', scope: 'backend', message: '' } });
+    expect(getCommitFormDraft('C:/Repos/one', '')).toMatchObject({
+      commitMsg: '',
+      subject: { type: 'fix', scope: 'backend', message: '' },
+    });
+  });
+
+  it('requires a message for imported and template types too', () => {
+    expect(getCommitFormDraft('C:/Repos/one', 'fix(backend): ').commitMsg).toBe('');
+    expect(updateCommitFormDraft('C:/Repos/one', { commitMsg: 'docs: ' }).commitMsg).toBe('');
   });
 });

@@ -1,8 +1,9 @@
 import { useI18n } from '@/i18n';
-import { ActionRequirement, ActionRequirementHelp } from '@/components/ui/ActionRequirement';
+import { ActionRequirement } from '@/components/ui/ActionRequirement';
 import { useOpenSettingsGroup } from '@/hooks/useOpenSettingsGroup';
-import { useId, useRef } from 'react';
+import { useId } from 'react';
 import { AiCommitPlan } from './AiCommitPlan';
+import { CommitMessageFields } from './CommitMessageFields';
 import type { GitStatusWithConflicts } from './types';
 import type { useAiCommit } from './useAiCommit';
 import type { useCommitForm } from './useCommitForm';
@@ -49,7 +50,6 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
 }) => {
   const { t, tr } = useI18n();
   const openSettings = useOpenSettingsGroup();
-  const titleField = useRef<HTMLTextAreaElement>(null);
   const titleHintId = useId();
   const busy = fileOps.isMutating || commitForm.isCommitting || aiCommit.isAiCommitting || aiCommit.isAiJobRunning;
   const titleRequirement =
@@ -79,40 +79,12 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
   return (
     <div className="staging-commit-area">
       <AiCommitPlan groups={aiCommit.aiGroups} />
-      <div className="staging-commit-title-field">
-        <textarea
-          ref={titleField}
-          className="staging-commit-input"
-          aria-describedby={titleRequirement ? titleHintId : undefined}
-          placeholder={
-            hasOpenConflicts
-              ? t('generated.components.staging_area.stagingcommitpanel.resolve_conflicts_then_commit_507014dd')
-              : t('generated.components.staging_area.stagingcommitpanel.commit_title_0f9ab32c')
-          }
-          value={commitForm.commitMsg}
-          onChange={(event) => commitForm.setCommitMsg(event.target.value)}
-          onKeyDown={(event) => {
-            if (!isCommitInputDisabled && event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-              event.preventDefault();
-              commitForm.handleCommit();
-            }
-          }}
-          disabled={isCommitInputDisabled}
-        />
-        <ActionRequirementHelp id={titleHintId} reason={titleRequirement} remedy={{ onClick: () => titleField.current?.focus() }} />
-      </div>
-      <textarea
-        className="staging-commit-input staging-commit-description"
-        placeholder={t('generated.components.staging_area.stagingcommitpanel.commit_description_optional_ec8b5872')}
-        value={commitForm.commitDescription}
-        onChange={(event) => commitForm.setCommitDescription(event.target.value)}
-        onKeyDown={(event) => {
-          if (!isCommitInputDisabled && event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-            event.preventDefault();
-            commitForm.handleCommit();
-          }
-        }}
+      <CommitMessageFields
+        commitForm={commitForm}
         disabled={isCommitInputDisabled}
+        hasOpenConflicts={hasOpenConflicts}
+        titleRequirement={titleRequirement}
+        titleHintId={titleHintId}
       />
       <div className="staging-commit-bar">
         <div className="staging-commit-options">
