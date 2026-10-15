@@ -5,6 +5,8 @@ import { gitConfigurationEnvironment, remoteUrl } from './remoteTransferValidati
 import type { GitRunOptions } from './GitProcessTypes';
 import * as fs from 'node:fs';
 import { resolveExistingRepositoryPathWithoutSymlinks } from './RepositoryPathSafety';
+import { lfsProgressReporter } from './GitLfsTransferProgress';
+import type { RemoteTransferContext } from './remoteTransferModels';
 
 type Reader = Pick<GitRunner, 'run' | 'runBuffer'>;
 type TransferRunner = Pick<GitRunner, 'run' | 'streamOutput'>;
@@ -54,6 +56,7 @@ export async function lfsEndpoint(
 }
 
 export function lfsTransferEnvironment(base: NodeJS.ProcessEnv, remote: string, endpoint: string, gitUrl?: string): NodeJS.ProcessEnv {
+  base = { ...base, GIT_LFS_FORCE_PROGRESS: '1', LC_ALL: 'C' };
   // Keep Git LFS's native SSH discovery and git-lfs-authenticate metadata. Replacing
   // an SSH transport with its HTTPS URL would discard SSH authentication.
   if (gitUrl && (/^ssh:\/\//i.test(gitUrl) || (!gitUrl.includes('://') && !/^[A-Za-z]:[\\/]/.test(gitUrl) && /^[^/\\:]+:/.test(gitUrl))))
@@ -63,6 +66,7 @@ export function lfsTransferEnvironment(base: NodeJS.ProcessEnv, remote: string, 
         ['remote.lfspushdefault', remote],
         ['lfs.remote.autodetect', 'false'],
         ['lfs.remote.searchall', 'false'],
+        ['lfs.allowincompletepush', 'false'],
         [`remote.${remote}.url`, gitUrl],
       ],
       base,
@@ -75,6 +79,7 @@ export function lfsTransferEnvironment(base: NodeJS.ProcessEnv, remote: string, 
       [`remote.${remote}.lfspushurl`, endpoint],
       ['lfs.remote.autodetect', 'false'],
       ['lfs.remote.searchall', 'false'],
+      ['lfs.allowincompletepush', 'false'],
     ],
     base,
   );
@@ -102,21 +107,30 @@ export async function uploadLfsObjects(
   git: TransferRunner,
   env: NodeJS.ProcessEnv,
   signal?: AbortSignal,
-  progress?: (message: string) => void,
+  progress?: RemoteTransferContext['onProgress'],
   gitUrl?: string,
 ): Promise<void> {
   if (!objects.length) return;
-  progress?.(`Uploading Git LFS objects: ${remote}`);
   const envOverrides = lfsTransferEnvironment(env, remote, endpoint, gitUrl);
   // Object IDs come from the captured revisions, not from the current branch or working tree.
   for (let offset = 0; offset < objects.length; offset += 100) {
     signal?.throwIfAborted();
+    progress?.(`Uploading Git LFS objects: ${remote}`, {
+      phase: 'lfs-upload',
+      remote,
+      processedObjects: offset,
+      totalObjects: objects.length,
+    });
+    const report = lfsProgressReporter(remote, objects, progress, offset);
     await git.streamOutput(
       repoPath,
       ['lfs', 'push', '--object-id', remote, ...objects.slice(offset, offset + 100).map((object) => object.oid)],
-      progress ?? (() => {}),
+      (message) => {
+        if (!report(message)) progress?.(message);
+      },
       signal,
       { envOverrides },
     );
   }
+  signal?.throwIfAborted();
 }

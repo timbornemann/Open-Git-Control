@@ -3,6 +3,7 @@ import type { GitPushPlanDto, GitPushBatchDto } from '../../src/types/remoteTran
 import type { GitRunner } from './GitRunner';
 import type { PublishedRef } from './remotePushResults';
 import { redactGitSensitiveText } from './GitErrorFormatter';
+import type { RemoteTransferProgressDto } from '../../src/types/remoteTransferProgress';
 
 export type CredentialEnvironmentFactory = (input: {
   connectionId?: string | null;
@@ -17,7 +18,7 @@ export type RemoteTransferContext = {
   generation: number;
   signal?: AbortSignal;
   ensureActive: () => void;
-  onProgress?: (message: string) => void;
+  onProgress?: (message: string, transfer?: RemoteTransferProgressDto) => void;
   authorizePush?: (args: string[]) => Promise<void>;
 };
 export type StoredPlan = {

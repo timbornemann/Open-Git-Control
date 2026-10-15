@@ -4,6 +4,7 @@ import { readPushSecretScanScope, type PushSecretScanScope } from './PushSecretS
 import { pullStrategyArguments, readGitPullConfiguration } from './GitPullConfiguration';
 import { readRemoteSnapshot, assertPushSourceUnchanged, probePushUrlIsolation, remoteConfigurationFingerprint } from './remoteSnapshot';
 import { lfsEndpoint, lfsTransferEnvironment, uploadLfsObjects } from './GitLfsTransfers';
+import { gitPushProgress } from './GitLfsTransferProgress';
 import type {
   GitRemoteSnapshotDto,
   GitPushBatchDto,
@@ -411,10 +412,14 @@ export class RemoteTransferService {
           );
         context.ensureActive();
         if (!refs.length) return { ...target, status: 'up-to-date', message: 'All planned refs and LFS objects are present on this endpoint.' };
-        const args = ['push', '--porcelain', '--no-follow-tags', '--recurse-submodules=no'];
+        const args = ['push', '--porcelain', '--progress', '--no-follow-tags', '--recurse-submodules=no'];
         if (plan.dto.force) args.push(`--force-with-lease=${target.destinationRef}:${target.leaseOid ?? ''}`);
         args.push('--', target.remoteName, ...refs.map((ref) => `${ref.sourceOid}:${ref.destinationRef}`));
-        const result: GitProcessResult = await this.git.runResult(repoPath, args, { envOverrides, signal });
+        const result: GitProcessResult = await this.git.runResult(repoPath, args, {
+          envOverrides,
+          signal,
+          onOutput: gitPushProgress(target.remoteName, context.onProgress),
+        });
         context.ensureActive();
         return pushResult(target, result);
       },

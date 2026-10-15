@@ -204,12 +204,14 @@ export class GitRunner {
       this.classifyCommand(args, options.requestedKind),
       args[0] || 'git',
       (signal) =>
-        this.processExecutor.runResult(repoPath, args, {
-          cwd: repoPath,
-          maxBuffer: 8 * 1024 * 1024,
-          env: { ...process.env, ...options.envOverrides },
-          signal,
-        }),
+        options.onOutput
+          ? this.spawnOperations.streamResult(repoPath, args, options.onOutput, signal, options.envOverrides)
+          : this.processExecutor.runResult(repoPath, args, {
+              cwd: repoPath,
+              maxBuffer: 8 * 1024 * 1024,
+              env: { ...process.env, ...options.envOverrides },
+              signal,
+            }),
       { signal: options.signal },
     );
   }

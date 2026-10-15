@@ -1,4 +1,5 @@
 import type { SecretScanProgressDto } from './secretScan';
+import type { RemoteTransferProgressDto } from './remoteTransferProgress';
 
 export type GitJobStatus = 'start' | 'progress' | 'done' | 'failed' | 'cancelled';
 export type GitJobPhaseDto = 'snapshot' | 'context' | 'grouping' | 'validating' | 'committing' | 'retry' | 'fallback' | 'done' | 'failed' | 'cancelled';
@@ -18,6 +19,7 @@ export interface GitJobEventDto {
   progress?: number;
   details?: {
     secretScan?: SecretScanProgressDto;
+    remoteTransfer?: RemoteTransferProgressDto;
     phase?: GitJobPhaseDto;
     mode?: AiAutoCommitModeDto | string;
     groupId?: number;

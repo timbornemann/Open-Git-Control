@@ -8,6 +8,7 @@ import type {
   GitLineHandler,
   GitLineStreamOptions,
   GitTransferOptions,
+  GitProcessResult,
 } from './GitProcessTypes';
 import { createAbortError } from './GitProcessTypes';
 import { redactGitSensitiveText } from './GitErrorFormatter';
@@ -183,8 +184,20 @@ export class GitSpawnOperations {
     return runGitLineConsumer(repoPath, args, onLine, signal, options);
   }
 
-  streamOutput(repoPath: string, args: string[], onLine: (line: string) => void, signal: AbortSignal, envOverrides?: NodeJS.ProcessEnv): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
+  async streamOutput(repoPath: string, args: string[], onLine: (line: string) => void, signal: AbortSignal, envOverrides?: NodeJS.ProcessEnv): Promise<string> {
+    const result = await this.streamResult(repoPath, args, onLine, signal, envOverrides);
+    if (result.exitCode !== 0) throw new Error((result.stderr || result.stdout || `git ${args.join(' ')} exited with code ${result.exitCode}`).trim());
+    return result.stdout.trimEnd();
+  }
+
+  streamResult(
+    repoPath: string,
+    args: string[],
+    onLine: (line: string) => void,
+    signal: AbortSignal,
+    envOverrides?: NodeJS.ProcessEnv,
+  ): Promise<GitProcessResult> {
+    return new Promise<GitProcessResult>((resolve, reject) => {
       const proc = spawn(toolExecutable('git'), args, {
         cwd: repoPath,
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -192,12 +205,12 @@ export class GitSpawnOperations {
         detached: process.platform !== 'win32',
         env: toolEnvironment(envOverrides),
       });
-      const stdoutPending = { value: '' };
-      const stderrPending = { value: '' };
       let stdout = '';
       let stderr = '';
       let outputBytes = 0;
       let settled = false;
+      const stdoutDecoder = new StringDecoder('utf8');
+      const stderrDecoder = new StringDecoder('utf8');
       const { stop: abort, waitForStop } = gitProcessTree(proc);
       signal.addEventListener('abort', abort, { once: true });
       if (signal.aborted) abort();
@@ -210,49 +223,56 @@ export class GitSpawnOperations {
         abort();
         void waitForStop().then(() => reject(error));
       };
-      const consume = (chunk: Buffer, pending: { value: string }, capture: (text: string) => void) => {
+      const emit = (line: string) => {
+        if (settled || !line.trim()) return;
+        try {
+          onLine(redactGitSensitiveText(line.trim()));
+        } catch (error) {
+          fail(error instanceof Error ? error : new Error('Git progress delivery failed.'));
+        }
+      };
+      const oversized = () => fail(new Error(`Git stream line exceeded the ${MAX_STREAM_LINE_BYTES / 1024 / 1024} MB limit.`));
+      const stdoutProgress = createProgressCollector(emit, MAX_STREAM_LINE_BYTES, oversized);
+      const stderrProgress = createProgressCollector(emit, MAX_STREAM_LINE_BYTES, oversized);
+      const consume = (chunk: Buffer, collector: ReturnType<typeof createProgressCollector>, capture: (data: Buffer) => void) => {
         if (settled) return;
         outputBytes += chunk.length;
         if (outputBytes > MAX_STREAM_OUTPUT_BYTES) {
           fail(new Error(`Git stream output exceeded the ${MAX_STREAM_OUTPUT_BYTES / 1024 / 1024} MB limit.`));
           return;
         }
-        if (!emitLines(chunk, pending, onLine, capture, MAX_STREAM_LINE_BYTES)) {
-          fail(new Error(`Git stream line exceeded the ${MAX_STREAM_LINE_BYTES / 1024 / 1024} MB limit.`));
-        }
+        capture(chunk);
+        collector.write(chunk);
       };
 
       proc.stdout.on('data', (chunk: Buffer) => {
-        consume(chunk, stdoutPending, (text) => {
-          stdout += text;
+        consume(chunk, stdoutProgress, (data) => {
+          stdout += stdoutDecoder.write(data);
         });
       });
       proc.stderr.on('data', (chunk: Buffer) => {
-        consume(chunk, stderrPending, (text) => {
-          if (stderr.length < 256 * 1024) stderr += text;
+        consume(chunk, stderrProgress, (data) => {
+          stderr = (stderr + stderrDecoder.write(data)).slice(-256 * 1024);
         });
       });
       proc.on('error', (error) => fail(error));
       proc.on('close', async (code, closeSignal) => {
         if (settled) return;
-        settled = true;
         cleanup();
         await waitForStop();
         if (signal.aborted || closeSignal) {
+          settled = true;
           reject(createAbortError('Git stream was aborted.'));
           return;
         }
 
-        const stdoutTail = stdoutPending.value.trim();
-        const stderrTail = stderrPending.value.trim();
-        if (stdoutTail) onLine(redactGitSensitiveText(stdoutTail));
-        if (stderrTail) onLine(redactGitSensitiveText(stderrTail));
-
-        if (code !== 0) {
-          reject(new Error(redactGitSensitiveText((stderr || stdout || `git ${args.join(' ')} exited with code ${code}`).trim())));
-          return;
-        }
-        resolve(stdout.trimEnd());
+        stdoutProgress.end();
+        stderrProgress.end();
+        stdout += stdoutDecoder.end();
+        stderr = (stderr + stderrDecoder.end()).slice(-256 * 1024);
+        if (settled) return;
+        settled = true;
+        resolve({ stdout: redactGitSensitiveText(stdout), stderr: redactGitSensitiveText(stderr), exitCode: code ?? -1 });
       });
     });
   }
@@ -335,26 +355,6 @@ export class GitSpawnOperations {
     });
   }
 }
-
-const emitLines = (
-  chunk: Buffer,
-  pendingRef: { value: string },
-  onLine: (line: string) => void,
-  capture: (text: string) => void,
-  maxPendingBytes: number,
-): boolean => {
-  const text = chunk.toString('utf8');
-  capture(text);
-
-  const parts = `${pendingRef.value}${text}`.split(/\r\n|\n|\r/);
-  pendingRef.value = parts.pop() ?? '';
-  if (Buffer.byteLength(pendingRef.value) > maxPendingBytes) return false;
-  for (const part of parts) {
-    const line = part.trim();
-    if (line) onLine(redactGitSensitiveText(line));
-  }
-  return true;
-};
 
 const createProgressCollector = (onLine: (line: string) => void, maxPendingBytes: number, onLimitExceeded: () => void) => {
   const decoder = new StringDecoder('utf8');

@@ -96,7 +96,7 @@ describe('Git LFS transfers with real Git and independent local LFS stores', () 
     }
     expect(fs.readFileSync(f.hook, 'utf8')).toBe('#!/bin/sh\nexit 0\n');
     expect(await f.git(f.repo, 'for-each-ref', '--format=%(upstream)', 'refs/heads/main')).toBe('');
-    expect(f.context.onProgress).toHaveBeenCalledWith(expect.stringContaining('Uploading Git LFS objects'));
+    expect(f.context.onProgress).toHaveBeenCalledWith(expect.stringContaining('Uploading Git LFS objects'), expect.objectContaining({ phase: 'lfs-upload' }));
   });
 
   integrationTest('keeps partial success and retries only the failed LFS destination', async (lifecycle) => {

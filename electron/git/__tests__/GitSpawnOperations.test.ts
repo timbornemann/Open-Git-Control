@@ -24,6 +24,53 @@ describe('GitSpawnOperations stream limits', () => {
     Object.defineProperty(process, 'platform', originalPlatform);
   });
 
+  it('streams CR-delimited push diagnostics before exit while preserving partial porcelain results and a final error', async () => {
+    const child = new FakeGitProcess();
+    spawnMock.mockReturnValue(child);
+    const progress = vi.fn();
+    const result = new GitSpawnOperations().streamResult('/repo', ['push', '--porcelain', '--progress'], progress, new AbortController().signal);
+    let completed = false;
+    void result.then(() => {
+      completed = true;
+    });
+    child.stdout.emit('data', Buffer.from('Uploading LFS objects: 50% (4/8), 4 MB | 1 MB/s\r'));
+    child.stdout.emit('data', Buffer.from('Uploading LFS objects: 100% (8/8), 8 MB | 0 B/s, done.\r\n'));
+    expect(progress).toHaveBeenCalledWith('Uploading LFS objects: 50% (4/8), 4 MB | 1 MB/s');
+    expect(completed).toBe(false);
+    child.stdout.emit('data', Buffer.from('*\tabc:refs/heads/main\t[new branch]\n!\tdef:refs/tags/v1\t[rejected]\n'));
+    child.stderr.emit('data', Buffer.from('remote: tag rejected after LFS upload'));
+    child.emit('close', 1, null);
+    await expect(result).resolves.toMatchObject({
+      exitCode: 1,
+      stdout: expect.stringContaining('*\tabc:refs/heads/main'),
+      stderr: 'remote: tag rejected after LFS upload',
+    });
+    expect(progress).toHaveBeenLastCalledWith('remote: tag rejected after LFS upload');
+  });
+
+  it('preserves split UTF-8 in both streamed and captured push output', async () => {
+    const child = new FakeGitProcess();
+    spawnMock.mockReturnValue(child);
+    const progress = vi.fn();
+    const result = new GitSpawnOperations().streamResult('/repo', ['push'], progress, new AbortController().signal);
+    const bytes = Buffer.from('remote: Grüße\n');
+    for (const byte of bytes) child.stderr.emit('data', Buffer.from([byte]));
+    child.emit('close', 0, null);
+    await expect(result).resolves.toMatchObject({ stderr: 'remote: Grüße\n' });
+    expect(progress).toHaveBeenCalledExactlyOnceWith('remote: Grüße');
+  });
+
+  it('does not resolve a streamed push as successful when cancellation follows a completed LFS meter', async () => {
+    const child = new FakeGitProcess();
+    spawnMock.mockReturnValue(child);
+    const controller = new AbortController();
+    const result = new GitSpawnOperations().streamResult('/repo', ['push'], vi.fn(), controller.signal);
+    child.stdout.emit('data', Buffer.from('Uploading LFS objects: 100% (8/8), 8 MB | 0 B/s, done.\n'));
+    controller.abort();
+    await expect(result).rejects.toMatchObject({ name: 'AbortError' });
+    expect(child.kill).toHaveBeenCalledOnce();
+  });
+
   it.each([
     [['diff', '--no-index', '--', '/dev/null', 'new.txt'], 1, true],
     [['diff', '--no-index', '--', '/dev/null', 'missing.txt'], 128, false],

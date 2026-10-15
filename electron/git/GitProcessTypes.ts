@@ -22,6 +22,8 @@ export type GitRunOptions = {
   signal?: AbortSignal;
   requestedKind?: GitJobKind;
   coalesceKey?: string;
+  /** Stream diagnostics while preserving porcelain stdout and non-zero ref results. */
+  onOutput?: (line: string) => void;
 };
 
 export type GitBufferRunOptions = {

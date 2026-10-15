@@ -122,6 +122,31 @@ describe('repository authority for structured remote transfers', () => {
     });
     expect(publish).not.toHaveBeenCalled();
   });
+  it('delivers measured LFS and publishing phases with the owning repository and job', async () => {
+    const remoteTransfer = { phase: 'lfs-upload', remote: 'origin', processedObjects: 1, totalObjects: 8, processedBytes: 1000, totalBytes: 8000 };
+    mocked.executePush.mockImplementation(async (_repoPath, _planId, context) => {
+      context.onProgress('LFS upload', remoteTransfer);
+      context.onProgress('Publishing Git refs', { phase: 'publishing', remote: 'origin' });
+      return { state: 'success' };
+    });
+    await invoke('executePush', { repoPath: activeRepo, planId: 'plan' });
+    expect(event.sender.send).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        operation: 'git:executePush',
+        status: 'progress',
+        details: { repoPath: activeRepo, remoteTransfer },
+      }),
+    );
+    expect(event.sender.send).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        operation: 'git:executePush',
+        status: 'progress',
+        details: { repoPath: activeRepo, remoteTransfer: { phase: 'publishing', remote: 'origin' } },
+      }),
+    );
+  });
   it('discards a read after a repository switch and binds push scanning to the initiating sender and repo', async () => {
     let finishRead!: (value: unknown) => void;
     mocked.getRemotes.mockReturnValueOnce(

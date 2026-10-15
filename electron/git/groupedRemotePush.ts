@@ -5,6 +5,7 @@ import { lines } from './remoteTransferModels';
 import { gitConfigurationEnvironment } from './remoteTransferValidation';
 import { pushResult, type PublishedRef } from './remotePushResults';
 import { uploadLfsObjects } from './GitLfsTransfers';
+import { gitPushProgress } from './GitLfsTransferProgress';
 
 export function assertGroupedCredentialChoices(targets: GitPushTargetDto[], connections: Record<string, string | null>): void {
   for (const name of new Set(targets.filter((target) => target.grouped).map((target) => target.remoteName))) {
@@ -71,13 +72,14 @@ export async function runGroupedRemotePush(
       [
         'push',
         '--porcelain',
+        '--progress',
         '--no-follow-tags',
         '--recurse-submodules=no',
         '--',
         first.remoteName,
         ...refs.map((ref) => `${ref.sourceOid}:${ref.destinationRef}`),
       ],
-      { envOverrides, signal },
+      { envOverrides, signal, onOutput: gitPushProgress(first.remoteName, context.onProgress) },
     );
   } finally {
     await scope?.dispose();

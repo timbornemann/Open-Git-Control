@@ -7,6 +7,7 @@ import { useRemoteTransferState, type RemoteTransferState } from './remoteTransf
 import type { RemoteTransferCoordinator } from './remoteTransferCoordinator';
 import { secretScanNotification, secretScanFallbackDetail } from './secretScanNotification';
 import { pushFailureDetails, transferFailureContext } from './transferFailureContext';
+import { remoteTransferProgressNotification } from './remoteTransferProgressNotification';
 
 const pushOperations = new Set(['git:executePush', 'git:retryPush', 'git:planPush']);
 const notificationTitle = (current: RemoteTransferState) =>
@@ -31,6 +32,7 @@ export function useRemoteTransferNotifications(coordinator: RemoteTransferCoordi
       job.timestamp >= (entry.current?.progress && entry.current.intent === state.intent ? entry.current.startedAt : Date.now()),
   );
   const progress = latest?.message?.trim() ?? '';
+  const transferProgress = state.transferStage === 'transferring' ? latest?.details?.remoteTransfer : undefined;
   const scanProgress =
     state.transferStage === 'scanning' && state.scanProgressId
       ? jobs.find(
@@ -118,6 +120,7 @@ export function useRemoteTransferNotifications(coordinator: RemoteTransferCoordi
       autoHideMs: null,
       dismissible: false,
       ...(state.transferStage === 'scanning' && !state.cancelling ? secretScanNotification(scanProgress, translate.current) : {}),
+      ...(transferProgress && !state.cancelling ? remoteTransferProgressNotification(transferProgress, translate.current) : {}),
       actions: [{ label: translate.current('Abbrechen', 'Cancel'), onClick: () => coordinator.cancel(), disabled: state.cancelling }],
     };
     const previous = entry.current;
@@ -129,7 +132,7 @@ export function useRemoteTransferNotifications(coordinator: RemoteTransferCoordi
       progress: true,
       startedAt: previous?.progress && previous.intent === state.intent ? previous.startedAt : Date.now(),
     };
-  }, [coordinator, notifications, state, progress, scanProgress]);
+  }, [coordinator, notifications, state, progress, scanProgress, transferProgress]);
 
   useLayoutEffect(() => {
     const ids = owned.current;

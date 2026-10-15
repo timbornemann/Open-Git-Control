@@ -133,6 +133,90 @@ afterEach(() => {
 });
 
 describe('push secret-scan notification progress', () => {
+  it('keeps one running notification through measured LFS bytes, native 100% and Git publication until the result is confirmed', async () => {
+    await start();
+    const id = queue.toast!.id;
+    await flush(() => completeScan({ success: true, data: cleanScan }));
+    const transfer = async (
+      remoteTransfer: NonNullable<GitJobEventDto['details']>['remoteTransfer'],
+      message = 'Uploading LFS objects: 100% (8/8), 0 B | 0 B/s, done.',
+    ) => {
+      jobs.unshift({
+        id: 'push',
+        operation: 'git:executePush',
+        status: 'progress',
+        timestamp: Date.now(),
+        message,
+        details: { repoPath: '/repo', remoteTransfer },
+      });
+      await render();
+    };
+    await transfer({
+      phase: 'lfs-upload',
+      remote: 'origin',
+      processedObjects: 0,
+      totalObjects: 8,
+      processedBytes: 4_000_000,
+      totalBytes: 8_000_000,
+      speed: '1 MB/s',
+    });
+    expect(bar()?.getAttribute('aria-valuenow')).toBe('50');
+    expect(container.textContent).toContain('4 MB / 8 MB');
+    expect(container.textContent).not.toContain('done.');
+    await transfer({ phase: 'lfs-finalizing', remote: 'origin', processedObjects: 8, totalObjects: 8, processedBytes: 0, totalBytes: 8_000_000 });
+    expect(container.textContent).toContain('Finalizing LFS');
+    expect(container.textContent).toContain('8 / 8 LFS objects processed');
+    expect(container.textContent).not.toContain('0 B/s');
+    expect(container.textContent).not.toContain('100%');
+    expect(bar()?.hasAttribute('aria-valuenow')).toBe(false);
+    expect(queue.toast!.kind).toBe('progress');
+    await transfer({ phase: 'publishing', remote: 'origin' });
+    expect(container.textContent).toContain('Waiting for the server to confirm');
+    expect(container.textContent).not.toContain('8 / 8');
+    expect(bar()?.hasAttribute('aria-valuenow')).toBe(false);
+    expect(queue.toast!.kind).toBe('progress');
+    expect(queue.toasts).toHaveLength(1);
+    expect(queue.toast!.id).toBe(id);
+    await flush(() => completePush({ ...plan, planId: 'plan', state: 'success' }));
+    expect(queue.toast!.kind).toBe('success');
+    expect(bar()).toBeNull();
+  });
+
+  it('does not convert a completed LFS meter into success if the following Git push fails', async () => {
+    await start();
+    await flush(() => completeScan({ success: true, data: cleanScan }));
+    jobs.unshift({
+      id: 'push',
+      operation: 'git:executePush',
+      status: 'progress',
+      timestamp: Date.now(),
+      message: 'done.',
+      details: { repoPath: '/repo', remoteTransfer: { phase: 'publishing', remote: 'origin' } },
+    });
+    await render();
+    await flush(() =>
+      completePush({
+        ...plan,
+        planId: 'plan',
+        state: 'failed',
+        targets: [
+          {
+            id: 'origin',
+            remoteName: 'origin',
+            url: 'https://example.test/repo.git',
+            destinationRef: 'refs/heads/main',
+            sourceOid: plan.sourceOid,
+            status: 'failed',
+            message: 'Server rejected the push after LFS upload',
+          },
+        ],
+      }),
+    );
+    expect(queue.toast!.kind).toBe('error');
+    expect(bar()).toBeNull();
+    expect(queue.toast!.technicalDetails).toContain('Server rejected the push after LFS upload');
+  });
+
   it('shows indeterminate setup, measured commit progress and final checks, then replaces the scan with the push in the same notification', async () => {
     await start();
     const id = queue.toast!.id;

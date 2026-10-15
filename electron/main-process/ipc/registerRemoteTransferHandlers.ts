@@ -103,8 +103,15 @@ export function registerRemoteTransferHandlers({
             if (writes.has(operation)) ensureCommitProtectionIsIdle(repoPath);
             verifyPushPolicy?.();
           },
-          onProgress: (message) =>
-            emitJobEvent(event.sender, { id: jobId, operation: jobOperation, status: 'progress', message, details: { repoPath }, timestamp: Date.now() }),
+          onProgress: (message, remoteTransfer) =>
+            emitJobEvent(event.sender, {
+              id: jobId,
+              operation: jobOperation,
+              status: 'progress',
+              message,
+              details: { repoPath, ...(remoteTransfer ? { remoteTransfer } : {}) },
+              timestamp: Date.now(),
+            }),
           authorizePush: async (args) => {
             const verifyPolicy = await pushGuard.createPushPolicyVerifier?.(repoPath);
             const blocked = await pushGuard.requirePushSecretScanApproval(event, args, repoPath);
