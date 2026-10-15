@@ -82,7 +82,7 @@ export function RemoteConfigurationActions({ snapshot, preferences, update, disa
       : tr('Fragt vor dem Start. Diese Auswahl dient als Vorschlag.', 'Asks before starting. This selection is a suggestion.');
   return (
     <>
-      <h2>{tr('So synchronisierst du dieses Repository', 'How this repository synchronizes')}</h2>
+      <h2>{tr('Synchronisierung', 'Synchronization')}</h2>
       <p>
         {soleRemote
           ? tr(
@@ -94,12 +94,6 @@ export function RemoteConfigurationActions({ snapshot, preferences, update, disa
               'First choose a source or targets. Then decide for each action whether to use that selection directly.',
             )}
       </p>
-      <small>
-        {tr(
-          'Die Anzeigen „Nächster Transfer“ zeigen das Verhalten nach dem Speichern deiner Auswahl.',
-          'The Next transfer summaries show the behavior after saving your choices.',
-        )}
-      </small>
       <div className="remote-configuration__rules">
         <section className="remote-configuration__rule" aria-labelledby="remote-fetch-title">
           <div className="remote-configuration__rule-description">

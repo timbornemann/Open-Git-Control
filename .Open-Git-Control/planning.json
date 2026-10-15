@@ -98,28 +98,6 @@
       "tags": [],
       "createdAt": 1791913255033,
       "updatedAt": 1791913255033
-    },
-    {
-      "id": "6cafc5cf-7111-4603-a50d-e1850111a996",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Remote einstellungen",
-      "description": "aufklappbare elemente sidn uneindeutig, außerdme kann man aus den repo einstellunen seine konten verwalten das sollte nicht sien, das macht man bereits in den einstellungen",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1792066636589,
-      "updatedAt": 1792066636589
-    },
-    {
-      "id": "5726ec4a-ddcf-4737-81dc-4f7efba9a9d2",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "alternative commit nachricht box",
-      "description": "neue commit nachricht box: hier hat man ein dopdown aus den git klassikern wie fix, docs, perf, add, und so weiter, dann ein kelines feld in dme man den bereich auswählne kann das das was nach z.b. fix in der klammer steht fix(backend), und ein weiteres feld für danach was dann die commit nachricht hinter der zuordnung ist. dann noch ein feld für die optionale beschreibung. das soll den stil vereinheitlichen. wenn man beim dropdown der bereiche nichts asuwählt also standard, kann man in das feld was eigentlich für die klammern ist optional was rein schrieebn wie eine eigene nachricht, das wird dann ohne klammern davor gesetzt oder man lässt es leer und kann ganz normal seine commit nachricht und beschreibugn schreiben und commtien. nach jedem commti setzt sich die dropdown auswahl und die felseder wieder zurück.",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1792068284752,
-      "updatedAt": 1792068378434
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowDownUp, GitBranch, Network, Plus, RotateCcw, Save } from 'lucide-react';
+import { GitBranch, Network, Plus, RotateCcw, Save } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { RemoteEndpointEditor } from './RemoteEndpointEditor';
 import { RemoteConfigurationSelection } from './RemoteConfigurationSelection';
@@ -10,7 +10,6 @@ import './hosting.css';
 import './remote-configuration.css';
 import { useOptionalUIContext } from '@/contexts/AppStateContext';
 import { Button } from '@/components/ui/Button';
-import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { ActionRequirement } from '@/components/ui/ActionRequirement';
 import { remoteConfigurationIssue } from './remoteConfigurationValidation';
 
@@ -18,13 +17,11 @@ export function RemoteConfigurationView({ repoPath }: { repoPath: string | null 
   const { tr } = useI18n();
   const editor = useRemoteConfiguration(repoPath);
   const onPublish = useOptionalUIContext()?.onOpenRepositoryPublication;
-  const [section, setSection] = useState<'transfers' | 'connections'>('transfers');
   const [addRequest, setAddRequest] = useState<{ repoPath: string; id: number } | null>(null);
   const snapshot = editor.snapshot;
   const issue = snapshot ? remoteConfigurationIssue(snapshot, editor.preferences, tr) : null;
   const addRemote = () => {
     if (!repoPath || !snapshot || editor.task.busy) return;
-    setSection('connections');
     setAddRequest((previous) => ({ repoPath, id: (previous?.id ?? 0) + 1 }));
   };
   if (!repoPath) return <p className="hosting-empty">{tr('Zuerst ein lokales Repository öffnen.', 'Open a local repository first.')}</p>;
@@ -43,9 +40,7 @@ export function RemoteConfigurationView({ repoPath }: { repoPath: string | null 
             </span>
             <span>
               <Network size={14} aria-hidden="true" />
-              {snapshot.remotes.length === 1
-                ? tr('1 Verbindung', '1 connection')
-                : tr(`${snapshot.remotes.length} Verbindungen`, `${snapshot.remotes.length} connections`)}
+              {snapshot.remotes.length} {tr('Remotes', 'remotes')}
             </span>
             <Button icon={<Plus size={14} />} disabled={editor.task.busy} onClick={addRemote}>
               {tr('Remote hinzufügen', 'Add remote')}
@@ -53,38 +48,60 @@ export function RemoteConfigurationView({ repoPath }: { repoPath: string | null 
           </div>
         )}
       </header>
-      <nav className="remote-configuration__navigation" aria-label={tr('Konfigurationsbereiche', 'Configuration sections')}>
-        <SegmentedControl
-          ariaLabel={tr('Konfigurationsbereich', 'Configuration section')}
-          value={section}
-          onChange={setSection}
-          options={[
-            {
-              value: 'transfers',
-              label: (
-                <>
-                  <ArrowDownUp size={14} aria-hidden="true" />
-                  {tr('Übertragungen', 'Transfers')}
-                </>
-              ),
-            },
-            {
-              value: 'connections',
-              label: (
-                <>
-                  <Network size={14} aria-hidden="true" />
-                  {tr('Verbindungen & Konten', 'Connections & accounts')}
-                </>
-              ),
-            },
-          ]}
-        />
+      <nav className="remote-configuration__navigation" aria-label={tr('Zu einem Abschnitt springen', 'Jump to section')}>
+        <a href="#remote-connections">{tr('Remotes', 'Remotes')}</a>
+        <a href="#remote-transfers">{tr('Synchronisierung', 'Synchronization')}</a>
+        {Boolean(snapshot?.remotes.length) && <a href="#remote-branches">{tr('Branches & Profile', 'Branches & profiles')}</a>}
+        <a href="#remote-hosting">{tr('Hosting-Ziel', 'Hosting target')}</a>
       </nav>
       <div className="remote-configuration__content" aria-busy={editor.task.busy}>
         {snapshot && (
           <>
-            <div hidden={section !== 'transfers'}>
-              {snapshot.remotes.length > 0 && (
+            <section id="remote-connections" className="remote-configuration__section">
+              <div className="remote-configuration__section-heading">
+                <div>
+                  <h2>{tr('Remotes', 'Remotes')}</h2>
+                  <p>
+                    {tr(
+                      'Ein Remote verbindet dieses Projekt mit einem Git-Repository auf einem Server. Wähle eine Verbindung, um ihre Adresse oder ihren Zugang zu ändern.',
+                      'A remote connects this project to a Git repository on a server. Select a connection to change its address or access.',
+                    )}
+                  </p>
+                </div>
+                {onPublish && (
+                  <Button disabled={editor.task.busy} onClick={() => onPublish()}>
+                    {tr('Repository veröffentlichen', 'Publish repository')}
+                  </Button>
+                )}
+              </div>
+              <RemoteEndpointEditor
+                key={repoPath}
+                repoPath={repoPath}
+                addRequest={addRequest?.repoPath === repoPath ? addRequest.id : 0}
+                snapshot={snapshot}
+                preferences={editor.preferences}
+                connections={editor.connections}
+                bind={editor.bind}
+                setCredentialMode={editor.setCredentialMode}
+                edit={editor.edit}
+                request={editor.request}
+                task={editor.task}
+                reload={editor.reload}
+                unbind={(name, url) => {
+                  const next = {
+                    ...editor.preferences,
+                    bindings: editor.preferences.bindings?.filter((binding) => binding.remoteName !== name || binding.url !== url),
+                  };
+                  if (next.hostingRemote === name) {
+                    delete next.hostingRemote;
+                    delete next.hostingRepository;
+                  }
+                  editor.update(next);
+                }}
+              />
+            </section>
+            <div id="remote-transfers">
+              {snapshot.remotes.length > 0 ? (
                 <RemoteConfigurationSelection
                   snapshot={snapshot}
                   preferences={editor.preferences}
@@ -93,90 +110,25 @@ export function RemoteConfigurationView({ repoPath }: { repoPath: string | null 
                   disabled={editor.task.busy}
                   setUpstream={editor.setUpstream}
                 />
-              )}
-              {snapshot.remotes.length === 0 && (
-                <section className="remote-configuration__section remote-configuration__empty">
-                  <Network size={24} aria-hidden="true" />
-                  <h2>{tr('Dieses Repository ist noch nicht verbunden', 'This repository is not connected yet')}</h2>
+              ) : (
+                <section className="remote-configuration__section">
+                  <h2>{tr('Synchronisierung', 'Synchronization')}</h2>
                   <p>
                     {tr(
-                      'Verbinde ein vorhandenes Repository über seine Git-URL oder erstelle ein neues Repository auf deinem Hosting-Anbieter.',
-                      'Connect an existing repository using its Git URL or create a new repository on your hosting provider.',
+                      'Füge oben dein erstes Remote hinzu. Danach kannst du hier die Quellen und Ziele für Fetch, Pull und Push festlegen.',
+                      'Add your first remote above. Then choose sources and targets for fetch, pull and push here.',
                     )}
                   </p>
-                  <div className="hosting-actions">
-                    <Button variant="primary" onClick={addRemote}>
-                      {tr('Vorhandenes Repository verbinden', 'Connect existing repository')}
-                    </Button>
-                    {onPublish && (
-                      <Button disabled={editor.task.busy} onClick={() => onPublish()}>
-                        {tr('Repository veröffentlichen', 'Publish repository')}
-                      </Button>
-                    )}
-                  </div>
-                  <details className="remote-configuration__advanced">
-                    <summary>{tr('Pull-Strategie vorbereiten', 'Prepare pull strategy')}</summary>
-                    <RemotePullStrategy
-                      preferences={editor.preferences}
-                      configuration={editor.pullConfiguration}
-                      update={editor.update}
-                      disabled={editor.task.busy}
-                    />
-                  </details>
+                  <RemotePullStrategy
+                    preferences={editor.preferences}
+                    configuration={editor.pullConfiguration}
+                    update={editor.update}
+                    disabled={editor.task.busy}
+                  />
                 </section>
               )}
             </div>
-            <div hidden={section !== 'connections'}>
-              <section className="remote-configuration__section">
-                <div className="remote-configuration__section-heading">
-                  <div>
-                    <h2>{tr('Verbundene Repositorys', 'Connected repositories')}</h2>
-                    <p>
-                      {tr(
-                        'Jede Verbindung heißt in Git „Remote“. Der Name, etwa origin oder backup, gilt nur in diesem lokalen Repository.',
-                        'Git calls each connection a “remote”. Its name, such as origin or backup, belongs to this local repository.',
-                      )}
-                    </p>
-                  </div>
-                  {onPublish && (
-                    <Button disabled={editor.task.busy} onClick={() => onPublish()}>
-                      {tr('Repository veröffentlichen', 'Publish repository')}
-                    </Button>
-                  )}
-                </div>
-                <RemoteEndpointEditor
-                  key={repoPath}
-                  repoPath={repoPath}
-                  addRequest={addRequest?.repoPath === repoPath ? addRequest.id : 0}
-                  snapshot={snapshot}
-                  preferences={editor.preferences}
-                  connections={editor.connections}
-                  bind={editor.bind}
-                  setCredentialMode={editor.setCredentialMode}
-                  edit={editor.edit}
-                  request={editor.request}
-                  task={editor.task}
-                  reload={editor.reload}
-                  unbind={(name, url) => {
-                    const next = {
-                      ...editor.preferences,
-                      bindings: editor.preferences.bindings?.filter((binding) => binding.remoteName !== name || binding.url !== url),
-                    };
-                    if (next.hostingRemote === name) {
-                      delete next.hostingRemote;
-                      delete next.hostingRepository;
-                    }
-                    editor.update(next);
-                  }}
-                />
-              </section>
-              <RemoteConfigurationHosting
-                preferences={editor.preferences}
-                connections={editor.connections}
-                update={editor.update}
-                disabled={editor.task.busy}
-              />
-            </div>
+            <RemoteConfigurationHosting preferences={editor.preferences} connections={editor.connections} update={editor.update} disabled={editor.task.busy} />
           </>
         )}
         {!snapshot && editor.task.busy && (
@@ -194,8 +146,8 @@ export function RemoteConfigurationView({ repoPath }: { repoPath: string | null 
           </strong>
           <small>
             {tr(
-              '„Speichern“ übernimmt Übertragungsregeln und Kontozuordnungen. Es startet keinen Transfer.',
-              'Save applies transfer rules and account bindings. It does not start a transfer.',
+              'Speichert Synchronisierung und Repository-Zuordnungen. Remote-Adressen und Namen werden separat direkt übernommen.',
+              'Saves synchronization and repository bindings. Remote addresses and names are applied separately and immediately.',
             )}
           </small>
         </div>
@@ -205,7 +157,14 @@ export function RemoteConfigurationView({ repoPath }: { repoPath: string | null 
           </Button>
           <ActionRequirement
             reason={editor.task.busy ? null : issue}
-            remedy={issue ? { label: tr('Auswahl prüfen', 'Review selection'), onClick: () => setSection('transfers') } : undefined}
+            remedy={
+              issue
+                ? {
+                    label: tr('Auswahl prüfen', 'Review selection'),
+                    onClick: () => document.getElementById('remote-transfers')?.scrollIntoView({ block: 'start' }),
+                  }
+                : undefined
+            }
           >
             <Button variant="primary" icon={<Save size={14} />} disabled={editor.task.busy || !snapshot} onClick={editor.save}>
               {tr('Speichern', 'Save')}
@@ -213,10 +172,13 @@ export function RemoteConfigurationView({ repoPath }: { repoPath: string | null 
           </ActionRequirement>
         </div>
         {editor.task.error && (
-          <details className="remote-configuration__error" role="alert">
-            <summary>{tr('Die Änderung konnte nicht übernommen werden. Details anzeigen.', 'The change could not be applied. Show details.')}</summary>
-            <p>{editor.task.error}</p>
-          </details>
+          <div className="remote-configuration__error" role="alert">
+            <strong>{tr('Die Änderung konnte nicht übernommen werden.', 'The change could not be applied.')}</strong>
+            <details>
+              <summary>{tr('Technische Details', 'Technical details')}</summary>
+              <p>{editor.task.error}</p>
+            </details>
+          </div>
         )}
       </footer>
     </main>

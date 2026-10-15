@@ -13,7 +13,7 @@ export function RemoteConfigurationHosting({ preferences, connections, update, d
       binding.repository?.fullPath === preferences.hostingRepository?.fullPath,
   );
   return (
-    <section className="remote-configuration__section">
+    <section id="remote-hosting" className="remote-configuration__section">
       <h2>{tr('Repository für PRs, CI und Releases', 'Repository for PRs, CI and releases')}</h2>
       <p>
         {tr(
@@ -52,8 +52,8 @@ export function RemoteConfigurationHosting({ preferences, connections, update, d
       {!bindings.length && (
         <p>
           {tr(
-            'Öffne oben bei einer Verbindung „Anmeldung und Hosting-Konto“, ordne ein Konto zu und wähle das Repository hier aus. Normale Git-Übertragungen benötigen diese Zuordnung nicht.',
-            'Open Authentication and hosting account on a connection above, bind an account and select its repository here. Normal Git transfers do not need this binding.',
+            'Wähle oben ein Remote und ordne unter „Zugang für dieses Remote“ ein vorhandenes Konto zu. Anschließend kannst du sein Repository hier auswählen.',
+            'Select a remote above and bind an existing account under Access for this remote. You can then select its repository here.',
           )}
         </p>
       )}

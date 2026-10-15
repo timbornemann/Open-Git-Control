@@ -36,32 +36,26 @@ export function RemoteConfigurationSelection({ snapshot, preferences, pullConfig
   const pushBranches = preferences.pushBranches?.[mappingBranch] ?? {};
   const upstreamBranch = pullDefaults.branch || snapshot.branch;
   return (
-    <section className="remote-configuration__section">
-      <RemoteConfigurationActions
-        snapshot={snapshot}
-        preferences={preferences}
-        pullConfiguration={pullConfiguration}
-        update={update}
-        disabled={disabled}
-        selected={selected}
-        activeProfileName={activeProfile?.name}
-      />
-      <h2>{tr('Erweiterte Einstellungen', 'Advanced settings')}</h2>
-      <p>
-        {tr(
-          'Für andere Branchnamen, Backup-Profile oder ein neues Branch-Tracking. Für normale Transfers sind diese Einstellungen nicht erforderlich.',
-          'For different branch names, backup profiles or new branch tracking. These settings are not required for normal transfers.',
-        )}
-      </p>
-      <details className="remote-configuration__advanced">
-        <summary>{tr('Branch-Zuordnungen und Tracking', 'Branch mappings and tracking')}</summary>
+    <>
+      <section className="remote-configuration__section">
+        <RemoteConfigurationActions
+          snapshot={snapshot}
+          preferences={preferences}
+          pullConfiguration={pullConfiguration}
+          update={update}
+          disabled={disabled}
+          selected={selected}
+          activeProfileName={activeProfile?.name}
+        />
+      </section>
+      <section id="remote-branches" className="remote-configuration__section">
+        <h2>{tr('Branch-Zuordnungen und Tracking', 'Branch mappings and tracking')}</h2>
         <p>
           {tr(
             'Optional: Nur ändern, wenn ein Remote einen anderen Branchnamen verwenden soll.',
             'Optional: change these only when a remote should use a different branch name.',
           )}
         </p>
-        <p>{tr('Beim Wechsel der Pull-Quelle werden deren Branch-Zuordnungen zurückgesetzt.', 'Changing the pull source clears its branch mappings.')}</p>
         <p>
           {tr(
             'Leere Felder verwenden den Git-Standard: Pull nutzt den Tracking-Branch der gewählten Quelle, sonst den lokalen Branchnamen. Push nutzt den lokalen Branchnamen. Deine Zuordnungen gelten nach „Speichern“.',
@@ -121,22 +115,16 @@ export function RemoteConfigurationSelection({ snapshot, preferences, pullConfig
           ))}
         </div>
         <RemoteBranchTracking snapshot={snapshot} remote={pullDefaults.remote} targetBranch={upstreamBranch} disabled={disabled} setUpstream={setUpstream} />
-      </details>
-      <details className="remote-configuration__advanced">
-        <summary>
+      </section>
+      <section id="remote-profiles" className="remote-configuration__section">
+        <h2>
           {tr('Push-Profile', 'Push profiles')}
           {preferences.profiles?.length ? ` (${preferences.profiles.length})` : ''}
-        </summary>
+        </h2>
         <p>
           {tr(
             'Profile speichern Ziele und Branch-Zuordnungen. Tags und Force-Push werden pro Übertragung ausgewählt.',
             'Profiles save targets and branch mappings. Tags and force push are selected for each transfer.',
-          )}
-        </p>
-        <p>
-          {tr(
-            'Beispiel: „Hauptserver & Backup“ lädt auf zwei Remotes. Wähle das Profil hier und nutze für Push „Diese Auswahl direkt verwenden“, um es bei normalen Pushes wiederzuverwenden.',
-            'Example: “Main server & backup” uploads to two remotes. Select the profile here and choose Use this selection directly for push to reuse it for normal pushes.',
           )}
         </p>
         <label>
@@ -237,7 +225,7 @@ export function RemoteConfigurationSelection({ snapshot, preferences, pullConfig
             {tr('Profil entfernen', 'Remove profile')}
           </Button>
         </div>
-      </details>
-    </section>
+      </section>
+    </>
   );
 }

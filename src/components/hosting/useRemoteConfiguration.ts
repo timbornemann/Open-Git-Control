@@ -114,10 +114,11 @@ export function useRemoteConfiguration(repoPath: string | null) {
     );
   };
   const edit = (action: 'remove' | 'rename' | 'set-url', name: string, value?: string) =>
-    void task.run(async () => {
+    task.run(async () => {
       if (!repoPath) return;
-      await request('editRemote', { repoPath, mutation: { action, name, ...(action === 'rename' ? { newName: value } : { url: value }) } });
+      const updated = await request('editRemote', { repoPath, mutation: { action, name, ...(action === 'rename' ? { newName: value } : { url: value }) } });
       await reload();
+      return updated;
     });
   const bind = (name: string, endpointUrl: string, connectionId: string, resolutionUrl = endpointUrl) =>
     void task.run(

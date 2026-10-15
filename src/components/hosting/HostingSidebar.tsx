@@ -111,7 +111,7 @@ export function HostingSidebar({ local = false }: { local?: boolean }) {
             {activeRepo && link('repositories', tr('Repository veröffentlichen', 'Publish repository'), <UploadCloud size={14} />, () => onPublish?.())}
             {activeRepo && link('remotes', tr('Remote-Konfiguration', 'Remote configuration'), <Settings2 size={14} />, onOpenRemoteConfig)}
             {link('repositories', tr('Repository-Katalog', 'Repository catalog'), <BookOpen size={14} />)}
-            {link('connections', tr('Konten & Server', 'Accounts & servers'), <Server size={14} />)}
+            {!local && link('connections', tr('Konten & Server', 'Accounts & servers'), <Server size={14} />)}
           </nav>
         </RepoCardContent>
       )}

@@ -117,6 +117,7 @@ describe('hosting sidebar navigation', () => {
 
   it('shows one target without redundant selection and opens its features or remote configuration without a transfer', async () => {
     await render();
+    expect(button('Accounts & servers')).toBeUndefined();
     expect(host.querySelector('select')).toBeNull();
     expect(host.textContent).toContain('team/project');
     expect(host.textContent).toContain('github.com');

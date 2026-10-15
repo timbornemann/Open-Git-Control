@@ -69,12 +69,14 @@ const select = async (label: string, value: string) => {
   });
 };
 const click = async (label: string) => {
-  const button = [...host.querySelectorAll<HTMLButtonElement>('button')].find((candidate) => candidate.textContent?.trim() === label)!;
+  const button = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+    (candidate) => !candidate.closest('[hidden]') && (candidate.textContent?.trim() === label || candidate.getAttribute('aria-label') === label),
+  )!;
   expect(button).toBeTruthy();
   await act(async () => button.click());
 };
 
-it('shows automatic transfers for a sole remote and keeps optional settings collapsed without starting a transfer', async () => {
+it('shows automatic transfers and editable repository settings without hidden menus or global account management', async () => {
   const original = vi.mocked(transferClient.request).getMockImplementation()!;
   vi.mocked(transferClient.request).mockImplementation(async (operation, input) => {
     if (operation === 'getRemotes') {
@@ -91,7 +93,11 @@ it('shows automatic transfers for a sole remote and keeps optional settings coll
   expect(host.querySelector<HTMLSelectElement>('select[aria-label="Pull strategy"]')?.value).toBe('default');
   expect(host.textContent).toContain('Effective Git configuration: Rebase');
   expect(host.textContent).toContain('branch.main.rebase = true');
-  expect(host.querySelector('details.remote-configuration__advanced')?.hasAttribute('open')).toBe(false);
+  expect(host.querySelector('details.remote-configuration__advanced')).toBeNull();
+  expect(host.querySelector('#remote-branches input')?.closest('details')).toBeNull();
+  expect(host.querySelector('#remote-profiles input')?.closest('details')).toBeNull();
+  expect(host.textContent).not.toContain('Manage accounts & servers');
+  expect(host.textContent).not.toContain('Connections & accounts');
   expect([...host.querySelectorAll('.remote-configuration__destination')].map((element) => element.textContent)).toEqual([
     'backuphttps://github.com/team/repo.git',
     'backup/main',
@@ -273,9 +279,9 @@ it('keeps binding and credential-mode changes in the draft until Save', async ()
     ],
   };
   await render();
-  await click('Connections & accounts');
+  await click('Change access');
   const authentication = [...host.querySelectorAll<HTMLSelectElement>('select')].find(
-    (element) => element.parentElement?.textContent?.includes('Git authentication for this endpoint') && !element.disabled,
+    (element) => element.parentElement?.textContent?.includes('Authentication for Git transfers') && !element.disabled,
   )!;
   await act(async () => {
     authentication.value = 'system';
@@ -308,9 +314,9 @@ const resolvedRepository: HostedRepository = {
   fork: false,
 };
 const chooseAccount = async () => {
-  await click('Connections & accounts');
+  await click('Change access');
   const element = [...host.querySelectorAll<HTMLSelectElement>('select')].find((candidate) =>
-    candidate.parentElement?.textContent?.includes('Bind hosting account'),
+    candidate.parentElement?.textContent?.includes('App account for optional assignment'),
   )!;
   await act(async () => {
     element.value = 'account';
@@ -344,7 +350,7 @@ it('resolves an SSH alias through the explicit repository web URL and saves its 
   await render();
   await chooseAccount();
   await setRepositoryUrl('https://forgejo.example/team/repo');
-  await click('Bind account to this endpoint');
+  await click('Assign app account');
   expect(hostingClient.request).toHaveBeenCalledWith('resolveRepository', { connectionId: 'account', url: 'https://forgejo.example/team/repo' });
   expect(persisted['C:/repo']).toBeUndefined();
   await select('Fetch source', 'private');
@@ -364,7 +370,7 @@ it('ignores a repository-resolution result after switching to another repository
   );
   await render('C:/one');
   await chooseAccount();
-  await click('Bind account to this endpoint');
+  await click('Assign app account');
   await render('C:/two');
   await act(async () => {
     resolve(resolvedRepository);
@@ -437,19 +443,21 @@ it('renames and updates an existing push profile in the draft without replacing 
   expect(persisted['C:/repo'].profiles).toMatchObject([{ id: 'profile', name: 'New profile', remoteNames: ['private', 'backup'] }]);
 });
 
-it('keeps transfer drafts across section navigation and shows the chosen branch direction without starting any transfer', async () => {
+it('keeps transfer drafts while selecting remotes and leaves the settings visible on one page', async () => {
   await render();
   await select('Pull source', 'private');
   await select('pull selection mode', 'remember');
   const transfers = host.querySelector('#remote-pull-title')!.closest('.remote-configuration__section')!;
   const connections = host.querySelector('.remote-configuration__remote-list')!.closest('.remote-configuration__section')!;
   expect(transfers.closest('[hidden]')).toBeNull();
-  expect(connections.closest('[hidden]')).not.toBeNull();
-  expect(transfers.textContent).toContain('private/main → main');
-  await click('Connections & accounts');
-  expect(transfers.closest('[hidden]')).not.toBeNull();
   expect(connections.closest('[hidden]')).toBeNull();
-  await click('Transfers');
+  expect(transfers.textContent).toContain('private/main → main');
+  const sourceField = host.querySelector('select[aria-label="Pull source"]');
+  await click('Edit remote backup');
+  expect(transfers.closest('[hidden]')).toBeNull();
+  expect(connections.closest('[hidden]')).toBeNull();
+  await click('Edit remote private');
+  expect(host.querySelector('select[aria-label="Pull source"]')).toBe(sourceField);
   expect(host.querySelector<HTMLSelectElement>('select[aria-label="Pull source"]')?.value).toBe('private');
   expect(host.querySelector<HTMLSelectElement>('select[aria-label="pull selection mode"]')?.value).toBe('remember');
   expect(persisted['C:/repo']).toBeUndefined();
@@ -466,7 +474,6 @@ it('requires explicit inline confirmation before removing a remote and lets the 
     operation === 'editRemote' ? snapshot(input.repoPath) : original(operation, input),
   );
   await render();
-  await click('Connections & accounts');
   await click('Remove connection');
   expect(host.querySelector('[aria-label="Confirm removal"]')).not.toBeNull();
   expect(vi.mocked(transferClient.request).mock.calls.some(([operation]) => operation === 'editRemote')).toBe(false);

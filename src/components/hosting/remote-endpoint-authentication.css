@@ -1,0 +1,77 @@
+.remote-configuration__authentication {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+.remote-access__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.remote-access__heading h4 {
+  margin: 0;
+}
+.remote-access__heading .ui-button {
+  flex: none;
+}
+.remote-configuration__authentication .remote-access__session {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 8px 0 14px;
+}
+.remote-access__session > svg {
+  flex: none;
+  margin-top: 2px;
+}
+.remote-configuration__endpoint-account {
+  padding: 12px 0;
+}
+.remote-configuration__endpoint-account + .remote-configuration__endpoint-account {
+  border-top: 1px solid var(--line-subtle);
+}
+.remote-configuration__endpoint-url {
+  display: block;
+  margin-bottom: 10px;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+.remote-access__current {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.remote-access__current > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-secondary);
+}
+.remote-access__current > div {
+  min-width: 0;
+}
+.remote-access__current strong {
+  font-size: 0.76rem;
+}
+.remote-access__current p {
+  margin: 5px 0;
+}
+.remote-access__account-choice,
+.remote-access__editor {
+  max-width: 660px;
+}
+.remote-access__editor {
+  margin: 14px 0 0 26px;
+  padding-left: 14px;
+  border-left: 2px solid var(--line-subtle);
+}
+.remote-access__account-choice {
+  margin-top: 14px;
+}
+@container hosting (max-width: 540px) {
+  .remote-access__editor {
+    margin-left: 0;
+    padding-left: 12px;
+  }
+}
