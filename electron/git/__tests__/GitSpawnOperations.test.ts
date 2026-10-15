@@ -66,6 +66,56 @@ describe('GitSpawnOperations stream limits', () => {
     expect(process.kill).toHaveBeenCalledTimes(1);
   });
 
+  it.each([false, true])('delivers opted-in long lines as bounded Unicode-safe fragments (final newline: %s)', async (newline) => {
+    const process = new FakeGitProcess();
+    spawnMock.mockReturnValue(process);
+    const parts: Array<{ line: string; fragment?: { first: boolean; last: boolean } }> = [];
+    const operation = new GitSpawnOperations().streamLines(
+      '/repo',
+      ['show'],
+      (line, fragment) => {
+        parts.push({ line, fragment });
+      },
+      new AbortController().signal,
+      { redactOutput: false, fragmentLongLines: true },
+    );
+    const longLine = 'x'.repeat(65535) + '😀' + 'ä'.repeat(1024 * 1024);
+    const bytes = Buffer.from(`${longLine}\r\nnext${newline ? '\n' : ''}`);
+    for (let offset = 0; offset < bytes.length; offset += 32767) process.stdout.emit('data', bytes.subarray(offset, offset + 32767));
+    process.emit('close', 0);
+    await operation;
+    const fragments = parts.filter((part) => part.fragment);
+    expect(fragments.map((part) => part.line).join('')).toBe(longLine);
+    expect(fragments[0].fragment).toEqual({ first: true, last: false });
+    expect(fragments.at(-1)?.fragment).toEqual({ first: false, last: true });
+    expect(fragments.every((part) => part.line.length <= 65536 && !/^[\udc00-\udfff]|[\ud800-\udbff]$/.test(part.line))).toBe(true);
+    expect(parts.at(-1)).toEqual({ line: 'next', fragment: undefined });
+    expect(process.kill).not.toHaveBeenCalled();
+  });
+
+  it.each(['cancel', 'error'])('stops the process when a fragmented line consumer reports %s', async (mode) => {
+    const process = new FakeGitProcess();
+    spawnMock.mockReturnValue(process);
+    const controller = new AbortController();
+    const consumer = vi.fn(() => {
+      if (mode === 'cancel') controller.abort();
+      else throw new Error('Fragment scan failed');
+    });
+    const operation = new GitSpawnOperations().streamLines('/repo', ['show'], consumer, controller.signal, { redactOutput: false, fragmentLongLines: true });
+    process.stdout.emit('data', Buffer.alloc(2 * 1024 * 1024, 'x'));
+    if (mode === 'cancel') await expect(operation).rejects.toMatchObject({ name: 'AbortError' });
+    else await expect(operation).rejects.toThrow('Fragment scan failed');
+    expect(consumer).toHaveBeenCalledTimes(1);
+    expect(process.kill).toHaveBeenCalledOnce();
+  });
+
+  it('requires an explicit raw consumer before fragmenting potentially sensitive output', async () => {
+    await expect(new GitSpawnOperations().streamLines('/repo', ['show'], vi.fn(), new AbortController().signal, { fragmentLongLines: true })).rejects.toThrow(
+      'explicit raw-output consumer',
+    );
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
   it('preserves Unicode characters split across line-stream chunks', async () => {
     const process = new FakeGitProcess();
     spawnMock.mockReturnValue(process);

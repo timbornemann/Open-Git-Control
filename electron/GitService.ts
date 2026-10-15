@@ -15,7 +15,7 @@ import { RepositoryFiles, type RepositoryFileDataUrl, type RepositoryFileSource 
 import type { RepositoryTextEncoding } from './git/RepositoryFileEncoding';
 import { StashService } from './git/StashService';
 import { SubmoduleService } from './git/SubmoduleService';
-import type { GitTransferOptions } from './git/GitProcessTypes';
+import type { GitLineHandler, GitLineStreamOptions, GitTransferOptions } from './git/GitProcessTypes';
 
 export type { CommitStats, FileTimelineCommit };
 export type { DiffPreviewResult };
@@ -579,9 +579,9 @@ export class GitService {
   async streamCommandLinesAtPath(
     repoPath: string,
     args: string[],
-    onLine: (line: string) => void,
+    onLine: GitLineHandler,
     signal?: AbortSignal,
-    options: { redactOutput?: boolean; envOverrides?: NodeJS.ProcessEnv } = {},
+    options: GitLineStreamOptions = {},
   ): Promise<void> {
     const normalizedPath = (repoPath || '').trim();
     if (!normalizedPath) {

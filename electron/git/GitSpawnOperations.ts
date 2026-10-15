@@ -1,7 +1,14 @@
 import { toolExecutable, toolEnvironment } from '../system-tools/toolRuntime';
 import { spawn } from 'child_process';
 import { StringDecoder } from 'string_decoder';
-import type { DiffPreviewResult, GitBufferRunOptions, GitCloneProgressResult, GitTransferOptions } from './GitProcessTypes';
+import type {
+  DiffPreviewResult,
+  GitBufferRunOptions,
+  GitCloneProgressResult,
+  GitLineHandler,
+  GitLineStreamOptions,
+  GitTransferOptions,
+} from './GitProcessTypes';
 import { createAbortError } from './GitProcessTypes';
 import { redactGitSensitiveText } from './GitErrorFormatter';
 import { gitProcessTree } from './GitProcessTree';
@@ -172,13 +179,7 @@ export class GitSpawnOperations {
     });
   }
 
-  streamLines(
-    repoPath: string,
-    args: string[],
-    onLine: (line: string) => void,
-    signal: AbortSignal,
-    options: { redactOutput?: boolean; envOverrides?: NodeJS.ProcessEnv } = {},
-  ): Promise<void> {
+  streamLines(repoPath: string, args: string[], onLine: GitLineHandler, signal: AbortSignal, options: GitLineStreamOptions = {}): Promise<void> {
     return runGitLineConsumer(repoPath, args, onLine, signal, options);
   }
 

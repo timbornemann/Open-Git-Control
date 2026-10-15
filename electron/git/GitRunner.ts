@@ -23,6 +23,8 @@ import {
   type GitCloneProgressResult,
   type GitExecFileOptions,
   type GitInputRunOptions,
+  type GitLineHandler,
+  type GitLineStreamOptions,
   type GitRunOptions,
   type GitProcessResult,
   type GitTransferOptions,
@@ -318,13 +320,7 @@ export class GitRunner {
     });
   }
 
-  async streamLines(
-    repoPath: string,
-    args: string[],
-    onLine: (line: string) => void,
-    signal?: AbortSignal,
-    options: { redactOutput?: boolean; envOverrides?: NodeJS.ProcessEnv } = {},
-  ): Promise<void> {
+  async streamLines(repoPath: string, args: string[], onLine: GitLineHandler, signal?: AbortSignal, options: GitLineStreamOptions = {}): Promise<void> {
     this.assertRepoPathAvailable(repoPath);
     await this.schedule(
       repoPath,

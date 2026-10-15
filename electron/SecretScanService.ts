@@ -2,6 +2,7 @@ import { SecretAllowlistMatcher, type SecretAllowlistRule } from './SecretAllowl
 import type { GitService } from './GitService';
 import { scanLfsSecrets } from './git/GitLfsSecretScanner';
 import { SecretScanProgress } from './git/SecretScanProgress';
+import { SecretScanLongLine } from './git/SecretScanLongLine';
 import type { SecretScanProgressDto, SecretScanPushScopeDto } from '../src/types/secretScan';
 import type { PushSecretScanScope } from './git/PushSecretScanScope';
 
@@ -402,6 +403,7 @@ export class SecretScanService {
   }): Promise<SecretScanResult> {
     const strictness = options.strictness;
     const allowlistRules = parseAllowlist(options.allowlistText || '');
+    const longLineAllowlistRules = allowlistRules.filter((rule) => rule.kind === 'path');
     const matcher = allowlistRules.some((rule) => rule.kind === 'regex') ? new SecretAllowlistMatcher(allowlistRules, options.signal) : undefined;
     try {
       const notes: string[] = [...(options.pushScanScope?.notes ?? [])];
@@ -432,21 +434,29 @@ export class SecretScanService {
         }
       };
 
-      const scanCandidate = async (candidate: DiffCandidateLine) => {
+      const scanCandidate = async (candidate: DiffCandidateLine, fragment?: { first: boolean; last: boolean; seen: Set<string> }) => {
         if (options.signal?.aborted) return;
-        if (candidate.source === 'staged') stagedLines += 1;
-        else if (candidate.source === 'tag') tagLines += 1;
-        else toPushLines += 1;
+        if (!fragment || fragment.first) {
+          if (candidate.source === 'staged') stagedLines += 1;
+          else if (candidate.source === 'tag') tagLines += 1;
+          else toPushLines += 1;
+        }
         const checkedLines = stagedLines + toPushLines + tagLines;
         progress.lines(checkedLines);
         if (checkedLines % 250 === 0) options.onProgress?.(checkedLines);
         for (const pattern of SECRET_PATTERNS) {
+          if (fragment?.seen.has(pattern.id)) continue;
           if (!patternEnabledForStrictness(pattern, strictness)) continue;
           if (pattern.configFileOnly && !isConfigurationFile(candidate.filePath)) continue;
           const match = candidate.line.match(pattern.regex);
           if (!match || (pattern.validateMatch && !pattern.validateMatch(match))) continue;
+          if (fragment && !fragment.last && pattern.configFileOnly && !/^\s*[#;]/.test(candidate.line.slice(match.index! + match[0].length))) continue;
           const finding = { filePath: candidate.filePath, line: candidate.line, ruleId: pattern.id };
-          if (matcher ? await matcher.test(finding) : isAllowlisted(finding, allowlistRules)) continue;
+          // Partial/normalized content must not manufacture a content-regex
+          // allowlist match that would not match the complete original line.
+          if (fragment ? isAllowlisted(finding, longLineAllowlistRules) : matcher ? await matcher.test(finding) : isAllowlisted(finding, allowlistRules))
+            continue;
+          fragment?.seen.add(pattern.id);
           if (findings.length >= 1000) {
             if (!findingLimitNoted) {
               notes.push('Secret scan finding limit reached (1000); additional findings were omitted.');
@@ -461,7 +471,9 @@ export class SecretScanService {
             source: candidate.source,
             filePath: candidate.filePath,
             lineNumber: candidate.lineNumber,
-            contextLine: sanitizeContextLine(candidate.line),
+            // A credential can begin in an earlier fragment. Never expose its
+            // unrecognizable tail as context for another finding on that line.
+            contextLine: fragment ? '[REDACTED_SECRET] (long-line preview omitted)' : sanitizeContextLine(candidate.line),
           });
         }
       };
@@ -470,64 +482,93 @@ export class SecretScanService {
         let currentFile = '';
         let currentNewLineNumber = 0;
         let combinedParentCount = 0;
-        await this.gitService.streamCommandLinesAtPath(
-          options.repoPath,
-          args,
-          async (line) => {
-            if (line.startsWith('diff --')) {
-              // Never retain the prior file for a malformed or quoted header.
-              // The following +++ line provides the authoritative target path.
-              currentFile = '';
-              currentNewLineNumber = 0;
-              combinedParentCount = 0;
-              return;
-            }
-            const patchTargetPath = parsePatchTargetPath(line);
-            if (patchTargetPath !== null) {
-              currentFile = patchTargetPath;
-              return;
-            }
-            const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-            if (hunkMatch) {
-              currentNewLineNumber = Number(hunkMatch[1]) || 0;
-              combinedParentCount = 0;
-              return;
-            }
-            const combinedHunkMatch = line.match(/^(@{3,})\s+(.*?)\+(\d+)(?:,\d+)?\s+\1/);
-            if (combinedHunkMatch) {
-              currentNewLineNumber = Number(combinedHunkMatch[3]) || 0;
-              combinedParentCount = combinedHunkMatch[1].length - 1;
-              return;
-            }
-            if (!currentFile || currentNewLineNumber <= 0) return;
-            if (combinedParentCount > 0) {
-              const prefix = line.slice(0, combinedParentCount);
-              if (prefix.length !== combinedParentCount || !/^[ +\-]+$/.test(prefix)) return;
-              if ([...prefix].every((character) => character === '+')) {
-                await scanCandidate({
-                  filePath: currentFile,
-                  lineNumber: currentNewLineNumber,
-                  line: line.slice(combinedParentCount),
-                  source,
-                });
-              }
-              if (![...prefix].every((character) => character === '-')) currentNewLineNumber += 1;
-              return;
-            }
-            if (line.startsWith('+') && !line.startsWith('+++')) {
+        let longLine: SecretScanLongLine | undefined;
+        const consumeLine = async (line: string) => {
+          if (line.startsWith('diff --')) {
+            // Never retain the prior file for a malformed or quoted header.
+            // The following +++ line provides the authoritative target path.
+            currentFile = '';
+            currentNewLineNumber = 0;
+            combinedParentCount = 0;
+            return;
+          }
+          const patchTargetPath = parsePatchTargetPath(line);
+          if (patchTargetPath !== null) {
+            currentFile = patchTargetPath;
+            return;
+          }
+          const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+          if (hunkMatch) {
+            currentNewLineNumber = Number(hunkMatch[1]) || 0;
+            combinedParentCount = 0;
+            return;
+          }
+          const combinedHunkMatch = line.match(/^(@{3,})\s+(.*?)\+(\d+)(?:,\d+)?\s+\1/);
+          if (combinedHunkMatch) {
+            currentNewLineNumber = Number(combinedHunkMatch[3]) || 0;
+            combinedParentCount = combinedHunkMatch[1].length - 1;
+            return;
+          }
+          if (!currentFile || currentNewLineNumber <= 0) return;
+          if (combinedParentCount > 0) {
+            const prefix = line.slice(0, combinedParentCount);
+            if (prefix.length !== combinedParentCount || !/^[ +\-]+$/.test(prefix)) return;
+            if ([...prefix].every((character) => character === '+')) {
               await scanCandidate({
                 filePath: currentFile,
                 lineNumber: currentNewLineNumber,
-                line: line.slice(1),
+                line: line.slice(combinedParentCount),
                 source,
               });
-              currentNewLineNumber += 1;
-              return;
             }
-            if (line.startsWith(' ')) currentNewLineNumber += 1;
+            if (![...prefix].every((character) => character === '-')) currentNewLineNumber += 1;
+            return;
+          }
+          if (line.startsWith('+') && !line.startsWith('+++')) {
+            await scanCandidate({
+              filePath: currentFile,
+              lineNumber: currentNewLineNumber,
+              line: line.slice(1),
+              source,
+            });
+            currentNewLineNumber += 1;
+            return;
+          }
+          if (line.startsWith(' ')) currentNewLineNumber += 1;
+        };
+        await this.gitService.streamCommandLinesAtPath(
+          options.repoPath,
+          args,
+          async (line, fragment) => {
+            if (!fragment) return consumeLine(line);
+            if (fragment.first) {
+              const prefix = combinedParentCount || 1;
+              const added = combinedParentCount ? /^\++$/.test(line.slice(0, prefix)) : line.startsWith('+') && !line.startsWith('+++');
+              if (added && currentFile && currentNewLineNumber > 0) {
+                const seen = new Set<string>();
+                const filePath = currentFile,
+                  lineNumber = currentNewLineNumber;
+                longLine = new SecretScanLongLine((window, first, last) =>
+                  scanCandidate({ filePath, lineNumber, line: window, source }, { first, last, seen }),
+                );
+                if (!notes.some((note) => note.startsWith('Very long lines'))) {
+                  notes.push('Very long lines were scanned in overlapping segments; only path allowlist rules apply to these lines.');
+                }
+                line = line.slice(prefix);
+              } else {
+                // Removed/context lines and diff metadata still advance the
+                // parser exactly once, rather than once per output fragment.
+                await consumeLine(line);
+              }
+            }
+            if (longLine) await longLine.consume(line, fragment.last);
+            if (fragment.last) {
+              if (longLine) currentNewLineNumber++;
+              longLine = undefined;
+            }
           },
           options.signal,
-          { redactOutput: false, envOverrides: options.envOverrides },
+          { redactOutput: false, envOverrides: options.envOverrides, fragmentLongLines: true },
         );
       };
 
