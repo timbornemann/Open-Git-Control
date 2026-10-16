@@ -40,6 +40,7 @@
     "test:unit": "node scripts/run-tests.js",
     "test:coverage": "node scripts/run-tests.js --coverage",
     "test:storage:electron": "npm run build:electron && node scripts/test-storage-electron.js",
+    "test:startup:electron": "node scripts/test-startup-electron.js",
     "test:ci": "npm run legal:prepare && npm run legal:check && npm run lint && npm run format:check && npm run build:electron && npm run test:coverage && npm run build",
     "docs:release-links": "node scripts/update-readme-release-links.js"
   },

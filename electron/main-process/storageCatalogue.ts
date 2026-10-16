@@ -51,7 +51,7 @@ export const STORAGE_ADAPTERS: readonly StorageAdapter[] = [
     category: 'protected',
     disposable: false,
     matches: (p) =>
-      /^(settings\.json|project-planner\.json|window-state-v1\.json|hosting-connections\.json|hosting-credentials\.json|.*\.bin|storage-maintenance-v1\.json|storage-usage-v1\.json|Local State|Preferences|\.updaterId|lockfile)$/.test(
+      /^(settings\.json|project-planner\.json|window-state-v1\.json|hosting-connections\.json|hosting-credentials\.json|.*\.bin|storage-maintenance-v1\.json|storage-usage-v1\.json|startup(?:\.previous)?\.log|Local State|Preferences|\.updaterId|lockfile)$/.test(
         p,
       ) || /^(Local Storage|Session Storage|IndexedDB|Network|WebStorage|Service Worker|SharedStorage|Shared Dictionary|blob_storage)\//.test(p),
   },

@@ -135,6 +135,10 @@ jobs:
       - name: Validate release artifacts
         run: node scripts/validate-release-assets.js "${{ needs.prepare.outputs.version }}" "${{ matrix.platform }}"
 
+      - name: Verify packaged Windows startup and restart
+        if: matrix.platform == 'windows'
+        run: npm run test:startup:electron -- release/win-unpacked/resources/app.asar
+
       - name: Verify macOS application bundle
         if: matrix.platform == 'macos'
         shell: bash

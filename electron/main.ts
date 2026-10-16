@@ -25,6 +25,7 @@ import { clearSavedPlanningApiAuthToken, generateSavedPlanningApiAuthToken, getP
 import { configureBrowserCacheSwitches, configureCodeCache } from './main-process/browserCacheMaintenance';
 import { isHttpCacheWorker } from './main-process/httpCacheWorker';
 import { finishBeforeQuit } from './main-process/finishBeforeQuit';
+import { initializeStartupDiagnostics, recordStartup, flushStartupDiagnostics } from './main-process/startupDiagnostics';
 
 // A packaged app in "dev mode" would load the localhost dev server, open
 // DevTools and apply the relaxed dev CSP; isDevelopmentRuntime() gates on
@@ -42,6 +43,7 @@ const openMainWindowIfReady = () => {
 const isPrimaryInstance = !isHttpCacheWorker && acquireSingleInstanceLock(app, BrowserWindow, openMainWindowIfReady);
 
 if (isPrimaryInstance) {
+  const stopStartupDiagnostics = initializeStartupDiagnostics();
   configureBrowserCacheSwitches(isDev);
   registerHtmlPreviewScheme();
   installIpcSenderValidation({ isDev, mainProcessDir: __dirname });
@@ -124,6 +126,7 @@ if (isPrimaryInstance) {
   });
 
   app.whenReady().then(() => {
+    recordStartup('app-ready');
     stopSystemTools = registerSystemToolsHandlers({ isDev, mainProcessDir: __dirname });
     void systemToolsService.start().catch((error) => console.error('[system-tools] Initial check failed:', error));
     app.setName(APP_DISPLAY_NAME);
@@ -132,6 +135,7 @@ if (isPrimaryInstance) {
     }
 
     configureCodeCache(isDev);
+    recordStartup('code-cache-ready');
     ({ repositoryRunService, disposeStorageMaintenance } = setupIPC({
       gitService,
       githubService,
@@ -145,11 +149,13 @@ if (isPrimaryInstance) {
       getOpenAiApiKeyFromSecureStore,
       buildDiagnosticsReport,
     }));
+    recordStartup('ipc-ready');
 
     installAppSecurity({ isDev, mainProcessDir: __dirname });
     installHtmlPreviewProtocol();
     openMainWindowIfReady();
     updaterManager.configureAutoUpdates(readSettingsWithMigration().autoUpdateEnabled);
+    recordStartup('startup-services-ready');
     if (process.env.OPEN_GIT_CONTROL_API_DISABLED !== 'true') {
       void startPlanningApiServer({
         authTokenProvider: () => getPlanningApiAuthState().token,
@@ -170,6 +176,8 @@ if (isPrimaryInstance) {
   });
 
   finishBeforeQuit(app, async () => {
+    recordStartup('shutdown-cleanup-start');
+    stopStartupDiagnostics();
     disposeStorageMaintenance?.();
     stopSystemTools?.();
     repositoryRunService?.dispose();
@@ -180,6 +188,8 @@ if (isPrimaryInstance) {
       });
     }
     await commitStatsService.dispose();
+    recordStartup('shutdown-cleanup-complete');
+    await flushStartupDiagnostics();
   });
 
   app.on('window-all-closed', () => {

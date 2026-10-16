@@ -5,6 +5,7 @@ import { installExternalWindowHandler } from './externalLinks';
 import { readSettings } from './settingsStore';
 import { installTextContextMenu } from './textContextMenu';
 import { installMainWindowStatePersistence, readMainWindowState } from './windowState';
+import { watchStartupWindow } from './startupDiagnostics';
 
 function resolveExistingFile(candidates: string[]): string | undefined {
   for (const candidate of candidates) {
@@ -50,6 +51,7 @@ export function createMainWindow(isDev: boolean, appDisplayName: string, mainPro
       spellcheck: true,
     },
   });
+  watchStartupWindow(win);
   installMainWindowStatePersistence(win);
   if (savedWindowState.isMaximized) {
     win.maximize();

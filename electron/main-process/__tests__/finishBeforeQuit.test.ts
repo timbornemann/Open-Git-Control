@@ -4,6 +4,26 @@ import { describe, expect, it, vi } from 'vitest';
 import { finishBeforeQuit } from '../finishBeforeQuit';
 
 describe('durable shutdown', () => {
+  it('resumes on a new event-loop turn after Electron has unwound the cancelled native quit', async () => {
+    vi.useFakeTimers({ toFake: ['setImmediate'] });
+    try {
+      const application = Object.assign(new EventEmitter(), { quit: vi.fn() });
+      const cleanup = vi.fn(async () => {});
+      finishBeforeQuit(application as unknown as App, cleanup);
+      application.emit('will-quit', { preventDefault: vi.fn() });
+      // Drain Promise callbacks without advancing fake immediates. waitFor
+      // advances fake timers itself and would already resume the native quit.
+      for (let turn = 0; turn < 8; turn++) await Promise.resolve();
+      expect(vi.getTimerCount()).toBe(1);
+      expect(cleanup).toHaveBeenCalledOnce();
+      expect(application.quit).not.toHaveBeenCalled();
+      vi.runOnlyPendingTimers();
+      expect(application.quit).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('defers repeated quit attempts until cleanup finishes and resumes quitting once', async () => {
     const application = Object.assign(new EventEmitter(), { quit: vi.fn() });
     let finish!: () => void;

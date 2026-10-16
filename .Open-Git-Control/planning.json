@@ -98,6 +98,28 @@
       "tags": [],
       "createdAt": 1791913255033,
       "updatedAt": 1791913255033
+    },
+    {
+      "id": "6c65c8a7-b949-4475-97a0-4c175eda87d6",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "viele dateien stagen",
+      "description": "bei vielen dateien mit vielen zeilen braucht es ewigkeiten sachen zu sagen, wenn man nur eine datei wählt, dann dauert es sehr lange bis diese in der staging area als gestaded ist, zusätzlich flaktert die gesammte liste sher oft, während diesem prozess, das macht auch das anklicken der kleinen pluse schwer da es die ganze zeit flakktert\n\nund wenn man oben auf das alle stagen klcikt dauert es bei 400 dateien mit 20000000 zeilen änderung extrem lange bis alles gestaget ist, also wirklich lange, in diesem prozsss flaktert ebenfalls alles ganz viel in dier staging area bereich, also je die einzelenen einträge",
+      "priority": "medium",
+      "status": "bug",
+      "tags": [],
+      "createdAt": 1792081994184,
+      "updatedAt": 1792081994184
+    },
+    {
+      "id": "9efdb97e-130c-4639-bdb9-19b0f97cabbd",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "git lfs",
+      "description": "wenn man eine datei bei git lfs hinzufügen möchte, ist man aktuell immer gezwungen die datei mit zu stagen, mann kann nicth nur hinzufügen zu lfs machen\n\ndas gleiche gilt für den dateityp oder endung hinzufügen bei lfs, wenn ich dateiendung hinzufüge sollte es auch die option geben nur zur lfs config hizufügen diese datei mit stagen oder alle passenden dateien stagen",
+      "priority": "medium",
+      "status": "bug",
+      "tags": [],
+      "createdAt": 1792082490983,
+      "updatedAt": 1792082490983
     }
   ]
 }
