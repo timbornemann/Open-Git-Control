@@ -128,7 +128,15 @@ if (isPrimaryInstance) {
   app.whenReady().then(() => {
     recordStartup('app-ready');
     stopSystemTools = registerSystemToolsHandlers({ isDev, mainProcessDir: __dirname });
-    void systemToolsService.start().catch((error) => console.error('[system-tools] Initial check failed:', error));
+    recordStartup('system-tools-started');
+    const stopInitialToolLog = systemToolsService.onStatus((status) => {
+      recordStartup('system-tools-status', Object.fromEntries(status.tools.map((tool) => [tool.id, tool.state])));
+    });
+    void systemToolsService
+      .start()
+      .then(() => recordStartup('system-tools-complete'))
+      .catch((error) => console.error('[system-tools] Initial check failed:', error))
+      .finally(stopInitialToolLog);
     app.setName(APP_DISPLAY_NAME);
     if (process.platform === 'win32') {
       app.setAppUserModelId(WINDOWS_APP_ID);
@@ -180,6 +188,7 @@ if (isPrimaryInstance) {
     stopStartupDiagnostics();
     disposeStorageMaintenance?.();
     stopSystemTools?.();
+    await systemToolsService.dispose();
     repositoryRunService?.dispose();
     updaterManager.dispose();
     if (planningApiServer) {

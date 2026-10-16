@@ -9,8 +9,32 @@ assert.ok(profile && path.isAbsolute(profile), 'An isolated startup test profile
 assert.ok(applicationPath && path.isAbsolute(applicationPath), 'Choose the built application or its packaged app.asar.');
 app.setPath('userData', profile);
 app.setPath('sessionData', profile);
+console.log(`Native startup test process: ${process.pid}`);
 process.env.OPEN_GIT_CONTROL_API_DISABLED = 'true';
 process.env.NODE_ENV = 'production';
+let mainToolPathReads = 0;
+if (process.env.OGC_STARTUP_TEST_TOOL_STALL === '1') {
+  const blocked = path.join(profile, 'blocked-program-location');
+  const pathKey = Object.keys(process.env).find((key) => key.toLowerCase() === 'path') || 'PATH';
+  process.env[pathKey] = `${blocked}${path.delimiter}${process.env[pathKey] || ''}`;
+  const stat = fs.statSync;
+  fs.statSync = function (file, ...args) {
+    if (String(file).startsWith(blocked)) mainToolPathReads++;
+    return stat.call(this, file, ...args);
+  };
+  const childProcess = require('node:child_process');
+  const spawn = childProcess.spawn;
+  childProcess.spawn = function (executable, args, options) {
+    if (executable === process.execPath && args?.[0] === '-e' && args[1].includes('input.candidates')) {
+      const stall = `const ogcFs=require('node:fs'),ogcStat=ogcFs.statSync;ogcFs.statSync=function(file,...args){
+        if(String(file).startsWith(${JSON.stringify(blocked)}))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,30000);
+        return ogcStat.call(this,file,...args);
+      };`;
+      args = ['-e', stall + args[1]];
+    }
+    return spawn.call(this, executable, args, options);
+  };
+}
 let ready = false;
 let cleanupCompleted = false;
 const timeout = setTimeout(() => {
@@ -84,6 +108,7 @@ if (process.env.OGC_STARTUP_TEST_LIFECYCLE === '1') {
           if (!interactive) await new Promise((resolve) => setTimeout(resolve, 50));
         }
         assert.ok(interactive, 'The app must remain interactive after clicking its navigation.');
+        assert.equal(mainToolPathReads, 0, 'Program discovery must never stat candidate paths on the UI thread.');
         console.log('Application started with CSS, preload and bootstrap available.');
         app.quit();
       } catch (error) {

@@ -29,6 +29,8 @@ Git for Windows normally includes LFS, but its installer allows deselecting it. 
 
 The resolver searches absolute PATH entries, standard installation directories, Homebrew locations and Windows installation/PATH registry values. It does not search the selected repository. macOS checks developer-tool availability before executing Apple's `/usr/bin/git` placeholder, avoiding an unexpected developer-tool installation prompt. Tools installed after launch can therefore become usable without restarting the app. A restart is suggested only when the installer finishes but verification still fails.
 
+Candidate filesystem checks and version commands run in disposable helper processes. A stalled filesystem check is skipped after one second, version commands have an eight-second limit, and each search has a fifteen-second budget. Later search paths remain eligible after a stalled candidate. This keeps slow local installations, execution aliases or disconnected drives from blocking the window. Concurrent package-manager lookups share one check; refreshing locations clears that result. Shutdown cancels outstanding helpers and waits for their process trees to stop. Initial tool states and completion are recorded in `startup.log`.
+
 ## Official downloads and references
 
 - [Git installation](https://git-scm.com/install/)
@@ -45,5 +47,7 @@ The tool status is included in diagnostics. Installation IPC accepts only predef
 Unter **Einstellungen → App & Diagnose → Werkzeuge** stehen Status, Version, offizieller Download und automatische Installation für Git sowie optional Git LFS und GitHub CLI bereit. Fehlt Git, erscheint nach abgeschlossener Prüfung einmal pro Sitzung ein Hinweis. Das Warndreieck bleibt bis zur erfolgreichen Prüfung sichtbar. Repositorys und ihre gespeicherte Auswahl bleiben erhalten; nach einer Installation oder einer erneuten Prüfung werden die Git-Funktionen wieder verfügbar.
 
 Die Installation startet ausschließlich nach deiner Auswahl und zeigt Paketquelle und Befehl. Rechte bestätigt das Betriebssystem. Paketmanager und zusätzliche Paketquellen werden nicht eingerichtet. Falls die automatische Installation nicht möglich ist, nutze den offiziellen Download beziehungsweise die Anleitung und den kopierbaren Befehl. LFS-Filter und Hooks werden weiterhin nur durch den bestehenden repositorylokalen LFS-Ablauf eingerichtet.
+
+Die Programmsuche läuft in getrennten, zeitlich begrenzten Hilfsprozessen. Ein hängender Suchpfad wird übersprungen; weitere Installationsorte werden weiterhin geprüft. Dadurch blockiert die Prüfung die Oberfläche auch bei langsamen lokalen Programmen oder nicht erreichbaren Laufwerken nicht. Beim Beenden werden laufende Prüfungen abgebrochen und ihre Hilfsprozesse beendet.
 
 Unter **Einstellungen → Allgemein → Git-Commit-Identität** kannst du Git-Name und E-Mail nachträglich für das aktuelle Repository oder global auf diesem Computer ändern. Vor einem Commit werden fehlende Angaben im selben Formular eingerichtet. Die Hosting-Anmeldung ersetzt diese Angaben nicht. Repository-Einstellungen haben Vorrang; bereits erstellte Commits bleiben unverändert.

@@ -4,15 +4,14 @@ import { runToolProcess } from '../ToolProcess';
 import fs from 'node:fs';
 
 describe('system executable discovery', () => {
-  it('verifies executable Windows aliases even when stat is denied', async () => {
+  it('enumerates Windows aliases without touching candidate paths on the main thread', () => {
     const stat = vi.spyOn(fs, 'statSync').mockImplementation(() => {
       throw Object.assign(new Error('alias stat denied'), { code: 'EACCES' });
     });
     try {
-      const run = vi.fn().mockResolvedValue({ stdout: 'v1.29.0', stderr: '' });
-      const resolver = new ToolExecutableResolver({ platform: 'win32', env: { PATH: 'C:\\WindowsApps' }, run });
-      expect(await resolver.find('winget')).toBe('C:\\WindowsApps\\winget.exe');
-      expect(run).toHaveBeenCalledWith('C:\\WindowsApps\\winget.exe', ['--version']);
+      const resolver = new ToolExecutableResolver({ platform: 'win32', env: { PATH: 'C:\\WindowsApps' } });
+      expect(resolver.candidates('winget')).toContain('C:\\WindowsApps\\winget.exe');
+      expect(stat).not.toHaveBeenCalled();
     } finally {
       stat.mockRestore();
     }
@@ -83,4 +82,13 @@ describe('system executable discovery', () => {
     expect(await runToolProcess(process.execPath, ['--version'])).toMatchObject({ stdout: expect.stringMatching(/^v\d+/) });
     await expect(runToolProcess(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], 200)).rejects.toThrow();
   }, 10000);
+  it('coalesces package manager discovery and checks again after refreshing installation locations', async () => {
+    const run = vi.fn().mockResolvedValue({ stdout: 'v1.29.0', stderr: '' });
+    const resolver = new ToolExecutableResolver({ platform: 'linux', env: { PATH: '/tools' }, exists: (file) => file === '/tools/winget', run });
+    expect(await Promise.all([resolver.find('winget'), resolver.find('winget'), resolver.find('winget')])).toEqual(Array(3).fill('/tools/winget'));
+    expect(run).toHaveBeenCalledOnce();
+    await resolver.refreshLocations();
+    expect(await resolver.find('winget')).toBe('/tools/winget');
+    expect(run).toHaveBeenCalledTimes(2);
+  });
 });

@@ -26,6 +26,24 @@ function fixture() {
   return { service, resolver, plans, run, installed };
 }
 describe('system tool lifecycle and installer isolation', () => {
+  it('does not restart background program checks after shutdown during registry discovery', async () => {
+    const f = fixture();
+    let complete!: () => void;
+    vi.spyOn(f.resolver, 'refreshLocations').mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          complete = resolve;
+        }),
+    );
+    const inspect = vi.spyOn(f.resolver, 'inspect');
+    const pending = f.service.start();
+    await f.service.dispose();
+    complete();
+    await pending;
+    await f.service.recheck();
+    expect(inspect).not.toHaveBeenCalled();
+    expect(f.run).not.toHaveBeenCalled();
+  });
   it('starts in checking state, merges parallel checks, and never starts an installer while probing', async () => {
     const f = fixture();
     expect(f.service.snapshot()).toMatchObject({ checkedAt: null, tools: expect.arrayContaining([expect.objectContaining({ id: 'git', state: 'checking' })]) });

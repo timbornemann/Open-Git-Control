@@ -23,6 +23,7 @@ export function initializeStartupDiagnostics(): () => void {
     electron: process.versions.electron || '',
     platform: process.platform,
     arch: process.arch,
+    pid: process.pid,
   });
   app.on('child-process-gone', (_event, details) => {
     recordStartup('child-process-gone', { type: details.type, reason: details.reason, exitCode: details.exitCode });

@@ -14,16 +14,24 @@ const environment = {
   NODE_ENV: 'production',
 };
 delete environment.ELECTRON_RUN_AS_NODE;
-const run = (lifecycle, repository = false) => {
+const run = (lifecycle, repository = false, stalledToolPath = false) => {
   const result = spawnSync(require('electron'), [path.join(__dirname, 'startup-electron-fixture.js')], {
-    env: { ...environment, OGC_STARTUP_TEST_LIFECYCLE: lifecycle ? '1' : '0', OGC_STARTUP_TEST_REPOSITORY: repository ? '1' : '0' },
+    env: {
+      ...environment,
+      OGC_STARTUP_TEST_LIFECYCLE: lifecycle ? '1' : '0',
+      OGC_STARTUP_TEST_REPOSITORY: repository ? '1' : '0',
+      OGC_STARTUP_TEST_TOOL_STALL: stalledToolPath ? '1' : '0',
+    },
     windowsHide: true,
     encoding: 'utf8',
     timeout: 45_000,
   });
   process.stdout.write(result.stdout || '');
   process.stderr.write(result.stderr || '');
-  if (result.error) throw result.error;
+  if (result.error) {
+    console.error({ pid: result.pid, status: result.status, signal: result.signal, error: result.error.code });
+    throw result.error;
+  }
   assert.equal(result.status, 0, `The native ${lifecycle ? 'shutdown' : 'startup'} smoke test must finish on its own.`);
   assert.ok(result.stdout.includes(lifecycle ? 'cleanup=true' : 'Application started with CSS, preload and bootstrap available.'));
   if (!lifecycle) assert.ok(fs.readFileSync(path.join(root, 'startup.log'), 'utf8').includes('shutdown-cleanup-complete'));
@@ -69,6 +77,9 @@ try {
   // Reuse the same profile: a remaining process or lock must not turn a second
   // launch into an empty window or silently forward it to a disposed instance.
   run(false, true);
+  // A genuinely blocked filesystem call in program discovery must not hold up
+  // first paint, IPC, repository restoration or interactive navigation.
+  run(false, true, true);
   console.log('Native startup, shutdown and restart smoke tests passed.');
 } finally {
   const resolved = path.resolve(root);

@@ -19,6 +19,7 @@ export class SystemToolsService {
   private checking: Promise<SystemToolsStatus> | null = null;
   private installing = false;
   private active = false;
+  private stopped = false;
   private agreements = new Map<string, string>();
   private statusListeners = new Set<(status: SystemToolsStatus) => void>();
   private installListeners = new Set<(event: SystemToolInstallEvent) => void>();
@@ -62,7 +63,13 @@ export class SystemToolsService {
     this.status.tools.forEach(updateToolRuntime);
     return this.recheck();
   }
+  async dispose(): Promise<void> {
+    this.stopped = true;
+    this.active = false;
+    await this.resolver.dispose();
+  }
   private publish() {
+    if (this.stopped) return;
     const snapshot = this.snapshot();
     this.statusListeners.forEach((listener) => listener(snapshot));
   }
@@ -72,6 +79,7 @@ export class SystemToolsService {
     this.publish();
   }
   recheck(): Promise<SystemToolsStatus> {
+    if (this.stopped) return Promise.resolve(this.snapshot());
     if (this.checking) return this.checking;
     this.checking = this.check().finally(() => {
       this.checking = null;
@@ -80,9 +88,12 @@ export class SystemToolsService {
   }
   private async check(): Promise<SystemToolsStatus> {
     await this.resolver.refreshLocations();
+    if (this.stopped) return this.snapshot();
     const git = await this.resolver.inspect('git');
+    if (this.stopped) return this.snapshot();
     this.setTool(git);
     await Promise.all(['git-lfs', 'github-cli'].map(async (id) => this.setTool(await this.resolver.inspect(id as 'git-lfs' | 'github-cli', git))));
+    if (this.stopped) return this.snapshot();
     this.status.checkedAt = Date.now();
     this.publish();
     // Installation discovery is independent of repository restoration and initial Git feedback.
