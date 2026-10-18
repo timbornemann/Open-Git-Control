@@ -17,10 +17,14 @@ const TEXT = new Set(
 );
 
 export function lfsRecommendation(filePath: string, bytes: number, sample: Buffer): GitLfsFileState['recommendation'] {
+  return lfsContentRecommendation(filePath, bytes, detectRepositoryFileEncoding(sample) === 'binary');
+}
+
+export function lfsContentRecommendation(filePath: string, bytes: number, binary: boolean): GitLfsFileState['recommendation'] {
   const extension = path.extname(filePath).slice(1).toLowerCase();
   if (!bytes || TEXT.has(extension) || /(?:^|\/)(?:[^/]*lock[^/]*|\.env(?:\.[^/]*)?)$/i.test(filePath)) return undefined;
   if (ASSETS.has(extension) && bytes >= LFS_ASSET_MIN_BYTES) return 'asset';
-  if (bytes >= LFS_BINARY_MIN_BYTES && detectRepositoryFileEncoding(sample) === 'binary') return 'binary';
+  if (bytes >= LFS_BINARY_MIN_BYTES && binary) return 'binary';
   return undefined;
 }
 

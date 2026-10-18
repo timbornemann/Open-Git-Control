@@ -3,12 +3,18 @@ import type { SystemToolId, SystemToolStatus } from '../../src/shared/ipc/system
 
 const tools = new Map<SystemToolId, SystemToolStatus>();
 let managed = false;
+let revision = 0;
+export const toolRuntimeRevision = (): number => revision;
 export const SYSTEM_TOOL_ERROR_PREFIX = 'SYSTEM_TOOL_UNAVAILABLE:';
 
 export function manageToolRuntime(): void {
+  if (!managed) revision++;
   managed = true;
 }
 export function updateToolRuntime(status: SystemToolStatus): void {
+  const previous = tools.get(status.id);
+  if (JSON.stringify([previous?.state, previous?.version, previous?.executable]) !== JSON.stringify([status.state, status.version, status.executable]))
+    revision++;
   tools.set(status.id, status);
 }
 export function toolExecutable(id: SystemToolId): string {

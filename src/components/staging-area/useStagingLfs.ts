@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import type { GitLfsFileState, GitLfsStagingMode, GitLfsStatus, TrackWithGitLfsRequest } from '@/shared/ipc/gitLfs';
@@ -14,9 +14,13 @@ export function useStagingLfs(
   track: (request: TrackWithGitLfsRequest) => Promise<boolean>,
   setInputDialog?: (dialog: InputDialogState | null) => void,
 ) {
-  const lfsAvailability = useSystemTools((state) => state.status?.tools.find((tool) => tool.id === 'git-lfs')?.state);
+  const lfsAvailability = useSystemTools((state) => {
+    const tool = state.status?.tools.find((tool) => tool.id === 'git-lfs');
+    return `${tool?.state}:${tool?.version}:${tool?.executable}`;
+  });
   const { tr } = useI18n();
   const [snapshot, setSnapshot] = useState<{ repo: string; status: GitLfsStatus } | null>(null);
+  const inFlight = useRef<{ repo: string; promise: Promise<void> } | null>(null);
   useEffect(() => {
     let active = true;
     if (!repoPath || !status || typeof gitClient.getGitLfsStatus !== 'function') return;
@@ -25,7 +29,13 @@ export function useStagingLfs(
       ...[...status.unstaged, ...status.untracked].map((entry) => ({ path: entry.path, source: 'unstaged' as const })),
     ];
     const unique = [...new Map(files.map((file) => [`${file.source}:${file.path}`, file])).values()];
-    void (async () => {
+    const previous = inFlight.current?.repo === repoPath ? inFlight.current.promise : null;
+    const request = (async () => {
+      // Keep only the newest queued status while a preview is being read.
+      // The status includes no blob IDs or file timestamps: membership alone
+      // cannot prove that an unchanged-looking entry still has the same content.
+      if (previous) await previous;
+      if (!active) return;
       const states: GitLfsFileState[] = [];
       let available = true;
       let error: string | undefined;
@@ -39,10 +49,27 @@ export function useStagingLfs(
         available = result.data.available;
         error = result.data.error;
       }
-      if (active) setSnapshot({ repo: repoPath, status: { available, error, files: states } });
+      if (active)
+        setSnapshot((current) => {
+          const old = new Map(current?.repo === repoPath ? current.status.files.map((file) => [`${file.source}:${file.path}`, file]) : []);
+          const files = states.map((file) => {
+            const previous = old.get(`${file.source}:${file.path}`);
+            return previous && sameFileState(previous, file) ? previous : file;
+          });
+          if (
+            current?.repo === repoPath &&
+            current.status.available === available &&
+            current.status.error === error &&
+            current.status.files.length === files.length &&
+            files.every((file, index) => file === current.status.files[index])
+          )
+            return current;
+          return { repo: repoPath, status: { available, error, files } };
+        });
     })().catch((error: unknown) => {
       if (active) setSnapshot({ repo: repoPath, status: { available: false, files: [], error: error instanceof Error ? error.message : String(error) } });
     });
+    inFlight.current = { repo: repoPath, promise: request };
     return () => {
       active = false;
     };
@@ -121,4 +148,8 @@ export function useStagingLfs(
     track: trackFile,
     configure,
   };
+}
+
+function sameFileState(first: GitLfsFileState, second: GitLfsFileState): boolean {
+  return (Object.keys({ ...first, ...second }) as Array<keyof GitLfsFileState>).every((key) => first[key] === second[key]);
 }

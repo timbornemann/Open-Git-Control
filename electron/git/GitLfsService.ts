@@ -12,6 +12,7 @@ import { withPrivateIndex } from './PrivateIndex';
 import { createPrivateTempDir, cleanupPrivateTempDir } from './PrivateTempFiles';
 import { resolveRepositoryPathForCreateWithoutSymlinks } from './RepositoryPathSafety';
 import { inspectLfsTrackingTargets } from './GitLfsTracking';
+import { GitLfsStatusCache } from './GitLfsStatusCache';
 
 function readAttributes(target: string): Buffer | null {
   try {
@@ -41,6 +42,7 @@ function replaceAttributes(target: string, data: Buffer, mode: number): void {
 }
 
 export class GitLfsService {
+  private readonly previews = new GitLfsStatusCache();
   constructor(private readonly runner: GitRunner) {}
   private reader(): LfsReader {
     return {
@@ -52,16 +54,14 @@ export class GitLfsService {
   }
   async getStatus(request: GitLfsStatusRequest): Promise<GitLfsStatus> {
     if (!request || !Array.isArray(request.files) || request.files.length > 10000) throw new Error('Invalid Git LFS status request.');
-    let available = true;
-    let error: string | undefined;
-    try {
-      await this.runner.run(request.repoPath, ['lfs', 'version']);
-    } catch {
-      available = false;
-      error = 'Git LFS is not installed or cannot be started. Install Git LFS and restart the application.';
-    }
-    const files = await inspectLfsFiles(request.repoPath, request.files, this.reader());
-    return { available, error, files: files.map((file) => file.state) };
+    return this.previews.read(
+      request.repoPath,
+      () => this.runner.run(request.repoPath, ['lfs', 'version']),
+      async (cache, availability) => {
+        const files = request.files.length ? await inspectLfsFiles(request.repoPath, request.files, this.reader(), cache) : [];
+        return { ...availability, files: files.map((file) => file.state) };
+      },
+    );
   }
   private async initialize(repoPath: string, git: CommitEditGit): Promise<void> {
     await git.run(repoPath, ['lfs', 'version']);
