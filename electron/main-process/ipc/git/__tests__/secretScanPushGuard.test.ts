@@ -88,6 +88,17 @@ const createHarness = (scanPushDiffs: ReturnType<typeof vi.fn>) => {
 };
 
 describe('secret scan push state binding', () => {
+  it('does not reuse a one-shot approval after changing scan strictness', async () => {
+    const scan = vi.fn(async () => findingsResult as any);
+    const harness = createHarness(scan);
+    const args = ['origin', 'main'];
+    await handlers.get('git:scanPushSecrets')!(harness.event, { repoPath: 'C:/repo', pushArgs: args });
+    expect(await handlers.get('git:approveSecretScanPush')!(harness.event, args, 'C:/repo')).toEqual({ success: true });
+    harness.readSettingsWithMigration.mockReturnValue({ secretScanBeforePushEnabled: true, secretScanStrictness: 'high' } as any);
+    expect(await harness.guard.requirePushSecretScanApproval(harness.event, args, 'C:/repo')).toMatchObject({ success: false });
+    expect(scan).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps an explicitly requested scan cancellation informational', async () => {
     const scan = vi.fn(
       async ({ signal }: { signal: AbortSignal }) =>

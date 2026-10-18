@@ -54,6 +54,7 @@ if (isPrimaryInstance) {
   let repositoryRunService: { dispose: () => void } | null = null;
   let stopSystemTools: (() => void) | undefined;
   let disposeStorageMaintenance: (() => void) | undefined;
+  let disposeSecretScans: (() => void) | undefined;
   const preferredPlanningApiPort = (() => {
     const parsed = Number(process.env.OPEN_GIT_CONTROL_API_PORT || '2990');
     return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 2990;
@@ -145,7 +146,7 @@ if (isPrimaryInstance) {
 
     configureCodeCache(isDev);
     recordStartup('code-cache-ready');
-    ({ repositoryRunService, disposeStorageMaintenance } = setupIPC({
+    ({ repositoryRunService, disposeStorageMaintenance, disposeSecretScans } = setupIPC({
       gitService,
       githubService,
       aiService,
@@ -194,6 +195,7 @@ if (isPrimaryInstance) {
   finishBeforeQuit(app, async () => {
     recordStartup('shutdown-cleanup-start');
     stopStartupDiagnostics();
+    disposeSecretScans?.();
     disposeStorageMaintenance?.();
     stopSystemTools?.();
     await systemToolsService.dispose();

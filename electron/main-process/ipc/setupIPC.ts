@@ -65,7 +65,7 @@ export function setupIPC({
   getGeminiApiKeyFromSecureStore,
   getOpenAiApiKeyFromSecureStore,
   buildDiagnosticsReport,
-}: SetupIpcDeps): { repositoryRunService: RepositoryRunService; disposeStorageMaintenance: () => void } {
+}: SetupIpcDeps): { repositoryRunService: RepositoryRunService; disposeStorageMaintenance: () => void; disposeSecretScans: () => void } {
   const repositoryRunConfigService = new RepositoryRunConfigService();
   const repositoryRunService = new RepositoryRunService(repositoryRunConfigService);
   registerReadCancellation();
@@ -136,5 +136,5 @@ export function setupIPC({
     runService: repositoryRunService,
     readStoredRepoPaths: () => readStoreData().repos.map((repo) => repo.path),
   });
-  return { repositoryRunService, disposeStorageMaintenance: maintenance.dispose };
+  return { repositoryRunService, disposeStorageMaintenance: maintenance.dispose, disposeSecretScans: () => pushGuard.abortActiveScan() };
 }

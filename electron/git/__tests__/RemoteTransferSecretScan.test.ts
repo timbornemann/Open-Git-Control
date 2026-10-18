@@ -102,6 +102,22 @@ function fixture(content = 'Clean initial content\n', usePathAlias = false) {
 }
 
 describe('single remote push with the real secret scan and IPC guard', () => {
+  it('reuses a background preflight through a new push plan while retaining the findings dialog and one-shot approval', async () => {
+    const f = fixture('AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF\n');
+    await f.scanner.scanPushDiffs({ repoPath: f.repoPath, strictness: 'low', allowlistText: '', revisions: ['HEAD'], background: true });
+    f.stream.mockClear();
+    const { plan, resultScan } = await f.prepare();
+    expect(resultScan.findings).toHaveLength(1);
+    expect(resultScan.pushScope).toMatchObject({ mode: 'incremental', totalCommits: 1 });
+    expect(f.showCommits()).toEqual([]);
+    expect(await f.request('executePush', { planId: plan.id })).toMatchObject({ success: false, error: expect.stringContaining('Potential secrets') });
+    expect(f.showCommits()).toEqual([]);
+    expect(git(f.remotePath, 'for-each-ref', '--format=%(refname)', 'refs/heads')).toBe('');
+    expect(await handlers.get(IpcChannel.GitApproveSecretScanPush)!(f.event, plan.secretScanArgs, f.repoPath)).toEqual({ success: true });
+    expect(await f.request('executePush', { planId: plan.id })).toMatchObject({ success: true, data: { state: 'success' } });
+    expect(git(f.remotePath, 'rev-parse', 'refs/heads/main')).toBe(plan.sourceOid);
+  }, 30_000);
+
   it.each([false, true])(
     'publishes a clean captured commit without setup or a separate approval, including a repeated up-to-date push (path alias: %s)',
     async (usePathAlias) => {

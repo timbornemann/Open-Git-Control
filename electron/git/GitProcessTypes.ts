@@ -54,6 +54,7 @@ export type GitTransferOptions = {
 export type GitLineFragment = { first: boolean; last: boolean };
 export type GitLineHandler = (line: string, fragment?: GitLineFragment) => void | Promise<void>;
 export type GitLineStreamOptions = {
+  requestedKind?: GitJobKind;
   redactOutput?: boolean;
   envOverrides?: NodeJS.ProcessEnv;
   /** Internal raw consumers must explicitly handle continuations of the same logical line. */

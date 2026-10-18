@@ -328,7 +328,7 @@ export class GitRunner {
     this.assertRepoPathAvailable(repoPath);
     await this.schedule(
       repoPath,
-      'interactive',
+      options.requestedKind ?? 'interactive',
       args[0] || 'stream',
       (schedulerSignal) => this.spawnOperations.streamLines(repoPath, args, onLine, schedulerSignal, options),
       { signal },

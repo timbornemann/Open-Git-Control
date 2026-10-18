@@ -30,6 +30,7 @@ export async function scanLfsSecrets(
     tooLargeMessage: 'Git LFS scan metadata exceeds its limit.',
     envOverrides: options.envOverrides,
     signal: options.signal,
+    requestedKind: options.requestedKind,
   });
   const parts = raw.toString().split('\0');
   const paths = new Map<string, string[]>();
@@ -44,7 +45,7 @@ export async function scanLfsSecrets(
     const targets = [...new Set(paths.get(blob) ?? [])].filter((filePath) => !seen.has(`${filePath}:${pointer.oid}`));
     if (!targets.length) continue;
     try {
-      const location = await localLfsObject(repoPath, pointer, git);
+      const location = await localLfsObject(repoPath, pointer, { run: (repo, args) => git.run(repo, args, options) });
       if (!location) throw new Error('LFS content is not available locally');
       const descriptor = fs.openSync(location, 'r');
       let sample: Buffer;

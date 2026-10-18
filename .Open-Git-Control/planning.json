@@ -94,21 +94,21 @@
       "title": "Schwarzes Flackern",
       "description": "Schwarzes Flackern: Ich habe noch keinen rythmus gefunden wann und warum das auftritt, aber ab und zu flackert die ganze Anwendung schwarz auf, nur für einen frame oder so, ganz kurz, aber der Bildschirm wird schwarz, untersuche warum das passiert auch wenn es nur selten ist und kaum auffällt sollte das nicht passieren, sein genau und untersuche die Details und behebe diesen bug",
       "priority": "medium",
-      "status": "bug",
+      "status": "done",
       "tags": [],
       "createdAt": 1791913255033,
-      "updatedAt": 1792323294812
+      "updatedAt": 1792340611468
     },
     {
       "id": "6c65c8a7-b949-4475-97a0-4c175eda87d6",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "viele dateien stagen",
-      "description": "bei vielen dateien mit vielen zeilen braucht es ewigkeiten sachen zu sagen, wenn man nur eine datei wählt, dann dauert es sehr lange bis diese in der staging area als gestaded ist, zusätzlich flaktert die gesammte liste sher oft, während diesem prozess, das macht auch das anklicken der kleinen pluse schwer da es die ganze zeit flakktert\n\nund wenn man oben auf das alle stagen klcikt dauert es bei 400 dateien mit 20000000 zeilen änderung extrem lange bis alles gestaget ist, also wirklich lange, in diesem prozsss flaktert ebenfalls alles ganz viel in dier staging area bereich, also je die einzelenen einträge",
+      "description": "viele dateien stagen: bei vielen dateien mit vielen zeilen braucht es ewigkeiten sachen zu sagen, wenn man nur eine datei wählt, dann dauert es sehr lange bis diese in der staging area als gestaded ist, zusätzlich flaktert die gesammte liste sher oft, während diesem prozess, das macht auch das anklicken der kleinen pluse schwer da es die ganze zeit flakktert\n\nund wenn man oben auf das alle stagen klcikt dauert es bei 400 dateien mit 20000000 zeilen änderung extrem lange bis alles gestaget ist, also wirklich lange, in diesem prozsss flaktert ebenfalls alles ganz viel in dier staging area bereich, also je die einzelenen einträge",
       "priority": "medium",
       "status": "bug",
       "tags": [],
       "createdAt": 1792081994184,
-      "updatedAt": 1792081994184
+      "updatedAt": 1792340647646
     },
     {
       "id": "9efdb97e-130c-4639-bdb9-19b0f97cabbd",
@@ -127,10 +127,10 @@
       "title": "change icon modal not closing",
       "description": "change icon modal not closing: der fehler, das ich nahc dem ich das repo icon mit dem dialog wechlen wollte das model nicht mehr schleißen konnte, ich habe ein icon gewählt, habe dieses dann angeklcijkt, es wurde auch direkt geändert, aber ich konnte dann im modal weder speichert, noch abbrechen noch das x oben anklciken und bekamm den toast error \"cancelation error\" das einzige was geholfen hat war das programm neu zu starten",
       "priority": "medium",
-      "status": "bug",
+      "status": "done",
       "tags": [],
       "createdAt": 1792324282753,
-      "updatedAt": 1792339460792
+      "updatedAt": 1792340614568
     }
   ]
 }

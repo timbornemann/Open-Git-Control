@@ -12,6 +12,7 @@ import { repositoryPathKey, requireActiveRepositoryPath } from '../../activeRepo
 import { emitJobEvent } from '../jobEvents';
 import type { RemoteTransferContext } from '../../../git/remoteTransferModels';
 import type { PushSecretScanScope } from '../../../git/PushSecretScanScope';
+import { PushSecretScanPreflight } from '../../PushSecretScanPreflight';
 
 type PushScanResolver = (repoPath: string, args: string[], context: RemoteTransferContext) => Promise<PushSecretScanScope | null>;
 
@@ -27,6 +28,7 @@ type SecretScanPushApproval = {
   repoKey: string;
   argsKey: string;
   stateFingerprint: string;
+  strictness: AppSettings['secretScanStrictness'];
   senderId: number | null;
   expiresAt: number;
   verifyRemote?: () => Promise<void>;
@@ -42,6 +44,7 @@ export type SecretScanPushGuard = {
   requirePushSecretScanApproval: (event: any, rawArgs: unknown[], expectedRepoPath: string) => Promise<{ success: false; error: string } | null>;
   /** Aborts any in-flight scan, e.g. when the active repository changes. */
   abortActiveScan: () => void;
+  setActiveRepository?: (repoPath: string) => void;
   /** Registers a Main-owned plan resolver; no remote exclusions cross IPC. */
   setPushScanResolver?: (resolve: PushScanResolver) => void;
   /** Keeps every endpoint in a batch bound to the policy checked before authorization. */
@@ -131,6 +134,7 @@ export function registerSecretScanPushGuard({
    */
   let secretScanPushApproval: SecretScanPushApproval | null = null;
   let completedRendererScan: CompletedRendererScan | null = null;
+  const preflight = new PushSecretScanPreflight({ gitService, secretScanService, readSettings: readSettingsWithMigration, allowlistReader });
 
   const activeRepoKey = (): string => {
     const activeRepoPath = gitService.getRepoPath();
@@ -188,6 +192,7 @@ export function registerSecretScanPushGuard({
       return { success: false, error: error instanceof Error ? error.message : 'Repository path is required.' };
     }
     const repoJob = repoJobRegistry.begin(repoPath);
+    const resumePreflight = preflight.pause();
     const controller = new AbortController();
     repoJob.signal.addEventListener('abort', () => controller.abort(), { once: true });
     activeSecretScanController = controller;
@@ -206,13 +211,14 @@ export function registerSecretScanPushGuard({
 
     try {
       const settings = readSettingsWithMigration();
+      const scanStrictness = settings.secretScanStrictness;
       const allowlist = await allowlistReader.prepare(repoJob.repoPath);
       const bindsPushState = Array.isArray(params.pushArgs);
       const stateFingerprintBefore = bindsPushState ? await readPushStateFingerprint(gitService, repoJob.repoPath, allowlistReader) : null;
       const { pushScanScope, ensureActive, options: scopeOptions } = await preparePushScope(event, params.pushArgs, repoJob, controller);
       const result = await secretScanService.scanPushDiffs({
         repoPath: repoJob.repoPath,
-        strictness: settings.secretScanStrictness,
+        strictness: scanStrictness,
         allowlistText: allowlist.text,
         includeTags: params?.includeTags === true,
         revisions: Array.isArray(params.revisions) ? params.revisions.map((revision) => String(revision || '')).slice(0, 8) : undefined,
@@ -233,6 +239,7 @@ export function registerSecretScanPushGuard({
       });
       await pushScanScope?.assertCurrent();
       allowlistReader.assertVersion(repoJob.repoPath, allowlist.version);
+      if (scanStrictness !== readSettingsWithMigration().secretScanStrictness) throw new Error(PUSH_STATE_CHANGED_ERROR);
       ensureActive();
 
       const stateFingerprintAfter = bindsPushState ? await readPushStateFingerprint(gitService, repoJob.repoPath, allowlistReader) : null;
@@ -247,10 +254,12 @@ export function registerSecretScanPushGuard({
           repoKey: repositoryPathKey(repoJob.repoPath),
           argsKey: pushArgsKey(params.pushArgs),
           stateFingerprint: stateFingerprintAfter,
+          strictness: scanStrictness,
           senderId: senderIdOf(event),
           expiresAt: Date.now() + 120_000,
           hasFindings: findingCount > 0,
           verifyRemote: async () => {
+            if (scanStrictness !== readSettingsWithMigration().secretScanStrictness) throw new Error(PUSH_STATE_CHANGED_ERROR);
             await pushScanScope?.assertCurrent();
             allowlistReader.assertVersion(repoJob.repoPath, allowlist.version);
           },
@@ -301,6 +310,7 @@ export function registerSecretScanPushGuard({
       return { success: false as const, error: safeError };
     } finally {
       repoJob.complete();
+      resumePreflight();
       if (activeSecretScanController === controller) activeSecretScanController = null;
     }
   };
@@ -323,7 +333,8 @@ export function registerSecretScanPushGuard({
       approval.senderId === senderIdOf(event) &&
       approval.repoKey === expectedRepoKey &&
       approval.repoKey === activeRepoKey() &&
-      approval.argsKey === argsKey
+      approval.argsKey === argsKey &&
+      approval.strictness === settings.secretScanStrictness
     ) {
       try {
         const currentFingerprint = await readPushStateFingerprint(gitService, expectedRepoPath, allowlistReader);
@@ -393,7 +404,8 @@ export function registerSecretScanPushGuard({
       scan.expiresAt <= Date.now() ||
       scan.senderId !== senderIdOf(event) ||
       scan.repoKey !== repositoryPathKey(repoPath) ||
-      scan.argsKey !== pushArgsKey(rawArgs)
+      scan.argsKey !== pushArgsKey(rawArgs) ||
+      scan.strictness !== readSettingsWithMigration().secretScanStrictness
     ) {
       return { success: false };
     }
@@ -410,6 +422,7 @@ export function registerSecretScanPushGuard({
       repoKey: repositoryPathKey(repoPath),
       argsKey: pushArgsKey(rawArgs),
       stateFingerprint,
+      strictness: scan.strictness,
       senderId: senderIdOf(event),
       expiresAt: Date.now() + 120_000,
       verifyRemote: scan.verifyRemote,
@@ -445,7 +458,9 @@ export function registerSecretScanPushGuard({
     setPushScanResolver: (resolve) => {
       resolvePushScan = resolve;
     },
+    setActiveRepository: (repoPath) => preflight.setActiveRepository(repoPath),
     abortActiveScan: () => {
+      preflight.setActiveRepository(null);
       completedRendererScan = null;
       secretScanPushApproval = null;
       activeSecretScanController?.abort();

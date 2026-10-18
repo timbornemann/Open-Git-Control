@@ -5,6 +5,8 @@ import { SecretScanProgress } from './git/SecretScanProgress';
 import { SecretScanLongLine } from './git/SecretScanLongLine';
 import type { SecretScanProgressDto, SecretScanPushScopeDto } from '../src/types/secretScan';
 import type { PushSecretScanScope } from './git/PushSecretScanScope';
+import { SecretScanHistoryCache, SECRET_SCAN_HISTORY_ENV, type HistoryScanEntry } from './git/SecretScanHistoryCache';
+import type { GitRunOptions } from './git/GitProcessTypes';
 
 export type SecretScanStrictness = 'low' | 'medium' | 'high';
 export type SecretScanSource = 'staged' | 'to-push' | 'tag';
@@ -12,6 +14,11 @@ export type SecretScanSource = 'staged' | 'to-push' | 'tag';
 // Keep batched `git show` invocations well below Windows' command-line limit,
 // including SHA-256 object IDs and all fixed diff flags.
 const MAX_COMMITS_PER_DIFF_PROCESS = 96;
+const scanReadOptions = (options: Pick<GitRunOptions, 'signal' | 'envOverrides'> & { background?: boolean }): GitRunOptions => ({
+  signal: options.signal,
+  envOverrides: options.envOverrides,
+  requestedKind: options.background ? 'background' : undefined,
+});
 type SecretSeverity = 'medium' | 'high' | 'critical';
 
 type PatternDefinition = {
@@ -380,6 +387,8 @@ function normalizeSecretScanRemote(value: unknown): string | undefined {
 }
 
 export class SecretScanService {
+  private readonly historyCache = new SecretScanHistoryCache();
+
   constructor(private readonly gitService: GitService) {}
 
   async scanPushDiffs(options: {
@@ -400,7 +409,15 @@ export class SecretScanService {
     /** Internal-only Git environment overrides, used for private AI indexes. */
     envOverrides?: NodeJS.ProcessEnv;
     stagedBaseTree?: string;
+    /** Main-only idle preflight: local history, no mutable staged content or UI events. */
+    background?: boolean;
+    /** Local warm-up hint only. Never used as the authorized scope of a push. */
+    preflightCommits?: string[];
   }): Promise<SecretScanResult> {
+    options = { ...options, envOverrides: { ...options.envOverrides, ...SECRET_SCAN_HISTORY_ENV } };
+    const readOptions = scanReadOptions(options);
+    const read = (args: string[]) =>
+      this.gitService.runner ? this.gitService.runner.run(options.repoPath, args, readOptions) : this.gitService.runCommandAtPath(options.repoPath, args);
     const strictness = options.strictness;
     const allowlistRules = parseAllowlist(options.allowlistText || '');
     const longLineAllowlistRules = allowlistRules.filter((rule) => rule.kind === 'path');
@@ -413,6 +430,8 @@ export class SecretScanService {
       let toPushLines = 0;
       let tagLines = 0;
       let findingLimitNoted = false;
+      let activeHistoryEntry: HistoryScanEntry | undefined;
+      let lastBackgroundYield = Date.now();
       const progress = new SecretScanProgress(options.onScanProgress, options.pushScanScope?.summary);
       progress.phase('preparing');
       const pushPlan = options.pushArgs && !options.pushScanScope ? await this.resolvePushPlan(options.repoPath, options.pushArgs) : null;
@@ -426,7 +445,7 @@ export class SecretScanService {
           commits,
           scannedLfs,
           (candidate) => scanCandidate({ ...candidate, source }),
-          options,
+          { ...options, ...readOptions },
         );
         if (lfsNotes.length) {
           notes.push(...lfsNotes);
@@ -437,11 +456,19 @@ export class SecretScanService {
       const scanCandidate = async (candidate: DiffCandidateLine, fragment?: { first: boolean; last: boolean; seen: Set<string> }) => {
         if (options.signal?.aborted) return;
         if (!fragment || fragment.first) {
+          if (activeHistoryEntry) activeHistoryEntry.checkedLines++;
           if (candidate.source === 'staged') stagedLines += 1;
           else if (candidate.source === 'tag') tagLines += 1;
           else toPushLines += 1;
         }
         const checkedLines = stagedLines + toPushLines + tagLines;
+        if (options.background && checkedLines % 128 === 0 && Date.now() - lastBackgroundYield >= 8) {
+          await new Promise<void>((resolve) => {
+            setImmediate(resolve);
+          });
+          options.signal?.throwIfAborted();
+          lastBackgroundYield = Date.now();
+        }
         progress.lines(checkedLines);
         if (checkedLines % 250 === 0) options.onProgress?.(checkedLines);
         for (const pattern of SECRET_PATTERNS) {
@@ -475,15 +502,24 @@ export class SecretScanService {
             // unrecognizable tail as context for another finding on that line.
             contextLine: fragment ? '[REDACTED_SECRET] (long-line preview omitted)' : sanitizeContextLine(candidate.line),
           });
+          activeHistoryEntry?.findings.push(findings[findings.length - 1]);
         }
       };
 
-      const streamDiff = async (args: string[], source: SecretScanSource) => {
+      const streamDiff = async (args: string[], source: SecretScanSource, capture?: Map<string, HistoryScanEntry>) => {
         let currentFile = '';
         let currentNewLineNumber = 0;
         let combinedParentCount = 0;
         let longLine: SecretScanLongLine | undefined;
         const consumeLine = async (line: string) => {
+          const marker = capture && /^OGC_SECRET_COMMIT:([a-f0-9]{40,64})$/.exec(line);
+          if (marker && args.includes(marker[1])) {
+            activeHistoryEntry = { checkedLines: 0, findings: [], longLines: false };
+            capture!.set(marker[1], activeHistoryEntry);
+            currentFile = '';
+            currentNewLineNumber = 0;
+            return;
+          }
           if (line.startsWith('diff --')) {
             // Never retain the prior file for a malformed or quoted header.
             // The following +++ line provides the authoritative target path.
@@ -551,6 +587,7 @@ export class SecretScanService {
                 longLine = new SecretScanLongLine((window, first, last) =>
                   scanCandidate({ filePath, lineNumber, line: window, source }, { first, last, seen }),
                 );
+                if (activeHistoryEntry) activeHistoryEntry.longLines = true;
                 if (!notes.some((note) => note.startsWith('Very long lines'))) {
                   notes.push('Very long lines were scanned in overlapping segments; only path allowlist rules apply to these lines.');
                 }
@@ -568,8 +605,9 @@ export class SecretScanService {
             }
           },
           options.signal,
-          { redactOutput: false, envOverrides: options.envOverrides, fragmentLongLines: true },
+          { ...readOptions, redactOutput: false, fragmentLongLines: true },
         );
+        activeHistoryEntry = undefined;
       };
 
       const scanCommits = async (commits: string[], source: SecretScanSource) => {
@@ -581,6 +619,22 @@ export class SecretScanService {
         }
 
         if (commitsToScan.length) progress.beginCommits(commitsToScan.length, source === 'tag');
+        let cache: Awaited<ReturnType<SecretScanHistoryCache['prepare']>>;
+        if (commitsToScan.length && this.gitService.runner) {
+          try {
+            cache = await this.historyCache.prepare(
+              options.repoPath,
+              commitsToScan,
+              JSON.stringify([strictness, options.allowlistText]),
+              this.gitService.runner,
+              readOptions,
+            );
+          } catch (error) {
+            options.signal?.throwIfAborted();
+            if ((error as Error)?.name === 'AbortError') throw error;
+            // Cache failure never replaces or skips the ordinary secret scan.
+          }
+        }
         for (let offset = 0; offset < commitsToScan.length; offset += MAX_COMMITS_PER_DIFF_PROCESS) {
           if (options.signal?.aborted) {
             const aborted = new Error('Secret scan was aborted.');
@@ -588,23 +642,54 @@ export class SecretScanService {
             throw aborted;
           }
           const batch = commitsToScan.slice(offset, offset + MAX_COMMITS_PER_DIFF_PROCESS);
+          // LFS files are mutable outside Git's object store. Always recheck
+          // their availability and integrity, including when patches are cached.
           await scanLfs(batch, source);
-          await streamDiff(
-            [
-              'show',
-              '--format=',
-              '--diff-merges=first-parent',
-              '--no-ext-diff',
-              '--no-textconv',
-              '--no-color',
-              '--unified=0',
-              '--find-renames',
-              '--find-copies',
-              ...batch,
-            ],
-            source,
-          );
+          const missing: string[] = [];
+          let reusedLines = 0;
+          for (const oid of batch) {
+            const cached = this.historyCache.get(cache?.keys.get(oid));
+            if (!cached) {
+              missing.push(oid);
+              continue;
+            }
+            if (source === 'tag') tagLines += cached.checkedLines;
+            else toPushLines += cached.checkedLines;
+            reusedLines += cached.checkedLines;
+            for (const finding of cached.findings) {
+              if (findings.length >= 1000) {
+                if (!findingLimitNoted) notes.push('Secret scan finding limit reached (1000); additional findings were omitted.');
+                findingLimitNoted = true;
+                break;
+              }
+              findings.push({ ...finding, source, id: `${source}:${finding.filePath}:${finding.lineNumber}:${finding.ruleId}:${findings.length + 1}` });
+            }
+            if (cached.longLines && !notes.some((note) => note.startsWith('Very long lines')))
+              notes.push('Very long lines were scanned in overlapping segments; only path allowlist rules apply to these lines.');
+          }
+          const captured = cache ? new Map<string, HistoryScanEntry>() : undefined;
+          if (missing.length)
+            await streamDiff(
+              [
+                'show',
+                cache ? '--format=OGC_SECRET_COMMIT:%H' : '--format=',
+                '--diff-merges=first-parent',
+                '--no-ext-diff',
+                '--no-textconv',
+                '--no-color',
+                '--unified=0',
+                '--find-renames',
+                '--find-copies',
+                ...missing,
+              ],
+              source,
+              captured,
+            );
           options.signal?.throwIfAborted();
+          await cache?.assertCurrent();
+          if (captured && !findingLimitNoted && !matcher?.timedOutCount)
+            for (const [oid, entry] of captured) this.historyCache.put(cache!.keys.get(oid)!, entry);
+          if (reusedLines) progress.lines(stagedLines + toPushLines + tagLines);
           progress.completeBatch(batch.length);
         }
       };
@@ -635,13 +720,7 @@ export class SecretScanService {
         for (const revision of revisions) {
           progress.phase('preparing');
           try {
-            const commitsRaw = await this.gitService.runCommandAtPath(options.repoPath, [
-              'rev-list',
-              '--reverse',
-              '--topo-order',
-              revision,
-              ...remoteExclusionArgs,
-            ]);
+            const commitsRaw = await read(['rev-list', '--reverse', '--topo-order', revision, ...remoteExclusionArgs]);
             const commits = parseCommitList(commitsRaw);
             await scanCommits(commits, 'to-push');
             scannedSource = true;
@@ -663,10 +742,10 @@ export class SecretScanService {
       const isAbortError = (error: unknown): boolean => options.signal?.aborted === true || (error as { name?: string } | null)?.name === 'AbortError';
 
       const scanUpstreamAheadCommits = async () => {
-        const upstreamRefRaw = await this.gitService.runCommandAtPath(options.repoPath, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
+        const upstreamRefRaw = await read(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
         const upstreamRef = normalizeSecretScanRevision(upstreamRefRaw, 'upstream revision');
         if (!upstreamRef) return;
-        const commitsRaw = await this.gitService.runCommandAtPath(options.repoPath, ['rev-list', '--reverse', '--topo-order', `${upstreamRef}..HEAD`]);
+        const commitsRaw = await read(['rev-list', '--reverse', '--topo-order', `${upstreamRef}..HEAD`]);
         const commits = parseCommitList(commitsRaw);
         await scanCommits(commits, 'to-push');
         notes.push(commits.length > 0 ? `Scanned ${commits.length} commit(s) ahead of ${upstreamRef}.` : `No commits found ahead of ${upstreamRef}.`);
@@ -708,13 +787,7 @@ export class SecretScanService {
         if (!options.includeTags && !pushPlan?.includeTags) return;
         progress.phase('preparing');
         try {
-          const tagOnlyCommitsRaw = await this.gitService.runCommandAtPath(options.repoPath, [
-            'rev-list',
-            '--reverse',
-            '--topo-order',
-            '--tags',
-            ...remoteExclusionArgs,
-          ]);
+          const tagOnlyCommitsRaw = await read(['rev-list', '--reverse', '--topo-order', '--tags', ...remoteExclusionArgs]);
           const tagOnlyCommits = parseCommitList(tagOnlyCommitsRaw);
           await scanCommits(tagOnlyCommits, 'tag');
           if (tagOnlyCommits.length > 0) {
@@ -727,14 +800,19 @@ export class SecretScanService {
       };
 
       if (options.stagedBaseTree && !/^[0-9a-f]{40,64}$/.test(options.stagedBaseTree)) throw new Error('Invalid scan base tree.');
-      progress.phase('staged');
-      await streamDiff(
-        ['diff', '--cached', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0', ...(options.stagedBaseTree ? [options.stagedBaseTree] : [])],
-        'staged',
-      );
+      if (!options.background) {
+        progress.phase('staged');
+        await streamDiff(
+          ['diff', '--cached', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0', ...(options.stagedBaseTree ? [options.stagedBaseTree] : [])],
+          'staged',
+        );
+      }
       if (options.includePushHistory !== false) {
         progress.phase('preparing');
-        if (options.pushScanScope) {
+        if (options.background && options.preflightCommits) {
+          if (options.preflightCommits.some((oid) => !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(oid))) throw new Error('Invalid preflight commit.');
+          await scanCommits(options.preflightCommits, 'to-push');
+        } else if (options.pushScanScope) {
           await scanCommits(options.pushScanScope.historyCommits, 'to-push');
           await scanCommits(options.pushScanScope.tagCommits, 'tag');
         } else {
@@ -742,8 +820,10 @@ export class SecretScanService {
           await scanTagCommits();
         }
       }
-      progress.phase('lfs');
-      await scanLfs(null, 'staged');
+      if (!options.background) {
+        progress.phase('lfs');
+        await scanLfs(null, 'staged');
+      }
 
       options.onProgress?.(stagedLines + toPushLines + tagLines);
       options.signal?.throwIfAborted();

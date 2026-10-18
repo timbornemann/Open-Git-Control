@@ -111,6 +111,7 @@ export function registerGitHandlers({
       });
     }
     secretScanPushGuard.abortActiveScan();
+    secretScanPushGuard.setActiveRepository?.(activeRepoPath);
     secretScanCommitGuard.clearApprovals();
     commitStatsService.setActiveRepo(activeRepoPath);
     return activeRepoPath;
