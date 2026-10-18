@@ -11,6 +11,7 @@ import { readStorageJson, assertManagedPath } from './storageSafety';
 import { isStorageBusy } from './managedStorage';
 import { isAnalyticsSnapshot } from '../analytics/analyticsSnapshotFormat';
 import { repositoryPathKey } from './activeRepositoryAuthorization';
+import { isLfsInventoryDocument, LFS_INVENTORY_DIRECTORY } from '../git/GitLfsInventoryFormat';
 
 export async function recognizedCache(root: string, file: StorageFile): Promise<boolean> {
   assertManagedPath(root, file.file);
@@ -32,6 +33,7 @@ export async function recognizedCache(root: string, file: StorageFile): Promise<
   }
   const value = readStorageJson(root, file.file) as Record<string, unknown>;
   if (!value || typeof value !== 'object') return false;
+  if (file.relative.startsWith(`${LFS_INVENTORY_DIRECTORY}/`)) return isLfsInventoryDocument(value) && path.basename(file.file, '.json') === value.namespace;
   if (file.category === 'previews')
     return validatePreview(value) && path.basename(file.file, '.json') === createHash('sha256').update(JSON.stringify(value.key)).digest('hex');
   if (file.relative.startsWith('repository-icons/'))
@@ -94,7 +96,7 @@ export function cacheCandidates(files: StorageFile[], state: MaintenanceState, n
 
 /** Only empty, recognized cache directories can be pruned, never repository folders. */
 export function removeEmptyCacheDirectories(root: string): void {
-  for (const name of ['preview-cache-v1', 'repository-analytics/v1', 'hosting-catalogs', 'repository-icons']) {
+  for (const name of ['preview-cache-v1', 'repository-analytics/v1', 'hosting-catalogs', 'repository-icons', LFS_INVENTORY_DIRECTORY]) {
     const directory = path.join(root, name);
     const visit = (current: string) => {
       if (isStorageBusy(current)) return;

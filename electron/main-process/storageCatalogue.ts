@@ -27,6 +27,7 @@ export const STORAGE_ADAPTERS: readonly StorageAdapter[] = [
     matches: (p) => /^repository-analytics\/v1\/[a-f0-9]{64}\/(snapshot\.json|[a-f0-9]{64}\/records\.jsonl)$/.test(p),
   },
   { name: 'statistics', category: 'statistics', disposable: true, matches: (p) => p === 'commit-stats-v1.jsonl' },
+  { name: 'lfs-inventory', category: 'auxiliary', disposable: true, matches: (p) => /^lfs-inventory-v1\/[a-f0-9]{64}\.json$/.test(p) },
   { name: 'icons', category: 'auxiliary', disposable: false, matches: (p) => /^repository-icons\/[a-f0-9]{64}\.json$/.test(p) },
   {
     name: 'catalogs',

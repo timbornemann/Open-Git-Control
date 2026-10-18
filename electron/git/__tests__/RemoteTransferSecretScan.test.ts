@@ -4,6 +4,8 @@ import * as os from 'os';
 import * as path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GitService } from '../../GitService';
+import { GitLfsInventory } from '../GitLfsInventory';
+import { GitLfsInventoryStore } from '../GitLfsInventoryStore';
 import { SecretScanService } from '../../SecretScanService';
 import { DEFAULT_SETTINGS } from '../../settings';
 import { RemotePreferencesStore } from '../RemotePreferencesStore';
@@ -72,6 +74,7 @@ function fixture(content = 'Clean initial content\n', usePathAlias = false) {
     pushGuard,
     repoJobRegistry,
     preferencesStore: new RemotePreferencesStore(() => path.join(root, 'preferences.json')),
+    lfsInventory: new GitLfsInventory((namespace) => new GitLfsInventoryStore(() => path.join(root, 'profile'), namespace)),
     readStoredRepoPaths: () => [repoPath],
   });
   const request = (operation: string, input: object = {}) => handlers.get(IpcChannel.RemoteTransferRequest)!(event, operation, { repoPath, ...input });

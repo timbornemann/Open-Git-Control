@@ -1,6 +1,6 @@
 import type { GitRunner } from './GitRunner';
 import type { GitLfsPointer } from '../../src/shared/ipc/gitLfs';
-import { readLfsPointers } from './GitLfsPointers';
+import { GitLfsInventory } from './GitLfsInventory';
 import { gitConfigurationEnvironment, remoteUrl } from './remoteTransferValidation';
 import type { GitRunOptions } from './GitProcessTypes';
 import * as fs from 'node:fs';
@@ -10,15 +10,19 @@ import type { RemoteTransferContext } from './remoteTransferModels';
 
 type Reader = Pick<GitRunner, 'run' | 'runBuffer'>;
 type TransferRunner = Pick<GitRunner, 'run' | 'streamOutput'>;
+const inventories = new WeakMap<Reader, GitLfsInventory>();
+export function configureLfsInventory(git: Reader, inventory: GitLfsInventory): void {
+  inventories.set(git, inventory);
+}
 
 /** Pure Git inspection still detects LFS repositories when the LFS executable is missing. */
 export async function referencedLfsObjects(repoPath: string, refs: string[], git: Reader, options: GitRunOptions = {}): Promise<GitLfsPointer[]> {
-  if (!refs.length) return [];
-  if (refs.some((ref) => !/^[a-f0-9]{40,64}$/.test(ref))) throw new Error('Invalid Git LFS source revision.');
-  const objects = (await git.run(repoPath, ['rev-list', '--objects', '--no-object-names', ...refs], options)).trim().split(/\r?\n/).filter(Boolean);
-  const pointers = new Map<string, GitLfsPointer>();
-  for (const { pointer } of await readLfsPointers(repoPath, objects, git, options)) pointers.set(pointer.oid, pointer);
-  return [...pointers.values()].sort((a, b) => a.oid.localeCompare(b.oid));
+  let inventory = inventories.get(git);
+  if (!inventory) {
+    inventory = new GitLfsInventory();
+    inventories.set(git, inventory);
+  }
+  return inventory.read(repoPath, refs, git, options);
 }
 
 export async function lfsEndpoint(

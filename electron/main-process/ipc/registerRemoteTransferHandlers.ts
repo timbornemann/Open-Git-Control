@@ -1,4 +1,7 @@
-import { ipcMain } from 'electron';
+import { app, ipcMain } from 'electron';
+import { configureLfsInventory } from '../../git/GitLfsTransfers';
+import { GitLfsInventory } from '../../git/GitLfsInventory';
+import { GitLfsInventoryStore } from '../../git/GitLfsInventoryStore';
 import type { GitService } from '../../GitService';
 import { RemoteTransferService, type CredentialEnvironmentFactory, type RemoteTransferContext } from '../../git/RemoteTransferService';
 import type { RemotePreferencesStore } from '../../git/RemotePreferencesStore';
@@ -22,6 +25,7 @@ type Dependencies = {
   repoJobRegistry?: RepoJobRegistry;
   preferencesStore?: RemotePreferencesStore;
   readStoredRepoPaths?: () => string[];
+  lfsInventory?: GitLfsInventory;
 };
 const operations = new Set<RemoteTransferOperation>([
   'getRemotes',
@@ -50,7 +54,9 @@ export function registerRemoteTransferHandlers({
   repoJobRegistry = defaultRegistry,
   preferencesStore,
   readStoredRepoPaths = () => readStoreData().repos.map((repo) => repo.path),
+  lfsInventory = new GitLfsInventory((namespace) => new GitLfsInventoryStore(() => app.getPath('userData'), namespace)),
 }: Dependencies): RemoteTransferService {
+  configureLfsInventory(gitService.runner, lfsInventory);
   const service = new RemoteTransferService(gitService.runner, preferencesStore, createCredentialEnvironment, getCredentialGeneration);
   pushGuard.setPushScanResolver?.((repoPath, args, context) => service.getPushScanScope(repoPath, args, context));
   const running = new Map<string, Set<AbortController>>();

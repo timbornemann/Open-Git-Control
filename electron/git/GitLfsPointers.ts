@@ -2,53 +2,87 @@ import type { GitRunner } from './GitRunner';
 import type { GitRunOptions } from './GitProcessTypes';
 import { parseGitLfsPointer, type GitLfsPointer } from '../../src/shared/ipc/gitLfs';
 
-export async function readLfsPointers(
+export const LFS_OBJECT_BATCH_SIZE = 256;
+export const gitObjectId = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
+export type LfsObjectReader = Pick<GitRunner, 'runBuffer'>;
+export type LfsBlob = { blob: string; pointer: GitLfsPointer };
+type ObjectInfo = { oid: string; type: 'blob' | 'tree' | 'commit' | 'tag'; size: number };
+
+/** Missing objects must never become cached negative pointer results. */
+export async function readLfsObjectInfo(
   repoPath: string,
-  objects: string[],
-  git: Pick<GitRunner, 'runBuffer'>,
+  expressions: string[],
+  git: LfsObjectReader,
   options: GitRunOptions = {},
-): Promise<Array<{ blob: string; pointer: GitLfsPointer }>> {
-  const result: Array<{ blob: string; pointer: GitLfsPointer }> = [];
-  const unique = [...new Set(objects)];
-  if (unique.some((oid) => !/^[a-f0-9]{40,64}$/.test(oid))) throw new Error('Invalid Git blob identity.');
-  for (let offset = 0; offset < unique.length; offset += 256) {
+  allowMissing = false,
+): Promise<Array<ObjectInfo | null>> {
+  if (expressions.some((value) => !/^(?:[a-f0-9]{40}|[a-f0-9]{64})(?:\^\{\})?$/.test(value))) throw new Error('Invalid Git blob identity.');
+  const result: Array<ObjectInfo | null> = [];
+  for (let offset = 0; offset < expressions.length; offset += LFS_OBJECT_BATCH_SIZE) {
     options.signal?.throwIfAborted();
-    const group = unique.slice(offset, offset + 256);
+    const group = expressions.slice(offset, offset + LFS_OBJECT_BATCH_SIZE);
     const metadata = await git.runBuffer(repoPath, ['cat-file', '--batch-check=%(objectname) %(objecttype) %(objectsize)'], {
+      ...options,
       input: `${group.join('\n')}\n`,
       maxBytes: 65536,
       tooLargeMessage: 'Git LFS object metadata exceeded its limit.',
-      envOverrides: options.envOverrides,
-      signal: options.signal,
-      requestedKind: options.requestedKind,
     });
-    const candidates = metadata
-      .toString()
-      .trim()
-      .split('\n')
-      .filter((line) => /^[a-f0-9]{40,64} blob (?:[0-9]{1,3}|10[0-1][0-9]|102[0-4])$/.test(line))
-      .map((line) => line.split(' ')[0]);
+    const lines = metadata.toString().trimEnd().split('\n');
+    if (lines.length !== group.length) throw new Error('Invalid Git LFS metadata response.');
+    lines.forEach((line, index) => {
+      if (line === `${group[index]} missing`) {
+        if (!allowMissing) throw new Error('A Git LFS source object is not available locally.');
+        result.push(null);
+        return;
+      }
+      const match = /^((?:[a-f0-9]{40}|[a-f0-9]{64})) (blob|tree|commit|tag) (\d+)$/.exec(line);
+      if (!match || !Number.isSafeInteger(Number(match[3])) || (!group[index].endsWith('^{}') && match[1] !== group[index]))
+        throw new Error('Invalid Git LFS metadata response.');
+      result.push({ oid: match[1], type: match[2] as ObjectInfo['type'], size: Number(match[3]) });
+    });
+  }
+  return result;
+}
+
+/** Classify immutable object IDs, including verified non-pointers, in bounded batches. */
+export async function classifyLfsObjects(repoPath: string, objects: string[], git: LfsObjectReader, options: GitRunOptions = {}) {
+  const result = new Map<string, GitLfsPointer | null>();
+  const unique = [...new Set(objects)];
+  for (let offset = 0; offset < unique.length; offset += LFS_OBJECT_BATCH_SIZE) {
+    const group = unique.slice(offset, offset + LFS_OBJECT_BATCH_SIZE);
+    const metadata = await readLfsObjectInfo(repoPath, group, git, options);
+    for (const oid of group) result.set(oid, null);
+    const candidates = metadata.filter((info): info is ObjectInfo => info?.type === 'blob' && info.size <= 1024);
     if (!candidates.length) continue;
     const data = await git.runBuffer(repoPath, ['cat-file', '--batch'], {
-      input: `${candidates.join('\n')}\n`,
+      ...options,
+      input: `${candidates.map((info) => info.oid).join('\n')}\n`,
       maxBytes: candidates.length * 1200,
       tooLargeMessage: 'Git LFS pointer data exceeded its limit.',
-      envOverrides: options.envOverrides,
-      signal: options.signal,
-      requestedKind: options.requestedKind,
     });
     let position = 0;
-    while (position < data.length) {
+    for (const candidate of candidates) {
+      options.signal?.throwIfAborted();
       const end = data.indexOf(10, position);
       if (end < 0) throw new Error('Invalid Git LFS batch response.');
       const header = /^([a-f0-9]{40,64}) blob (\d+)$/.exec(data.subarray(position, end).toString());
-      if (!header) throw new Error('Invalid Git LFS blob response.');
+      if (!header || header[1] !== candidate.oid) throw new Error('Invalid Git LFS blob response.');
       const size = Number(header[2]);
-      if (size > 1024 || end + 1 + size >= data.length) throw new Error('Invalid Git LFS pointer size.');
+      if (size !== candidate.size || end + 1 + size >= data.length || data[end + 1 + size] !== 10) throw new Error('Invalid Git LFS pointer size.');
       const pointer = parseGitLfsPointer(data.subarray(end + 1, end + 1 + size).toString());
-      if (pointer) result.push({ blob: header[1], pointer });
+      result.set(candidate.oid, pointer);
       position = end + 1 + size + 1;
     }
+    if (position !== data.length) throw new Error('Invalid Git LFS batch response.');
   }
+  return result;
+}
+
+export async function readLfsPointers(repoPath: string, objects: string[], git: LfsObjectReader, options: GitRunOptions = {}): Promise<LfsBlob[]> {
+  const result: LfsBlob[] = [];
+  const unique = [...new Set(objects)];
+  for (let offset = 0; offset < unique.length; offset += LFS_OBJECT_BATCH_SIZE)
+    for (const [blob, pointer] of await classifyLfsObjects(repoPath, unique.slice(offset, offset + LFS_OBJECT_BATCH_SIZE), git, options))
+      if (pointer) result.push({ blob, pointer });
   return result;
 }
