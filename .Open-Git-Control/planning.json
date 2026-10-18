@@ -92,12 +92,12 @@
       "id": "fbfdba54-88ff-475c-90fd-6d0b3347d042",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Schwarzes Flackern",
-      "description": "Ich habe noch keinen rytmus gefunden wann udn warum das aufrtrit, aber ab und zu flaktert die ganze anwendung schwarz auf, nur für einen frame oder so, ganz kurz, aber der bildschrim wird schwarz, untersuche warum das passiert auch wenn es nur selten ist und kaum auffällt sollte das nicht passieren, sein genau und untersuchese die details",
+      "description": "Schwarzes Flackern: Ich habe noch keinen rythmus gefunden wann und warum das auftritt, aber ab und zu flackert die ganze Anwendung schwarz auf, nur für einen frame oder so, ganz kurz, aber der Bildschirm wird schwarz, untersuche warum das passiert auch wenn es nur selten ist und kaum auffällt sollte das nicht passieren, sein genau und untersuche die Details und behebe diesen bug",
       "priority": "medium",
       "status": "bug",
       "tags": [],
       "createdAt": 1791913255033,
-      "updatedAt": 1791913255033
+      "updatedAt": 1792323294812
     },
     {
       "id": "6c65c8a7-b949-4475-97a0-4c175eda87d6",
@@ -120,6 +120,17 @@
       "tags": [],
       "createdAt": 1792082490983,
       "updatedAt": 1792082490983
+    },
+    {
+      "id": "41616167-b8b2-4931-9fcf-09c9a9e8ac70",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "change icon modal not cloasing",
+      "description": "der fehler, das ich nahc dem ich das repo icon mit dem dialog wechlen wollte das model nicht mehr schleißen konnte, ich habe ein icon gewählt, habe dieses dann angeklcijkt, es wurde auch direkt geändert, aber ich konnte dann im modal weder speichert, noch abbrechen noch das x oben anklciken und bekamm den toast error \"cancelation error\" das einzige was geholfen hat war das programm neu zu starten",
+      "priority": "medium",
+      "status": "bug",
+      "tags": [],
+      "createdAt": 1792324282753,
+      "updatedAt": 1792324282753
     }
   ]
 }

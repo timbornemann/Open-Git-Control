@@ -15,7 +15,7 @@ export class GitProcessExecutor {
 
   async runResult(repoPath: string, args: string[], options: GitExecFileOptions): Promise<GitProcessResult> {
     try {
-      const result = await this.execFileAsyncRunner(toolExecutable('git'), args, { ...options, env: toolEnvironment(options.env) });
+      const result = await this.execFileAsyncRunner(toolExecutable('git'), args, { ...options, windowsHide: true, env: toolEnvironment(options.env) });
       return { ...result, exitCode: 0 };
     } catch (error: unknown) {
       if (options.signal?.aborted || readGitProcessErrorText(error, 'name') === 'AbortError') throw createAbortError('Git operation was aborted.');
@@ -34,7 +34,13 @@ export class GitProcessExecutor {
 
     while (true) {
       try {
-        const { stdout } = await this.execFileAsyncRunner(toolExecutable('git'), args, { ...execOptions, env: toolEnvironment(execOptions.env) });
+        // A windowed Electron parent has no console to inherit. Keep polling,
+        // interactive reads and retries from briefly opening a native console.
+        const { stdout } = await this.execFileAsyncRunner(toolExecutable('git'), args, {
+          ...execOptions,
+          windowsHide: true,
+          env: toolEnvironment(execOptions.env),
+        });
         return stdout.trimEnd();
       } catch (error: unknown) {
         const errorName = readGitProcessErrorText(error, 'name');

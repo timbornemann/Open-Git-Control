@@ -38,6 +38,9 @@ export function createMainWindow(isDev: boolean, appDisplayName: string, mainPro
     ...savedWindowState.bounds,
     title: appDisplayName,
     autoHideMenuBar: true,
+    // Keep the native surface opaque and close to the app's default background
+    // before the renderer paints, including when Windows restores the window.
+    backgroundColor: '#0f1214',
     ...(windowIconPath ? { icon: windowIconPath } : {}),
     webPreferences: {
       preload: path.join(mainProcessDir, 'preload.js'),

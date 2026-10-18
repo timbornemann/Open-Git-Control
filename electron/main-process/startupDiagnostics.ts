@@ -46,6 +46,10 @@ export function initializeStartupDiagnostics(): () => void {
 
 export function watchStartupWindow(window: BrowserWindow): void {
   recordStartup('main-window-created');
+  window.on('show', () => recordStartup('window-show'));
+  window.on('hide', () => recordStartup('window-hide'));
+  window.on('minimize', () => recordStartup('window-minimize'));
+  window.on('restore', () => recordStartup('window-restore'));
   window.on('unresponsive', () => recordStartup('window-unresponsive'));
   window.on('responsive', () => recordStartup('window-responsive'));
   window.webContents.on('render-process-gone', (_event, details) => recordStartup('renderer-gone', { reason: details.reason, exitCode: details.exitCode }));
@@ -56,7 +60,10 @@ export function watchStartupWindow(window: BrowserWindow): void {
   window.webContents.on('console-message', (event) => {
     if (event.level === 'error') recordStartup('renderer-error', { message: event.message, line: event.lineNumber });
   });
-  window.webContents.once('did-finish-load', () => {
+  window.webContents.on('did-start-navigation', (details) => {
+    if (details.isMainFrame && !details.isSameDocument) recordStartup('document-navigation');
+  });
+  window.webContents.on('did-finish-load', () => {
     recordStartup('document-loaded');
     const timer = setTimeout(() => recordStartup('renderer-health-timeout'), 5000);
     timer.unref();

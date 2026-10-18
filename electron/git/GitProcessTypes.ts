@@ -10,6 +10,7 @@ export type GitExecFileOptions = {
   cwd: string;
   maxBuffer: number;
   env: NodeJS.ProcessEnv;
+  windowsHide?: boolean;
   signal?: AbortSignal;
 };
 

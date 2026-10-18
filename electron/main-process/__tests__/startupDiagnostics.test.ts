@@ -63,4 +63,32 @@ describe('native startup diagnostics', () => {
     expect(entries).toContainEqual(expect.objectContaining({ event: 'renderer-health', mounted: true, stylesheets: 5 }));
     expect(entries.map((entry) => entry.event)).toEqual(expect.arrayContaining(['window-unresponsive', 'preload-error', 'renderer-gone', 'renderer-error']));
   });
+
+  it('distinguishes window transitions and later document reloads from ordinary in-page updates', async () => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-startup-events-test-'));
+    application.getPath.mockReturnValue(root);
+    stop = initializeStartupDiagnostics();
+    const contents = Object.assign(new EventEmitter(), {
+      executeJavaScript: vi.fn().mockResolvedValue({ mounted: true, stylesheets: 5, background: 'rgb(15, 18, 20)' }),
+    });
+    const window = Object.assign(new EventEmitter(), { webContents: contents });
+    watchStartupWindow(window as unknown as BrowserWindow);
+    for (const event of ['show', 'minimize', 'restore', 'hide']) window.emit(event);
+    contents.emit('did-start-navigation', { isMainFrame: true, isSameDocument: false });
+    contents.emit('did-finish-load');
+    contents.emit('did-start-navigation', { isMainFrame: true, isSameDocument: true });
+    contents.emit('did-start-navigation', { isMainFrame: false, isSameDocument: false });
+    contents.emit('did-start-navigation', { isMainFrame: true, isSameDocument: false });
+    contents.emit('did-finish-load');
+    await vi.waitFor(() => expect(contents.executeJavaScript).toHaveBeenCalledTimes(2));
+    await flushStartupDiagnostics();
+    const events = fs
+      .readFileSync(path.join(root, 'startup.log'), 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line).event);
+    expect(events.filter((event) => event === 'document-navigation')).toHaveLength(2);
+    expect(events.filter((event) => event === 'document-loaded')).toHaveLength(2);
+    expect(events).toEqual(expect.arrayContaining(['window-show', 'window-hide', 'window-minimize', 'window-restore']));
+  });
 });

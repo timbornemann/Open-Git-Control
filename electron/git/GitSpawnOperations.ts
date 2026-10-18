@@ -124,7 +124,7 @@ export class GitSpawnOperations {
 
   getDiffPreview(repoPath: string, args: string[], maxBytes: number, maxLines: number, signal: AbortSignal): Promise<DiffPreviewResult> {
     return new Promise<DiffPreviewResult>((resolve, reject) => {
-      const proc = spawn(toolExecutable('git'), args, { cwd: repoPath, env: toolEnvironment(), stdio: ['ignore', 'pipe', 'pipe'] });
+      const proc = spawn(toolExecutable('git'), args, { cwd: repoPath, windowsHide: true, env: toolEnvironment(), stdio: ['ignore', 'pipe', 'pipe'] });
       const chunks: Buffer[] = [];
       let capturedBytes = 0;
       let lineCount = 0;

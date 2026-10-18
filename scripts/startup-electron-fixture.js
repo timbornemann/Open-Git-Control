@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const childProcess = require('node:child_process');
+const { promisify } = require('node:util');
 const { app, BrowserWindow } = require('electron');
 
 const profile = process.env.OGC_STARTUP_TEST_PROFILE;
@@ -12,6 +14,23 @@ app.setPath('sessionData', profile);
 console.log(`Native startup test process: ${process.pid}`);
 process.env.OPEN_GIT_CONTROL_API_DISABLED = 'true';
 process.env.NODE_ENV = 'production';
+// The real GUI parent has no terminal to inherit. Verify native process options
+// here as well as in unit tests; an omitted flag can flash a console over the app.
+const execFile = childProcess.execFile;
+const hidden = (options) => assert.equal(options?.windowsHide, true, 'Background commands must hide their Windows console.');
+childProcess.execFile = function (file, args, options, ...rest) {
+  hidden(options);
+  return execFile.call(this, file, args, options, ...rest);
+};
+childProcess.execFile[promisify.custom] = function (file, args, options) {
+  hidden(options);
+  return execFile[promisify.custom].call(this, file, args, options);
+};
+const spawn = childProcess.spawn;
+childProcess.spawn = function (file, args, options) {
+  hidden(options);
+  return spawn.call(this, file, args, options);
+};
 let mainToolPathReads = 0;
 if (process.env.OGC_STARTUP_TEST_TOOL_STALL === '1') {
   const blocked = path.join(profile, 'blocked-program-location');
@@ -77,6 +96,7 @@ if (process.env.OGC_STARTUP_TEST_LIFECYCLE === '1') {
     });
     window.webContents.once('did-finish-load', async () => {
       try {
+        assert.match(window.getBackgroundColor().toLowerCase(), /^#(?:ff)?0f1214(?:ff)?$/, 'The native window needs an opaque app background.');
         const deadline = Date.now() + 20_000;
         while (!ready && Date.now() < deadline) {
           ready = await window.webContents.executeJavaScript(`Boolean(
@@ -108,6 +128,32 @@ if (process.env.OGC_STARTUP_TEST_LIFECYCLE === '1') {
           if (!interactive) await new Promise((resolve) => setTimeout(resolve, 50));
         }
         assert.ok(interactive, 'The app must remain interactive after clicking its navigation.');
+        if (process.env.OGC_STARTUP_TEST_REPOSITORY === '1') {
+          const { GitRunner } = require(path.join(applicationPath, 'dist-electron/electron/git/GitRunner.js'));
+          const runner = new GitRunner();
+          const repo = path.join(profile, 'repository');
+          fs.writeFileSync(path.join(repo, 'visibility-smoke.txt'), 'Native background process smoke test\n');
+          await window.webContents.executeJavaScript('window.__startupTestRoot = document.querySelector(".app-container"); true');
+          for (let pass = 0; pass < 4; pass++) {
+            const [, result, preview] = await Promise.all([
+              runner.run(repo, ['status', '--porcelain'], { requestedKind: 'polling' }),
+              runner.runResult(repo, ['rev-parse', 'HEAD'], { requestedKind: 'polling' }),
+              runner.getDiffPreview(repo, ['diff', '--', 'visibility-smoke.txt']),
+            ]);
+            assert.equal(result.exitCode, 0);
+            assert.ok(preview.text.includes('+Native background process smoke test'));
+            assert.ok(
+              await window.webContents.executeJavaScript('window.__startupTestRoot === document.querySelector(".app-container")'),
+              'Background Git queries must leave the mounted application in place.',
+            );
+          }
+          const image = await window.webContents.capturePage();
+          assert.ok(
+            !image.isEmpty() && image.toBitmap().some((value, index) => index % 4 !== 3 && value > 64),
+            'The app must paint content after background queries.',
+          );
+          console.log('Background polling and diff previews stayed hidden with the app mounted and painted.');
+        }
         assert.equal(mainToolPathReads, 0, 'Program discovery must never stat candidate paths on the UI thread.');
         console.log('Application started with CSS, preload and bootstrap available.');
         app.quit();
