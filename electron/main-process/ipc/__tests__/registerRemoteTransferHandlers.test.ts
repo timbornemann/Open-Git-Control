@@ -4,6 +4,8 @@ import { RepoJobRegistry } from '../../repoJobRegistry';
 import { registerRemoteTransferHandlers } from '../registerRemoteTransferHandlers';
 import type { GitService } from '../../../GitService';
 import type { SecretScanPushGuard } from '../git/secretScanPushGuard';
+import { BackgroundFetchPreemptedError } from '../../../git/BackgroundFetchPreemptedError';
+import { beginCommitProtection, COMMIT_PROTECTION_BUSY_ERROR } from '../../RepositoryCommitProtection';
 
 const mocked = vi.hoisted(() => ({
   handlers: new Map<string, (...args: any[]) => Promise<any>>(),
@@ -13,6 +15,7 @@ const mocked = vi.hoisted(() => ({
   checkConnection: vi.fn(),
   editRemote: vi.fn(),
   executePush: vi.fn(),
+  fetch: vi.fn(),
 }));
 vi.mock('electron', () => ({
   ipcMain: { handle: (channel: string, fn: (...args: any[]) => Promise<any>) => mocked.handlers.set(channel, fn) },
@@ -26,6 +29,7 @@ vi.mock('../../../git/RemoteTransferService', () => ({
     checkConnection = mocked.checkConnection;
     editRemote = mocked.editRemote;
     executePush = mocked.executePush;
+    fetch = mocked.fetch;
   },
 }));
 
@@ -49,12 +53,84 @@ describe('repository authority for structured remote transfers', () => {
     mocked.getPullConfiguration.mockResolvedValue({ branch: 'main', rebase: null, fastForward: null, mergeOptions: null });
     mocked.checkConnection.mockResolvedValue(true);
     mocked.editRemote.mockResolvedValue({ remotes: [] });
+    mocked.fetch.mockResolvedValue({ output: '' });
     registerRemoteTransferHandlers({
       gitService: { getRepoPath: () => activeRepo, runner: {} } as GitService,
       pushGuard,
       repoJobRegistry: registry,
       readStoredRepoPaths: () => ['C:/repos/saved'],
     });
+  });
+  it('forwards automatic fetch priority separately from tag scope', async () => {
+    await expect(invoke('fetch', { repoPath: activeRepo, remote: 'origin', background: true, tagsOnly: true })).resolves.toEqual({
+      success: true,
+      data: { output: '' },
+    });
+    expect(mocked.fetch).toHaveBeenCalledWith(activeRepo, 'origin', expect.objectContaining({ signal: expect.any(AbortSignal) }), {
+      background: true,
+      tagsOnly: true,
+    });
+    expect(registry.isRepositoryBusy(activeRepo)).toBe(false);
+  });
+  it('returns a deferred automatic sync without emitting a failure or completed fetch', async () => {
+    mocked.fetch.mockRejectedValueOnce(new BackgroundFetchPreemptedError());
+    await expect(invoke('fetch', { repoPath: activeRepo, remote: 'origin', background: true })).resolves.toEqual({
+      success: true,
+      data: { output: '', deferred: true },
+    });
+    expect(event.sender.send.mock.calls.map(([, payload]) => payload.status)).toEqual(['start', 'cancelled']);
+    expect(event.sender.send.mock.calls.at(-1)?.[1].details).toEqual({ repoPath: activeRepo, deferred: true });
+    expect(registry.isRepositoryBusy(activeRepo)).toBe(false);
+  });
+  it('defers an automatic retry during a protected commit while preserving manual fetch errors', async () => {
+    const release = beginCommitProtection(activeRepo)!;
+    try {
+      await expect(invoke('fetch', { repoPath: activeRepo, remote: 'origin', background: true })).resolves.toEqual({
+        success: true,
+        data: { output: '', deferred: true },
+      });
+      expect(event.sender.send).not.toHaveBeenCalled();
+      await expect(invoke('fetch', { repoPath: activeRepo, remote: 'origin' })).resolves.toEqual({ success: false, error: COMMIT_PROTECTION_BUSY_ERROR });
+      expect(mocked.fetch).not.toHaveBeenCalled();
+    } finally {
+      release();
+    }
+  });
+  it('handles the commit guard becoming busy after an automatic fetch starts', async () => {
+    let release: (() => void) | null = null;
+    mocked.fetch.mockImplementationOnce(async () => {
+      release = beginCommitProtection(activeRepo);
+      return { output: '' };
+    });
+    try {
+      await expect(invoke('fetch', { repoPath: activeRepo, remote: 'origin', background: true })).resolves.toMatchObject({
+        success: true,
+        data: { deferred: true },
+      });
+      expect(event.sender.send.mock.calls.map(([, payload]) => payload.status)).toEqual(['start', 'cancelled']);
+    } finally {
+      (release as (() => void) | null)?.();
+    }
+  });
+  it.each([false, true])('preserves network errors for fetch (background: %s)', async (background) => {
+    mocked.fetch.mockRejectedValueOnce(new Error('Authentication failed.'));
+    await expect(invoke('fetch', { repoPath: activeRepo, remote: 'origin', background })).resolves.toEqual({ success: false, error: 'Authentication failed.' });
+    expect(event.sender.send.mock.calls.at(-1)?.[1].status).toBe('failed');
+  });
+  it.each(['repository switch', 'explicit cancellation'])('does not retry a fetch cancelled by %s', async (reason) => {
+    mocked.fetch.mockImplementationOnce(async () => {
+      if (reason === 'repository switch') {
+        activeRepo = 'C:/repos/other';
+        registry.cancelForRepoChange(activeRepo);
+      } else await invoke('cancel', { repoPath: activeRepo });
+      throw new BackgroundFetchPreemptedError();
+    });
+    await expect(invoke('fetch', { repoPath: activeRepo, remote: 'origin', background: true })).resolves.toMatchObject({ success: false });
+    expect(event.sender.send.mock.calls.at(-1)?.[1].status).toBe('cancelled');
+  });
+  it('rejects malformed automatic fetch modes', async () => {
+    await expect(invoke('fetch', { repoPath: activeRepo, remote: 'origin', background: 'true' })).resolves.toMatchObject({ success: false });
+    expect(mocked.fetch).not.toHaveBeenCalled();
   });
   it('allows exact saved inactive repository reads while refusing writes and arbitrary reads', async () => {
     await expect(invoke('getRemotes', { repoPath: 'C:/repos/saved' })).resolves.toMatchObject({ success: true });

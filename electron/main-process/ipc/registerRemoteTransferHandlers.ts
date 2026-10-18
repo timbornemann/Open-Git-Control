@@ -6,7 +6,8 @@ import { redactGitSensitiveText } from '../../git/GitErrorFormatter';
 import { IpcChannel } from '../../../src/types/ipcContract';
 import type { RemoteTransferOperation, RemoteTransferOperations } from '../../../src/types/remoteTransfers';
 import { repositoryPathKey, requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
-import { ensureCommitProtectionIsIdle } from '../RepositoryCommitProtection';
+import { COMMIT_PROTECTION_BUSY_ERROR, ensureCommitProtectionIsIdle } from '../RepositoryCommitProtection';
+import { BackgroundFetchPreemptedError } from '../../git/BackgroundFetchPreemptedError';
 import { repoJobRegistry as defaultRegistry, type RepoJobRegistry } from '../repoJobRegistry';
 import { createJobId } from '../gitCommandPolicy';
 import { emitJobEvent } from './jobEvents';
@@ -62,13 +63,14 @@ export function registerRemoteTransferHandlers({
       let job: ReturnType<RepoJobRegistry['begin']> | undefined;
       let controller: AbortController | undefined;
       let key = '';
+      let repoPath = '';
       const jobId = createJobId(`remote-${operation}`);
       const jobOperation = `git:${operation}`;
       try {
         if (!operations.has(operation) || !input || typeof input !== 'object' || typeof input.repoPath !== 'string' || !input.repoPath.trim())
           throw new Error('Invalid remote transfer request.');
+        if (operation === 'fetch' && 'background' in input && typeof input.background !== 'boolean') throw new Error('Invalid background fetch mode.');
         const readonly = operation === 'getRemotes' || operation === 'getPreferences' || operation === 'getPullConfiguration';
-        let repoPath: string;
         try {
           repoPath = requireActiveRepositoryPath(input.repoPath, gitService.getRepoPath(), IpcChannel.RemoteTransferRequest);
         } catch (error) {
@@ -143,12 +145,10 @@ export function registerRemoteTransferHandlers({
             data = await service.editRemote(repoPath, (input as RemoteTransferOperations['editRemote']['input']).mutation, context);
             break;
           case 'fetch':
-            data = await service.fetch(
-              repoPath,
-              (input as RemoteTransferOperations['fetch']['input']).remote,
-              context,
-              (input as RemoteTransferOperations['fetch']['input']).tagsOnly,
-            );
+            data = await service.fetch(repoPath, (input as RemoteTransferOperations['fetch']['input']).remote, context, {
+              tagsOnly: (input as RemoteTransferOperations['fetch']['input']).tagsOnly,
+              background: (input as RemoteTransferOperations['fetch']['input']).background,
+            });
             break;
           case 'pull':
             data = await service.pull(repoPath, input as RemoteTransferOperations['pull']['input'], context);
@@ -186,6 +186,25 @@ export function registerRemoteTransferHandlers({
         return { success: true, data };
       } catch (error) {
         const message = redactGitSensitiveText(error instanceof Error ? error.message : 'Remote transfer failed.');
+        const deferred =
+          operation === 'fetch' &&
+          (input as RemoteTransferOperations['fetch']['input'])?.background === true &&
+          (error instanceof BackgroundFetchPreemptedError || message === COMMIT_PROTECTION_BUSY_ERROR) &&
+          !controller?.signal.aborted &&
+          repoPath &&
+          repositoryPathKey(gitService.getRepoPath() || '') === repositoryPathKey(repoPath);
+        if (deferred) {
+          if (job)
+            emitJobEvent(event.sender, {
+              id: jobId,
+              operation: jobOperation,
+              status: 'cancelled',
+              message: 'Automatic fetch deferred for a foreground Git action.',
+              details: { repoPath, deferred: true },
+              timestamp: Date.now(),
+            });
+          return { success: true, data: { output: '', deferred: true } };
+        }
         if (transfers.has(operation))
           emitJobEvent(event.sender, {
             id: jobId,

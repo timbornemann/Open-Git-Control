@@ -103,7 +103,11 @@ export interface RemoteTransferOperations {
   getPreferences: { input: { repoPath: string }; output: RemotePreferences };
   getPullConfiguration: { input: { repoPath: string }; output: GitPullConfigurationDto };
   setPreferences: { input: { repoPath: string; preferences: RemotePreferences }; output: RemotePreferences };
-  fetch: { input: { repoPath: string; remote: string; tagsOnly?: boolean }; output: { output: string } };
+  fetch: {
+    input: { repoPath: string; remote: string; tagsOnly?: boolean; background?: boolean };
+    /** Deferred automatic syncs have not completed and must not publish success. */
+    output: { output: string; deferred?: true };
+  };
   pull: { input: { repoPath: string; remote: string; branch: string; mode: PullMode; autostash?: boolean }; output: { output: string } };
   setUpstream: { input: { repoPath: string; remote: string; branch: string }; output: true };
   planPush: {

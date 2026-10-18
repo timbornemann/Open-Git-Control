@@ -466,14 +466,15 @@ describe('RemoteTransferService with real Git', () => {
     const advanced = f.commit('remote release');
     git(f.repo, 'push', target, `${advanced}:refs/heads/main`, `${advanced}:refs/tags/release`, `${advanced}:refs/tags/remote-only`);
     git(f.repo, 'reset', '--hard', f.initial);
-    await f.service.fetch(f.repo, 'forgejo', f.context);
+    await f.service.fetch(f.repo, 'forgejo', f.context, { background: true });
     expect(git(f.repo, 'rev-parse', 'refs/remotes/forgejo/main')).toBe(advanced);
     expect(git(f.repo, 'rev-parse', 'refs/tags/release')).toBe(f.initial);
     expect(git(f.repo, 'for-each-ref', '--format=%(refname)', 'refs/ogc/remote-tags')).toBe('');
-    await f.service.fetch(f.repo, 'forgejo', f.context, true);
+    await f.service.fetch(f.repo, 'forgejo', f.context, { tagsOnly: true, background: true });
     expect(git(f.repo, 'rev-parse', 'refs/ogc/remote-tags/forgejo/release')).toBe(advanced);
     expect(git(f.repo, 'rev-parse', 'refs/ogc/remote-tags/forgejo/remote-only')).toBe(advanced);
     expect(git(f.repo, 'tag', '--list')).toBe('release');
     expect(git(f.repo, 'rev-parse', 'refs/tags/release')).toBe(f.initial);
+    expect(f.lifecycle.runner.getSchedulerDiagnostics().filter((entry) => entry.kind === 'background-fetch')).toHaveLength(2);
   });
 });

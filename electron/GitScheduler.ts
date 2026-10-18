@@ -1,8 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { repositoryCommonDirectory, physicalPathKey } from './git/RepositoryCommonDirectory';
+import { BackgroundFetchPreemptedError } from './git/BackgroundFetchPreemptedError';
 
-export type GitJobKind = 'write' | 'interactive' | 'polling' | 'background' | 'network' | 'network-read';
+export type GitJobKind = 'write' | 'interactive' | 'polling' | 'background' | 'network' | 'network-read' | 'background-fetch';
 
 export type GitSchedulerDiagnostic = {
   repoPath: string;
@@ -42,6 +43,7 @@ const PRIORITY: Record<GitJobKind, number> = {
   // only affects tie-break ordering among queued jobs.
   network: 4,
   'network-read': 4,
+  'background-fetch': 5,
 };
 
 const MAX_CONCURRENT_READS = 4;
@@ -74,6 +76,9 @@ export class GitScheduler {
 
     if (kind === 'write' || kind === 'interactive') {
       this.abortBackground(state);
+    }
+    if (kind === 'write' || kind === 'network' || kind === 'network-read') {
+      this.preemptBackgroundFetch(state);
     }
 
     const controller = new AbortController();
@@ -192,6 +197,19 @@ export class GitScheduler {
     });
   }
 
+  private preemptBackgroundFetch(state: RepoState): void {
+    if (state.activeNetwork?.kind === 'background-fetch') {
+      state.activeNetwork.controller.abort(new BackgroundFetchPreemptedError());
+    }
+    state.queue = state.queue.filter((entry) => {
+      if (entry.kind !== 'background-fetch') return true;
+      const reason = new BackgroundFetchPreemptedError();
+      entry.controller.abort(reason);
+      entry.reject(reason);
+      return false;
+    });
+  }
+
   private pump(repoPath: string, state: RepoState): void {
     state.queue = state.queue.filter((entry) => {
       if (!entry.controller.signal.aborted) return true;
@@ -206,7 +224,8 @@ export class GitScheduler {
     if (!state.activeNetwork) {
       const pureNetworkReadIndex = state.queue.findIndex((entry) => entry.kind === 'network-read');
       const hasQueuedWrite = state.queue.some((entry) => entry.kind === 'write');
-      const mutatingNetworkIndex = state.activeWrite || hasQueuedWrite ? -1 : state.queue.findIndex((entry) => entry.kind === 'network');
+      const mutatingNetworkIndex =
+        state.activeWrite || hasQueuedWrite ? -1 : state.queue.findIndex((entry) => entry.kind === 'network' || entry.kind === 'background-fetch');
       const networkIndex = pureNetworkReadIndex >= 0 ? pureNetworkReadIndex : mutatingNetworkIndex;
       if (networkIndex >= 0) {
         const [entry] = state.queue.splice(networkIndex, 1);
@@ -219,7 +238,9 @@ export class GitScheduler {
 
     const nextWriteIndex = state.queue.findIndex((entry) => entry.kind === 'write');
     if (nextWriteIndex >= 0) {
-      const mutatingNetworkActive = state.activeNetwork?.kind === 'network';
+      // A preempted fetch owns this lane until its complete process tree has
+      // exited. Never release a write merely because abort() was requested.
+      const mutatingNetworkActive = state.activeNetwork && state.activeNetwork.kind !== 'network-read';
       if (!mutatingNetworkActive) {
         if (state.activeReads.size > 0) return;
         const [entry] = state.queue.splice(nextWriteIndex, 1);
@@ -233,7 +254,7 @@ export class GitScheduler {
       const activeBackgroundCount = [...state.activeReads].filter((entry) => entry.kind === 'background').length;
       const hasActiveInteractiveRead = [...state.activeReads].some((entry) => entry.kind === 'interactive');
       const nextIndex = state.queue.findIndex((entry) => {
-        if (entry.kind === 'write' || entry.kind === 'network' || entry.kind === 'network-read') return false;
+        if (entry.kind === 'write' || entry.kind === 'network' || entry.kind === 'network-read' || entry.kind === 'background-fetch') return false;
         if (entry.kind === 'background') {
           return !hasActiveInteractiveRead && activeBackgroundCount < MAX_BACKGROUND_READS;
         }
@@ -253,11 +274,13 @@ export class GitScheduler {
     try {
       if (entry.controller.signal.aborted) throw abortError();
       const value = await entry.run(entry.controller.signal);
+      if (entry.kind === 'background-fetch') entry.controller.signal.throwIfAborted();
       if (typeof value === 'string') resultBytes = Buffer.byteLength(value);
       entry.resolve(value);
     } catch (error) {
       aborted = entry.controller.signal.aborted || (error as any)?.name === 'AbortError';
-      entry.reject(aborted ? abortError() : error);
+      const reason = entry.controller.signal.reason;
+      entry.reject(aborted ? (reason instanceof BackgroundFetchPreemptedError ? reason : abortError()) : error);
     } finally {
       if (lane === 'write') {
         state.activeWrite = null;

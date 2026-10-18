@@ -53,6 +53,8 @@ export const useRepositoryRemoteSync = ({
   const [remoteSync, setRemoteSync] = useState<RemoteSyncState>({ ...EMPTY_REMOTE_SYNC_STATE });
   const [lastFetchedRemote, setLastFetchedRemote] = useState<string | null>(null);
   const isRemoteFetchRunningRef = useRef(false);
+  const needsAutomaticRetryRef = useRef(false);
+  const scheduleAutomaticRetryRef = useRef<(() => void) | null>(null);
   const remoteFetchRunIdRef = useRef(0);
   const completedSyncVersionRef = useRef(0);
   const activeRepoRef = useRef<string | null>(activeRepo);
@@ -95,6 +97,7 @@ export const useRepositoryRemoteSync = ({
     remoteFetchRunIdRef.current += 1;
     completedSyncVersionRef.current += 1;
     isRemoteFetchRunningRef.current = false;
+    needsAutomaticRetryRef.current = false;
     setRemoteSync({ ...EMPTY_REMOTE_SYNC_STATE });
     setLastFetchedRemote(null);
   }, [activeRepo]);
@@ -104,6 +107,7 @@ export const useRepositoryRemoteSync = ({
     return subscribeRemoteSyncSuccess(activeRepo, ({ remote, fetchedAt }) => {
       if (activeRepoRef.current !== activeRepo) return;
       completedSyncVersionRef.current += 1;
+      needsAutomaticRetryRef.current = false;
       setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchedAt: fetchedAt, lastFetchError: null }));
       setLastFetchedRemote(remote);
     });
@@ -159,12 +163,13 @@ export const useRepositoryRemoteSync = ({
   }, [activeRepo, refreshTrigger, setRemoteSync]);
 
   const refreshRemoteState = useCallback(
-    async (showToast = false) => {
+    async (showToast = false, { background = false }: { background?: boolean } = {}) => {
       // `hasAnyRemote === null` means the remote list has not loaded yet; wait
       // rather than guessing. `false` is a confirmed local-only repository and
       // is handled inside the try block below instead of being a no-op.
       if (!gitClient.isAvailable() || !activeRepo || hasAnyRemote === null) return false;
       if (isRemoteFetchRunningRef.current || isGitActionRunningRef.current || useRemoteTransferState.getState().busy) return false;
+      needsAutomaticRetryRef.current = false;
       const repoAtStart = activeRepo;
       const fetchRunId = remoteFetchRunIdRef.current + 1;
       remoteFetchRunIdRef.current = fetchRunId;
@@ -175,6 +180,16 @@ export const useRepositoryRemoteSync = ({
       isRemoteFetchRunningRef.current = true;
       setActiveGitActionLabel(fetchLabel);
       setRemoteSync((prev) => ({ ...prev, isFetching: true }));
+      const deferAutomaticFetch = () => {
+        needsAutomaticRetryRef.current = background;
+        setRemoteSync((prev) => ({ ...prev, isFetching: false }));
+        return false;
+      };
+      const reportFetchError = (message: string) => {
+        setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchError: message }));
+        if (showToast) setGitActionToast({ msg: message, isError: true });
+      };
+      const fetchOptions = background ? { background: true } : {};
 
       try {
         // A repository with no configured remote cannot be fetched from, but its
@@ -224,14 +239,22 @@ export const useRepositoryRemoteSync = ({
         // Fetch branch tracking refs first. Pulling tags into `refs/tags/*`
         // would make a normal background refresh fail if a same-named local
         // tag points to another commit.
-        await transferClient.request('fetch', { repoPath: repoAtStart, remote: fetchRemote });
-        if (!isCurrent()) return false;
+        const fetchPhase = async (tagsOnly = false) => {
+          const result = await transferClient.request('fetch', {
+            repoPath: repoAtStart,
+            remote: fetchRemote,
+            ...fetchOptions,
+            ...(tagsOnly ? { tagsOnly: true } : {}),
+          });
+          if (!isCurrent()) return false;
+          return result.deferred ? deferAutomaticFetch() : true;
+        };
+        if (!(await fetchPhase())) return false;
 
         // Maintain remote release state independently from local tags.
         // `--prune` removes tags deleted on the remote from this tracking
         // namespace on the next sync, without moving local tags.
-        await transferClient.request('fetch', { repoPath: repoAtStart, remote: fetchRemote, tagsOnly: true });
-        if (!isCurrent()) return false;
+        if (!(await fetchPhase(true))) return false;
 
         // Adopt remote tags that do not exist locally yet. Existing local tags
         // are deliberately left untouched; a mismatching name is exposed as a
@@ -246,10 +269,7 @@ export const useRepositoryRemoteSync = ({
         if (!isCurrent()) return false;
         if (!referenceStatus.success) {
           const errorMessage = String(referenceStatus.error || t('generated.components.layout.hooks.userepositorydomain.could_not_update_remote_fbb52423'));
-          setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchError: errorMessage }));
-          if (showToast) {
-            setGitActionToast({ msg: errorMessage, isError: true });
-          }
+          reportFetchError(errorMessage);
           return false;
         }
 
@@ -259,10 +279,7 @@ export const useRepositoryRemoteSync = ({
           if (adoptionResult.success) continue;
 
           const errorMessage = String(adoptionResult.error || t('generated.components.layout.hooks.userepositorydomain.could_not_update_remote_fbb52423'));
-          setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchError: errorMessage }));
-          if (showToast) {
-            setGitActionToast({ msg: errorMessage, isError: true });
-          }
+          reportFetchError(errorMessage);
           return false;
         }
 
@@ -275,10 +292,7 @@ export const useRepositoryRemoteSync = ({
       } catch (error: any) {
         if (!isCurrent()) return false;
         const errorMessage = error?.message || t('generated.components.layout.hooks.userepositorydomain.could_not_update_remote_fbb52423');
-        setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchError: errorMessage }));
-        if (showToast) {
-          setGitActionToast({ msg: errorMessage, isError: true });
-        }
+        reportFetchError(errorMessage);
         return false;
       } finally {
         if (remoteFetchRunIdRef.current === fetchRunId) {
@@ -309,23 +323,41 @@ export const useRepositoryRemoteSync = ({
       return;
     }
 
-    const refreshIfVisible = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      void refreshRemoteState();
+    let disposed = false;
+    let retryTimer: number | null = null;
+    const scheduleRetry = () => {
+      if (disposed || !needsAutomaticRetryRef.current || retryTimer !== null) return;
+      retryTimer = window.setTimeout(() => {
+        retryTimer = null;
+        if (needsAutomaticRetryRef.current) void refreshIfVisible();
+      }, 5000);
+    };
+    const refreshIfVisible = async () => {
+      if (disposed || (typeof document !== 'undefined' && document.visibilityState === 'hidden')) return;
+      await refreshRemoteState(false, { background: true });
+      // Wait for foreground work to settle rather than immediately taking the
+      // network lane again. Use the current effect if settings changed while
+      // this fetch was running; an obsolete effect must not lose the retry.
+      scheduleAutomaticRetryRef.current?.();
     };
     const handleVisibilityChange = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        void refreshRemoteState();
+        void refreshIfVisible();
       }
     };
 
-    void refreshRemoteState();
+    scheduleAutomaticRetryRef.current = scheduleRetry;
+    if (needsAutomaticRetryRef.current) scheduleRetry();
+    else void refreshIfVisible();
     const intervalId = window.setInterval(refreshIfVisible, autoFetchIntervalMs);
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', handleVisibilityChange);
     }
 
     return () => {
+      disposed = true;
+      scheduleAutomaticRetryRef.current = null;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
       window.clearInterval(intervalId);
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', handleVisibilityChange);

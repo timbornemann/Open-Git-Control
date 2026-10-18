@@ -44,6 +44,8 @@ import {
   type Runner,
 } from './remoteTransferModels';
 
+type FetchOptions = Pick<RemoteTransferOperations['fetch']['input'], 'tagsOnly' | 'background'>;
+
 /** Named Git remotes retain hooks and transport configuration; accounts bind to individual URLs. */
 export class RemoteTransferService {
   private readonly plans = new Map<string, StoredPlan>();
@@ -165,12 +167,13 @@ export class RemoteTransferService {
     }
   }
 
-  async fetch(repoPath: string, name: string, context: RemoteTransferContext, tagsOnly = false): Promise<{ output: string }> {
+  async fetch(repoPath: string, name: string, context: RemoteTransferContext, options: FetchOptions = {}): Promise<{ output: string }> {
     const remote = await this.selectedRemote(repoPath, name);
     const url = remoteUrl(remote.fetchUrls[0]);
     const output = await this.withCredentials(repoPath, name, url, context, {}, (envOverrides, signal) =>
-      this.git.streamOutput(repoPath, remoteFetchArguments(name, tagsOnly), context.onProgress ?? (() => {}), signal, {
+      this.git.streamOutput(repoPath, remoteFetchArguments(name, options.tagsOnly === true), context.onProgress ?? (() => {}), signal, {
         envOverrides,
+        ...(options.background === true ? { backgroundFetch: true } : {}),
       }),
     );
     context.ensureActive();

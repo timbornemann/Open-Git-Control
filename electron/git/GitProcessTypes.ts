@@ -49,6 +49,8 @@ export type GitInputRunOptions = {
 export type GitTransferOptions = {
   envOverrides?: NodeJS.ProcessEnv;
   signal?: AbortSignal;
+  /** Only automatic fetches may yield their network lane to foreground work. */
+  backgroundFetch?: boolean;
 };
 
 export type GitLineFragment = { first: boolean; last: boolean };

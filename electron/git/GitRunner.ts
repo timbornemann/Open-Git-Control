@@ -361,7 +361,7 @@ export class GitRunner {
     options: GitTransferOptions = {},
   ): Promise<string> {
     this.assertRepoPathAvailable(repoPath);
-    const kind = this.classifyCommand(args);
+    const kind = options.backgroundFetch === true && commandToken(commandArguments(args)[0]) === 'fetch' ? 'background-fetch' : this.classifyCommand(args);
     return this.schedule(
       repoPath,
       kind,
