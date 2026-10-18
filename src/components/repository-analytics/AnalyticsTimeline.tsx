@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui';
-import { FileTimelineView } from '@/components/FileTimelineView';
+import { viewModules } from '@/data/viewModules';
 import { useI18n } from '@/i18n';
 import type { AnalyticsFilters, RepositoryAnalyticsSnapshot } from '@/shared/ipc/repositoryAnalytics';
 import { AnalyticsEmpty } from './AnalyticsCharts';
@@ -8,6 +8,7 @@ import { loadAnalyticsTimeline, readAnalyticsTimeline, timelineContextKey, TIMEL
 import './analyticsTimeline.css';
 
 type Props = { repoPath: string; snapshot: RepositoryAnalyticsSnapshot | null; filters: AnalyticsFilters; running: boolean };
+const FileTimelineView = viewModules.timeline.View;
 export function AnalyticsTimeline({ repoPath, snapshot, filters, running }: Props) {
   const { tr } = useI18n();
   const context = timelineContextKey(repoPath, filters);

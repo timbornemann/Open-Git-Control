@@ -17,6 +17,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    manifest: 'build-manifest.json',
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -34,21 +35,9 @@ export default defineConfig({
           ) {
             return 'vendor-integrations';
           }
-          if (normalizedId.includes('/src/components/commit-graph/')) {
-            return 'feature-commit-graph';
-          }
-          if (normalizedId.includes('/src/components/diff-viewer/')) {
-            return 'feature-diff-viewer';
-          }
-          if (normalizedId.includes('/src/components/release-creator/')) {
-            return 'feature-release-creator';
-          }
-          if (normalizedId.includes('/src/components/project-planner/')) {
-            return 'feature-project-planner';
-          }
-          if (normalizedId.includes('/src/components/layout/SettingsMainContent')) {
-            return 'feature-settings';
-          }
+          // Shared hooks and sidebar components must not pull an entire page
+          // into the startup dependency graph. Let dynamic imports define the
+          // feature boundaries instead of grouping their whole directories.
           return undefined;
         },
       },

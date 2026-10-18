@@ -1,4 +1,3 @@
-import { preloadViewModules } from './viewModules';
 import { getElectronApi } from '@/services/electronApi';
 import { hydratePreviews, queryClient, refreshVisibleResources } from './queryClient';
 import { resourceKey } from './clientCache';
@@ -13,7 +12,6 @@ let bootstrapPromise: Promise<void> | undefined;
 export function startDataRuntime() {
   if (started) return bootstrapPromise;
   started = true;
-  void preloadViewModules();
   const api = getElectronApi()?.app;
   const startedAt = Date.now();
   bootstrapPromise = api
@@ -46,7 +44,6 @@ export function startDataRuntime() {
       // Schedule visible reads before releasing queued background work.
       refreshVisibleResources();
       backgroundQueue.setPaused(false);
-      void preloadViewModules();
     }
   };
   document.addEventListener('visibilitychange', visibility);

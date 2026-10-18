@@ -20,6 +20,7 @@ describe('timeline in the analytics workspace', () => {
     mocks.timeline.mockResolvedValue({ success: true, data: commits });
     await render();
     await click('Timeline');
+    await act(async () => vi.dynamicImportSettled());
     expect(host.querySelector('.analytics-sidebar-nav [aria-current="page"]')?.textContent).toBe('Timeline');
     expect(mocks.timeline).toHaveBeenCalledWith(5000, 'C:/repo', 'b'.repeat(40));
     expect(host.querySelector('.analytics-content--timeline')).toBeTruthy();
@@ -54,6 +55,7 @@ describe('timeline in the analytics workspace', () => {
     mocks.timeline.mockReturnValueOnce(old.promise);
     await render();
     await click('Timeline');
+    await act(async () => vi.dynamicImportSettled());
     const next: RepositoryAnalyticsSnapshot = {
       ...analyticsReport('C:/another'),
       head: 'd'.repeat(40),

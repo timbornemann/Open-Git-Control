@@ -5,6 +5,12 @@ import { useI18n } from '@/i18n';
 import { UpdateNotification } from './UpdateNotification';
 import { RepositoryActivityRail } from './RepositoryActivityRail';
 import { SystemToolsWarning } from '@/components/system-tools/SystemToolsWarning';
+import { preloadViewModule } from '@/data/viewModules';
+
+const tabPreloadHandlers = (tab: AppSidebarProps['activeTab']) => ({
+  onPointerEnter: () => void preloadViewModule(tab),
+  onFocus: () => void preloadViewModule(tab),
+});
 
 type SidebarActivityBarProps = Pick<AppSidebarProps, 'activeTab' | 'setActiveTab'> & {
   isSidebarCollapsed: boolean;
@@ -31,10 +37,16 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({ activeTa
       >
         {isSidebarCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
       </button>
-      <button className={`icon-btn ${activeTab === 'repo' ? 'active' : ''}`} onClick={() => activateTab('repo')} title={t('sidebar.currentRepository')}>
+      <button
+        {...tabPreloadHandlers('repo')}
+        className={`icon-btn ${activeTab === 'repo' ? 'active' : ''}`}
+        onClick={() => activateTab('repo')}
+        title={t('sidebar.currentRepository')}
+      >
         <FolderGit2 size={22} />
       </button>
       <button
+        {...tabPreloadHandlers('analytics')}
         className={`icon-btn ${activeTab === 'analytics' ? 'active' : ''}`}
         onClick={() => activateTab('analytics')}
         title={tr('Statistik & Analyse', 'Statistics & analytics')}
@@ -43,13 +55,19 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({ activeTa
       >
         <BarChart3 size={22} />
       </button>
-      <button className={`icon-btn ${activeTab === 'planner' ? 'active' : ''}`} onClick={() => activateTab('planner')} title={t('sidebar.planner')}>
+      <button
+        {...tabPreloadHandlers('planner')}
+        className={`icon-btn ${activeTab === 'planner' ? 'active' : ''}`}
+        onClick={() => activateTab('planner')}
+        title={t('sidebar.planner')}
+      >
         <ListTodo size={22} />
       </button>
       <button className={`icon-btn ${activeTab === 'localRepos' ? 'active' : ''}`} onClick={() => activateTab('localRepos')} title={t('sidebar.localRepos')}>
         <FolderOpen size={22} />
       </button>
       <button
+        {...tabPreloadHandlers('hosting')}
         className={`icon-btn ${activeTab === 'hosting' || activeTab === 'github' ? 'active' : ''}`}
         onClick={() => activateTab('hosting')}
         title="Hosting"
@@ -61,7 +79,12 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({ activeTa
       </div>
       <UpdateNotification />
       <SystemToolsWarning />
-      <button className={`icon-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => activateTab('settings')} title={t('sidebar.settings')}>
+      <button
+        {...tabPreloadHandlers('settings')}
+        className={`icon-btn ${activeTab === 'settings' ? 'active' : ''}`}
+        onClick={() => activateTab('settings')}
+        title={t('sidebar.settings')}
+      >
         <Settings size={22} />
       </button>
     </div>

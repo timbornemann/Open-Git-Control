@@ -4,6 +4,7 @@ const path = require('node:path');
 const childProcess = require('node:child_process');
 const { promisify } = require('node:util');
 const { app, BrowserWindow } = require('electron');
+const { viewEntries } = require('./verify-view-chunks');
 
 const profile = process.env.OGC_STARTUP_TEST_PROFILE;
 const applicationPath = process.env.OGC_STARTUP_TEST_APP;
@@ -58,6 +59,7 @@ if (process.env.OGC_STARTUP_TEST_TOOL_STALL === '1') {
 }
 let ready = false;
 let cleanupCompleted = false;
+let verified = false;
 const timeout = setTimeout(() => {
   console.error(`Startup/lifecycle smoke test timed out: ready=${ready}, cleanupCompleted=${cleanupCompleted}`);
   app.exit(1);
@@ -77,6 +79,7 @@ if (process.env.OGC_STARTUP_TEST_LIFECYCLE === '1') {
   finishBeforeQuit(app, async () => {
     await fs.promises.writeFile(path.join(profile, 'cleanup-finished'), 'preserved');
     cleanupCompleted = true;
+    verified = true;
   });
   app
     .whenReady()
@@ -111,6 +114,12 @@ if (process.env.OGC_STARTUP_TEST_LIFECYCLE === '1') {
           if (!ready) await new Promise((resolve) => setTimeout(resolve, 50));
         }
         assert.ok(ready, 'The app must mount with its stylesheets and preload API.');
+        const manifest = JSON.parse(fs.readFileSync(path.join(applicationPath, 'dist/build-manifest.json'), 'utf8'));
+        const inactiveFiles = viewEntries.filter((key) => key !== 'src/components/commit-graph/index.ts').map((key) => manifest[key].file);
+        const earlyImports = await window.webContents.executeJavaScript(`performance.getEntriesByType('resource')
+          .filter(entry => ${JSON.stringify(inactiveFiles)}.some(file => new URL(entry.name).pathname.endsWith('/' + file)))
+          .map(entry => entry.name)`);
+        assert.deepEqual(earlyImports, [], 'Inactive views must not load before the active page is available.');
         const bootstrapped = await window.webContents.executeJavaScript(`window.electronAPI.app.getBootstrap().then(
           data => Boolean(data.settings && Array.isArray(data.repositories.repos)),
           () => false
@@ -158,6 +167,7 @@ if (process.env.OGC_STARTUP_TEST_LIFECYCLE === '1') {
         }
         assert.equal(mainToolPathReads, 0, 'Program discovery must never stat candidate paths on the UI thread.');
         console.log('Application started with CSS, preload and bootstrap available.');
+        verified = true;
         app.quit();
       } catch (error) {
         fail(error);
@@ -167,6 +177,7 @@ if (process.env.OGC_STARTUP_TEST_LIFECYCLE === '1') {
   require(path.join(applicationPath, 'dist-electron/electron/main.js'));
 }
 app.on('quit', (_event, exitCode) => {
+  fs.writeFileSync(path.join(profile, 'native-smoke-outcome.json'), JSON.stringify({ ready, verified, cleanupCompleted, exitCode }));
   const cleanup = process.env.OGC_STARTUP_TEST_LIFECYCLE === '1' ? `; cleanup=${cleanupCompleted}` : '';
   console.log(`Native app quit: ${exitCode}; startup=${ready}${cleanup}`);
 });

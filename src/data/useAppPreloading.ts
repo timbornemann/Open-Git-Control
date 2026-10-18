@@ -4,7 +4,8 @@ import { preload, resourceKey } from './clientCache';
 import { gitClient } from '@/services/gitClient';
 import { plannerClient } from '@/services/plannerClient';
 import { cacheDiagnostics, queryClient } from './queryClient';
-import { viewModules } from './viewModules';
+import { getViewModule } from './viewModules';
+import { scheduleViewModulePreloads } from './viewModulePreloading';
 import { useGitAvailable } from '@/app/state/systemToolsStore';
 
 export function useAppPreloading(activeRepo: string | null, openRepos: string[], tab: string, showSecondaryHistory: boolean) {
@@ -13,9 +14,8 @@ export function useAppPreloading(activeRepo: string | null, openRepos: string[],
   if (navigation.current.tab !== tab) navigation.current = { tab, started: performance.now() };
   useLayoutEffect(() => {
     const prepared =
-      tab in viewModules &&
-      viewModules[tab as keyof typeof viewModules].isReady() &&
-      (tab === 'hosting'
+      getViewModule(tab)?.isReady() &&
+      (tab === 'hosting' || tab === 'github'
         ? queryClient
             .getQueryCache()
             .getAll()
@@ -31,8 +31,9 @@ export function useAppPreloading(activeRepo: string | null, openRepos: string[],
     return () => cancelAnimationFrame(frame);
   }, [tab]);
   useEffect(() => {
-    if (tab in viewModules) void viewModules[tab as keyof typeof viewModules].preload().catch(() => {});
+    const cancelPreloads = scheduleViewModulePreloads(tab);
     if (tab === 'planner') void plannerClient.getData().catch(() => {});
+    return cancelPreloads;
   }, [tab]);
   useEffect(() => {
     if (gitReady && activeRepo) preloadRepository(activeRepo, showSecondaryHistory);

@@ -1,43 +1,4 @@
-import React, { useEffect, useState, type ComponentType } from 'react';
-import { DataPlaceholder } from '@/components/common/DataPlaceholder';
-
-function preloadable<P extends object>(
-  loader: () => Promise<{ default: ComponentType<P> }>,
-): { View: (props: P) => React.ReactElement; preload: () => Promise<void>; isReady: () => boolean } {
-  let loaded: ComponentType<P> | undefined;
-  let pending: Promise<void> | undefined;
-  const preload = () =>
-    (pending ??= loader()
-      .then((module) => {
-        loaded = module.default;
-      })
-      .catch((error: unknown) => {
-        pending = undefined;
-        throw error;
-      }));
-  const View = (props: P) => {
-    const [, ready] = useState(0);
-    const [error, setError] = useState<Error | null>(null);
-    useEffect(() => {
-      let mounted = true;
-      if (!loaded)
-        void preload().then(
-          () => {
-            if (mounted) ready((value) => value + 1);
-          },
-          (reason: Error) => {
-            if (mounted) setError(reason);
-          },
-        );
-      return () => {
-        mounted = false;
-      };
-    }, []);
-    if (error) throw error;
-    return loaded ? React.createElement(loaded, props) : <DataPlaceholder />;
-  };
-  return { View, preload, isReady: () => loaded !== undefined };
-}
+import { preloadable } from './preloadableView';
 
 export const viewModules = {
   editor: preloadable(async () => ({ default: (await import('@/components/working-directory/WorkingDirectoryCodeEditor')).WorkingDirectoryCodeEditor })),
@@ -51,9 +12,15 @@ export const viewModules = {
   settings: preloadable(async () => ({ default: (await import('@/components/layout/SettingsMainContent')).SettingsMainContent })),
 };
 
-export async function preloadViewModules() {
-  for (const name of ['hosting', 'planner', 'repo', 'settings', 'analytics', 'file', 'editor', 'timeline'] as const) {
-    if (document.visibilityState === 'hidden') return;
-    await viewModules[name].preload().catch(() => {});
-  }
+export function getViewModule(name: string) {
+  if (name === 'github') return viewModules.hosting;
+  return Object.prototype.hasOwnProperty.call(viewModules, name) ? viewModules[name as keyof typeof viewModules] : undefined;
+}
+
+export function preloadViewModule(name: string): Promise<void> {
+  return (
+    getViewModule(name)
+      ?.preload()
+      .catch(() => {}) ?? Promise.resolve()
+  );
 }

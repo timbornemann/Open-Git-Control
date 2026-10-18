@@ -14,27 +14,44 @@ const environment = {
   NODE_ENV: 'production',
 };
 delete environment.ELECTRON_RUN_AS_NODE;
+let runNumber = 0;
 const run = (lifecycle, repository = false, stalledToolPath = false) => {
-  const result = spawnSync(require('electron'), [path.join(__dirname, 'startup-electron-fixture.js')], {
-    env: {
-      ...environment,
-      OGC_STARTUP_TEST_LIFECYCLE: lifecycle ? '1' : '0',
-      OGC_STARTUP_TEST_REPOSITORY: repository ? '1' : '0',
-      OGC_STARTUP_TEST_TOOL_STALL: stalledToolPath ? '1' : '0',
-    },
-    windowsHide: true,
-    encoding: 'utf8',
-    timeout: 45_000,
-  });
-  process.stdout.write(result.stdout || '');
-  process.stderr.write(result.stderr || '');
-  if (result.error) {
-    console.error({ pid: result.pid, status: result.status, signal: result.signal, error: result.error.code });
-    throw result.error;
+  const outcomePath = path.join(root, 'native-smoke-outcome.json');
+  fs.rmSync(outcomePath, { force: true });
+  // File-backed output avoids waiting for EOF from inherited Windows pipe
+  // handles after the app exits. Keep it outside the profile being removed.
+  const outputPath = `${root}-run-${++runNumber}.log`;
+  const output = fs.openSync(outputPath, 'w');
+  try {
+    let result;
+    try {
+      result = spawnSync(require('electron'), [path.join(__dirname, 'startup-electron-fixture.js')], {
+        env: {
+          ...environment,
+          OGC_STARTUP_TEST_LIFECYCLE: lifecycle ? '1' : '0',
+          OGC_STARTUP_TEST_REPOSITORY: repository ? '1' : '0',
+          OGC_STARTUP_TEST_TOOL_STALL: stalledToolPath ? '1' : '0',
+        },
+        windowsHide: true,
+        stdio: ['ignore', output, output],
+        timeout: 45_000,
+      });
+    } finally {
+      fs.closeSync(output);
+    }
+    process.stdout.write(fs.readFileSync(outputPath, 'utf8'));
+    if (result.error) {
+      console.error({ pid: result.pid, status: result.status, signal: result.signal, error: result.error.code });
+      throw result.error;
+    }
+    assert.equal(result.status, 0, `The native ${lifecycle ? 'shutdown' : 'startup'} smoke test must finish on its own.`);
+    const outcome = JSON.parse(fs.readFileSync(outcomePath, 'utf8'));
+    assert.ok(outcome.ready && outcome.verified && outcome.exitCode === 0, 'All native app checks must finish before a successful exit.');
+    if (lifecycle) assert.ok(outcome.cleanupCompleted, 'The app must complete its shutdown cleanup.');
+    if (!lifecycle) assert.ok(fs.readFileSync(path.join(root, 'startup.log'), 'utf8').includes('shutdown-cleanup-complete'));
+  } finally {
+    fs.rmSync(outputPath, { force: true });
   }
-  assert.equal(result.status, 0, `The native ${lifecycle ? 'shutdown' : 'startup'} smoke test must finish on its own.`);
-  assert.ok(result.stdout.includes(lifecycle ? 'cleanup=true' : 'Application started with CSS, preload and bootstrap available.'));
-  if (!lifecycle) assert.ok(fs.readFileSync(path.join(root, 'startup.log'), 'utf8').includes('shutdown-cleanup-complete'));
 };
 try {
   if (process.platform === 'win32' && path.basename(applicationPath) === 'app.asar') {
