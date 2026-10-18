@@ -66,7 +66,7 @@ export function registerGitHandlers({
     repoJobRegistry,
   });
 
-  registerGitHistoryHandlers({ gitService, commitStatsService, workingTreeService });
+  const resetWorkingTreeWatches = registerGitHistoryHandlers({ gitService, commitStatsService, workingTreeService });
   registerGitFileHandlers({ gitService, readStoredRepoPaths, ensureWriteAllowed: ensureCommitProtectionIsIdle });
   registerGitOperationStateHandler({ gitService });
   registerRepositoryActivityHandler({ gitService, readStoredRepoPaths });
@@ -85,6 +85,7 @@ export function registerGitHandlers({
     if (!requestedRepoPath) throw new Error('Repository path is required.');
     commitStatsService.interruptBackgroundWork();
     await gitService.setRepoPathAsync(requestedRepoPath);
+    resetWorkingTreeWatches();
     workingTreeService.setActiveRepo();
     const activeRepoPath = gitService.getRepoPath() || requestedRepoPath;
     repoJobRegistry.cancelForRepoChange(activeRepoPath);
@@ -118,6 +119,7 @@ export function registerGitHandlers({
   });
 
   ipcMain.handle(IpcChannel.GitClearRepo, async () => {
+    resetWorkingTreeWatches();
     commitStatsService.interruptBackgroundWork();
     workingTreeService.setActiveRepo();
     repoJobRegistry.cancelForRepoChange(null);
@@ -420,10 +422,8 @@ export function registerGitHandlers({
       try {
         authorizedRepoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitRepoOriginUrl);
       } catch {
-        // Origin lookup also supports inactive repositories in the sidebar.
-        // Authorize only exact, main-owned paths
-        // from the persisted workspace list; never accept an arbitrary renderer
-        // path and never extend this exception to mutations.
+        // Sidebar origin reads may use inactive repositories, but only exact,
+        // persisted main-owned paths. This exception never authorizes mutations.
         const requestedKey = repositoryPathKey(requestedRepoPath);
         const storedRepoPath = readStoredRepoPaths().find((storedPath) => repositoryPathKey(storedPath) === requestedKey);
         if (!storedRepoPath) throw new Error('Requested repository is not an open repository.');

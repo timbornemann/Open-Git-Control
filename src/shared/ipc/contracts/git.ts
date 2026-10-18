@@ -1,5 +1,6 @@
 import type { ElectronRepositorySecretScanAllowlistAPI } from './repositorySecretScanAllowlist';
 import type { RepositoryAnalyticsApi } from '../repositoryAnalytics';
+import type { WorkingTreeWatchApi } from '../workingTreeWatch';
 import type { ReadRequest } from '../../cache/resource';
 import type { GitLfsApi } from '../gitLfs';
 import type { GitIdentityApi } from '../gitIdentity';
@@ -231,7 +232,7 @@ export type OpenRepositoryPathResultDto = {
   error?: string;
 };
 
-export interface ElectronGitAPI extends GitLfsApi, GitIdentityApi, ElectronRepositorySecretScanAllowlistAPI, RepositoryAnalyticsApi {
+export interface ElectronGitAPI extends GitLfsApi, GitIdentityApi, ElectronRepositorySecretScanAllowlistAPI, RepositoryAnalyticsApi, WorkingTreeWatchApi {
   inspectCommitMessageEdit: (request: CommitMessageEditRequest) => Promise<IpcResult<CommitMessageEditInspection>>;
   rewordCommitMessage: (request: RewordCommitMessageRequest) => Promise<IpcResult<CommitMessageEditResult> & { cancelled?: boolean }>;
   getCommitMessageEditBackups: (repoPath: string) => Promise<IpcResult<CommitMessageEditBackup[]>>;
@@ -246,7 +247,7 @@ export interface ElectronGitAPI extends GitLfsApi, GitIdentityApi, ElectronRepos
   onCommitStats: (callback: (update: CommitStatsUpdateDto) => void) => () => void;
   getWorkingTreeSnapshot: (repoPath?: string) => Promise<IpcResult<WorkingTreeSnapshotDto>>;
   getRepositoryChangeSummary: (repoPath: string, readRequest?: ReadRequest) => Promise<IpcResult<RepositoryChangeSummaryDto>>;
-  getWorkingTreeStats: (snapshotId: string, repoPath?: string) => Promise<IpcResult<WorkingTreeStatsDto>>;
+  getWorkingTreeStats: (snapshotId: string, repoPath?: string, readRequest?: ReadRequest) => Promise<IpcResult<WorkingTreeStatsDto>>;
   getSequencerState: (repoPath?: string) => Promise<IpcResult<GitSequencerStateDto>>;
   stagePaths: (paths: string[], repoPath?: string) => Promise<IpcResult<string>>;
   getDiffPreview: (args: string[], limits?: DiffPreviewLimitsDto, repoPath?: string) => Promise<IpcResult<DiffPreviewDto>>;

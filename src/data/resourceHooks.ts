@@ -7,8 +7,8 @@ import { resourceKey } from './clientCache';
 
 /** Observe without installing a second refresh loop. The owning adapter or
  * existing domain lifecycle is responsible for scheduling the read. */
-export function useCachedResult<T>(key: ResourceKey) {
-  return useQuery<T>({ queryKey: key, queryFn: skipToken, enabled: false }, queryClient);
+export function useCachedResult<T>(key: ResourceKey, subscribed = true) {
+  return useQuery<T>({ queryKey: key, queryFn: skipToken, enabled: false, subscribed }, queryClient);
 }
 
 /** Drop-in data state for existing workflows; selection/edit buffers stay in

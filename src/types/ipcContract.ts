@@ -85,6 +85,8 @@ export const enum IpcChannel {
   GitWorkingTreeSnapshot = 'git:workingTreeSnapshot',
   GitRepositoryChangeSummary = 'git:repositoryChangeSummary',
   GitWorkingTreeStats = 'git:workingTreeStats',
+  GitWorkingTreeWatch = 'git:workingTreeWatch',
+  GitWorkingTreeChanged = 'git:workingTreeChanged',
   GitDeleteRepoFile = 'git:deleteRepoFile',
   GitWriteRepoFile = 'git:writeRepoFile',
   GitListWorkingDirectory = 'git:listWorkingDirectory',

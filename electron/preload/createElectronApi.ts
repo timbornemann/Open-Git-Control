@@ -1,4 +1,5 @@
 import { createRepositorySecretScanAllowlistApi } from './createRepositorySecretScanAllowlistApi';
+import { createWorkingTreeWatchApi } from './createWorkingTreeWatchApi';
 import { createRepositoryAnalyticsApi } from './createRepositoryAnalyticsApi';
 import { createRepositoryLocationApi } from './createRepositoryLocationApi';
 import { createSystemToolsApi } from './createSystemToolsApi';
@@ -142,14 +143,19 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       ipcRenderer.on(IpcChannel.GitCommitStats, handler);
       return () => ipcRenderer.removeListener(IpcChannel.GitCommitStats, handler);
     },
+    ...createWorkingTreeWatchApi(ipcRenderer),
     getWorkingTreeSnapshot: (repoPath?: string) =>
       repoPath
         ? invokeGitOperationForRepo(repoPath, 'status', IpcChannel.GitWorkingTreeSnapshot, repoPath)
         : invokeGitOperation('status', IpcChannel.GitWorkingTreeSnapshot),
-    getWorkingTreeStats: (snapshotId: string, repoPath?: string) =>
-      repoPath
-        ? invokeGitOperationForRepo(repoPath, 'status', IpcChannel.GitWorkingTreeStats, snapshotId, repoPath)
-        : invokeGitOperation('status', IpcChannel.GitWorkingTreeStats, snapshotId),
+    getWorkingTreeStats: (snapshotId: string, repoPath?: string, readRequest?: ReadRequest) =>
+      readRequest
+        ? repoPath
+          ? invokeGitOperationForRepo(repoPath, 'status', IpcChannel.GitWorkingTreeStats, snapshotId, repoPath, readRequest)
+          : invokeGitOperation('status', IpcChannel.GitWorkingTreeStats, snapshotId, repoPath, readRequest)
+        : repoPath
+          ? invokeGitOperationForRepo(repoPath, 'status', IpcChannel.GitWorkingTreeStats, snapshotId, repoPath)
+          : invokeGitOperation('status', IpcChannel.GitWorkingTreeStats, snapshotId),
     // Background inspection must not trigger active-workspace recovery dialogs.
     getRepositoryChangeSummary: (repoPath: string, readRequest?: ReadRequest) =>
       ipcRenderer.invoke(IpcChannel.GitRepositoryChangeSummary, repoPath, readRequest),
@@ -365,6 +371,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       getWorkingTreeSnapshot: flatApi.getWorkingTreeSnapshot,
       getRepositoryChangeSummary: flatApi.getRepositoryChangeSummary,
       getWorkingTreeStats: flatApi.getWorkingTreeStats,
+      watchWorkingTree: flatApi.watchWorkingTree,
+      onWorkingTreeChanged: flatApi.onWorkingTreeChanged,
       getSequencerState: flatApi.getSequencerState,
       stagePaths: flatApi.stagePaths,
       getDiffPreview: flatApi.getDiffPreview,

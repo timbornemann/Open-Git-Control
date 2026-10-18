@@ -29,7 +29,6 @@ const MainViewComponent: React.FC = () => {
   const onNavigateToCommit = useGitStore((state) => state.onNavigateToCommit);
   const autoOpenConflictResolverPath = useWorkflowStore((state) => state.autoOpenConflictResolverPath);
   const onAutoOpenConflictResolverConsumed = useWorkflowStore((state) => state.onAutoOpenConflictResolverConsumed);
-  const workingTree = useWorkingTreeSnapshot(activeRepo, refreshTrigger);
 
   const { primaryPaneBasis, isContentResizing, contentAreaRef, handleContentResizeStart } = useMainViewPaneResizer();
 
@@ -124,6 +123,7 @@ const MainViewComponent: React.FC = () => {
       (showRecoveryCenter || isRunConfigOpen || isRemoteConfigOpen || isSecretScanAllowlistOpen || isReleaseCreatorOpen || isRepositoryPublicationOpen)
     );
   const showInspectorPane = canShowInspectorPane && isInspectorPaneVisible;
+  const workingTree = useWorkingTreeSnapshot(activeRepo, refreshTrigger, canShowInspectorPane);
 
   return (
     <div className="main-view">

@@ -9,6 +9,7 @@ import { isRepoUnavailableError } from '../../../../src/shared/git/errors';
 import { IpcChannel } from '../../../../src/types/ipcContract';
 import { parseFileBlame, parseFileHistory, parseStashList } from '../../parsing';
 import { requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
+import { registerWorkingTreeWatchHandlers } from './registerWorkingTreeWatchHandlers';
 
 type RegisterGitHistoryHandlersDeps = {
   gitService: GitService;
@@ -24,7 +25,8 @@ const isUnbornHeadError = (error: unknown): boolean => {
   );
 };
 
-export function registerGitHistoryHandlers({ gitService, commitStatsService, workingTreeService }: RegisterGitHistoryHandlersDeps): void {
+export function registerGitHistoryHandlers({ gitService, commitStatsService, workingTreeService }: RegisterGitHistoryHandlersDeps): () => void {
+  const resetWatches = registerWorkingTreeWatchHandlers(gitService);
   const commitStatsSubscribers = new Set<WebContents>();
   commitStatsService.onUpdate((update) => {
     for (const webContents of commitStatsSubscribers) {
@@ -123,16 +125,22 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
     }
   });
 
-  ipcMain.handle(IpcChannel.GitWorkingTreeStats, async (_event: unknown, snapshotId: unknown, requestedRepoPath?: unknown) => {
-    try {
-      const normalizedId = String(snapshotId || '').trim();
-      if (!normalizedId) throw new Error('Snapshot ID is required.');
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitWorkingTreeStats);
-      return { success: true, data: await workingTreeService.getStats(normalizedId, repoPath) };
-    } catch (error: unknown) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
+  ipcMain.handle(
+    IpcChannel.GitWorkingTreeStats,
+    async (event: IpcMainInvokeEvent, snapshotId: unknown, requestedRepoPath?: unknown, readRequest?: ReadRequest) => {
+      const request = beginReadRequest(event, readRequest);
+      try {
+        const normalizedId = String(snapshotId || '').trim();
+        if (!normalizedId) throw new Error('Snapshot ID is required.');
+        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitWorkingTreeStats);
+        return { success: true, data: await workingTreeService.getStats(normalizedId, repoPath, request.signal) };
+      } catch (error: unknown) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      } finally {
+        request.finish();
+      }
+    },
+  );
 
   ipcMain.handle(
     IpcChannel.GitFileBlameRange,
@@ -230,4 +238,5 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
+  return resetWatches;
 }

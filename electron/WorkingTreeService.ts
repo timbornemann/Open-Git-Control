@@ -1,10 +1,12 @@
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import type { GitService } from './GitService';
-import { parsePorcelainStatusZ } from '../src/shared/git/porcelainStatus';
+import { parseNulStatus, parseStatusPath, hasStagedChanges, type StatusSample } from './WorkingTreeStatus';
+export { parseStatusPath } from './WorkingTreeStatus';
 import { toLiteralPathspec } from './git/RepositoryPathSafety';
 import { createRepositoryPathResolver } from './git/RepositoryPathSafetyAsync';
 import { gitArgumentBatches } from './git/GitArgumentBatches';
+import { WorkingTreeStatsRead } from './WorkingTreeStatsRead';
 
 export type WorkingTreeSnapshot = {
   snapshotId: string;
@@ -29,14 +31,6 @@ type StableWorkingTreeState = {
   contentFingerprint: string;
 };
 
-type StatusSample = {
-  statusRaw: string;
-  identity: string;
-  paths: string[] | null;
-  hasStagedChanges: boolean;
-  changeCount: number;
-};
-
 const SNAPSHOT_STABILITY_ATTEMPTS = 3;
 const staleSnapshotError = (): Error => new Error('Working tree snapshot is stale.');
 
@@ -52,165 +46,11 @@ const parseNumstat = (raw: string) => {
   return stats;
 };
 
-const decodeQuotedGitPath = (rawToken: string): string | null => {
-  if (!(rawToken.startsWith('"') && rawToken.endsWith('"'))) return rawToken;
-
-  const escaped = rawToken.slice(1, -1);
-  let output = '';
-  let octets: number[] = [];
-
-  const flushOctets = () => {
-    if (octets.length === 0) return;
-    output += Buffer.from(octets).toString('utf8');
-    octets = [];
-  };
-
-  for (let i = 0; i < escaped.length; i += 1) {
-    const char = escaped[i];
-    if (char !== '\\') {
-      flushOctets();
-      output += char;
-      continue;
-    }
-
-    const next = escaped[i + 1];
-    if (!next) {
-      flushOctets();
-      output += '\\';
-      continue;
-    }
-
-    if (/[0-7]/.test(next)) {
-      let octal = next;
-      let consumedDigits = 1;
-      while (consumedDigits < 3 && i + 1 + consumedDigits < escaped.length && /[0-7]/.test(escaped[i + 1 + consumedDigits])) {
-        octal += escaped[i + 1 + consumedDigits];
-        consumedDigits += 1;
-      }
-      octets.push(parseInt(octal, 8));
-      i += consumedDigits;
-      continue;
-    }
-
-    flushOctets();
-    const unescapedMap: Record<string, string> = {
-      a: '\x07',
-      b: '\b',
-      f: '\f',
-      n: '\n',
-      r: '\r',
-      t: '\t',
-      v: '\v',
-      '\\': '\\',
-      '"': '"',
-    };
-    output += unescapedMap[next] ?? next;
-    i += 1;
-  }
-
-  flushOctets();
-  return output;
-};
-
-export const parseStatusPath = (line: string): string | null => {
-  if (line.length < 3) return null;
-  const statusCode = line.slice(0, 2);
-  const payload = line.slice(3);
-  if (!payload) return null;
-  let rawPath = payload;
-  if (statusCode.includes('R') || statusCode.includes('C')) {
-    let quoted = false;
-    let escaped = false;
-    let renameSeparator = -1;
-    for (let index = 0; index <= payload.length - 4; index += 1) {
-      const char = payload[index];
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-      if (quoted && char === '\\') {
-        escaped = true;
-        continue;
-      }
-      if (char === '"') {
-        quoted = !quoted;
-        continue;
-      }
-      if (!quoted && renameSeparator < 0 && payload.slice(index, index + 4) === ' -> ') renameSeparator = index;
-    }
-    if (renameSeparator >= 0) rawPath = payload.slice(renameSeparator + 4);
-  }
-  return decodeQuotedGitPath(rawPath);
-};
-
-const quoteStatusPath = (filePath: string, force = false): string => {
-  const needsQuoting = [...filePath].some((character) => {
-    const codePoint = character.codePointAt(0) ?? 0;
-    return codePoint < 0x20 || codePoint === 0x7f || character === '"' || character === '\\';
-  });
-  if (!force && !needsQuoting) return filePath;
-  const escapes: Record<string, string> = {
-    '\x07': '\\a',
-    '\b': '\\b',
-    '\f': '\\f',
-    '\n': '\\n',
-    '\r': '\\r',
-    '\t': '\\t',
-    '\x0b': '\\v',
-    '"': '\\"',
-    '\\': '\\\\',
-  };
-  let encoded = '"';
-  for (const character of filePath) {
-    const escaped = escapes[character];
-    if (escaped) {
-      encoded += escaped;
-    } else if (character.charCodeAt(0) < 0x20 || character.charCodeAt(0) === 0x7f) {
-      for (const byte of Buffer.from(character, 'utf8')) encoded += `\\${byte.toString(8).padStart(3, '0')}`;
-    } else {
-      encoded += character;
-    }
-  }
-  return `${encoded}"`;
-};
-
-const parseNulStatus = (statusOutput: string): StatusSample => {
-  const displayLines: string[] = [];
-  const paths: string[] = [];
-  let staged = false;
-
-  for (const { code, path: targetPath, originalPath: sourcePath } of parsePorcelainStatusZ(statusOutput)) {
-    paths.push(targetPath);
-    if (code[0] !== ' ' && code[0] !== '?' && code[0] !== '!') staged = true;
-    const displayPath = sourcePath ? `${quoteStatusPath(sourcePath, true)} -> ${quoteStatusPath(targetPath, true)}` : quoteStatusPath(targetPath);
-    displayLines.push(`${code} ${displayPath}`);
-  }
-
-  return {
-    statusRaw: displayLines.join('\n'),
-    identity: statusOutput,
-    paths,
-    hasStagedChanges: staged,
-    changeCount: new Set(paths).size,
-  };
-};
-
-const hasStagedChanges = (statusRaw: string): boolean => {
-  for (const line of statusRaw.split(/\r?\n/)) {
-    if (!line || line.length < 2) continue;
-    const indexStatus = line[0];
-    if (indexStatus !== ' ' && indexStatus !== '?' && indexStatus !== '!') {
-      return true;
-    }
-  }
-  return false;
-};
-
 export class WorkingTreeService {
   private snapshotInFlight: { repoPath: string; promise: Promise<WorkingTreeSnapshot> } | null = null;
   private latestSnapshot: WorkingTreeSnapshot | null = null;
   private statsCache = new Map<string, WorkingTreeStats>();
-  private statsInFlight = new Map<string, Promise<WorkingTreeStats>>();
+  private statsInFlight = new Map<string, WorkingTreeStatsRead>();
   private statsControllers = new Map<string, AbortController>();
   private volatileFingerprintGeneration = 0;
   private repoGeneration = 0;
@@ -280,7 +120,8 @@ export class WorkingTreeService {
     }
   }
 
-  async getStats(snapshotId: string, requestedRepoPath?: string): Promise<WorkingTreeStats> {
+  async getStats(snapshotId: string, requestedRepoPath?: string, signal?: AbortSignal): Promise<WorkingTreeStats> {
+    signal?.throwIfAborted();
     const snapshot = this.latestSnapshot;
     if (!snapshot || snapshot.snapshotId !== snapshotId || (requestedRepoPath && snapshot.repoPath !== requestedRepoPath)) {
       throw staleSnapshotError();
@@ -288,7 +129,7 @@ export class WorkingTreeService {
     const cached = this.statsCache.get(snapshotId);
     if (cached) return cached;
     const inFlight = this.statsInFlight.get(snapshotId);
-    if (inFlight) return inFlight;
+    if (inFlight && !inFlight.controller.signal.aborted) return inFlight.observe(signal);
     const repoGeneration = this.repoGeneration;
 
     // A bare repository has no working tree, so `git diff --numstat` fails on
@@ -314,7 +155,9 @@ export class WorkingTreeService {
         readStats(['diff', '--numstat', '--cached'], 'staged'),
         readStats(['diff', '--numstat'], 'unstaged'),
       ]);
-      const currentState = await this.captureStableState(snapshot.repoPath);
+      if (this.repoGeneration !== repoGeneration) throw staleSnapshotError();
+      controller.signal.throwIfAborted();
+      const currentState = await this.captureStableState(snapshot.repoPath, controller.signal);
       const currentSnapshotId = this.buildSnapshotId(snapshot.repoPath, currentState.statusIdentity, currentState.contentFingerprint);
       if (
         this.repoGeneration !== repoGeneration ||
@@ -327,6 +170,7 @@ export class WorkingTreeService {
         }
         throw staleSnapshotError();
       }
+      controller.signal.throwIfAborted();
       const result: WorkingTreeStats = {
         snapshotId,
         staged: parseNumstat(stagedRaw),
@@ -339,18 +183,19 @@ export class WorkingTreeService {
       }
       return result;
     })();
-    this.statsInFlight.set(snapshotId, promise);
-    try {
-      return await promise;
-    } finally {
+    const read = new WorkingTreeStatsRead(promise, controller);
+    this.statsInFlight.set(snapshotId, read);
+    const finished = () => {
       // A preempted count must not leave its sibling diff consuming a read
       // slot. The scheduler aborts background reads before interactive writes.
       controller.abort();
       if (this.statsControllers.get(snapshotId) === controller) this.statsControllers.delete(snapshotId);
-      if (this.statsInFlight.get(snapshotId) === promise) {
+      if (this.statsInFlight.get(snapshotId) === read) {
         this.statsInFlight.delete(snapshotId);
       }
-    }
+    };
+    void promise.then(finished, finished);
+    return read.observe(signal);
   }
 
   private buildSnapshotId(repoPath: string, statusIdentity: string, contentFingerprint: string): string {
@@ -363,13 +208,14 @@ export class WorkingTreeService {
    * prevents a write between `status` and the index/file fingerprint from
    * producing a snapshot that never existed as one repository state.
    */
-  private async captureStableState(repoPath: string): Promise<StableWorkingTreeState> {
+  private async captureStableState(repoPath: string, signal?: AbortSignal): Promise<StableWorkingTreeState> {
     for (let attempt = 0; attempt < SNAPSHOT_STABILITY_ATTEMPTS; attempt += 1) {
-      const statusBefore = await this.getStatusSample(repoPath);
-      const fingerprintBefore = await this.getContentFingerprint(repoPath, statusBefore);
-      const statusAfter = await this.getStatusSample(repoPath);
+      signal?.throwIfAborted();
+      const statusBefore = await this.getStatusSample(repoPath, signal);
+      const fingerprintBefore = await this.getContentFingerprint(repoPath, statusBefore, signal);
+      const statusAfter = await this.getStatusSample(repoPath, signal);
       if (statusAfter.identity !== statusBefore.identity) continue;
-      const fingerprintAfter = await this.getContentFingerprint(repoPath, statusAfter);
+      const fingerprintAfter = await this.getContentFingerprint(repoPath, statusAfter, signal);
       if (fingerprintAfter === fingerprintBefore) {
         return {
           statusRaw: statusAfter.statusRaw,
@@ -383,12 +229,13 @@ export class WorkingTreeService {
     throw new Error('Working tree changed repeatedly while creating a snapshot. Please retry.');
   }
 
-  private async getStatusSample(repoPath: string): Promise<StatusSample> {
+  private async getStatusSample(repoPath: string, signal?: AbortSignal): Promise<StatusSample> {
+    signal?.throwIfAborted();
     const gitCapabilities = this.gitService as GitService & {
-      getStatusPorcelainZAtPath?: (path: string) => Promise<string>;
+      getStatusPorcelainZAtPath?: (path: string, signal?: AbortSignal, kind?: 'background') => Promise<string>;
     };
     if (typeof gitCapabilities.getStatusPorcelainZAtPath === 'function') {
-      return parseNulStatus(await gitCapabilities.getStatusPorcelainZAtPath(repoPath));
+      return parseNulStatus(await gitCapabilities.getStatusPorcelainZAtPath(repoPath, signal, signal ? 'background' : undefined));
     }
 
     const statusRaw = await this.gitService.getStatusPorcelainAtPath(repoPath);
@@ -416,7 +263,8 @@ export class WorkingTreeService {
     };
   }
 
-  private async getContentFingerprint(repoPath: string, status: StatusSample): Promise<string> {
+  private async getContentFingerprint(repoPath: string, status: StatusSample, signal?: AbortSignal): Promise<string> {
+    signal?.throwIfAborted();
     if (!status.paths) return `volatile:${++this.volatileFingerprintGeneration}`;
     const paths = new Set(status.paths);
 
@@ -432,16 +280,18 @@ export class WorkingTreeService {
       // modes and conflict stages, and therefore also cover unmerged entries.
       let batchIndex = 0;
       for (const batch of gitArgumentBatches(sortedPaths.map((filePath) => toLiteralPathspec(filePath)))) {
-        const stagedEntries = await this.gitService.runPollingCommandAtPath(
-          repoPath,
-          ['ls-files', '--stage', '-z', '--', ...batch],
-          `working-tree-snapshot:index:${batchIndex++}:${batch.join('\0')}`,
-        );
+        signal?.throwIfAborted();
+        const args = ['ls-files', '--stage', '-z', '--', ...batch];
+        const stagedEntries =
+          signal && typeof this.gitService.runCommandAtPathWithSignal === 'function'
+            ? await this.gitService.runCommandAtPathWithSignal(repoPath, args, signal, 'background')
+            : await this.gitService.runPollingCommandAtPath(repoPath, args, `working-tree-snapshot:index:${batchIndex++}:${batch.join('\0')}`);
         hash.update('index-stage').update('\0').update(stagedEntries).update('\0');
       }
     }
 
     for (let offset = 0; offset < sortedPaths.length; offset += batchSize) {
+      signal?.throwIfAborted();
       const batch = sortedPaths.slice(offset, offset + batchSize);
       const entries = await Promise.all(
         batch.map(async (filePath) => {
@@ -456,6 +306,7 @@ export class WorkingTreeService {
       );
       for (const entry of entries) hash.update(entry).update('\0');
     }
+    signal?.throwIfAborted();
     return hash.digest('hex');
   }
 }
