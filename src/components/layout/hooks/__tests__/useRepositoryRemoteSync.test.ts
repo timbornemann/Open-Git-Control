@@ -170,7 +170,7 @@ describe('useRepositoryRemoteSync', () => {
 
     expect(runGitCommandForRepo).toHaveBeenCalledWith('C:\\repos\\demo', 'status', '--porcelain=v2', '--branch');
     expect(transferClient.request).toHaveBeenCalledWith('getPreferences', { repoPath: 'C:\\repos\\demo' });
-    expect(transferClient.request).toHaveBeenCalledWith('fetch', { repoPath: 'C:\\repos\\demo', remote: 'origin', background: true });
+    expect(transferClient.request).toHaveBeenCalledWith('fetch', { repoPath: 'C:\\repos\\demo', remote: 'origin', includeTags: true, background: true });
     expect(runGitCommandForRepo.mock.calls.some(([, command]) => command === 'fetch')).toBe(false);
     expect(removeRemote).not.toHaveBeenCalled();
     expect(hook.current.remoteSync.lastFetchError).toContain('404');
@@ -291,16 +291,9 @@ describe('useRepositoryRemoteSync', () => {
       });
     });
 
-    expect(transferClient.request).toHaveBeenCalledWith('fetch', { repoPath: 'C:\\repos\\fork', remote: 'upstream', background: true });
-    expect(transferClient.request).toHaveBeenCalledWith('fetch', { repoPath: 'C:\\repos\\fork', remote: 'upstream', tagsOnly: true, background: true });
-    expect(runGitCommandForRepo).toHaveBeenCalledWith(
-      'C:\\repos\\fork',
-      'forEachRef',
-      '--format=%(refname)%00%(objectname)%00%(*objectname)',
-      'refs/tags',
-      'refs/ogc/remote-tags/upstream/',
-    );
-    expect(runGitCommandForRepo).toHaveBeenCalledWith('C:\\repos\\fork', 'adoptRemoteTag', 'upstream', 'v3.0.0');
+    expect(transferClient.request).toHaveBeenCalledWith('fetch', { repoPath: 'C:\\repos\\fork', remote: 'upstream', includeTags: true, background: true });
+    expect(vi.mocked(transferClient.request).mock.calls.filter(([operation]) => operation === 'fetch')).toHaveLength(1);
+    expect(runGitCommandForRepo.mock.calls.some(([, command]) => command === 'forEachRef' || command === 'adoptRemoteTag')).toBe(false);
     expect(runGitCommandForRepo.mock.calls.some(([, command]) => command === 'fetch')).toBe(false);
     hook.unmount();
   });
@@ -345,9 +338,8 @@ describe('useRepositoryRemoteSync', () => {
       });
     });
 
-    expect(transferClient.request).toHaveBeenCalledWith('fetch', { repoPath: 'C:/repos/mirrored', remote: 'private', background: true });
-    expect(transferClient.request).toHaveBeenCalledWith('fetch', { repoPath: 'C:/repos/mirrored', remote: 'private', tagsOnly: true, background: true });
-    expect(vi.mocked(transferClient.request).mock.calls.filter(([operation]) => operation === 'fetch')).toHaveLength(2);
+    expect(transferClient.request).toHaveBeenCalledWith('fetch', { repoPath: 'C:/repos/mirrored', remote: 'private', includeTags: true, background: true });
+    expect(vi.mocked(transferClient.request).mock.calls.filter(([operation]) => operation === 'fetch')).toHaveLength(1);
     expect(commands.mock.calls.some(([, command]) => command === 'fetch')).toBe(false);
     expect(hook.current.lastFetchedRemote).toBe('private');
     expect(triggerRefresh).toHaveBeenCalledOnce();
@@ -394,7 +386,7 @@ describe('useRepositoryRemoteSync', () => {
     });
 
     expect(vi.mocked(transferClient.request).mock.calls.filter(([operation]) => operation === 'fetch')).toEqual([
-      ['fetch', { repoPath: 'C:/repos/private', remote: 'private', background: true }],
+      ['fetch', { repoPath: 'C:/repos/private', remote: 'private', includeTags: true, background: true }],
     ]);
     expect(commands.mock.calls.some(([, command]) => command === 'fetch')).toBe(false);
     expect(hook.current.remoteSync.lastFetchError).toContain('not authenticated');
@@ -433,7 +425,7 @@ describe('useRepositoryRemoteSync', () => {
         setTimeout(resolve, 0);
       });
     });
-    expect(transferClient.request).toHaveBeenCalledWith('fetch', { repoPath: 'C:/repos/mirrored', remote: 'backup', background: true });
+    expect(transferClient.request).toHaveBeenCalledWith('fetch', { repoPath: 'C:/repos/mirrored', remote: 'backup', includeTags: true, background: true });
     expect(hook.current.lastFetchedRemote).toBe('backup');
     expect(vi.mocked(transferClient.request).mock.calls.some(([operation]) => operation === 'setPreferences')).toBe(false);
     hook.unmount();

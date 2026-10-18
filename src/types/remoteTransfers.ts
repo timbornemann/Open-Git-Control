@@ -104,9 +104,16 @@ export interface RemoteTransferOperations {
   getPullConfiguration: { input: { repoPath: string }; output: GitPullConfigurationDto };
   setPreferences: { input: { repoPath: string; preferences: RemotePreferences }; output: RemotePreferences };
   fetch: {
-    input: { repoPath: string; remote: string; tagsOnly?: boolean; background?: boolean };
+    input: {
+      repoPath: string;
+      remote: string;
+      tagsOnly?: boolean;
+      /** Fetch branches and tracked remote tags together, then adopt only missing local tags. */
+      includeTags?: boolean;
+      background?: boolean;
+    };
     /** Deferred automatic syncs have not completed and must not publish success. */
-    output: { output: string; deferred?: true };
+    output: { output: string; deferred?: true; refsChanged?: boolean };
   };
   pull: { input: { repoPath: string; remote: string; branch: string; mode: PullMode; autostash?: boolean }; output: { output: string } };
   setUpstream: { input: { repoPath: string; remote: string; branch: string }; output: true };

@@ -58,6 +58,18 @@ export function remoteFetchArguments(name: string, tagsOnly: boolean): string[] 
   ];
 }
 
+export function remoteFetchConfiguration(name: string, options: { tagsOnly?: boolean; includeTags?: boolean }) {
+  remoteName(name);
+  if (options.includeTags && options.tagsOnly) throw new Error('Tag-only and combined fetch modes cannot be used together.');
+  const args = remoteFetchArguments(name, options.tagsOnly === true);
+  if (options.includeTags) args.splice(1, 0, '--atomic', '--no-prune-tags');
+  // Append a process-local mapping without replacing configured branch fetches,
+  // custom destinations or negative refspecs. A tag-only command-line refspec
+  // would suppress the configured branch fetch instead.
+  const environment = options.includeTags ? gitConfigurationEnvironment([[`remote.${name}.fetch`, `+refs/tags/*:refs/ogc/remote-tags/${name}/*`]]) : {};
+  return { args, environment };
+}
+
 function repositoryRef(value: unknown): HostedRepositoryRef | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'object') throw new Error('Invalid hosted repository binding.');

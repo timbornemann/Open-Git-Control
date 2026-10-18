@@ -16,7 +16,9 @@ const mocked = vi.hoisted(() => ({
   editRemote: vi.fn(),
   executePush: vi.fn(),
   fetch: vi.fn(),
+  refVersion: vi.fn(),
 }));
+vi.mock('../../../git/RemoteSyncReferences', () => ({ remoteSyncReferenceVersion: mocked.refVersion }));
 vi.mock('electron', () => ({
   ipcMain: { handle: (channel: string, fn: (...args: any[]) => Promise<any>) => mocked.handlers.set(channel, fn) },
   app: { getPath: () => '/not-used' },
@@ -54,6 +56,7 @@ describe('repository authority for structured remote transfers', () => {
     mocked.checkConnection.mockResolvedValue(true);
     mocked.editRemote.mockResolvedValue({ remotes: [] });
     mocked.fetch.mockResolvedValue({ output: '' });
+    mocked.refVersion.mockReset().mockResolvedValue('unchanged');
     registerRemoteTransferHandlers({
       gitService: { getRepoPath: () => activeRepo, runner: {} } as GitService,
       pushGuard,
@@ -131,6 +134,66 @@ describe('repository authority for structured remote transfers', () => {
   it('rejects malformed automatic fetch modes', async () => {
     await expect(invoke('fetch', { repoPath: activeRepo, remote: 'origin', background: 'true' })).resolves.toMatchObject({ success: false });
     expect(mocked.fetch).not.toHaveBeenCalled();
+  });
+  it.each([{ tagsOnly: 'true' }, { includeTags: 'true' }, { tagsOnly: true, includeTags: true }])('rejects invalid fetch scopes: %j', async (scope) => {
+    await expect(invoke('fetch', { repoPath: activeRepo, remote: 'origin', ...scope })).resolves.toMatchObject({ success: false });
+    expect(mocked.fetch).not.toHaveBeenCalled();
+    expect(mocked.refVersion).not.toHaveBeenCalled();
+  });
+  it('compares combined sync references before and after fetching without reporting an unchanged sync as a mutation', async () => {
+    const input = { repoPath: activeRepo, remote: 'origin', includeTags: true, background: true };
+    await expect(invoke('fetch', input)).resolves.toEqual({ success: true, data: { output: '', refsChanged: false } });
+    expect(mocked.refVersion).toHaveBeenCalledTimes(2);
+    expect(mocked.fetch).toHaveBeenCalledWith(activeRepo, 'origin', expect.any(Object), { includeTags: true, background: true });
+    mocked.refVersion.mockResolvedValueOnce('unchanged').mockResolvedValueOnce('changed');
+    await expect(invoke('fetch', input)).resolves.toMatchObject({ data: { refsChanged: true } });
+    mocked.refVersion.mockResolvedValue('changed');
+    await expect(invoke('fetch', input)).resolves.toMatchObject({ data: { refsChanged: false } });
+  });
+  it.each(['failed', 'deferred'])('remembers changes from a %s attempt until a complete sync publishes them', async (reason) => {
+    const input = { repoPath: activeRepo, remote: 'origin', includeTags: true, background: true };
+    mocked.fetch.mockRejectedValueOnce(reason === 'deferred' ? new BackgroundFetchPreemptedError() : new Error('Interrupted tag adoption'));
+    const interrupted = await invoke('fetch', input);
+    expect(interrupted).toMatchObject(reason === 'deferred' ? { data: { deferred: true } } : { success: false });
+    mocked.refVersion.mockResolvedValue('changed-before-retry');
+    await expect(invoke('fetch', input)).resolves.toMatchObject({ success: true, data: { refsChanged: true } });
+    await expect(invoke('fetch', input)).resolves.toMatchObject({ success: true, data: { refsChanged: false } });
+  });
+  it('keeps its baseline if the commit guard becomes busy during the final reference read', async () => {
+    const input = { repoPath: activeRepo, remote: 'origin', includeTags: true, background: true };
+    let release: (() => void) | null = null;
+    mocked.refVersion.mockResolvedValueOnce('before').mockImplementationOnce(async () => {
+      release = beginCommitProtection(activeRepo);
+      return 'after';
+    });
+    try {
+      await expect(invoke('fetch', input)).resolves.toMatchObject({ data: { deferred: true } });
+    } finally {
+      (release as (() => void) | null)?.();
+    }
+    mocked.refVersion.mockResolvedValue('after');
+    await expect(invoke('fetch', input)).resolves.toMatchObject({ data: { refsChanged: true } });
+    await expect(invoke('fetch', input)).resolves.toMatchObject({ data: { refsChanged: false } });
+  });
+  it('does not silently classify a failed reference read as unchanged', async () => {
+    mocked.refVersion.mockRejectedValueOnce(new Error('Unable to read references'));
+    await expect(invoke('fetch', { repoPath: activeRepo, remote: 'origin', includeTags: true })).resolves.toMatchObject({
+      success: false,
+      error: 'Unable to read references',
+    });
+    expect(mocked.fetch).not.toHaveBeenCalled();
+  });
+  it('keeps separate reference baselines for each window observing the same repository', async () => {
+    const input = { repoPath: activeRepo, remote: 'origin', includeTags: true, background: true };
+    const otherWindow = { sender: { ...event.sender, id: 8, send: vi.fn() } };
+    const fetchOther = () => mocked.handlers.get(IpcChannel.RemoteTransferRequest)!(otherWindow, 'fetch', input);
+    await expect(invoke('fetch', input)).resolves.toMatchObject({ data: { refsChanged: false } });
+    await expect(fetchOther()).resolves.toMatchObject({ data: { refsChanged: false } });
+    mocked.refVersion.mockResolvedValue('new-version');
+    await expect(invoke('fetch', input)).resolves.toMatchObject({ data: { refsChanged: true } });
+    await expect(fetchOther()).resolves.toMatchObject({ data: { refsChanged: true } });
+    await expect(fetchOther()).resolves.toMatchObject({ data: { refsChanged: false } });
+    await expect(invoke('fetch', input)).resolves.toMatchObject({ data: { refsChanged: false } });
   });
   it('allows exact saved inactive repository reads while refusing writes and arbitrary reads', async () => {
     await expect(invoke('getRemotes', { repoPath: 'C:/repos/saved' })).resolves.toMatchObject({ success: true });

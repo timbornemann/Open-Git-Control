@@ -83,7 +83,7 @@ describe('automatic fetch yielding and retry', () => {
   it('does not publish failure or success for a deferred fetch and retries after foreground work', async () => {
     const input = makeInput();
     const hook = await mount(input);
-    expect(fetchCalls()).toEqual([['fetch', { repoPath: input.activeRepo, remote: 'origin', background: true }]]);
+    expect(fetchCalls()).toEqual([['fetch', { repoPath: input.activeRepo, remote: 'origin', includeTags: true, background: true }]]);
     expect(hook.current.remoteSync).toMatchObject({ isFetching: false, lastFetchError: null, lastFetchedAt: null });
     expect(input.triggerRefresh).not.toHaveBeenCalled();
     expect(input.setGitActionToast).not.toHaveBeenCalled();
@@ -99,25 +99,23 @@ describe('automatic fetch yielding and retry', () => {
     useRemoteTransferState.setState({ busy: false });
     vi.mocked(transferClient.request).mockImplementation(async (operation) => (operation === 'getPreferences' ? {} : { output: '' }));
     await tick();
-    expect(fetchCalls()).toHaveLength(3);
-    expect(fetchCalls()[2][1]).toMatchObject({ tagsOnly: true, background: true });
+    expect(fetchCalls()).toHaveLength(2);
+    expect(fetchCalls()[1][1]).toMatchObject({ includeTags: true, background: true });
     expect(hook.current.remoteSync).toMatchObject({ isFetching: false, lastFetchError: null, lastFetchedAt: expect.any(Number) });
     expect(input.triggerRefresh).toHaveBeenCalledOnce();
     await tick();
-    expect(fetchCalls()).toHaveLength(3);
+    expect(fetchCalls()).toHaveLength(2);
   });
 
-  it('preserves the previous successful sync timestamp when tag fetching yields', async () => {
+  it('preserves the previous successful sync timestamp when the combined fetch yields', async () => {
     const input = makeInput();
     vi.mocked(transferClient.request).mockImplementation(async (operation) => (operation === 'getPreferences' ? {} : { output: '' }));
     const hook = await mount(input);
     const fetchedAt = hook.current.remoteSync.lastFetchedAt;
     expect(fetchedAt).toEqual(expect.any(Number));
-    vi.mocked(transferClient.request).mockImplementation(async (operation, options) =>
-      operation === 'getPreferences' ? {} : { output: '', ...('tagsOnly' in options ? { deferred: true } : {}) },
-    );
+    vi.mocked(transferClient.request).mockImplementation(async (operation) => (operation === 'getPreferences' ? {} : { output: '', deferred: true }));
     await tick(60_000);
-    expect(fetchCalls()).toHaveLength(4);
+    expect(fetchCalls()).toHaveLength(2);
     expect(hook.current.remoteSync).toMatchObject({ lastFetchedAt: fetchedAt, lastFetchError: null, isFetching: false });
     expect(input.triggerRefresh).toHaveBeenCalledOnce();
     expect(input.setGitActionToast).not.toHaveBeenCalled();
@@ -137,9 +135,11 @@ describe('automatic fetch yielding and retry', () => {
     await tick(55_000);
     expect(hook.current.remoteSync.lastFetchError).toBe('Offline');
     expect(input.triggerRefresh).not.toHaveBeenCalled();
-    vi.mocked(transferClient.request).mockImplementation(async (operation) => (operation === 'getPreferences' ? {} : { output: '' }));
+    vi.mocked(transferClient.request).mockImplementation(async (operation) => (operation === 'getPreferences' ? {} : { output: '', refsChanged: false }));
     await tick();
     expect(hook.current.remoteSync.lastFetchError).toBeNull();
+    expect(hook.current.remoteSync.lastFetchedAt).toEqual(expect.any(Number));
+    expect(input.triggerRefresh).not.toHaveBeenCalled();
   });
 
   it.each([false, true])('keeps a manual fetch in the foreground and cancels the pending automatic retry (show toast: %s)', async (showToast) => {
@@ -149,14 +149,11 @@ describe('automatic fetch yielding and retry', () => {
     await act(async () => {
       expect(await hook.current.refreshRemoteState(showToast)).toBe(true);
     });
-    expect(fetchCalls().slice(1)).toEqual([
-      ['fetch', { repoPath: input.activeRepo, remote: 'origin' }],
-      ['fetch', { repoPath: input.activeRepo, remote: 'origin', tagsOnly: true }],
-    ]);
+    expect(fetchCalls().slice(1)).toEqual([['fetch', { repoPath: input.activeRepo, remote: 'origin', includeTags: true }]]);
     if (showToast) expect(input.setGitActionToast).toHaveBeenCalledWith(expect.objectContaining({ isError: false }));
     else expect(input.setGitActionToast).not.toHaveBeenCalled();
     await tick();
-    expect(fetchCalls()).toHaveLength(3);
+    expect(fetchCalls()).toHaveLength(2);
   });
 
   it('ignores late deferred responses after a successful manual sync', async () => {
@@ -214,6 +211,29 @@ describe('automatic fetch yielding and retry', () => {
     });
     root = undefined;
     await tick(60_000);
+    expect(fetchCalls()).toHaveLength(2);
+  });
+
+  it('keeps repeated unchanged syncs out of repository refresh while updating successful check state and branch counts', async () => {
+    vi.mocked(transferClient.request).mockImplementation(async (operation) => (operation === 'getPreferences' ? {} : { output: '', refsChanged: false }));
+    vi.mocked(gitClient.runGitCommandForRepo).mockResolvedValue({
+      success: true,
+      data: '# branch.head main\n# branch.upstream origin/main\n# branch.ab +2 -3\n',
+    });
+    const input = makeInput();
+    const hook = await mount(input);
+    const first = hook.current.remoteSync.lastFetchedAt;
+    expect(first).toEqual(expect.any(Number));
+    await tick(60_000);
+    expect(fetchCalls()).toHaveLength(2);
+    expect(hook.current.remoteSync).toMatchObject({ isFetching: false, lastFetchError: null, ahead: 2, behind: 3, hasUpstream: true });
+    expect(hook.current.remoteSync.lastFetchedAt).toBeGreaterThan(first!);
+    expect(input.triggerRefresh).not.toHaveBeenCalled();
+    expect(input.setGitActionToast).not.toHaveBeenCalled();
+
+    vi.mocked(transferClient.request).mockImplementation(async (operation) => (operation === 'getPreferences' ? {} : { output: '', refsChanged: true }));
+    await tick(60_000);
     expect(fetchCalls()).toHaveLength(3);
+    expect(input.triggerRefresh).toHaveBeenCalledOnce();
   });
 });

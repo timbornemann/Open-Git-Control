@@ -4,7 +4,6 @@ import type { RemotePreferences } from '@/types/remoteTransfers';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { getLocale } from '@/i18nCore';
 import { parseBranchSyncFromPorcelainV2 } from '@/utils/gitParsing';
-import { parseTagReferenceStatus, remoteTagTrackingRefPrefix, TAG_REFERENCE_STATUS_FORMAT } from '@/utils/tagConflicts';
 import { formatTime } from '@/utils/dateTime';
 import { gitClient } from '@/services/gitClient';
 import { transferClient } from '@/services/hostingClient';
@@ -236,55 +235,22 @@ export const useRepositoryRemoteSync = ({
         // Keep this operation bound to the repository whose remote and branch
         // state were inspected. The main process rejects it if that repository
         // ceased to be active while the asynchronous status call was pending.
-        // Fetch branch tracking refs first. Pulling tags into `refs/tags/*`
-        // would make a normal background refresh fail if a same-named local
-        // tag points to another commit.
-        const fetchPhase = async (tagsOnly = false) => {
-          const result = await transferClient.request('fetch', {
-            repoPath: repoAtStart,
-            remote: fetchRemote,
-            ...fetchOptions,
-            ...(tagsOnly ? { tagsOnly: true } : {}),
-          });
-          if (!isCurrent()) return false;
-          return result.deferred ? deferAutomaticFetch() : true;
-        };
-        if (!(await fetchPhase())) return false;
-
-        // Maintain remote release state independently from local tags.
-        // `--prune` removes tags deleted on the remote from this tracking
-        // namespace on the next sync, without moving local tags.
-        if (!(await fetchPhase(true))) return false;
-
-        // Adopt remote tags that do not exist locally yet. Existing local tags
-        // are deliberately left untouched; a mismatching name is exposed as a
-        // conflict instead of being silently moved by an automatic fetch.
-        const referenceStatus = await gitClient.runGitCommandForRepo(
-          repoAtStart,
-          'forEachRef',
-          TAG_REFERENCE_STATUS_FORMAT,
-          'refs/tags',
-          remoteTagTrackingRefPrefix(fetchRemote),
-        );
+        // One native operation fetches both namespaces and adopts missing tags.
+        // Its uncached ref comparison also covers pruning and interrupted syncs.
+        const result = await transferClient.request('fetch', {
+          repoPath: repoAtStart,
+          remote: fetchRemote,
+          includeTags: true,
+          ...fetchOptions,
+        });
         if (!isCurrent()) return false;
-        if (!referenceStatus.success) {
-          const errorMessage = String(referenceStatus.error || t('generated.components.layout.hooks.userepositorydomain.could_not_update_remote_fbb52423'));
-          reportFetchError(errorMessage);
-          return false;
+        if (result.deferred) return deferAutomaticFetch();
+        if (result.refsChanged === false && statusResult.success) {
+          const { ahead, behind, hasUpstream } = parseBranchSyncFromPorcelainV2(String(statusResult.data || ''));
+          setRemoteSync((prev) => ({ ...prev, ahead, behind, hasUpstream }));
         }
-
-        for (const tagName of parseTagReferenceStatus(referenceStatus.data, fetchRemote).remoteOnlyTagNames) {
-          const adoptionResult = await gitClient.runGitCommandForRepo(repoAtStart, 'adoptRemoteTag', fetchRemote, tagName);
-          if (!isCurrent()) return false;
-          if (adoptionResult.success) continue;
-
-          const errorMessage = String(adoptionResult.error || t('generated.components.layout.hooks.userepositorydomain.could_not_update_remote_fbb52423'));
-          reportFetchError(errorMessage);
-          return false;
-        }
-
-        notifyRemoteSyncSuccess(repoAtStart, fetchRemote);
-        triggerRefresh();
+        notifyRemoteSyncSuccess(repoAtStart, fetchRemote, 'fetch', result.refsChanged);
+        if (result.refsChanged !== false) triggerRefresh();
         if (showToast) {
           setGitActionToast({ msg: t('generated.components.layout.hooks.userepositorydomain.remote_updated_d577a6b1'), isError: false });
         }

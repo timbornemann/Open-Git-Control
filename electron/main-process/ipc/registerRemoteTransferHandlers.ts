@@ -16,6 +16,7 @@ import { createJobId } from '../gitCommandPolicy';
 import { emitJobEvent } from './jobEvents';
 import type { SecretScanPushGuard } from './git/secretScanPushGuard';
 import { readStoreData } from '../repoStore';
+import { remoteSyncReferenceVersion } from '../../git/RemoteSyncReferences';
 
 type Dependencies = {
   gitService: GitService;
@@ -60,6 +61,9 @@ export function registerRemoteTransferHandlers({
   const service = new RemoteTransferService(gitService.runner, preferencesStore, createCredentialEnvironment, getCredentialGeneration);
   pushGuard.setPushScanResolver?.((repoPath, args, context) => service.getPushScanScope(repoPath, args, context));
   const running = new Map<string, Set<AbortController>>();
+  // Each window retains its own completed version through failed/deferred
+  // attempts. A retry must still publish previously interrupted changes.
+  const syncVersions = new Map<string, string>();
 
   ipcMain.handle(
     IpcChannel.RemoteTransferRequest,
@@ -70,12 +74,19 @@ export function registerRemoteTransferHandlers({
       let controller: AbortController | undefined;
       let key = '';
       let repoPath = '';
+      let completedSync: { key: string; version: string } | undefined;
       const jobId = createJobId(`remote-${operation}`);
       const jobOperation = `git:${operation}`;
       try {
         if (!operations.has(operation) || !input || typeof input !== 'object' || typeof input.repoPath !== 'string' || !input.repoPath.trim())
           throw new Error('Invalid remote transfer request.');
         if (operation === 'fetch' && 'background' in input && typeof input.background !== 'boolean') throw new Error('Invalid background fetch mode.');
+        if (operation === 'fetch') {
+          const fetch = input as RemoteTransferOperations['fetch']['input'];
+          if (['tagsOnly', 'includeTags'].some((key) => key in fetch && typeof fetch[key as 'tagsOnly' | 'includeTags'] !== 'boolean'))
+            throw new Error('Invalid fetch scope.');
+          if (fetch.tagsOnly && fetch.includeTags) throw new Error('Tag-only and combined fetch modes cannot be used together.');
+        }
         const readonly = operation === 'getRemotes' || operation === 'getPreferences' || operation === 'getPullConfiguration';
         try {
           repoPath = requireActiveRepositoryPath(input.repoPath, gitService.getRepoPath(), IpcChannel.RemoteTransferRequest);
@@ -150,12 +161,27 @@ export function registerRemoteTransferHandlers({
           case 'editRemote':
             data = await service.editRemote(repoPath, (input as RemoteTransferOperations['editRemote']['input']).mutation, context);
             break;
-          case 'fetch':
-            data = await service.fetch(repoPath, (input as RemoteTransferOperations['fetch']['input']).remote, context, {
-              tagsOnly: (input as RemoteTransferOperations['fetch']['input']).tagsOnly,
-              background: (input as RemoteTransferOperations['fetch']['input']).background,
+          case 'fetch': {
+            const fetch = input as RemoteTransferOperations['fetch']['input'];
+            const scope = key;
+            const before = fetch.includeTags ? await remoteSyncReferenceVersion(repoPath, gitService.runner, context.signal) : undefined;
+            if (before !== undefined && !syncVersions.has(scope)) {
+              syncVersions.set(scope, before);
+              if (syncVersions.size > 128) syncVersions.delete(syncVersions.keys().next().value!);
+            }
+            const fetched = await service.fetch(repoPath, fetch.remote, context, {
+              tagsOnly: fetch.tagsOnly,
+              includeTags: fetch.includeTags,
+              background: fetch.background,
             });
+            data = fetched;
+            if (before !== undefined) {
+              const version = await remoteSyncReferenceVersion(repoPath, gitService.runner, context.signal);
+              data = { ...fetched, refsChanged: before !== version || syncVersions.get(scope) !== version };
+              completedSync = { key: scope, version };
+            }
             break;
+          }
           case 'pull':
             data = await service.pull(repoPath, input as RemoteTransferOperations['pull']['input'], context);
             break;
@@ -178,6 +204,10 @@ export function registerRemoteTransferHandlers({
         }
         // A cancelled push still returns its endpoint outcomes: already-published refs cannot be rolled back.
         if (operation !== 'executePush' && operation !== 'retryPush') context.ensureActive();
+        if (completedSync) {
+          syncVersions.delete(completedSync.key);
+          syncVersions.set(completedSync.key, completedSync.version);
+        }
         if (transfers.has(operation)) {
           const state = (data as { state?: string })?.state;
           emitJobEvent(event.sender, {

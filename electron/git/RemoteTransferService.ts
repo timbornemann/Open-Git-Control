@@ -5,6 +5,7 @@ import { pullStrategyArguments, readGitPullConfiguration } from './GitPullConfig
 import { readRemoteSnapshot, assertPushSourceUnchanged, probePushUrlIsolation, remoteConfigurationFingerprint } from './remoteSnapshot';
 import { lfsEndpoint, lfsTransferEnvironment, uploadLfsObjects } from './GitLfsTransfers';
 import { gitPushProgress } from './GitLfsTransferProgress';
+import { fetchRemoteReferences, type FetchOptions } from './RemoteFetch';
 import type {
   GitRemoteSnapshotDto,
   GitPushBatchDto,
@@ -27,7 +28,6 @@ import {
   refName,
   remoteName,
   remoteUrl,
-  remoteFetchArguments,
 } from './remoteTransferValidation';
 import { batchState, parseAdvertisedRefs, pushResult, type PublishedRef } from './remotePushResults';
 import { repositoryPathKey } from '../main-process/activeRepositoryAuthorization';
@@ -43,8 +43,6 @@ import {
   type StoredBatch,
   type Runner,
 } from './remoteTransferModels';
-
-type FetchOptions = Pick<RemoteTransferOperations['fetch']['input'], 'tagsOnly' | 'background'>;
 
 /** Named Git remotes retain hooks and transport configuration; accounts bind to individual URLs. */
 export class RemoteTransferService {
@@ -170,14 +168,9 @@ export class RemoteTransferService {
   async fetch(repoPath: string, name: string, context: RemoteTransferContext, options: FetchOptions = {}): Promise<{ output: string }> {
     const remote = await this.selectedRemote(repoPath, name);
     const url = remoteUrl(remote.fetchUrls[0]);
-    const output = await this.withCredentials(repoPath, name, url, context, {}, (envOverrides, signal) =>
-      this.git.streamOutput(repoPath, remoteFetchArguments(name, options.tagsOnly === true), context.onProgress ?? (() => {}), signal, {
-        envOverrides,
-        ...(options.background === true ? { backgroundFetch: true } : {}),
-      }),
+    return fetchRemoteReferences(repoPath, name, context, options, this.git, (environment, work) =>
+      this.withCredentials(repoPath, name, url, context, environment, work),
     );
-    context.ensureActive();
-    return { output: redactGitSensitiveText(output) };
   }
 
   /** Recheck the failed endpoint without fetching objects, altering refs or publishing. */
