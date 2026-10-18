@@ -39,17 +39,17 @@ Immer aktuelle Release-Seite:
 
 [github.com/timbornemann/Open-Git-Control/releases/latest](https://github.com/timbornemann/Open-Git-Control/releases/latest)
 
-Aktuell neuestes Release: [v3.0.4](https://github.com/timbornemann/Open-Git-Control/releases/tag/v3.0.4), veroeffentlicht am 2026-10-15.
+Aktuell neuestes Release: [v3.0.5](https://github.com/timbornemann/Open-Git-Control/releases/tag/v3.0.5), veroeffentlicht am 2026-10-18.
 
 Badge und Latest-Release-Seite bleiben automatisch aktuell. Die direkten Binary-Links unten sind durch die GitHub-Asset-Namen versioniert und werden vom Release-Workflow nach einem neuen stabilen Release aktualisiert.
 
 | Plattform   | Paket                 | Direkter GitHub-Download                                                                                                                                               |
 | ----------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Windows x64 | NSIS Installer `.exe` | [Open-Git-Control-3.0.4-win-x64.exe](https://github.com/timbornemann/Open-Git-Control/releases/download/v3.0.4/Open-Git-Control-3.0.4-win-x64.exe)                     |
-| Linux x64   | AppImage              | [Open-Git-Control-3.0.4-linux-x86_64.AppImage](https://github.com/timbornemann/Open-Git-Control/releases/download/v3.0.4/Open-Git-Control-3.0.4-linux-x86_64.AppImage) |
-| Linux amd64 | Debian-Paket `.deb`   | [Open-Git-Control-3.0.4-linux-amd64.deb](https://github.com/timbornemann/Open-Git-Control/releases/download/v3.0.4/Open-Git-Control-3.0.4-linux-amd64.deb)             |
-| macOS x64   | Disk Image `.dmg`     | [Open-Git-Control-3.0.4-mac-x64.dmg](https://github.com/timbornemann/Open-Git-Control/releases/download/v3.0.4/Open-Git-Control-3.0.4-mac-x64.dmg)                     |
-| macOS x64   | Zip-Archiv            | [Open-Git-Control-3.0.4-mac-x64.zip](https://github.com/timbornemann/Open-Git-Control/releases/download/v3.0.4/Open-Git-Control-3.0.4-mac-x64.zip)                     |
+| Windows x64 | NSIS Installer `.exe` | [Open-Git-Control-3.0.5-win-x64.exe](https://github.com/timbornemann/Open-Git-Control/releases/download/v3.0.5/Open-Git-Control-3.0.5-win-x64.exe)                     |
+| Linux x64   | AppImage              | [Open-Git-Control-3.0.5-linux-x86_64.AppImage](https://github.com/timbornemann/Open-Git-Control/releases/download/v3.0.5/Open-Git-Control-3.0.5-linux-x86_64.AppImage) |
+| Linux amd64 | Debian-Paket `.deb`   | [Open-Git-Control-3.0.5-linux-amd64.deb](https://github.com/timbornemann/Open-Git-Control/releases/download/v3.0.5/Open-Git-Control-3.0.5-linux-amd64.deb)             |
+| macOS x64   | Disk Image `.dmg`     | [Open-Git-Control-3.0.5-mac-x64.dmg](https://github.com/timbornemann/Open-Git-Control/releases/download/v3.0.5/Open-Git-Control-3.0.5-mac-x64.dmg)                     |
+| macOS x64   | Zip-Archiv            | [Open-Git-Control-3.0.5-mac-x64.zip](https://github.com/timbornemann/Open-Git-Control/releases/download/v3.0.5/Open-Git-Control-3.0.5-mac-x64.zip)                     |
 
 Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadaten fuer den Auto-Updater. Normale Nutzer sollten einen der Installer oben herunterladen.
 
