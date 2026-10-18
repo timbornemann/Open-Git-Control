@@ -6,6 +6,7 @@ import type { HostedRepository, HostingConnection } from '@/types/hostingDtos';
 import type { RemotePreferences } from '@/types/remoteTransfers';
 import { HostingSidebar } from './HostingSidebar';
 import { useHostingState } from './hostingState';
+import { notifyRemoteSyncSuccess } from '@/data/remoteSyncEvents';
 
 const mocks = vi.hoisted(() => ({
   request: vi.fn<(operation: string, input?: unknown) => Promise<unknown>>(),
@@ -131,6 +132,49 @@ describe('hosting sidebar navigation', () => {
     expect(mocks.openRemotes).toHaveBeenCalledOnce();
     expect(mocks.setTab).not.toHaveBeenCalled();
     expectNoTransfers();
+  });
+
+  it('recovers a failed hosting target after a successful sync, and keeps a healthy target mounted on later syncs', async () => {
+    const normalRequest = mocks.transfer.getMockImplementation()!;
+    mocks.transfer.mockImplementation(async (operation, input) => {
+      if (operation === 'getRemotes') throw new Error('value.split is not a function');
+      return normalRequest(operation, input);
+    });
+    await render();
+    expect(host.textContent).toContain('value.split is not a function');
+    mocks.transfer.mockImplementation(normalRequest);
+    const count = () => mocks.transfer.mock.calls.filter(([operation]) => operation === 'getRemotes').length;
+    const before = count();
+    await act(async () => notifyRemoteSyncSuccess('C:/Code/other', 'origin'));
+    expect(count()).toBe(before);
+    await act(async () => notifyRemoteSyncSuccess('C:/Code/project', 'origin'));
+    expect(host.textContent).not.toContain('value.split is not a function');
+    expect(host.textContent).toContain('team/project');
+    expect(count()).toBe(before + 1);
+    const target = host.querySelector('.hosting-sidebar__target');
+    expect(target).not.toBeNull();
+    await act(async () => notifyRemoteSyncSuccess('C:/Code/project', 'origin'));
+    expect(count()).toBe(before + 1);
+    expect(host.querySelector('.hosting-sidebar__target')).toBe(target);
+  });
+
+  it('ignores a stale startup failure that arrives after the hosting target recovers from a sync', async () => {
+    const normalRequest = mocks.transfer.getMockImplementation()!;
+    let rejectOld!: (reason: Error) => void;
+    const pending = new Promise<never>((_resolve, reject) => {
+      rejectOld = reject;
+    });
+    mocks.transfer.mockImplementation(async (operation, input) => (operation === 'getRemotes' ? pending : normalRequest(operation, input)));
+    await render();
+    expect(host.textContent).toContain('Loading hosting target');
+    mocks.transfer.mockImplementation(normalRequest);
+    await act(async () => notifyRemoteSyncSuccess('C:/Code/project', 'origin'));
+    expect(host.textContent).toContain('team/project');
+    await act(async () => {
+      rejectOld(new Error('value.split is not a function'));
+    });
+    expect(host.textContent).not.toContain('value.split is not a function');
+    expect(host.textContent).toContain('team/project');
   });
 
   it('keeps complete target identities across providers, servers and accounts with the same repository ID and namespace', async () => {

@@ -10,6 +10,7 @@ import { gitClient } from '@/services/gitClient';
 import { transferClient } from '@/services/hostingClient';
 import { getBackgroundFetchRemote } from '@/utils/remoteTransferSelection';
 import { useRemoteTransferState } from '@/components/hosting/remoteTransferState';
+import { notifyRemoteSyncSuccess, subscribeRemoteSyncSuccess } from '@/data/remoteSyncEvents';
 import type { RemoteStatusInfo } from '@/components/layout/layoutTypes';
 import type { GitActionToast, RepositoryRemote } from './repositoryDomainTypes';
 
@@ -53,6 +54,7 @@ export const useRepositoryRemoteSync = ({
   const [lastFetchedRemote, setLastFetchedRemote] = useState<string | null>(null);
   const isRemoteFetchRunningRef = useRef(false);
   const remoteFetchRunIdRef = useRef(0);
+  const completedSyncVersionRef = useRef(0);
   const activeRepoRef = useRef<string | null>(activeRepo);
   const { t, tr } = useLanguageTranslations(language);
 
@@ -91,9 +93,20 @@ export const useRepositoryRemoteSync = ({
   useLayoutEffect(() => {
     activeRepoRef.current = activeRepo;
     remoteFetchRunIdRef.current += 1;
+    completedSyncVersionRef.current += 1;
     isRemoteFetchRunningRef.current = false;
     setRemoteSync({ ...EMPTY_REMOTE_SYNC_STATE });
     setLastFetchedRemote(null);
+  }, [activeRepo]);
+
+  useEffect(() => {
+    if (!activeRepo) return;
+    return subscribeRemoteSyncSuccess(activeRepo, ({ remote, fetchedAt }) => {
+      if (activeRepoRef.current !== activeRepo) return;
+      completedSyncVersionRef.current += 1;
+      setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchedAt: fetchedAt, lastFetchError: null }));
+      setLastFetchedRemote(remote);
+    });
   }, [activeRepo]);
 
   const formatLastFetchedAt = useCallback(
@@ -115,6 +128,7 @@ export const useRepositoryRemoteSync = ({
 
   useEffect(() => {
     let cancelled = false;
+    const syncVersion = completedSyncVersionRef.current;
     const fetchRemoteTracking = async () => {
       if (!activeRepo || !gitClient.isAvailable()) {
         setRemoteSync((prev) => ({ ...prev, ahead: 0, behind: 0, hasUpstream: false }));
@@ -123,7 +137,7 @@ export const useRepositoryRemoteSync = ({
 
       try {
         const { success, data } = await gitClient.runGitCommandForRepo(activeRepo, 'status', '--porcelain=v2', '--branch');
-        if (cancelled) return;
+        if (cancelled || completedSyncVersionRef.current !== syncVersion) return;
         if (!success || !data) return;
 
         const parsed = parseBranchSyncFromPorcelainV2(String(data));
@@ -154,6 +168,8 @@ export const useRepositoryRemoteSync = ({
       const repoAtStart = activeRepo;
       const fetchRunId = remoteFetchRunIdRef.current + 1;
       remoteFetchRunIdRef.current = fetchRunId;
+      const syncVersion = completedSyncVersionRef.current;
+      const isCurrent = () => activeRepoRef.current === repoAtStart && completedSyncVersionRef.current === syncVersion;
 
       const fetchLabel = t('generated.components.layout.hooks.userepositorydomain.running_fetch_2dde9664');
       isRemoteFetchRunningRef.current = true;
@@ -181,9 +197,9 @@ export const useRepositoryRemoteSync = ({
           gitClient.runGitCommandForRepo(repoAtStart, 'status', '--porcelain=v2', '--branch'),
           transferClient.request('getPreferences', { repoPath: repoAtStart }),
         ]);
-        if (activeRepoRef.current !== repoAtStart) return false;
+        if (!isCurrent()) return false;
         const fetchRemote = await resolveConfiguredFetchRemote(repoAtStart, statusResult.success ? String(statusResult.data || '') : '', preferences);
-        if (activeRepoRef.current !== repoAtStart) return false;
+        if (!isCurrent()) return false;
         if (!fetchRemote) {
           // No unambiguous remote to fetch from (e.g. several remotes and no
           // tracking branch); leave the last known state untouched.
@@ -209,13 +225,13 @@ export const useRepositoryRemoteSync = ({
         // would make a normal background refresh fail if a same-named local
         // tag points to another commit.
         await transferClient.request('fetch', { repoPath: repoAtStart, remote: fetchRemote });
-        if (activeRepoRef.current !== repoAtStart) return false;
+        if (!isCurrent()) return false;
 
         // Maintain remote release state independently from local tags.
         // `--prune` removes tags deleted on the remote from this tracking
         // namespace on the next sync, without moving local tags.
         await transferClient.request('fetch', { repoPath: repoAtStart, remote: fetchRemote, tagsOnly: true });
-        if (activeRepoRef.current !== repoAtStart) return false;
+        if (!isCurrent()) return false;
 
         // Adopt remote tags that do not exist locally yet. Existing local tags
         // are deliberately left untouched; a mismatching name is exposed as a
@@ -227,7 +243,7 @@ export const useRepositoryRemoteSync = ({
           'refs/tags',
           remoteTagTrackingRefPrefix(fetchRemote),
         );
-        if (activeRepoRef.current !== repoAtStart) return false;
+        if (!isCurrent()) return false;
         if (!referenceStatus.success) {
           const errorMessage = String(referenceStatus.error || t('generated.components.layout.hooks.userepositorydomain.could_not_update_remote_fbb52423'));
           setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchError: errorMessage }));
@@ -239,7 +255,7 @@ export const useRepositoryRemoteSync = ({
 
         for (const tagName of parseTagReferenceStatus(referenceStatus.data, fetchRemote).remoteOnlyTagNames) {
           const adoptionResult = await gitClient.runGitCommandForRepo(repoAtStart, 'adoptRemoteTag', fetchRemote, tagName);
-          if (activeRepoRef.current !== repoAtStart) return false;
+          if (!isCurrent()) return false;
           if (adoptionResult.success) continue;
 
           const errorMessage = String(adoptionResult.error || t('generated.components.layout.hooks.userepositorydomain.could_not_update_remote_fbb52423'));
@@ -250,15 +266,14 @@ export const useRepositoryRemoteSync = ({
           return false;
         }
 
-        setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchedAt: Date.now(), lastFetchError: null }));
-        setLastFetchedRemote(fetchRemote);
+        notifyRemoteSyncSuccess(repoAtStart, fetchRemote);
         triggerRefresh();
         if (showToast) {
           setGitActionToast({ msg: t('generated.components.layout.hooks.userepositorydomain.remote_updated_d577a6b1'), isError: false });
         }
         return true;
       } catch (error: any) {
-        if (activeRepoRef.current !== repoAtStart) return false;
+        if (!isCurrent()) return false;
         const errorMessage = error?.message || t('generated.components.layout.hooks.userepositorydomain.could_not_update_remote_fbb52423');
         setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchError: errorMessage }));
         if (showToast) {

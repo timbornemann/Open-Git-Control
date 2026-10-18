@@ -6,6 +6,7 @@ import type { RemoteSelectionMode, RemoteTransferAction } from '@/types/remoteTr
 import type { RemoteTransferDialog } from './remoteTransferDialogState';
 import { initialRemoteTransferState, useRemoteTransferState, type RemoteTransferSelection, type RemoteTransferState } from './remoteTransferState';
 import { syncRemoteTags } from './syncRemoteTags';
+import { notifyRemoteSyncSuccess } from '@/data/remoteSyncEvents';
 
 export interface RemoteTransferContext {
   repoPath: string | null;
@@ -344,7 +345,9 @@ export class RemoteTransferCoordinator {
     });
   }
   private finish(message: string) {
+    const { intent, selection } = this.state;
     this.set({ phase: 'idle', busy: false, cancelling: false, failedPull: null, error: '' });
+    if (intent && (intent.mode === 'fetch' || intent.mode === 'pull')) notifyRemoteSyncSuccess(intent.repoPath, selection.selectedRemoteNames[0], intent.mode);
     this.environment.refresh();
     this.environment.toast(message, false);
   }

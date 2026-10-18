@@ -116,11 +116,11 @@ describe('Git LFS transfers with real Git and independent local LFS stores', () 
     });
     const plan = await f.service.planPush(f.repo, { repoPath: f.repo, remoteNames: ['origin', 'backup'] }, f.context);
     const first = await f.service.executePush(f.repo, plan.id, f.context);
-    expect(first.state).toBe('partial');
+    expect(first.state, JSON.stringify(first.targets)).toBe('partial');
     expect(first.targets.map((target) => target.status)).toEqual(['success', 'failed']);
     expect(await f.git(f.b, 'for-each-ref', '--format=%(refname)')).toBe('');
     const retry = await f.service.retryPush(f.repo, first.id, undefined, f.context);
-    expect(retry.state).toBe('success');
+    expect(retry.state, JSON.stringify(retry.targets)).toBe('success');
     expect(uploads).toEqual(['origin', 'backup', 'backup']);
   });
 

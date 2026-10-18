@@ -8,6 +8,7 @@ import { GitSpawnOperations } from './GitSpawnOperations';
 import type { CommitEditGit } from './CommitEditGit';
 import { runCommitEditProcess } from './CommitEditProcess';
 import { runGitChunkStream } from './GitChunkStream';
+import { gitPollingKey } from './GitPollingKey';
 const commandToken = (value: string | undefined): string =>
   String(value || '')
     .trim()
@@ -192,16 +193,17 @@ export class GitRunner {
       (activeSignal) => this.processExecutor.run(repoPath, args, { ...execOptions, signal: activeSignal }),
       {
         signal: options.signal,
-        coalesceKey: kind === 'polling' ? (options.coalesceKey ?? args.join('\0')) : undefined,
+        coalesceKey: kind === 'polling' ? gitPollingKey('text', args, options) : undefined,
       },
     );
   }
 
   async runResult(repoPath: string, args: string[], options: GitRunOptions = {}): Promise<GitProcessResult> {
     this.assertRepoPathAvailable(repoPath);
+    const kind = this.classifyCommand(args, options.requestedKind);
     return this.schedule(
       repoPath,
-      this.classifyCommand(args, options.requestedKind),
+      kind,
       args[0] || 'git',
       (signal) =>
         options.onOutput
@@ -212,7 +214,7 @@ export class GitRunner {
               env: { ...process.env, ...options.envOverrides },
               signal,
             }),
-      { signal: options.signal },
+      { signal: options.signal, coalesceKey: kind === 'polling' ? gitPollingKey('result', args, options) : undefined },
     );
   }
 

@@ -7,6 +7,7 @@ import { gitClient } from '@/services/gitClient';
 import { transferClient } from '@/services/hostingClient';
 import type { GitRemoteSnapshotDto } from '@/types/remoteTransfers';
 import { rememberRemoteTransferSelection } from '@/utils/remoteTransferSelection';
+import { notifyRemoteSyncSuccess } from '@/data/remoteSyncEvents';
 
 const privateSnapshot = (repoPath: string, otherRemote: string): GitRemoteSnapshotDto => ({
   repoPath,
@@ -58,6 +59,81 @@ afterEach(() => {
 });
 
 describe('useRepositoryRemoteSync', () => {
+  it('clears a startup failure immediately after a manual sync of this repository, without fetching again', async () => {
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({
+      success: true,
+      data: '# branch.head main\n# branch.upstream origin/main\n# branch.ab +0 -0\n',
+    });
+    vi.mocked(transferClient.request).mockImplementation(async (operation) => {
+      if (operation === 'getPreferences') return {};
+      throw new Error('value.split is not a function');
+    });
+    const input = {
+      activeRepo: 'C:/repos/demo',
+      refreshTrigger: 0,
+      triggerRefresh: vi.fn(),
+      autoFetchIntervalMs: 60_000,
+      language: 'en' as const,
+      hasAnyRemote: true,
+      remotes: [{ name: 'origin', url: 'https://github.com/acme/demo.git' }],
+      setGitActionToast: vi.fn(),
+      setActiveGitActionLabel: vi.fn(),
+      isGitActionRunningRef: { current: false },
+    };
+    const hook = renderHook(() => useRepositoryRemoteSync(input));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(hook.current.remoteStatus.title).toBe('Remote check failed');
+    const calls = vi.mocked(transferClient.request).mock.calls.length;
+    await act(async () => notifyRemoteSyncSuccess('C:/repos/other', 'origin'));
+    expect(hook.current.remoteSync.lastFetchError).toBe('value.split is not a function');
+    await act(async () => notifyRemoteSyncSuccess('C:\\repos\\demo\\', 'origin'));
+    expect(hook.current.remoteSync.lastFetchError).toBeNull();
+    expect(hook.current.remoteSync.lastFetchedAt).toEqual(expect.any(Number));
+    expect(hook.current.lastFetchedRemote).toBe('origin');
+    expect(hook.current.remoteStatus.title).toBe('Remote is up to date');
+    expect(transferClient.request).toHaveBeenCalledTimes(calls);
+    hook.unmount();
+  });
+
+  it('ignores an older background failure that arrives after a successful manual sync', async () => {
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: '# branch.head main\n# branch.upstream origin/main\n' });
+    let failFetch!: (error: Error) => void;
+    const pending = new Promise<never>((_resolve, reject) => {
+      failFetch = reject;
+    });
+    vi.mocked(transferClient.request).mockImplementation(async (operation) => (operation === 'getPreferences' ? {} : pending));
+    const input = {
+      activeRepo: 'C:/repos/demo',
+      refreshTrigger: 0,
+      triggerRefresh: vi.fn(),
+      autoFetchIntervalMs: 60_000,
+      language: 'en' as const,
+      hasAnyRemote: true,
+      remotes: [{ name: 'origin', url: 'https://github.com/acme/demo.git' }],
+      setGitActionToast: vi.fn(),
+      setActiveGitActionLabel: vi.fn(),
+      isGitActionRunningRef: { current: false },
+    };
+    const hook = renderHook(() => useRepositoryRemoteSync(input));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(hook.current.remoteSync.isFetching).toBe(true);
+    await act(async () => notifyRemoteSyncSuccess('C:/repos/demo', 'origin'));
+    const fetchedAt = hook.current.remoteSync.lastFetchedAt;
+    await act(async () => {
+      failFetch(new Error('Old remote check failed'));
+    });
+    expect(hook.current.remoteSync.lastFetchError).toBeNull();
+    expect(hook.current.remoteSync.lastFetchedAt).toBe(fetchedAt);
+    expect(hook.current.remoteSync.isFetching).toBe(false);
+    hook.unmount();
+  });
+
   it('fetches only the resolved remote and never removes it after an ambiguous 404 response', async () => {
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
     const runGitCommandForRepo = vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: '# branch.head main\n' });

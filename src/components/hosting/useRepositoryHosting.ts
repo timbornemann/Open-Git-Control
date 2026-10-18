@@ -2,17 +2,25 @@ import { useEffect, useState } from 'react';
 import { hostingClient, transferClient } from '@/services/hostingClient';
 import type { HostedRepository, RepositoryEndpoint } from '@/types/hostingDtos';
 import { useHostingState } from './hostingState';
+import { subscribeRemoteSyncSuccess } from '@/data/remoteSyncEvents';
 
 /** Remote identity is adapter-owned; ambiguous accounts require an explicit selection. */
 export function useRepositoryHosting(repoPath: string | null) {
   const { connections, revision } = useHostingState();
-  const scope = JSON.stringify([repoPath, connections, revision]);
+  const [recoveryVersion, setRecoveryVersion] = useState(0);
+  const scope = JSON.stringify([repoPath, connections, revision, recoveryVersion]);
   const [resolvedScope, setResolvedScope] = useState('');
   const [endpoints, setEndpoints] = useState<RepositoryEndpoint[]>([]);
   const [repository, setRepository] = useState<HostedRepository | null>(null);
   const [remoteName, setRemoteName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    // A newer sync supersedes an in-flight or failed lookup. Healthy targets
+    // stay mounted without repeating hosting requests on every background fetch.
+    if (!repoPath || (!error && !loading && resolvedScope === scope)) return;
+    return subscribeRemoteSyncSuccess(repoPath, () => setRecoveryVersion((version) => version + 1));
+  }, [repoPath, error, loading, resolvedScope, scope]);
   useEffect(() => {
     let active = true;
     setRepository(null);
