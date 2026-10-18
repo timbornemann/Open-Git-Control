@@ -107,7 +107,6 @@ describe('staging completion through the live resource cache and Git', () => {
     );
     const service = new RepositoryFileViewerService(runner, files);
     // Keep the production cached client intact; stub only the IPC boundary.
-    vi.mocked(gitClient.getDiffPreview).mockRestore();
     vi.mocked(gitClient.applyPatch).mockRestore();
     vi.mocked(gitClient.getRepositoryFilePreview).mockRestore();
     const api: Pick<ElectronGitAPI, 'getDiffPreview' | 'applyPatch' | 'getRepositoryFilePreview'> = {

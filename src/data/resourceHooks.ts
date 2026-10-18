@@ -4,11 +4,15 @@ import { queryClient } from './queryClient';
 import { useCallback, useRef, type SetStateAction } from 'react';
 import type { IpcResult } from '@/types/ipc';
 import { resourceKey } from './clientCache';
+import { isImmutableGitRead } from './mutationEffects';
 
 /** Observe without installing a second refresh loop. The owning adapter or
  * existing domain lifecycle is responsible for scheduling the read. */
 export function useCachedResult<T>(key: ResourceKey, subscribed = true) {
-  return useQuery<T>({ queryKey: key, queryFn: skipToken, enabled: false, subscribed }, queryClient);
+  // Observers update the shared query options, including metadata. Preserve
+  // immutable identities instead of clearing the adapter's invalidation guard.
+  const immutable = key[1] === 'git' && isImmutableGitRead(key[3], key.slice(4));
+  return useQuery<T>({ queryKey: key, queryFn: skipToken, enabled: false, subscribed, meta: { immutable } }, queryClient);
 }
 
 /** Drop-in data state for existing workflows; selection/edit buffers stay in

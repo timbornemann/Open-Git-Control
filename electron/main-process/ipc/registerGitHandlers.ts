@@ -8,7 +8,7 @@ import type { AppSettings } from '../../settings';
 import { redactGitSensitiveText } from '../../git/GitErrorFormatter';
 import { IpcChannel } from '../../../src/types/ipcContract';
 import { createJobId } from '../gitCommandPolicy';
-import { normalizeDiffPreviewArgs } from '../diffPreviewPolicy';
+import { registerGitDiffPreviewHandler } from './git/registerGitDiffPreviewHandler';
 import { repoJobRegistry as defaultRepoJobRegistry } from '../repoJobRegistry';
 import type { RepoJobRegistry } from '../repoJobRegistry';
 import { handleGitCommand } from './gitCommandRouter';
@@ -244,23 +244,7 @@ export function registerGitHandlers({
     }
   });
 
-  ipcMain.handle(
-    IpcChannel.GitDiffPreview,
-    async (_event: any, args: unknown, limits: { maxBytes?: unknown; maxLines?: unknown } = {}, requestedRepoPath?: unknown) => {
-      try {
-        commitStatsService.interruptBackgroundWork();
-        const normalizedArgs = normalizeDiffPreviewArgs(args);
-        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitDiffPreview);
-        const data = await gitService.runner.getDiffPreview(repoPath, normalizedArgs, {
-          maxBytes: Number(limits.maxBytes) || undefined,
-          maxLines: Number(limits.maxLines) || undefined,
-        });
-        return { success: true, data };
-      } catch (error: any) {
-        return { success: false, error: error.message };
-      }
-    },
-  );
+  registerGitDiffPreviewHandler({ gitService, commitStatsService });
 
   ipcMain.handle(IpcChannel.GitCommand, async (event: any, commandName: unknown, ...rawArgs: unknown[]) => {
     let repoPath: string;

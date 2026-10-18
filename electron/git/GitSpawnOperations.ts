@@ -124,21 +124,29 @@ export class GitSpawnOperations {
 
   getDiffPreview(repoPath: string, args: string[], maxBytes: number, maxLines: number, signal: AbortSignal): Promise<DiffPreviewResult> {
     return new Promise<DiffPreviewResult>((resolve, reject) => {
-      const proc = spawn(toolExecutable('git'), args, { cwd: repoPath, windowsHide: true, env: toolEnvironment(), stdio: ['ignore', 'pipe', 'pipe'] });
+      signal.throwIfAborted();
+      const proc = spawn(toolExecutable('git'), args, {
+        cwd: repoPath,
+        windowsHide: true,
+        env: toolEnvironment(),
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: process.platform !== 'win32',
+      });
       const chunks: Buffer[] = [];
       let capturedBytes = 0;
       let lineCount = 0;
       let truncated = false;
       let stderr = '';
-      const abort = () => proc.kill();
+      const { stop: abort, waitForStop } = gitProcessTree(proc);
       signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) abort();
 
       proc.stdout.on('data', (chunk: Buffer) => {
-        if (truncated) return;
+        if (truncated || signal.aborted) return;
         const remainingBytes = maxBytes - capturedBytes;
         if (remainingBytes <= 0) {
           truncated = true;
-          proc.kill();
+          abort();
           return;
         }
         const accepted = chunk.length > remainingBytes ? chunk.subarray(0, remainingBytes) : chunk;
@@ -147,34 +155,39 @@ export class GitSpawnOperations {
         lineCount += accepted.toString('utf8').split('\n').length - 1;
         if (accepted.length < chunk.length || lineCount >= maxLines) {
           truncated = true;
-          proc.kill();
+          abort();
         }
       });
       proc.stderr.on('data', (chunk: Buffer) => {
-        stderr += chunk.toString();
+        stderr = (stderr + chunk.toString()).slice(-64 * 1024);
       });
-      proc.on('error', reject);
-      proc.on('close', (code, closeSignal) => {
+      proc.once('error', (error) => {
         signal.removeEventListener('abort', abort);
-        if (closeSignal && !truncated) {
-          reject(createAbortError('Git diff preview was aborted.'));
-          return;
-        }
-        // --no-index uses exit code 1 for a successful diff with changes.
-        const hasNoIndexChanges = code === 1 && args[0] === 'diff' && args.includes('--no-index');
-        if (code !== 0 && !hasNoIndexChanges && !truncated && closeSignal == null) {
-          reject(new Error(redactGitSensitiveText((stderr || `git ${args.join(' ')} exited with code ${code}`).trim())));
-          return;
-        }
-        let text = Buffer.concat(chunks).toString('utf8');
-        if (lineCount >= maxLines) {
-          text = text.split('\n').slice(0, maxLines).join('\n');
-        }
-        resolve({
-          text,
-          truncated,
-          bytes: Buffer.byteLength(text),
-          lines: text ? text.split('\n').length : 0,
+        reject(error);
+      });
+      proc.once('close', (code, closeSignal) => {
+        signal.removeEventListener('abort', abort);
+        void waitForStop().then(() => {
+          if (signal.aborted || (closeSignal && !truncated)) {
+            reject(createAbortError('Git diff preview was aborted.'));
+            return;
+          }
+          // --no-index uses exit code 1 for a successful diff with changes.
+          const hasNoIndexChanges = code === 1 && args[0] === 'diff' && args.includes('--no-index');
+          if (code !== 0 && !hasNoIndexChanges && !truncated && closeSignal == null) {
+            reject(new Error(redactGitSensitiveText((stderr || `git ${args.join(' ')} exited with code ${code}`).trim())));
+            return;
+          }
+          let text = Buffer.concat(chunks).toString('utf8');
+          if (lineCount >= maxLines) {
+            text = text.split('\n').slice(0, maxLines).join('\n');
+          }
+          resolve({
+            text,
+            truncated,
+            bytes: Buffer.byteLength(text),
+            lines: text ? text.split('\n').length : 0,
+          });
         });
       });
     });

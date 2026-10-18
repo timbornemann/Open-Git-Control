@@ -2,7 +2,19 @@
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gitClient } from '@/services/gitClient';
-import { button, click, deferred, dialogs, edit, editor, initializeViewerMocks, renderViewer, resetViewerMocks, viewerRequest } from './fileViewerHarness';
+import {
+  getDiffPreview,
+  button,
+  click,
+  deferred,
+  dialogs,
+  edit,
+  editor,
+  initializeViewerMocks,
+  renderViewer,
+  resetViewerMocks,
+  viewerRequest,
+} from './fileViewerHarness';
 import { fileViewerIdentity } from '../fileViewerRequest';
 
 beforeEach(initializeViewerMocks);
@@ -16,7 +28,7 @@ describe('file viewer draft protection', () => {
     expect(dialog.secondaryActionLabel).toBe('Save and open Diff');
     expect(dialog.confirmLabel).toBe('Discard draft and open Diff');
     expect(document.querySelector('[role=tab][aria-selected=true]')?.textContent).toBe('Text');
-    expect(gitClient.getDiffPreview).not.toHaveBeenCalled();
+    expect(getDiffPreview).not.toHaveBeenCalled();
     await act(async () => {
       if (action === 'save') await dialog.onSecondaryAction();
       else if (action === 'discard') dialog.onConfirm();
@@ -35,7 +47,7 @@ describe('file viewer draft protection', () => {
     await act(async () => dialogs.confirm.mock.calls.at(-1)?.[0].onSecondaryAction());
     expect(document.querySelector('[role=tab][aria-selected=true]')?.textContent).toBe('Text');
     expect(editor.value).toBe('draft');
-    expect(gitClient.getDiffPreview).not.toHaveBeenCalled();
+    expect(getDiffPreview).not.toHaveBeenCalled();
     view.unmount();
   });
   it('keeps edits typed during save-and-Diff in the editor instead of leaving them behind', async () => {
@@ -56,7 +68,7 @@ describe('file viewer draft protection', () => {
     expect(document.querySelector('[role=tab][aria-selected=true]')?.textContent).toBe('Text');
     expect(editor.value).toBe('draft typed during saving');
     expect(button('Save working file').disabled).toBe(false);
-    expect(gitClient.getDiffPreview).not.toHaveBeenCalled();
+    expect(getDiffPreview).not.toHaveBeenCalled();
     view.unmount();
   });
   it('keeps one draft while moving between Text, Table and Preview', async () => {

@@ -67,6 +67,7 @@ export function resourceKey(domain: ResourceDomain, method: string, input: reado
   }
   if (method === 'listWorkingDirectory' && !args[1]) args = [scope, ''];
   if (method === 'getCommitLogPage') args[0] = { limit: 100, offset: 0, scope: 'head', ...(args[0] as object) };
+  if (method === 'getDiffPreview') args = args.slice(0, 3);
   if (method === 'getWorkflowRunsPage') args[0] = { page: 1, perPage: 30, ...(args[0] as object) };
   return ['resource', domain, scope, method, ...args];
 }
@@ -163,6 +164,7 @@ export function cachedClient<T extends object>(domain: ResourceDomain, client: T
         const key = resourceKey(domain, property, args);
         const requestedPriority = priority;
         const force = requireFreshRead;
+        const immutable = domain === 'git' && isImmutableGitRead(property, args);
         if (force) void queryClient.cancelQueries({ queryKey: key, exact: true });
         const branchPages = domain === 'github' && property === 'getBranches' && supportsBranchPages();
         return readResource(
@@ -174,14 +176,13 @@ export function cachedClient<T extends object>(domain: ResourceDomain, client: T
                 ? cancellableRead(signal, requestedPriority, (request) =>
                     original.apply(client, request ? [{ ...(args[0] as object), readRequest: request }] : args),
                   )
-                : original.apply(client, args),
+                : property === 'getDiffPreview'
+                  ? cancellableRead(signal, requestedPriority, (request) => original.apply(client, request ? [args[0], args[1], args[2], request] : args))
+                  : original.apply(client, args),
           {
-            staleTime:
-              domain === 'git' && isImmutableGitRead(property, args) && !localLfsSnapshot(key, queryClient.getQueryData(key))
-                ? Infinity
-                : (policy?.staleTime ?? 15_000),
+            staleTime: immutable && !localLfsSnapshot(key, queryClient.getQueryData(key)) ? Infinity : (policy?.staleTime ?? 15_000),
             priority,
-            force,
+            force: force || (policy?.refreshOnRead && !immutable),
             scheduled: !branchPages,
           },
         );

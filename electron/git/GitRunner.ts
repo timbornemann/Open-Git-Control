@@ -291,37 +291,52 @@ export class GitRunner {
     );
   }
 
-  async getDiffPreview(repoPath: string, args: string[], limits: { maxBytes?: number; maxLines?: number } = {}): Promise<DiffPreviewResult> {
+  async getDiffPreview(
+    repoPath: string,
+    args: string[],
+    limits: { maxBytes?: number; maxLines?: number } = {},
+    signal?: AbortSignal,
+  ): Promise<DiffPreviewResult> {
     this.assertRepoPathAvailable(repoPath);
     const maxBytes = Math.max(64 * 1024, Math.min(limits.maxBytes || 2 * 1024 * 1024, 8 * 1024 * 1024));
     const maxLines = Math.max(100, Math.min(limits.maxLines || 5000, 20_000));
 
-    return this.schedule(repoPath, 'interactive', args[0] || 'diff', async (signal) => {
-      const preview = await this.spawnOperations.getDiffPreview(repoPath, args, maxBytes, maxLines, signal);
-      if (preview.text || args.length !== 3 || args[0] !== 'diff' || args[1] !== '--') return preview;
+    return this.schedule(
+      repoPath,
+      'interactive',
+      args[0] || 'diff',
+      async (activeSignal) => {
+        const preview = await this.spawnOperations.getDiffPreview(repoPath, args, maxBytes, maxLines, activeSignal);
+        if (preview.text || args.length !== 3 || args[0] !== 'diff' || args[1] !== '--') return preview;
 
-      // An ordinary working-tree diff omits untracked files. Preview those
-      // against the empty file without creating or changing the Git index.
-      const requestedPath = args[2].startsWith(':(literal)') ? args[2].slice(10) : args[2];
-      const filePath = path.posix.normalize(normalizeRepositoryRelativePath(requestedPath, 'Diff path'));
-      const untrackedPaths = await this.processExecutor.run(repoPath, ['ls-files', '--others', '--exclude-standard', '-z', '--', toLiteralPathspec(filePath)], {
-        cwd: repoPath,
-        maxBuffer: 64 * 1024,
-        env: process.env,
-        signal,
-      });
-      if (!untrackedPaths.split('\0').includes(filePath)) return preview;
-      const resolvedPath = resolveExistingRepositoryPathWithoutSymlinks(repoPath, filePath, 'Diff path');
-      if (!fs.statSync(resolvedPath).isFile()) return preview;
-      signal.throwIfAborted();
-      return this.spawnOperations.getDiffPreview(
-        repoPath,
-        ['diff', '--no-index', '--no-ext-diff', '--no-textconv', '--', '/dev/null', filePath],
-        maxBytes,
-        maxLines,
-        signal,
-      );
-    });
+        // An ordinary working-tree diff omits untracked files. Preview those
+        // against the empty file without creating or changing the Git index.
+        const requestedPath = args[2].startsWith(':(literal)') ? args[2].slice(10) : args[2];
+        const filePath = path.posix.normalize(normalizeRepositoryRelativePath(requestedPath, 'Diff path'));
+        const untrackedPaths = await this.processExecutor.run(
+          repoPath,
+          ['ls-files', '--others', '--exclude-standard', '-z', '--', toLiteralPathspec(filePath)],
+          {
+            cwd: repoPath,
+            maxBuffer: 64 * 1024,
+            env: process.env,
+            signal: activeSignal,
+          },
+        );
+        if (!untrackedPaths.split('\0').includes(filePath)) return preview;
+        const resolvedPath = resolveExistingRepositoryPathWithoutSymlinks(repoPath, filePath, 'Diff path');
+        if (!fs.statSync(resolvedPath).isFile()) return preview;
+        activeSignal.throwIfAborted();
+        return this.spawnOperations.getDiffPreview(
+          repoPath,
+          ['diff', '--no-index', '--no-ext-diff', '--no-textconv', '--', '/dev/null', filePath],
+          maxBytes,
+          maxLines,
+          activeSignal,
+        );
+      },
+      { signal },
+    );
   }
 
   async streamLines(repoPath: string, args: string[], onLine: GitLineHandler, signal?: AbortSignal, options: GitLineStreamOptions = {}): Promise<void> {

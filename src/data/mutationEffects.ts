@@ -85,12 +85,24 @@ export function githubMutationAffects(method: string, args: unknown[], key: read
 }
 
 export function isImmutableGitRead(method: string, args: unknown[]): boolean {
-  const sha = (value: unknown) => typeof value === 'string' && /^[a-f0-9]{40,64}$/.test(value);
+  const sha = (value: unknown) => typeof value === 'string' && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(value);
   if (['getRepositoryFilePreview', 'getRepositoryFileInfo', 'getMarkdownPreviewFile', 'getRepoFileDataUrl'].includes(method)) {
     const request = args[0] as { source?: string; commitHash?: string } | undefined;
     return request?.source === 'commit' && sha(request.commitHash);
   }
-  if (['getFileHistory', 'getFileBlame', 'getFileBlameRange', 'getDiffPreview'].includes(method)) return sha(args[1]);
+  if (method === 'getDiffPreview') {
+    const command = args[0];
+    return (
+      Array.isArray(command) &&
+      command.length === 6 &&
+      command[0] === 'show' &&
+      command[1] === '--format=' &&
+      command[2] === '--binary' &&
+      command[4] === '--' &&
+      sha(command[3])
+    );
+  }
+  if (['getFileHistory', 'getFileBlame', 'getFileBlameRange'].includes(method)) return sha(args[1]);
   const commandIndex = method === 'runGitCommandForRepo' ? 1 : 0;
   return ['show', 'commitDetails'].includes(String(args[commandIndex])) && args.slice(commandIndex + 1).some(sha);
 }

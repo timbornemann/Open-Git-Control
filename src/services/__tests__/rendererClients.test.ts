@@ -467,7 +467,7 @@ describe('renderer service clients', () => {
     ]);
     await expectDelegation(() => gitClient.getSequencerState('C:/repo'), api.git.getSequencerState, ['C:/repo']);
     await expectDelegation(() => gitClient.stagePaths(['a.ts'], 'C:/repo'), api.git.stagePaths, [['a.ts'], 'C:/repo']);
-    await expectDelegation(() => gitClient.getDiffPreview({ path: 'a.ts' } as any), api.git.getDiffPreview, [{ path: 'a.ts' }]);
+    await expectDelegation(() => gitClient.getDiffPreview(['diff']), api.git.getDiffPreview, [['diff'], undefined, undefined, visibleReadRequest]);
     await expectDelegation(() => gitClient.getFileBlameRange({ path: 'a.ts' } as any), api.git.getFileBlameRange, [{ path: 'a.ts' }]);
     await expectDelegation(() => gitClient.startInteractiveRebase({ base: 'main' } as any), api.git.startInteractiveRebase, [{ base: 'main' }]);
     await expectDelegation(() => gitClient.applyPatch({ patch: 'diff' } as any), api.git.applyPatch, [{ patch: 'diff' }]);

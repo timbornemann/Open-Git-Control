@@ -1,6 +1,6 @@
 import type { ResourceDomain } from '@/shared/cache/resource';
 
-export type ReadPolicy = { staleTime: number; repoArgument?: number; repoProperty?: boolean };
+export type ReadPolicy = { staleTime: number; repoArgument?: number; repoProperty?: boolean; refreshOnRead?: boolean };
 const read = (staleTime: number, repoArgument?: number): ReadPolicy => ({ staleTime, repoArgument });
 export const readPolicies: Record<ResourceDomain, Record<string, ReadPolicy>> = {
   app: { getSettings: read(Infinity), getStoredRepos: read(Infinity), getAppVersion: read(Infinity), getUpdaterStatus: read(30_000) },
@@ -28,7 +28,9 @@ export const readPolicies: Record<ResourceDomain, Record<string, ReadPolicy>> = 
     getWorkingDirectoryPreview: read(30_000, 1),
     getRepositoryFilePreview: { staleTime: 30_000, repoProperty: true },
     getRepositoryFileInfo: { staleTime: 30_000, repoProperty: true },
-    getDiffPreview: read(30_000, 2),
+    // Revalidate mutable diffs when opened, while keeping the usual bounded
+    // refresh cadence for already visible previews. Full hashes stay immutable.
+    getDiffPreview: { staleTime: 30_000, repoArgument: 2, refreshOnRead: true },
     getFileBlameRange: read(30_000, 4),
     getFileHistory: read(30_000, 3),
     getFileBlame: read(30_000, 2),

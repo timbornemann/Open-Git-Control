@@ -5,8 +5,8 @@ import * as path from 'path';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { gitClient } from '@/services/gitClient';
 import { useDiffPreviewData } from './useDiffPreviewData';
+import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
 
 const filePath = 'electron/git/__tests__/GitRunner.diffPreview.test.ts';
 const translate = (key: string) => key;
@@ -16,23 +16,26 @@ const textDiff = (lines: string[]) => ['diff --git a/test.ts b/test.ts', '--- a/
 describe('useDiffPreviewData binary detection', () => {
   let host: HTMLDivElement;
   let root: Root;
+  const getDiffPreview = vi.fn();
 
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     host = document.createElement('div');
     document.body.appendChild(host);
     root = createRoot(host);
-    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    getDiffPreview.mockReset();
+    window.electronAPI = { git: { getDiffPreview } } as unknown as ElectronAPI;
   });
 
   afterEach(() => {
     act(() => root.unmount());
     host.remove();
     vi.restoreAllMocks();
+    delete (window as { electronAPI?: ElectronAPI }).electronAPI;
   });
 
   const loadPreview = async (text: string) => {
-    vi.spyOn(gitClient, 'getDiffPreview').mockResolvedValue({
+    getDiffPreview.mockResolvedValue({
       success: true,
       data: { text, truncated: false, bytes: text.length, lines: text.split('\n').length },
     });

@@ -3,7 +3,18 @@ import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gitClient } from '@/services/gitClient';
 import type { DiffPreviewDto } from '@/types/gitDtos';
-import { button, click, deferred, dialogs, editor, initializeViewerMocks, renderViewer, resetViewerMocks, viewerRequest } from './fileViewerHarness';
+import {
+  getDiffPreview,
+  button,
+  click,
+  deferred,
+  dialogs,
+  editor,
+  initializeViewerMocks,
+  renderViewer,
+  resetViewerMocks,
+  viewerRequest,
+} from './fileViewerHarness';
 
 beforeEach(initializeViewerMocks);
 afterEach(resetViewerMocks);
@@ -26,7 +37,7 @@ describe('file viewer after staging the final hunk', () => {
       applied++;
       return { success: true };
     });
-    vi.mocked(gitClient.getDiffPreview).mockImplementation(async (args) =>
+    getDiffPreview.mockImplementation(async (args) =>
       preview(args.includes('--cached') ? diff(firstHunk, lastHunk) : applied === 0 ? diff(firstHunk, lastHunk) : applied === 1 ? diff(lastHunk) : ''),
     );
     const view = await renderViewer(request);
@@ -62,7 +73,7 @@ describe('file viewer after staging the final hunk', () => {
       applied = true;
       return { success: true };
     });
-    vi.mocked(gitClient.getDiffPreview).mockImplementation(async (args) => preview(args.includes('--cached') || !applied ? diff(lastHunk) : ''));
+    getDiffPreview.mockImplementation(async (args) => preview(args.includes('--cached') || !applied ? diff(lastHunk) : ''));
     const onRequestChange = vi.fn();
     const view = await renderViewer(request, { onRequestChange });
     await click('Stage');
@@ -82,7 +93,7 @@ describe('file viewer after staging the final hunk', () => {
       applied = true;
       return caseName === 'failed stage' ? { success: false, error: 'Git refused the patch' } : { success: true };
     });
-    vi.mocked(gitClient.getDiffPreview).mockImplementation(async (args) => {
+    getDiffPreview.mockImplementation(async (args) => {
       if (!applied) return preview(diff(lastHunk));
       if (caseName === 'failed check') return { success: false, error: 'Could not check the file' };
       return preview(args.includes('--cached') && caseName !== 'empty index' && source !== 'staged' ? diff(lastHunk) : '', caseName === 'truncated check');
@@ -103,15 +114,11 @@ describe('file viewer after staging the final hunk', () => {
       applied = true;
       return { success: true };
     });
-    vi.mocked(gitClient.getDiffPreview).mockImplementation(async (args) =>
-      args.includes('--cached') ? staged.promise : preview(applied ? '' : diff(lastHunk)),
-    );
+    getDiffPreview.mockImplementation(async (args) => (args.includes('--cached') ? staged.promise : preview(applied ? '' : diff(lastHunk))));
     const onRequestChange = vi.fn();
     const view = await renderViewer(request, { onRequestChange });
     await click('Stage');
-    await vi.waitFor(() =>
-      expect(gitClient.getDiffPreview).toHaveBeenCalledWith(['diff', '--cached', '--', request.path], expect.any(Object), request.repoPath),
-    );
+    await vi.waitFor(() => expect(getDiffPreview).toHaveBeenCalledWith(['diff', '--cached', '--', request.path], expect.any(Object), request.repoPath));
     if (change === 'tab') await click('Text');
     else if (change.startsWith('source')) {
       await view.rerender(viewerRequest('staged'));

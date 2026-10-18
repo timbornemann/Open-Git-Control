@@ -2,7 +2,19 @@
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gitClient } from '@/services/gitClient';
-import { button, click, deferred, dialogs, edit, editor, initializeViewerMocks, renderViewer, resetViewerMocks, viewerRequest } from './fileViewerHarness';
+import {
+  getDiffPreview,
+  button,
+  click,
+  deferred,
+  dialogs,
+  edit,
+  editor,
+  initializeViewerMocks,
+  renderViewer,
+  resetViewerMocks,
+  viewerRequest,
+} from './fileViewerHarness';
 
 beforeEach(initializeViewerMocks);
 afterEach(resetViewerMocks);
@@ -44,7 +56,7 @@ describe('shared file viewer sources', () => {
     });
     expect(view.props.onRepoChanged).toHaveBeenCalledTimes(1);
     await click('Diff');
-    expect(gitClient.getDiffPreview).toHaveBeenLastCalledWith(['diff', '--cached', '--', 'file.txt'], expect.any(Object), 'C:/viewer-repo');
+    expect(getDiffPreview).toHaveBeenLastCalledWith(['diff', '--cached', '--', 'file.txt'], expect.any(Object), 'C:/viewer-repo');
     expect(dialogs.confirm).not.toHaveBeenCalled();
     view.unmount();
   });

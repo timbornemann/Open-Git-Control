@@ -11,7 +11,6 @@ import { useDiffPreviewData } from '@/components/diff-viewer/useDiffPreviewData'
 import { useHunkPatchActions, type HunkPatchOperation } from '@/components/diff-viewer/useHunkPatchActions';
 import { MAX_RENDER_CHARS, MAX_RENDER_LINES } from '@/components/diff-viewer/diffViewerConstants';
 import { gitClient } from '@/services/gitClient';
-import { freshRead } from '@/data/clientCache';
 import type { RepositoryFileContextDto } from '@/shared/ipc/repositoryFiles';
 import { fileViewerIdentity } from './fileViewerRequest';
 
@@ -62,9 +61,10 @@ export function FileViewerDiff({ context, refreshTrigger, onRepoChanged, onNavig
     }
     if (!remaining) return;
     let active = true;
-    // Use the confirmed renderer read. A second forced working-diff read
-    // would cancel it through the shared query cache.
-    void freshRead(() => gitClient.getDiffPreview(['diff', '--cached', '--', path], { maxBytes: MAX_RENDER_CHARS, maxLines: MAX_RENDER_LINES }, repoPath))
+    // Mutable preview reads revalidate automatically and can share an existing
+    // read with a staged viewer instead of cancelling it.
+    void gitClient
+      .getDiffPreview(['diff', '--cached', '--', path], { maxBytes: MAX_RENDER_CHARS, maxLines: MAX_RENDER_LINES }, repoPath)
       .catch(() => null)
       .then((staged) => {
         if (!active || scopeRef.current !== currentScope) return;

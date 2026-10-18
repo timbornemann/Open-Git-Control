@@ -89,6 +89,57 @@ describe('GitSpawnOperations stream limits', () => {
     }
   });
 
+  it('does not spawn a diff process after the read was already cancelled', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(new GitSpawnOperations().getDiffPreview('/repo', ['diff'], 65536, 100, controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  it('lets cancellation win over an intentionally truncated diff result', async () => {
+    const child = new FakeGitProcess();
+    spawnMock.mockReturnValue(child);
+    const controller = new AbortController();
+    const operation = new GitSpawnOperations().getDiffPreview('/repo', ['diff'], 65536, 100, controller.signal);
+    child.stdout.emit('data', Buffer.from('line\n'.repeat(101)));
+    controller.abort();
+    await expect(operation).rejects.toMatchObject({ name: 'AbortError' });
+    expect(child.kill).toHaveBeenCalledOnce();
+  });
+
+  it('removes the diff abort listener when process creation fails', async () => {
+    const child = new FakeGitProcess();
+    spawnMock.mockReturnValue(child);
+    const controller = new AbortController();
+    const remove = vi.spyOn(controller.signal, 'removeEventListener');
+    const operation = new GitSpawnOperations().getDiffPreview('/repo', ['diff'], 65536, 100, controller.signal);
+    child.emit('error', new Error('Cannot start Git'));
+    await expect(operation).rejects.toThrow('Cannot start Git');
+    expect(remove).toHaveBeenCalledWith('abort', expect.any(Function));
+  });
+
+  it('waits for the Windows diff process tree to stop and rejects even an exit code of zero after cancellation', async () => {
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' });
+    const child = Object.assign(new FakeGitProcess(), { pid: 4321 });
+    const killer = new FakeGitProcess();
+    spawnMock.mockReturnValueOnce(child).mockReturnValueOnce(killer);
+    const controller = new AbortController();
+    const finished = vi.fn();
+    const operation = new GitSpawnOperations().getDiffPreview('/repo', ['diff'], 65536, 100, controller.signal).catch((error: Error) => {
+      finished();
+      return error;
+    });
+    controller.abort();
+    expect(spawnMock.mock.calls[1].slice(0, 2)).toEqual([windowsSystemExecutable('taskkill.exe'), ['/PID', '4321', '/T', '/F']]);
+    child.emit('close', 0, null);
+    await Promise.resolve();
+    expect(finished).not.toHaveBeenCalled();
+    killer.emit('close', 0);
+    expect(await operation).toMatchObject({ name: 'AbortError' });
+    expect(child.stdout.destroy).toHaveBeenCalledOnce();
+    expect(child.stderr.destroy).toHaveBeenCalledOnce();
+  });
+
   it('rejects an unterminated stream line before retaining it without bound', async () => {
     const process = new FakeGitProcess();
     spawnMock.mockReturnValue(process);

@@ -167,10 +167,10 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       repoPath
         ? invokeGitOperationForRepo(repoPath, 'add', IpcChannel.GitStagePaths, paths, repoPath)
         : invokeGitOperation('add', IpcChannel.GitStagePaths, paths),
-    getDiffPreview: (args: string[], limits?: { maxBytes?: number; maxLines?: number }, repoPath?: string) =>
+    getDiffPreview: (args: string[], limits?: { maxBytes?: number; maxLines?: number }, repoPath?: string, readRequest?: ReadRequest) =>
       repoPath
-        ? invokeGitOperationForRepo(repoPath, 'diff', IpcChannel.GitDiffPreview, args, limits || {}, repoPath)
-        : invokeGitOperation('diff', IpcChannel.GitDiffPreview, args, limits || {}),
+        ? invokeGitOperationForRepo(repoPath, 'diff', IpcChannel.GitDiffPreview, args, limits || {}, repoPath, ...(readRequest ? [readRequest] : []))
+        : invokeGitOperation('diff', IpcChannel.GitDiffPreview, args, limits || {}, ...(readRequest ? [undefined, readRequest] : [])),
     getFileBlameRange: (
       filePath: string,
       commitHash: string | undefined,

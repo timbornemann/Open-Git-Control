@@ -2,6 +2,8 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { vi } from 'vitest';
 import { gitClient } from '@/services/gitClient';
+import * as electronApi from '@/services/electronApi';
+import type { ElectronGitAPI } from '@/shared/ipc/contracts/electronApi';
 import { I18nProvider } from '@/i18n';
 import { FileViewer, type FileViewerProps } from '../FileViewer';
 import type { FileViewerRequest } from '../fileViewerRequest';
@@ -16,6 +18,7 @@ const editor = vi.hoisted(() => ({
   position: undefined as EditorPosition | undefined,
 }));
 export { dialogs, editor };
+export const getDiffPreview = vi.fn<ElectronGitAPI['getDiffPreview']>();
 vi.mock('@/contexts/AppStateContext', () => ({
   useUIContext: () => ({ setConfirmDialog: dialogs.confirm, setInputDialog: dialogs.input }),
   useOptionalRepositoryContext: () => ({ onToast: dialogs.toast }),
@@ -48,7 +51,8 @@ export function initializeViewerMocks() {
     },
   }));
   vi.spyOn(gitClient, 'saveRepositoryFile').mockResolvedValue({ success: true, data: { version: 'saved-version', bytes: 10 } });
-  vi.spyOn(gitClient, 'getDiffPreview').mockResolvedValue({ success: true, data: { text: diff, bytes: diff.length, lines: 6, truncated: false } });
+  getDiffPreview.mockReset().mockResolvedValue({ success: true, data: { text: diff, bytes: diff.length, lines: 6, truncated: false } });
+  vi.spyOn(electronApi, 'requireElectronGitApi').mockReturnValue({ getDiffPreview } as ElectronGitAPI);
   vi.spyOn(gitClient, 'getFileHistory').mockResolvedValue({ success: true, data: [] });
   vi.spyOn(gitClient, 'getFileBlameRange').mockResolvedValue({ success: true, data: [] });
   vi.spyOn(gitClient, 'getFileBlame').mockResolvedValue({ success: true, data: [] });

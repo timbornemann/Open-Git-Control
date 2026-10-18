@@ -1,7 +1,10 @@
-import { useResourceState } from '@/data/resourceHooks';
-import { freshRead } from '@/data/clientCache';
+import { useCachedResult } from '@/data/resourceHooks';
+import { resourceKey } from '@/data/clientCache';
+import { isImmutableGitRead } from '@/data/mutationEffects';
+import { queryClient } from '@/data/queryClient';
 import type { DiffPreviewDto } from '@/types/gitDtos';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { IpcResult } from '@/types/ipc';
+import { useLayoutEffect, useMemo, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
 import { parseDiff } from '@/utils/diffParser';
 import { gitClient } from '@/services/gitClient';
@@ -26,74 +29,62 @@ const buildDiffPreviewArgs = (request: DiffRequest): string[] => {
 };
 
 export const useDiffPreviewData = ({ repoPath, request, refreshTrigger, t }: UseDiffPreviewDataParams) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [confirmed, setConfirmed] = useState<{ repoPath: string; request: DiffRequest; refreshTrigger: number | undefined; preview: DiffPreviewDto } | null>(
-    null,
-  );
-  const [preview, setPreview, hasPreview] = useResourceState<DiffPreviewDto | null>(
-    'git',
-    'getDiffPreview',
-    [buildDiffPreviewArgs(request), { maxBytes: MAX_RENDER_CHARS, maxLines: MAX_RENDER_LINES }, repoPath],
-    null,
-  );
+  const { source, path } = request;
+  const commitHash = source === 'commit' ? request.commitHash : undefined;
+  const args = useMemo(() => buildDiffPreviewArgs({ source, path, commitHash }), [source, path, commitHash]);
+  const limits = { maxBytes: MAX_RENDER_CHARS, maxLines: MAX_RENDER_LINES };
+  const key = resourceKey('git', 'getDiffPreview', [args, limits, repoPath]);
+  // The shared query owns the native read. Removing its last observer aborts
+  // that read, while another viewer of the same file can keep using it.
+  const query = useCachedResult<IpcResult<DiffPreviewDto>>(key);
+  const preview = query.data?.success ? query.data.data : null;
+  const refresh = isImmutableGitRead('getDiffPreview', [args]) ? 0 : (refreshTrigger ?? 0);
+  const identity = JSON.stringify([repoPath, args, refresh]);
+  const [load, setLoad] = useState<{ identity: string; pending: boolean } | null>(null);
   const diffText = preview?.text || '';
   const sourceTruncated = preview?.truncated || false;
-  const requestGenerationRef = useRef(0);
 
   useLayoutEffect(() => {
-    const requestGeneration = requestGenerationRef.current + 1;
-    requestGenerationRef.current = requestGeneration;
-    const isCurrentRequest = () => requestGenerationRef.current === requestGeneration;
-
+    let active = true;
     if (!repoPath || !gitClient.isAvailable()) {
-      setIsLoading(false);
-      setError(null);
+      setLoad({ identity, pending: false });
       return;
     }
+    setLoad({ identity, pending: true });
 
     const fetchDiff = async () => {
-      setIsLoading(!hasPreview);
-      setError(null);
-
       try {
-        const result = await freshRead(() =>
-          gitClient.getDiffPreview(
-            buildDiffPreviewArgs(request),
-            {
-              maxBytes: MAX_RENDER_CHARS,
-              maxLines: MAX_RENDER_LINES,
-            },
-            repoPath,
-          ),
-        );
-        if (!isCurrentRequest()) return;
-
-        if (!result.success) {
-          setError(result.error || t('diffViewer.errors.diffLoadFailed'));
-          return;
-        }
-
-        setPreview(result.data);
-        setConfirmed({ repoPath, request, refreshTrigger, preview: result.data });
-      } catch (fetchError: unknown) {
-        if (!isCurrentRequest()) return;
-        console.error(fetchError);
-        setError(t('diffViewer.errors.diffLoadFailed'));
+        // Mutable previews are stale reads, not forced cancellations. Identical
+        // concurrent requests coalesce; full commit hashes reuse immutable data.
+        await gitClient.getDiffPreview(args, { maxBytes: MAX_RENDER_CHARS, maxLines: MAX_RENDER_LINES }, repoPath);
+      } catch {
+        // The shared query exposes read failures and discards cancellations.
+        // A replaced read must not leave an error over its successful successor.
       } finally {
-        if (isCurrentRequest()) {
-          setIsLoading(false);
-        }
+        if (active) setLoad({ identity, pending: false });
       }
     };
 
     void fetchDiff();
     return () => {
-      if (requestGenerationRef.current === requestGeneration) {
-        requestGenerationRef.current += 1;
-      }
+      active = false;
     };
-  }, [refreshTrigger, repoPath, request, t, hasPreview, setPreview]);
+  }, [repoPath, args, identity]);
+
+  const currentLoad = load?.identity === identity ? load : null;
+  const error = query.error ? query.error.message || t('diffViewer.errors.diffLoadFailed') : null;
+  const isLoading = Boolean(repoPath && gitClient.isAvailable() && !preview && !error && (!currentLoad || currentLoad.pending || query.isFetching));
+  const confirmedPreview =
+    repoPath &&
+    gitClient.isAvailable() &&
+    currentLoad &&
+    !currentLoad.pending &&
+    !error &&
+    preview &&
+    !query.isFetching &&
+    !queryClient.getQueryState(key)?.isInvalidated
+      ? preview
+      : null;
 
   const looksBinaryByExt = useMemo(() => looksBinaryByExtension(request.path), [request.path]);
 
@@ -119,7 +110,7 @@ export const useDiffPreviewData = ({ repoPath, request, refreshTrigger, t }: Use
   const canRenderText = !isBinaryDiff && !looksBinaryByExt;
 
   return {
-    isLoading: isLoading && !hasPreview,
+    isLoading,
     error,
     diffText,
     sourceTruncated,
@@ -129,7 +120,6 @@ export const useDiffPreviewData = ({ repoPath, request, refreshTrigger, t }: Use
     looksBinaryByExt,
     isTooLarge,
     hunkCount: parsed.hunks.length,
-    confirmedPreview:
-      confirmed?.repoPath === repoPath && confirmed.request === request && confirmed.refreshTrigger === refreshTrigger ? confirmed.preview : null,
+    confirmedPreview,
   };
 };

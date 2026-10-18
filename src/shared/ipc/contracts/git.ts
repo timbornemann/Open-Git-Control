@@ -250,7 +250,7 @@ export interface ElectronGitAPI extends GitLfsApi, GitIdentityApi, ElectronRepos
   getWorkingTreeStats: (snapshotId: string, repoPath?: string, readRequest?: ReadRequest) => Promise<IpcResult<WorkingTreeStatsDto>>;
   getSequencerState: (repoPath?: string) => Promise<IpcResult<GitSequencerStateDto>>;
   stagePaths: (paths: string[], repoPath?: string) => Promise<IpcResult<string>>;
-  getDiffPreview: (args: string[], limits?: DiffPreviewLimitsDto, repoPath?: string) => Promise<IpcResult<DiffPreviewDto>>;
+  getDiffPreview: (args: string[], limits?: DiffPreviewLimitsDto, repoPath?: string, readRequest?: ReadRequest) => Promise<IpcResult<DiffPreviewDto>>;
   getFileBlameRange: (
     filePath: string,
     commitHash: string | undefined,
