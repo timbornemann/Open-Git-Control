@@ -1,0 +1,177 @@
+import { Button, ComboBox, RadioGroup, ProgressIndicator, ScrollView, Palette } from "std-widgets.slint";
+
+component Caption inherits Text { color: #a7aba6; font-size: 12px; }
+component Heading inherits Text { color: #eeeee8; font-size: 17px; font-weight: 600; }
+component Rule inherits Rectangle { height: 1px; background: #343832; }
+
+export component RecoveryWindow inherits Window {
+    title: "Open-Git-Control Recovery";
+    icon: @image-url("../../logo.png");
+    preferred-width: 740px; preferred-height: 750px;
+    min-width: 570px; min-height: 440px;
+    background: #101413;
+    default-font-size: 14px;
+    default-font-family: "Segoe UI";
+    init => { Palette.color-scheme = ColorScheme.dark; }
+    in property <bool> de: true;
+    in property <bool> linux: false;
+    in property <[string]> installations;
+    in-out property <int> installation-index: -1;
+    in property <[string]> versions;
+    in-out property <int> version-index: -1;
+    in property <string> installation-path;
+    in property <string> profile-path;
+    in property <string> installed-version;
+    in property <string> target-version;
+    in property <string> notice;
+    in property <string> status;
+    in property <string> detail;
+    in property <string> summary;
+    in property <string> log-path;
+    in property <bool> error;
+    in property <bool> busy;
+    in property <bool> can-cancel;
+    in property <bool> can-force;
+    in property <bool> can-review;
+    in property <bool> has-more;
+    in property <bool> catalog-loading;
+    in property <bool> confirm;
+    in property <bool> complete;
+    in-out property <bool> show-details: false;
+    in property <float> progress;
+    in property <bool> indeterminate: true;
+    in property <int> action;
+    callback choose-installation(int);
+    callback browse-installation(bool);
+    callback browse-profile();
+    callback choose-action(int);
+    callback choose-version(int);
+    callback load-releases(bool);
+    callback review();
+    callback install();
+    callback back();
+    callback cancel();
+    callback force-close();
+    callback launch();
+    callback language();
+    callback licenses();
+
+    VerticalLayout {
+        spacing: 0px; padding: 0px;
+        Rectangle {
+            height: 72px; background: #22251f;
+            HorizontalLayout {
+                padding: 20px; spacing: 14px;
+                Image { source: @image-url("../../logo.png"); width: 32px; height: 32px; image-fit: contain; }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 3px;
+                    Heading { text: root.de ? "Notfall-Updater" : "Recovery updater"; }
+                    Caption { text: "Open-Git-Control · " + (root.de ? "Unabhängige Wiederherstellung" : "Independent recovery"); }
+                }
+                Button { text: root.de ? "English" : "Deutsch"; horizontal-stretch: 0; width: 88px; enabled: !root.busy && !root.confirm && !root.complete; clicked => { root.language(); } }
+            }
+        }
+        if root.busy: Rectangle {
+            height: root.can-force ? 150px : 84px; background: #1b211b;
+            VerticalLayout {
+                padding: 14px; spacing: 8px;
+                Text { text: root.status; color: #e0e4d8; font-weight: 600; wrap: word-wrap; }
+                ProgressIndicator { progress: root.progress; indeterminate: root.indeterminate; }
+                if root.can-force: Text {
+                    text: root.de ? "Die App reagiert noch nicht. Beim erzwungenen Beenden können ungespeicherte Änderungen und laufende Aufgaben verloren gehen." : "The app has not closed. Force closing can lose unsaved changes and running tasks.";
+                    color: #e9bd85; wrap: word-wrap; font-size: 12px;
+                }
+            }
+        }
+        ScrollView {
+            VerticalLayout {
+                padding: 22px; spacing: 15px;
+                Text {
+                    text: root.de ? "Aktualisieren und reparieren, auch wenn die App nicht mehr startet." : "Update and repair, even when the app no longer starts.";
+                    color: #deded5; wrap: word-wrap;
+                }
+                if root.notice != "": Rectangle {
+                    background: #252922; border-width: 0px;
+                    min-height: notice-text.preferred-height + 20px;
+                    notice-text := Text { x: 10px; y: 10px; width: parent.width - 20px; text: root.notice; color: #d4c6a4; wrap: word-wrap; }
+                }
+                if !root.confirm && !root.complete: VerticalLayout {
+                    spacing: 10px;
+                    Heading { text: root.de ? "Installation" : "Installation"; }
+                    HorizontalLayout {
+                        spacing: 10px;
+                        ComboBox { model: root.installations; current-index <=> root.installation-index; enabled: !root.busy; selected(value) => { root.choose-installation(self.current-index); } }
+                        Button { text: root.de ? "Ordner wählen…" : "Choose folder…"; enabled: !root.busy; clicked => { root.browse-installation(false); } }
+                    }
+                    if root.linux: Button { text: "AppImage…"; enabled: !root.busy; clicked => { root.browse-installation(true); } }
+                    Caption { text: root.installation-path; wrap: word-wrap; }
+                    HorizontalLayout {
+                        spacing: 12px;
+                        Caption { text: root.de ? "Installiert" : "Installed"; min-width: 84px; }
+                        Text { text: root.installed-version; color: #eeeeea; horizontal-stretch: 1; }
+                        Button { text: root.de ? "Datenordner…" : "Data folder…"; enabled: !root.busy; clicked => { root.browse-profile(); } }
+                    }
+                    Caption { text: root.profile-path; wrap: word-wrap; }
+                    Rule { }
+                    Heading { text: root.de ? "Was möchtest du tun?" : "What would you like to do?"; }
+                    RadioGroup {
+                        enabled: !root.busy;
+                        RadioButton { text: root.de ? "Aktualisieren" : "Update"; checked: root.action == 0; toggled => { if self.checked { root.choose-action(0); } } }
+                        RadioButton { text: root.de ? "Installation reparieren" : "Repair installation"; checked: root.action == 1; toggled => { if self.checked { root.choose-action(1); } } }
+                        RadioButton { text: root.de ? "Ältere Version wiederherstellen" : "Restore an older version"; checked: root.action == 2; toggled => { if self.checked { root.choose-action(2); } } }
+                    }
+                    Caption {
+                        text: root.action == 0 ? (root.de ? "Die neueste offizielle stabile Version installieren." : "Install the latest official stable version.")
+                            : root.action == 1 ? (root.de ? "Die installierte Version vollständig neu installieren. Deine Daten bleiben erhalten." : "Reinstall the installed version completely. Your data is preserved.")
+                            : (root.de ? "Automatische Downloads werden dabei pausiert. Manuelle Updates bleiben möglich." : "Automatic downloads will be paused. Manual updates remain available.");
+                        wrap: word-wrap;
+                    }
+                    HorizontalLayout {
+                        spacing: 12px;
+                        Caption { text: root.de ? "Zielversion" : "Target version"; min-width: 84px; }
+                        if root.action != 2: Text { text: root.target-version; color: #eeeeea; horizontal-stretch: 1; }
+                        if root.action == 2: ComboBox { model: root.versions; current-index <=> root.version-index; enabled: !root.busy; selected(value) => { root.choose-version(self.current-index); } }
+                        Button { text: root.de ? "Prüfen" : "Refresh"; enabled: !root.busy && !root.catalog-loading; clicked => { root.load-releases(false); } }
+                        if root.action == 2 && root.has-more: Button { text: root.de ? "Mehr…" : "More…"; enabled: !root.busy && !root.catalog-loading; clicked => { root.load-releases(true); } }
+                    }
+                }
+                if root.confirm: VerticalLayout {
+                    spacing: 14px;
+                    Heading { text: root.de ? "Installation bestätigen" : "Confirm installation"; }
+                    Text { text: root.summary; color: #eeeede; wrap: word-wrap; }
+                    Rule { }
+                    Text {
+                        text: root.de ? "Die App wird geschlossen und ihre Nutzerdaten werden gesichert. Repositories werden nicht verändert. Berechtigungen erfragt das Betriebssystem." : "The app will close and its user data will be backed up. Repositories are not modified. The operating system handles permission requests.";
+                        color: #b8bcb3; wrap: word-wrap;
+                    }
+                }
+                if root.complete: VerticalLayout {
+                    Heading { text: root.de ? "Installation geprüft" : "Installation verified"; }
+                    Text { text: root.target-version + " · " + root.installation-path; color: #91bcaa; wrap: word-wrap; }
+                }
+                Rule { }
+                if !root.busy: Text { text: root.status; color: root.error ? #f39189 : #d9ddd2; wrap: word-wrap; font-weight: 600; }
+                if root.detail != "": Button { text: root.show-details ? (root.de ? "Details ausblenden" : "Hide details") : (root.de ? "Details anzeigen" : "Show details"); clicked => { root.show-details = !root.show-details; } }
+                if root.show-details: Text { text: root.detail; color: #a7aba6; wrap: word-wrap; font-size: 12px; }
+                Caption { text: root.de ? "Protokolle und Sicherungen: " + root.log-path : "Logs and backups: " + root.log-path; wrap: word-wrap; }
+                Button { text: root.de ? "Lizenzen und Quellcode" : "Licenses and source"; clicked => { root.licenses(); } }
+                Rectangle { vertical-stretch: 1; }
+            }
+        }
+        Rule { }
+        Rectangle {
+            height: 66px; background: #191d19;
+            HorizontalLayout {
+                padding: 16px; spacing: 10px;
+                if root.confirm && !root.busy: Button { text: root.de ? "Zurück" : "Back"; clicked => { root.back(); } }
+                if root.busy && root.can-cancel: Button { text: root.de ? "Abbrechen" : "Cancel"; clicked => { root.cancel(); } }
+                if root.can-force: Button { text: root.de ? "Beenden erzwingen" : "Force close"; clicked => { root.force-close(); } }
+                Rectangle { horizontal-stretch: 1; }
+                if !root.confirm && !root.complete: Button { text: root.de ? "Weiter zur Zusammenfassung" : "Review installation"; primary: true; enabled: root.can-review && !root.busy; clicked => { root.review(); } }
+                if root.confirm && !root.busy: Button { text: root.de ? "Jetzt installieren" : "Install now"; primary: true; clicked => { root.install(); } }
+                if root.complete: Button { text: root.de ? "Open-Git-Control starten" : "Launch Open-Git-Control"; primary: true; clicked => { root.launch(); } }
+            }
+        }
+    }
+}

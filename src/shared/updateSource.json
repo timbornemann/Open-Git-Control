@@ -3,6 +3,12 @@
   "repo": "Open-Git-Control",
   "repositoryId": 1176739168,
   "productName": "Open-Git-Control",
+  "windowsInstallerGuid": "5bf8e5bd-d15e-5ba0-ac7e-6152647b161f",
+  "recovery": {
+    "windows": "win-x64.exe",
+    "macos": "mac-x64.zip",
+    "linux": "linux-x64.tar.gz"
+  },
   "platforms": {
     "windows": {
       "feed": "latest.yml",

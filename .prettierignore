@@ -10,3 +10,5 @@ build/
 *.ico
 *.png
 src/shared/generated/
+recovery/target/
+recovery/THIRD_PARTY_NOTICES.txt

@@ -1,0 +1,60 @@
+[package]
+name = "ogc-recovery"
+version = "3.0.5"
+edition = "2021"
+rust-version = "1.93"
+license = "GPL-3.0-only"
+description = "Independent recovery updater for Open-Git-Control"
+build = "build.rs"
+
+[features]
+default = ["gui"]
+gui = ["dep:slint", "dep:rfd"]
+
+[dependencies]
+anyhow = "1.0"
+base64 = "0.22"
+directories = "6.0"
+fs2 = "0.4"
+hex = "0.4"
+plist = "1.8"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots"] }
+tokio = { version = "1.48", features = ["rt", "time", "macros"] }
+semver = { version = "1.0", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+serde_yaml = "0.9"
+yaml-rust2 = { version = "=0.11.0", default-features = false }
+sha2 = "0.10"
+sysinfo = { version = "0.37", default-features = false, features = ["system"] }
+tempfile = "3.23"
+url = "2.5"
+uuid = { version = "1.18", features = ["v4"] }
+sys-locale = "0.3"
+zip = { version = "4.6", default-features = false, features = ["deflate"] }
+slint = { version = "=1.18.1", optional = true, default-features = false, features = ["std", "backend-winit", "renderer-software", "accessibility", "compat-1-18"] }
+rfd = { version = "0.15", optional = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+x11rb = "=0.13.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["NSRunningApplication", "libc"] }
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell", "Win32_System_Threading", "Win32_System_Registry"] }
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_UI_Shell"] }
+
+[build-dependencies]
+slint-build = "=1.18.1"
+winresource = "0.1"
+
+[profile.release]
+opt-level = "s"
+lto = "thin"
+strip = true
+codegen-units = 1

@@ -43,6 +43,10 @@ function validateArtifactFormat(file, size) {
         readBytes(file, centralOffset, 4).readUInt32LE(0) === 0x02014b50;
       break;
     }
+  } else if (file.endsWith('.tar.gz') && size >= 18) {
+    // The archive is also unpacked and its executable exercised by the native
+    // packaging smoke test. Do not expand an unbounded archive in this validator.
+    valid = header[0] === 0x1f && header[1] === 0x8b && header[2] === 8;
   }
   if (!valid) throw new Error(`Invalid installer or archive format: ${path.basename(file)}`);
 }

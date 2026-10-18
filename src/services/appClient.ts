@@ -105,6 +105,9 @@ export const appClient = cachedClient('app', {
   async installAppUpdate(...args: Parameters<ElectronAPI['installAppUpdate']>): ReturnType<ElectronAPI['installAppUpdate']> {
     return requireElectronAppApi().installAppUpdate(...args);
   },
+  openRecoveryUpdater() {
+    return requireElectronAppApi().openRecoveryUpdater();
+  },
 
   onUpdaterEvent(...args: Parameters<ElectronAPI['onUpdaterEvent']>): ReturnType<ElectronAPI['onUpdaterEvent']> {
     return requireElectronAppApi().onUpdaterEvent((status) => {

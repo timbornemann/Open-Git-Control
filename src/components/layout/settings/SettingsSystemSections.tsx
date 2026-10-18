@@ -2,6 +2,8 @@ import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import type { GitJobEventDto } from '@/types/aiDtos';
 import { useI18n } from '@/i18n';
+import { useState } from 'react';
+import { appClient } from '@/services/appClient';
 import { ReleaseNotesContent } from '../ReleaseNotesContent';
 import type { SettingsAiUpdaterState } from '../hooks/useSettingsAiUpdater';
 import {
@@ -21,7 +23,24 @@ export const SettingsUpdatesSection = ({
   ai,
   locale,
 }: SettingsSectionProps & { ai: SettingsAiUpdaterState; locale: string }) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
+  const [recoveryMessage, setRecoveryMessage] = useState('');
+  const [openingRecovery, setOpeningRecovery] = useState(false);
+  const openRecovery = async () => {
+    setOpeningRecovery(true);
+    try {
+      const result = await appClient.openRecoveryUpdater();
+      setRecoveryMessage(
+        result.success
+          ? tr('Der unabhängige Notfall-Updater wurde geöffnet.', 'The independent recovery updater has opened.')
+          : result.error || tr('Start fehlgeschlagen.', 'Could not open the recovery updater.'),
+      );
+    } catch (error) {
+      setRecoveryMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setOpeningRecovery(false);
+    }
+  };
   const content = (
     <>
       <dl className="settings-update-status">
@@ -93,10 +112,32 @@ export const SettingsUpdatesSection = ({
         onChange={(checked) => void onUpdateSettings({ autoUpdateEnabled: checked })}
       />
       <div className={actionRowClass(variant)}>
-        <Button onClick={ai.handleRunOneClickUpdate} disabled={ai.oneClickUpdateDisabled}>
+        <Button onClick={ai.handleRunOneClickUpdate} disabled={ai.oneClickUpdateDisabled || ai.updaterStatus?.recoveryActive}>
           {ai.oneClickUpdateLabel}
         </Button>
+        <Button variant="secondary" onClick={() => void openRecovery()} disabled={openingRecovery}>
+          {tr('Notfall-Updater öffnen', 'Open recovery updater')}
+        </Button>
       </div>
+      <p className={hintClass(variant)}>
+        {tr(
+          'Eigenständiges Hilfsprogramm zum Aktualisieren, Reparieren oder Wiederherstellen einer älteren Version. Auch über den Programmeintrag erreichbar, wenn die App nicht startet.',
+          'Independent helper to update, repair or restore an older version. Also available from its program shortcut when the app cannot start.',
+        )}
+      </p>
+      {ai.updaterStatus?.recoveryActive && (
+        <p className={hintClass(variant)} role="status">
+          {tr(
+            'Der Notfall-Updater ist aktiv. Updates in dieser App sind vorübergehend gesperrt.',
+            'The recovery updater is active. Updates here are temporarily blocked.',
+          )}
+        </p>
+      )}
+      {recoveryMessage && (
+        <p className={hintClass(variant)} role="status">
+          {recoveryMessage}
+        </p>
+      )}
     </>
   );
 

@@ -16,6 +16,7 @@ vi.mock('electron', () => ({
     handle: handleMock,
   },
 }));
+vi.mock('../../recoveryUpdater', () => ({ openRecoveryUpdater: vi.fn().mockResolvedValue({ success: true }) }));
 
 const {
   clearSavedGeminiApiKeySecurelyMock,
@@ -185,6 +186,11 @@ describe('platform IPC handlers', () => {
     await expect(handlers.get(IpcChannel.UpdaterRunOneClick)?.({})).resolves.toEqual({ started: true });
     await expect(handlers.get(IpcChannel.UpdaterDownload)?.({})).resolves.toEqual({ downloaded: true });
     await expect(handlers.get(IpcChannel.UpdaterInstall)?.({})).resolves.toEqual({ installed: true });
+    const { openRecoveryUpdater } = await import('../../recoveryUpdater');
+    await expect(handlers.get(IpcChannel.UpdaterOpenRecovery)?.({}, { executable: 'untrusted.exe', url: 'https://evil.invalid' })).resolves.toEqual({
+      success: true,
+    });
+    expect(openRecoveryUpdater).toHaveBeenCalledWith();
   });
 
   it('handles repository persistence, sanitized settings updates and app version', async () => {

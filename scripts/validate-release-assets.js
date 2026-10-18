@@ -29,10 +29,10 @@ async function validateReleaseAssets(version, platform, rootDirectory = process.
   const allowed = new Set(releaseAssetNames(version));
   const names = fs.readdirSync(releaseDir);
   for (const name of names) {
-    if ((/^latest.*\.ya?ml$/i.test(name) || /\.(exe|appimage|deb|dmg|zip|blockmap)$/i.test(name)) && !allowed.has(name))
+    if ((/^latest.*\.ya?ml$/i.test(name) || /\.(exe|appimage|deb|dmg|zip|tar\.gz|blockmap)$/i.test(name)) && !allowed.has(name))
       throw new Error(`Unapproved release artifact: ${name}`);
   }
-  for (const name of [required.feed, ...required.artifacts, ...required.blockmaps]) regularFile(releaseDir, name);
+  for (const name of [required.feed, ...required.artifacts, ...required.blockmaps, required.recovery]) regularFile(releaseDir, name);
 
   const digests = new Map();
   const digest = async (name) => {
@@ -78,6 +78,9 @@ async function validateReleaseAssets(version, platform, rootDirectory = process.
       validateBlockmap(fs.readFileSync(map.file), regularFile(releaseDir, name.slice(0, -'.blockmap'.length)).size);
     }
     installerNames.push(...policy.artifacts);
+    const recovery = regularFile(releaseDir, policy.recovery);
+    validateArtifactFormat(recovery.file, recovery.size);
+    installerNames.push(policy.recovery);
   }
   if (names.includes('SHA256SUMS.txt')) {
     const checksumFile = regularFile(releaseDir, 'SHA256SUMS.txt', 64 * 1024);
@@ -91,7 +94,7 @@ async function validateReleaseAssets(version, platform, rootDirectory = process.
     }
     if (seen.size !== installerNames.length) throw new Error('SHA256SUMS.txt does not cover every installer and archive.');
   }
-  return [required.feed, ...required.artifacts, ...required.blockmaps];
+  return [required.feed, ...required.artifacts, ...required.blockmaps, required.recovery];
 }
 
 if (require.main === module) {

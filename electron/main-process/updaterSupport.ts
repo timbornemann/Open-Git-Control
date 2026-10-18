@@ -86,3 +86,22 @@ export const withTimeout = <T>(operation: Promise<T>, timeoutMs: number, timeout
       });
   });
 };
+export function waitForUpdaterState<T extends { state: string }>(read: () => T, targets: readonly string[], timeoutMs: number): Promise<T> {
+  if (targets.includes(read().state)) return Promise.resolve(read());
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      clearInterval(interval);
+      reject(new Error(`Updater status timeout while waiting for: ${targets.join(', ')}`));
+    }, timeoutMs);
+    const interval = setInterval(() => {
+      const state = read();
+      if (targets.includes(state.state)) {
+        clearTimeout(timer);
+        clearInterval(interval);
+        resolve(state);
+      }
+    }, 150);
+    timer.unref?.();
+    interval.unref?.();
+  });
+}

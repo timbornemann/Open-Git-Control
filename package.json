@@ -27,10 +27,14 @@
     "legal:prepare": "node scripts/prepare-distribution-legal-files.js",
     "legal:check": "node scripts/prepare-distribution-legal-files.js --check",
     "licenses:update": "node scripts/update-spdx-license-texts.js",
-    "dist": "npm run legal:prepare && npm run build && electron-builder --publish never",
-    "dist:win": "npm run legal:prepare && npm run build && electron-builder --win nsis --x64 --publish never",
-    "dist:linux": "npm run legal:prepare && npm run build && electron-builder --linux AppImage deb --x64 --publish never",
-    "dist:mac": "npm run legal:prepare && npm run build && electron-builder --mac dmg zip --x64 --publish never",
+    "recovery:build": "node scripts/build-recovery.js",
+    "recovery:test": "cargo test --manifest-path recovery/Cargo.toml --locked",
+    "recovery:check": "cargo fmt --manifest-path recovery/Cargo.toml -- --check && cargo clippy --manifest-path recovery/Cargo.toml --locked --all-targets -- -D warnings",
+    "recovery:smoke": "node scripts/test-recovery.js",
+    "dist": "npm run legal:prepare && npm run recovery:build && npm run build && electron-builder --publish never",
+    "dist:win": "npm run legal:prepare && npm run recovery:build && npm run build && electron-builder --win nsis --x64 --publish never",
+    "dist:linux": "npm run legal:prepare && npm run recovery:build && npm run build && electron-builder --linux AppImage deb --x64 --publish never",
+    "dist:mac": "npm run legal:prepare && npm run recovery:build && npm run build && electron-builder --mac dmg zip --x64 --publish never",
     "release:win": "npm run dist:win",
     "release:linux": "npm run dist:linux",
     "release:mac": "npm run dist:mac",
@@ -108,6 +112,8 @@
   "build": {
     "appId": "com.opengitcontrol.app",
     "productName": "Open-Git-Control",
+    "afterPack": "scripts/package-recovery.js",
+    "afterAllArtifactBuild": "scripts/package-recovery-artifacts.js",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -120,6 +126,10 @@
       "logo.png"
     ],
     "extraResources": [
+      {
+        "from": "build/recovery",
+        "to": "recovery"
+      },
       {
         "from": "LICENSE",
         "to": "LICENSE"
@@ -150,10 +160,16 @@
       "icon": "logo.ico"
     },
     "nsis": {
+      "include": "packaging/recovery.nsh",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "license": "build/LICENSE.txt"
+    },
+    "deb": {
+      "fpm": [
+        "packaging/recovery.desktop=/usr/share/applications/open-git-control-recovery.desktop"
+      ]
     },
     "linux": {
       "maintainer": "Tim Bornemann <tim@timbornemann.de>",
@@ -197,6 +213,25 @@
       "notarize": false
     },
     "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 140,
+          "type": "file"
+        },
+        {
+          "x": 410,
+          "y": 140,
+          "type": "link",
+          "path": "/Applications"
+        },
+        {
+          "x": 130,
+          "y": 310,
+          "type": "file",
+          "path": "build/Open-Git-Control Recovery.app"
+        }
+      ],
       "license": "build/LICENSE.txt"
     }
   }

@@ -58,3 +58,37 @@ jobs:
       - name: Verify native Windows startup and restart
         if: runner.os == 'Windows'
         run: npm run test:startup:electron
+
+  recovery:
+    name: Native recovery (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.93.1
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: recovery
+      - name: Install Linux native UI dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev xvfb
+      - run: npm run recovery:check
+      - run: npm run recovery:test
+      - run: npm run recovery:build
+      - name: Native software-renderer smoke test
+        if: runner.os != 'Linux'
+        run: npm run recovery:smoke
+      - name: Native software-renderer smoke test (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run recovery:smoke
+      - name: Update, repair and restore official packages in isolation
+        run: node scripts/test-recovery-installation.js

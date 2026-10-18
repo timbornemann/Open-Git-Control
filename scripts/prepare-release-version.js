@@ -36,3 +36,11 @@ if (fs.existsSync(packageLockPath)) {
 }
 
 console.log(`Prepared release version: ${normalizedVersion}`);
+const cargoPath = path.resolve(process.cwd(), 'recovery/Cargo.toml');
+if (fs.existsSync(cargoPath)) {
+  const cargo = fs.readFileSync(cargoPath, 'utf8');
+  fs.writeFileSync(cargoPath, cargo.replace(/^(version\s*=\s*)"[^"]+"/m, `$1"${normalizedVersion}"`), 'utf8');
+  const lockPath = path.resolve(process.cwd(), 'recovery/Cargo.lock');
+  const lock = fs.readFileSync(lockPath, 'utf8');
+  fs.writeFileSync(lockPath, lock.replace(/(name = "ogc-recovery"\r?\nversion = )"[^"]+"/, `$1"${normalizedVersion}"`), 'utf8');
+}

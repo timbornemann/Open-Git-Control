@@ -50,8 +50,8 @@ afterEach(() => {
 describe('published release verification', () => {
   it('compares every uploaded byte stream, including manifests and blockmaps, to the locally verified build', async () => {
     const data = fixture();
-    await expect(verifyPublishedRelease(fixtureVersion, data.releaseDirectory, data.fetchImpl)).resolves.toBe(12);
-    expect(data.fetchImpl).toHaveBeenCalledTimes(13);
+    await expect(verifyPublishedRelease(fixtureVersion, data.releaseDirectory, data.fetchImpl)).resolves.toBe(15);
+    expect(data.fetchImpl).toHaveBeenCalledTimes(16);
   });
 
   it.each(['https://evil.example/update.exe', `${releaseRoot.replace('timbornemann', 'attacker')}/latest.yml`, `${releaseRoot}/latest.yml?redirect=evil`])(
@@ -126,6 +126,6 @@ describe('published release verification', () => {
       expect(value).toBe(`${cdn}?signed=github`);
       return new Response(new Uint8Array(data.bytes.get(redirectName)!));
     });
-    await expect(verifyPublishedRelease(fixtureVersion, data.releaseDirectory, fakeFetch)).resolves.toBe(12);
+    await expect(verifyPublishedRelease(fixtureVersion, data.releaseDirectory, fakeFetch)).resolves.toBe(15);
   });
 });

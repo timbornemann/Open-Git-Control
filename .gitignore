@@ -32,3 +32,6 @@ coverage
 NVIDIA Corporation/
 release/
 /build/*
+recovery/target/
+recovery/.cargo-home/
+recovery/THIRD_PARTY_NOTICES.txt

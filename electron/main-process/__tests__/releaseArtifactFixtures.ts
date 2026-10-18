@@ -50,6 +50,8 @@ function artifactPayload(suffix: string): { bytes: Buffer; blockMapSize?: number
     bytes.writeUInt16LE(1, bytes.length - 12);
     bytes.writeUInt32LE(46, bytes.length - 10);
     bytes.writeUInt32LE(32, bytes.length - 6);
+  } else if (suffix.endsWith('.tar.gz')) {
+    bytes = zlib.gzipSync(Buffer.from('recovery archive fixture'));
   }
   return { bytes };
 }
@@ -92,6 +94,10 @@ export function createReleaseFixture(platforms: ReleasePlatform[] = ['windows'],
       const name = `${source.productName}-${fixtureVersion}-${suffix}`;
       fs.writeFileSync(path.join(directory, 'release', `${name}.blockmap`), blockmapPayload(artifactPayload(suffix).bytes.length));
     }
+    const recoveryName = `${source.productName}-Recovery-${fixtureVersion}-${source.recovery[platform]}`;
+    const recoveryBytes = artifactPayload(source.recovery[platform]).bytes;
+    fs.writeFileSync(path.join(directory, 'release', recoveryName), recoveryBytes);
+    checksumLines.push(`${crypto.createHash('sha256').update(recoveryBytes).digest('hex')}  ${recoveryName}`);
   }
   if (withChecksums) fs.writeFileSync(path.join(directory, 'release', 'SHA256SUMS.txt'), `${checksumLines.join('\n')}\n`);
   return directory;

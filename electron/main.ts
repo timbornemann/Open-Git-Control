@@ -10,6 +10,7 @@ import { buildDiagnosticsReportFactory } from './main-process/diagnostics';
 import { setupIPC } from './main-process/ipc/setupIPC';
 import { getGeminiApiKeyFromSecureStore, getOpenAiApiKeyFromSecureStore, readSettingsWithMigration } from './main-process/settingsStore';
 import { UpdaterManager } from './main-process/updaterManager';
+import { prepareRecoveryUpdater, registerRecoveryShortcuts } from './main-process/recoveryUpdater';
 import { createMainWindow } from './main-process/windowFactory';
 import type { PlanningApiServerHandle } from './main-process/planningApiServer';
 import { startPlanningApiServer } from './main-process/planningApiServer';
@@ -162,6 +163,13 @@ if (isPrimaryInstance) {
     installAppSecurity({ isDev, mainProcessDir: __dirname });
     installHtmlPreviewProtocol();
     openMainWindowIfReady();
+    if (app.isPackaged && !process.env.OGC_STARTUP_TEST_PROFILE) {
+      BrowserWindow.getAllWindows()[0]?.webContents.once('did-finish-load', () => {
+        void prepareRecoveryUpdater()
+          .then(registerRecoveryShortcuts)
+          .catch((error) => console.warn('[recovery-updater]', String(error)));
+      });
+    }
     updaterManager.configureAutoUpdates(readSettingsWithMigration().autoUpdateEnabled);
     recordStartup('startup-services-ready');
     if (process.env.OPEN_GIT_CONTROL_API_DISABLED !== 'true') {

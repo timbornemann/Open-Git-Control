@@ -3,6 +3,7 @@ import { createRepositoryAnalyticsApi } from './createRepositoryAnalyticsApi';
 import { createRepositoryLocationApi } from './createRepositoryLocationApi';
 import { createSystemToolsApi } from './createSystemToolsApi';
 import { createStorageApi } from './createStorageApi';
+import { createUpdaterApi } from './createUpdaterApi';
 import type { RepositoryMutation } from '../../src/shared/ipc/storageMaintenance';
 import type { PreviewSnapshot, ReadRequest } from '../../src/shared/cache/resource';
 import type { IpcRenderer, IpcRendererEvent } from 'electron';
@@ -16,7 +17,6 @@ import type {
   GitJobEventDto,
   PlanningApiTokenLifetimeDto,
   StoredRepoData,
-  UpdaterStatusDto,
 } from '../../src/types/preloadDtos';
 import type { PlannerItemInput, PlannerProjectInput } from '../../src/types/projectPlanner';
 import { isRepoUnavailableError, type RepoUnavailablePayload } from '../../src/shared/git/errors';
@@ -333,16 +333,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     generatePlanningApiToken: (lifetime: PlanningApiTokenLifetimeDto) => ipcRenderer.invoke(IpcChannel.PlanningApiGenerateToken, lifetime),
     clearPlanningApiToken: () => ipcRenderer.invoke(IpcChannel.PlanningApiClearSavedToken),
     getAppVersion: () => ipcRenderer.invoke(IpcChannel.AppGetVersion),
-    getUpdaterStatus: () => ipcRenderer.invoke(IpcChannel.UpdaterGetStatus),
-    checkForAppUpdates: () => ipcRenderer.invoke(IpcChannel.UpdaterCheck),
-    runOneClickAppUpdate: () => ipcRenderer.invoke(IpcChannel.UpdaterRunOneClick),
-    downloadAppUpdate: () => ipcRenderer.invoke(IpcChannel.UpdaterDownload),
-    installAppUpdate: () => ipcRenderer.invoke(IpcChannel.UpdaterInstall),
-    onUpdaterEvent: (callback: (event: UpdaterStatusDto) => void) => {
-      const handler = (_event: IpcRendererEvent, payload: UpdaterStatusDto) => callback(payload);
-      ipcRenderer.on(IpcChannel.UpdaterEvent, handler);
-      return () => ipcRenderer.removeListener(IpcChannel.UpdaterEvent, handler);
-    },
+    ...createUpdaterApi(ipcRenderer),
     aiTestConnection: () => ipcRenderer.invoke(IpcChannel.AiTestConnection),
     aiListModels: () => ipcRenderer.invoke(IpcChannel.AiListModels),
     ollamaTestConnection: () => ipcRenderer.invoke(IpcChannel.AiTestConnection),
@@ -471,12 +462,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       generatePlanningApiToken: flatApi.generatePlanningApiToken,
       clearPlanningApiToken: flatApi.clearPlanningApiToken,
       getAppVersion: flatApi.getAppVersion,
-      getUpdaterStatus: flatApi.getUpdaterStatus,
-      checkForAppUpdates: flatApi.checkForAppUpdates,
-      runOneClickAppUpdate: flatApi.runOneClickAppUpdate,
-      downloadAppUpdate: flatApi.downloadAppUpdate,
-      installAppUpdate: flatApi.installAppUpdate,
-      onUpdaterEvent: flatApi.onUpdaterEvent,
+      ...createUpdaterApi(ipcRenderer),
       getDiagnosticsReport: flatApi.getDiagnosticsReport,
       writeClipboardText: flatApi.writeClipboardText,
     },

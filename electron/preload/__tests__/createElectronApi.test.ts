@@ -3,6 +3,13 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { createElectronApi } from '../createElectronApi';
 
 describe('createElectronApi', () => {
+  it('opens the recovery helper through a parameterless typed IPC action in both namespaces', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+    await expect(api.app.openRecoveryUpdater()).resolves.toEqual({ success: true });
+    await expect(api.openRecoveryUpdater()).resolves.toEqual({ success: true });
+    expect(invoke.mock.calls).toEqual([[IpcChannel.UpdaterOpenRecovery], [IpcChannel.UpdaterOpenRecovery]]);
+  });
   it('exposes native clipboard writes through both API namespaces', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

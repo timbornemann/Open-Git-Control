@@ -1,0 +1,3 @@
+[target.x86_64-pc-windows-msvc]
+# Keep recovery independent of VC runtime DLLs in the Electron installation.
+rustflags = ["-C", "target-feature=+crt-static"]

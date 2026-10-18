@@ -3,8 +3,9 @@ import { autoUpdater } from 'electron-updater';
 import type { ProgressInfo, UpdateInfo } from 'electron-updater';
 import { CancellationToken } from 'builder-util-runtime';
 import { IpcChannel } from '../../src/types/ipcContract';
-import { formatUpdaterError, normalizeReleaseNotes, pendingReleaseFromError, withTimeout } from './updaterSupport';
+import { formatUpdaterError, normalizeReleaseNotes, pendingReleaseFromError, waitForUpdaterState, withTimeout } from './updaterSupport';
 import { assertOfficialUpdateInfo, configureOfficialUpdaterSource } from './updaterSourcePolicy';
+import { RECOVERY_UPDATE_BUSY, UpdaterRecoveryGuard } from './updaterRecoveryGuard';
 
 export type UpdaterState = 'idle' | 'checking' | 'release-pending' | 'update-available' | 'no-update' | 'downloading' | 'downloaded' | 'error';
 
@@ -21,12 +22,12 @@ export type UpdaterStatusPayload = {
   lastCheckedAt: number | null;
   releaseNotes: string | null;
   error: string | null;
+  recoveryActive?: boolean;
 };
 
 const AUTO_UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 const UPDATER_DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000;
 const UPDATER_STATE_WAIT_TIMEOUT_MS = 5 * 1000;
-const UPDATER_STATE_POLL_INTERVAL_MS = 150;
 
 export class UpdaterManager {
   private autoUpdateInterval: NodeJS.Timeout | null = null;
@@ -38,6 +39,11 @@ export class UpdaterManager {
   private activeDownloadCancellationToken: CancellationToken | null = null;
 
   private availableUpdateInfo: UpdateInfo | null = null;
+  private readonly recoveryGuard = new UpdaterRecoveryGuard((blocked) => {
+    if (blocked) this.activeDownloadCancellationToken?.cancel();
+    autoUpdater.autoInstallOnAppQuit = !blocked && this.automaticDownloadsEnabled && process.platform !== 'darwin';
+    this.setUpdaterStatus({ recoveryActive: blocked });
+  });
 
   constructor(private readonly isDev: boolean) {
     this.updaterStatus = {
@@ -127,37 +133,7 @@ export class UpdaterManager {
   }
 
   private waitForUpdaterState(targetStates: UpdaterState[], timeoutMs: number): Promise<UpdaterStatusPayload> {
-    if (targetStates.includes(this.updaterStatus.state)) {
-      return Promise.resolve(this.updaterStatus);
-    }
-
-    return new Promise((resolve, reject) => {
-      let interval: NodeJS.Timeout | null = null;
-
-      const timeout = setTimeout(() => {
-        if (interval) {
-          clearInterval(interval);
-        }
-        reject(new Error(`Updater status timeout while waiting for: ${targetStates.join(', ')}`));
-      }, timeoutMs);
-
-      interval = setInterval(() => {
-        if (targetStates.includes(this.updaterStatus.state)) {
-          clearTimeout(timeout);
-          if (interval) {
-            clearInterval(interval);
-          }
-          resolve(this.updaterStatus);
-        }
-      }, UPDATER_STATE_POLL_INTERVAL_MS);
-
-      if (typeof timeout.unref === 'function') {
-        timeout.unref();
-      }
-      if (interval && typeof interval.unref === 'function') {
-        interval.unref();
-      }
-    });
+    return waitForUpdaterState(() => this.updaterStatus, targetStates, timeoutMs);
   }
 
   private async waitForOneClickDownload(): Promise<{ success: boolean; action?: 'downloaded'; error?: string }> {
@@ -179,6 +155,7 @@ export class UpdaterManager {
   }
 
   async checkForAppUpdates(): Promise<{ success: boolean; error?: string }> {
+    if (!this.isDev && this.recoveryGuard.refresh()) return { success: false, error: RECOVERY_UPDATE_BUSY };
     if (!this.updaterStatus.isSupported) {
       return { success: false, error: 'Auto-Updates sind nur in der installierten App verfuegbar.' };
     }
@@ -213,6 +190,7 @@ export class UpdaterManager {
   }
 
   async downloadAvailableUpdate(): Promise<{ success: boolean; error?: string }> {
+    if (!this.isDev && this.recoveryGuard.refresh()) return { success: false, error: RECOVERY_UPDATE_BUSY };
     if (!this.updaterStatus.isSupported) {
       return { success: false, error: 'Auto-Updates sind nur in der installierten App verfuegbar.' };
     }
@@ -268,6 +246,7 @@ export class UpdaterManager {
   }
 
   installDownloadedUpdate(): { success: boolean; error?: string } {
+    if (!this.isDev && this.recoveryGuard.refresh()) return { success: false, error: RECOVERY_UPDATE_BUSY };
     if (!this.updaterStatus.isSupported) {
       return { success: false, error: 'Auto-Updates sind nur in der installierten App verfuegbar.' };
     }
@@ -277,6 +256,7 @@ export class UpdaterManager {
     }
 
     setImmediate(() => {
+      if (this.recoveryGuard.refresh()) return;
       autoUpdater.quitAndInstall(false, true);
     });
 
@@ -284,6 +264,7 @@ export class UpdaterManager {
   }
 
   async runOneClickUpdate(): Promise<{ success: boolean; action?: 'no-update' | 'release-pending' | 'downloaded'; error?: string }> {
+    if (!this.isDev && this.recoveryGuard.refresh()) return { success: false, error: RECOVERY_UPDATE_BUSY };
     if (!this.updaterStatus.isSupported) {
       return { success: false, error: 'Auto-Updates sind nur in der installierten App verfuegbar.' };
     }
@@ -364,7 +345,7 @@ export class UpdaterManager {
 
     // Squirrel.Mac cannot undo native update staging. Defer it until an
     // explicit install request so disabling updates can still skip the update.
-    autoUpdater.autoInstallOnAppQuit = enabled && process.platform !== 'darwin';
+    autoUpdater.autoInstallOnAppQuit = enabled && process.platform !== 'darwin' && !this.recoveryGuard.refresh();
 
     // Availability checks remain active even when automatic downloads are
     // disabled, so the renderer can still advertise a new version. The user
@@ -395,6 +376,7 @@ export class UpdaterManager {
     }
 
     autoUpdater.autoDownload = false;
+    this.recoveryGuard.start();
     configureOfficialUpdaterSource(autoUpdater);
 
     autoUpdater.on('checking-for-update', () => {
@@ -475,6 +457,7 @@ export class UpdaterManager {
   }
 
   dispose(): void {
+    this.recoveryGuard.dispose();
     this.clearAutoUpdateInterval();
     this.activeDownloadCancellationToken?.cancel();
     this.activeDownloadCancellationToken?.dispose();

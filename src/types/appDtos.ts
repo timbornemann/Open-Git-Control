@@ -19,6 +19,7 @@ export interface StoredRepoData {
 export type UpdaterStateDto = 'idle' | 'checking' | 'release-pending' | 'update-available' | 'no-update' | 'downloading' | 'downloaded' | 'error';
 
 export interface UpdaterStatusDto {
+  recoveryActive?: boolean;
   isSupported: boolean;
   state: UpdaterStateDto;
   currentVersion: string;

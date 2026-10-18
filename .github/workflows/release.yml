@@ -94,11 +94,11 @@ jobs:
             label: Windows
             platform: windows
             script: dist:win
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             label: Linux
             platform: linux
             script: dist:linux
-          - os: macos-latest
+          - os: macos-15-intel
             label: macOS
             platform: macos
             script: dist:mac
@@ -124,6 +124,22 @@ jobs:
       - name: Prepare Electron runtime
         run: npx --no-install install-electron
 
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.93.1
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: recovery
+
+      - name: Install native Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev xvfb
+
+      - name: Verify native recovery core
+        run: npm run recovery:check && npm run recovery:test
+
       - name: Run release quality gate
         run: npm run test:ci
 
@@ -135,6 +151,17 @@ jobs:
       - name: Validate release artifacts
         run: node scripts/validate-release-assets.js "${{ needs.prepare.outputs.version }}" "${{ matrix.platform }}"
 
+      - name: Verify independent recovery UI
+        if: runner.os != 'Linux'
+        run: npm run recovery:smoke
+
+      - name: Verify independent recovery UI (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run recovery:smoke
+
+      - name: Verify actual recovery installation cycles
+        run: node scripts/test-recovery-installation.js
+
       - name: Verify packaged Windows startup and restart
         if: matrix.platform == 'windows'
         run: npm run test:startup:electron -- release/win-unpacked/resources/app.asar
@@ -143,7 +170,7 @@ jobs:
         if: matrix.platform == 'macos'
         shell: bash
         run: |
-          ZIP_FILE="$(find release -maxdepth 1 -name '*.zip' -print -quit)"
+          ZIP_FILE="$(find release -maxdepth 1 -name 'Open-Git-Control-*-mac-x64.zip' ! -name '*Recovery*' -print -quit)"
           test -n "$ZIP_FILE"
           mkdir -p signed-app-check
           ditto -x -k "$ZIP_FILE" signed-app-check
@@ -217,6 +244,7 @@ jobs:
             release/*.deb
             release/*.dmg
             release/*.zip
+            release/*.tar.gz
             release/SHA256SUMS.txt
           fail_on_unmatched_files: true
         env:
@@ -255,13 +283,13 @@ jobs:
       - name: Commit README updates
         shell: bash
         run: |
-          if git diff --quiet -- package.json package-lock.json README.md README.de.md; then
+          if git diff --quiet -- package.json package-lock.json recovery/Cargo.toml recovery/Cargo.lock README.md README.de.md; then
             echo "Release version and README links are already current."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json README.md README.de.md
+          git add package.json package-lock.json recovery/Cargo.toml recovery/Cargo.lock README.md README.de.md
           git commit -m "chore(release): sync ${{ needs.prepare.outputs.tag }} version and download links"
           git push

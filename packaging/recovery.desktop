@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Open-Git-Control Recovery
+Name[de]=Open-Git-Control Notfall-Updater
+Comment=Update, repair or restore Open-Git-Control
+Exec=/opt/Open-Git-Control/resources/recovery/open-git-control-recovery --installation /opt/Open-Git-Control
+Terminal=false
+Categories=Development;
+Icon=open-git-control

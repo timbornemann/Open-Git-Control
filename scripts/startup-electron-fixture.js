@@ -10,6 +10,8 @@ const applicationPath = process.env.OGC_STARTUP_TEST_APP;
 assert.ok(profile && path.isAbsolute(profile), 'An isolated startup test profile is required.');
 assert.ok(applicationPath && path.isAbsolute(applicationPath), 'Choose the built application or its packaged app.asar.');
 app.setPath('userData', profile);
+fs.mkdirSync(path.join(profile, 'app-data'), { recursive: true });
+app.setPath('appData', path.join(profile, 'app-data'));
 app.setPath('sessionData', profile);
 console.log(`Native startup test process: ${process.pid}`);
 process.env.OPEN_GIT_CONTROL_API_DISABLED = 'true';

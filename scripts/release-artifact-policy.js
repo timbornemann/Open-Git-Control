@@ -18,6 +18,7 @@ function platformArtifacts(version, platform) {
     feed: policy.feed,
     artifacts: policy.artifacts.map((suffix) => artifactName(version, suffix)),
     blockmaps: policy.blockmaps.map((suffix) => `${artifactName(version, suffix)}.blockmap`),
+    recovery: `${source.productName}-Recovery-${version}-${source.recovery[platform]}`,
   };
 }
 
@@ -26,7 +27,7 @@ function releaseAssetNames(version) {
     ...new Set(
       Object.keys(source.platforms).flatMap((platform) => {
         const policy = platformArtifacts(version, platform);
-        return [policy.feed, ...policy.artifacts, ...policy.blockmaps];
+        return [policy.feed, ...policy.artifacts, ...policy.blockmaps, policy.recovery];
       }),
     ),
     'SHA256SUMS.txt',

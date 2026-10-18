@@ -188,6 +188,7 @@ export const enum IpcChannel {
   UpdaterGetStatus = 'updater:getStatus',
   UpdaterInstall = 'updater:install',
   UpdaterRunOneClick = 'updater:runOneClick',
+  UpdaterOpenRecovery = 'updater:openRecovery',
 }
 
 export type IpcChannelName = `${IpcChannel}`;
