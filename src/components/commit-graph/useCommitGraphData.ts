@@ -4,9 +4,8 @@ import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { historyRevision, subscribeHistoryRevision } from '@/data/historyRevision';
 import type { GraphLayout } from '@/utils/graphLayout';
 import { isRepoUnavailableError, parseGitLog, type GitStatusDetailed } from '@/utils/gitParsing';
-import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { gitClient } from '@/services/gitClient';
-import { mergeCommitStatsUpdate, type CommitStatsUpdate } from './mergeCommitStatsUpdate';
+import { useCommitGraphStats } from './useCommitGraphStats';
 import { mergeQuickRefreshCommits } from './mergeQuickRefreshCommits';
 import {
   applyCachedStats,
@@ -398,77 +397,8 @@ export const useCommitGraphData = ({
     loadMoreCommits,
   });
 
-  // Always reflects the latest repoPath so async stats responses can detect a
-  // repository change that happened while they were in flight.
-  const repoPathRef = useRef(repoPath);
-  repoPathRef.current = repoPath;
-
-  const updateCommitStats = useCallback(
-    (updates: Record<string, CommitStatsUpdate>) => {
-      setLayout((current) => {
-        if (!current) return current;
-        let changed = false;
-        const nodes = current.nodes.map((node) => {
-          const update = updates[node.commit.hash];
-          if (!update) return node;
-          const commit = mergeCommitStatsUpdate(node.commit, update);
-          if (commit === node.commit) return node;
-          changed = true;
-          return {
-            ...node,
-            commit,
-          };
-        });
-        if (!changed) return current;
-        const next = { ...current, nodes };
-        if (repoPath) {
-          storeGraphCache(
-            getGraphCacheKey(repoPath, showSecondaryHistory),
-            nodes.map((node) => node.commit),
-            hasMoreCommits,
-          );
-        }
-        return next;
-      });
-    },
-    [hasMoreCommits, repoPath, showSecondaryHistory],
-  );
-
-  const requestCommitStats = useCallback(
-    async (hashes: string[], priority: 'selected' | 'visible' | 'background' = 'background') => {
-      if (!repoPath || hashes.length === 0) return;
-      const unique = [...new Set(hashes)].slice(0, 500);
-      const result = await gitClient.requestCommitStats(unique, priority, repoPath);
-      // Drop a stats response that arrived after the repository changed, so one
-      // repository's stats never merge into another repository's graph or cache.
-      if (normalizeRepoPathKey(repoPathRef.current || '') !== normalizeRepoPathKey(repoPath)) return;
-      if (!result.success) return;
-      const updates: Record<string, CommitStatsUpdate> = {};
-      for (const [hash, value] of Object.entries(result.data)) {
-        updates[hash] = {
-          stats: value.stats,
-          state: value.state,
-        };
-      }
-      updateCommitStats(updates);
-    },
-    [repoPath, updateCommitStats],
-  );
-
-  useEffect(() => {
-    if (!repoPath) return;
-    return gitClient.onCommitStats((update) => {
-      if (normalizeRepoPathKey(update.repoPath) !== normalizeRepoPathKey(repoPath)) return;
-      updateCommitStats({
-        [update.hash]: {
-          stats: update.stats,
-          state: update.state,
-        },
-      });
-    });
-  }, [repoPath, updateCommitStats]);
-
   const loadedCommitHashes = layout?.nodes.map((node) => node.commit.hash).join('\0') || '';
+  const requestCommitStats = useCommitGraphStats({ repoPath, scopeKey: graphScopeKey, revision, loadedCommitHashes, setLayout });
 
   useEffect(() => {
     if (!layout || !repoPath) return;

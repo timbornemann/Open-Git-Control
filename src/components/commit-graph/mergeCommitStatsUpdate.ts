@@ -12,20 +12,27 @@ const isRegressiveState = (current: GitCommit['statsState'], next: GitCommit['st
   return false;
 };
 
-export const mergeCommitStatsUpdate = (commit: GitCommit, update: CommitStatsUpdate): GitCommit => {
-  if (isRegressiveState(commit.statsState, update.state)) return commit;
+export const mergePendingCommitStatsUpdate = (current: CommitStatsUpdate, update: CommitStatsUpdate): CommitStatsUpdate => {
+  if (isRegressiveState(current.state, update.state)) return current;
   if (
-    commit.statsState === update.state &&
-    commit.stats?.files === update.stats?.files &&
-    commit.stats?.additions === update.stats?.additions &&
-    commit.stats?.deletions === update.stats?.deletions &&
-    (commit.stats === null) === (update.stats === null)
+    current.state === update.state &&
+    current.stats?.files === update.stats?.files &&
+    current.stats?.additions === update.stats?.additions &&
+    current.stats?.deletions === update.stats?.deletions &&
+    (current.stats === null) === (update.stats === null)
   ) {
-    return commit;
+    return current;
   }
+  return update;
+};
+
+export const mergeCommitStatsUpdate = (commit: GitCommit, update: CommitStatsUpdate): GitCommit => {
+  const current = { stats: commit.stats, state: commit.statsState };
+  const next = mergePendingCommitStatsUpdate(current, update);
+  if (next === current) return commit;
   return {
     ...commit,
-    stats: update.stats,
-    statsState: update.state,
+    stats: next.stats,
+    statsState: next.state,
   };
 };

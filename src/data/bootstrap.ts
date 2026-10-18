@@ -1,12 +1,12 @@
 import { preloadViewModules } from './viewModules';
 import { getElectronApi } from '@/services/electronApi';
-import { isPersistentResource, MAX_SNAPSHOT_BYTES, type PreviewSnapshot } from '@/shared/cache/resource';
 import { hydratePreviews, queryClient, refreshVisibleResources } from './queryClient';
 import { resourceKey } from './clientCache';
 import { backgroundQueue } from './backgroundQueue';
 import { prepareRestoredGraphs } from './preloading';
 import { receiveSystemTools, useSystemTools } from '@/app/state/systemToolsStore';
 import { isSystemToolAvailable } from '@/services/systemToolsAvailability';
+import { createPreviewPersistence } from './previewPersistence';
 
 let started = false;
 let bootstrapPromise: Promise<void> | undefined;
@@ -37,33 +37,7 @@ export function startDataRuntime() {
       /* Existing client reads remain available on a cold or damaged cache. */
     });
 
-  const pending = new Map<string, PreviewSnapshot>();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const flush = () => {
-    clearTimeout(timer);
-    timer = undefined;
-    if (!pending.size) return;
-    const batch = [...pending.values()];
-    pending.clear();
-    void api?.savePreviews?.(batch).catch(() => {});
-  };
-  queryClient.getQueryCache().subscribe((event) => {
-    if (event.type !== 'updated' || event.action.type !== 'success' || !isPersistentResource(event.query.queryKey)) return;
-    const state = event.query.state;
-    if (state.dataUpdatedAt <= startedAt || state.data === undefined) return;
-    const raw = JSON.stringify(state.data);
-    if (new TextEncoder().encode(raw).byteLength > MAX_SNAPSHOT_BYTES) return;
-    const payload = state.data as { data?: { snapshotId?: string; head?: string } };
-    pending.set(event.query.queryHash, {
-      version: 1,
-      key: event.query.queryKey,
-      savedAt: state.dataUpdatedAt,
-      sourceRevision: payload?.data?.snapshotId || payload?.data?.head || String(state.dataUpdatedAt),
-      complete: true,
-      data: state.data,
-    });
-    if (!timer) timer = setTimeout(flush, 300);
-  });
+  const { flush } = createPreviewPersistence(queryClient.getQueryCache(), api?.savePreviews, startedAt);
   const visibility = () => {
     if (document.visibilityState === 'hidden') {
       backgroundQueue.setPaused(true);
