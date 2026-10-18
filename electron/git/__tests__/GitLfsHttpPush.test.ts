@@ -158,7 +158,9 @@ describe('real LFS HTTP uploads followed by Git ref publication', () => {
     fs.writeFileSync(path.join(f.bare, 'allow-push'), '');
     expect((await run).state).toBe('success');
     expect(await f.refs()).toBe(f.plan.sourceOid);
-    expect(f.uploaded.get(f.oid)).toEqual(f.content);
+    // Compare all bytes natively: a deep assertion walks millions of Buffer
+    // entries and can exhaust the timeout under parallel Windows CI load.
+    expect(f.uploaded.get(f.oid)?.equals(f.content)).toBe(true);
     expect(f.puts).toEqual([f.oid]);
     const next = await f.service.planPush(f.repo, { repoPath: f.repo, remoteNames: ['origin'] }, f.context);
     expect((await f.service.executePush(f.repo, next.id, f.context)).targets[0].status).toBe('up-to-date');
