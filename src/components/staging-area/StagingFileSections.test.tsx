@@ -106,4 +106,19 @@ describe('StagingFileSections file previews', () => {
     expect(inspect).not.toHaveBeenCalled();
     expect(actions.showDiff).not.toHaveBeenCalled();
   });
+  it('preserves file rows, button identity, focus and scroll position through progress and statistics updates', () => {
+    render();
+    const row = host.querySelector<HTMLElement>('[aria-label="modified.txt"]')!;
+    const button = row.querySelector('button')!;
+    const list = row.closest<HTMLElement>('.staging-section-list')!;
+    row.focus();
+    list.scrollTop = 8;
+    for (let tick = 0; tick < 8; tick++) {
+      render();
+      expect(host.querySelector('[aria-label="modified.txt"]')).toBe(row);
+      expect(row.querySelector('button')).toBe(button);
+      expect(document.activeElement).toBe(row);
+      expect(list.scrollTop).toBe(8);
+    }
+  });
 });

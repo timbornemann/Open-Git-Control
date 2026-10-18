@@ -39,7 +39,9 @@ const SectionHeader = ({
 export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({ visibleStaged, visibleUnstaged, visibleUntracked, fileOps, onSelectFileInspect }) => {
   const { t } = useI18n();
 
-  const FileRow = ({ entry, section }: { entry: FileEntry; section: FileSection }) => {
+  // Render markup directly: defining a component type here would remount every
+  // visible row on each progress tick, losing hover, focus and pending clicks.
+  const renderFileRow = (entry: FileEntry, section: FileSection) => {
     const statusCode = section === 'staged' ? entry.x : entry.y;
     const info = getStatusInfo(statusCode);
     const inspectSource = section === 'staged' ? 'staged' : 'unstaged';
@@ -181,7 +183,7 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({ visibl
             rowHeight={28}
             fillAvailableHeight
             getKey={(file) => `s-${file.path}`}
-            renderItem={(file) => <FileRow entry={file} section="staged" />}
+            renderItem={(file) => renderFileRow(file, 'staged')}
           />
         </div>
       )}
@@ -220,7 +222,7 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({ visibl
             rowHeight={28}
             fillAvailableHeight
             getKey={(file) => `u-${file.path}`}
-            renderItem={(file) => <FileRow entry={file} section="unstaged" />}
+            renderItem={(file) => renderFileRow(file, 'unstaged')}
           />
         </div>
       )}
@@ -248,7 +250,7 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({ visibl
             rowHeight={28}
             fillAvailableHeight
             getKey={(file) => `t-${file.path}`}
-            renderItem={(file) => <FileRow entry={file} section="untracked" />}
+            renderItem={(file) => renderFileRow(file, 'untracked')}
           />
         </div>
       )}

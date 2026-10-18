@@ -14,6 +14,7 @@ export type WorkingTreeState = {
   dataRepoPath: string | null;
   snapshot: WorkingTreeSnapshotDto | null;
   status: GitStatusDetailed | null;
+  statusRaw: string;
   stats: WorkingTreeStatsDto | null;
   loading: boolean;
   refresh: () => Promise<void>;
@@ -24,6 +25,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
   const cachedSnapshot = cached.data?.success ? cached.data.data : null;
   const [snapshot, setSnapshot] = useState<WorkingTreeSnapshotDto | null>(null);
   const [status, setStatus] = useState<GitStatusDetailed | null>(null);
+  const [statusRaw, setStatusRaw] = useState('');
   const [stats, setStats] = useState<WorkingTreeStatsDto | null>(null);
   const [dataRepoPath, setDataRepoPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -32,10 +34,44 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
   const generationRef = useRef(0);
   const snapshotRef = useRef<WorkingTreeSnapshotDto | null>(null);
   const statsRef = useRef<WorkingTreeStatsDto | null>(null);
+  const statsRequestRef = useRef<{ generation: number; snapshotId: string; cancel: () => void } | null>(null);
+
+  const requestStats = useCallback((next: WorkingTreeSnapshotDto, generation: number) => {
+    if (statsRef.current?.snapshotId === next.snapshotId) return;
+    if (statsRequestRef.current?.generation === generation && statsRequestRef.current.snapshotId === next.snapshotId) return;
+    statsRequestRef.current?.cancel();
+    let active = true;
+    // Coalesce rapid staging clicks before starting a potentially expensive
+    // repository-wide line count. Status and mutation completion never wait.
+    const timer = setTimeout(() => {
+      void gitClient
+        .getWorkingTreeStats(next.snapshotId, next.repoPath)
+        .then((result) => {
+          if (!active || generation !== generationRef.current || snapshotRef.current?.snapshotId !== next.snapshotId || !result.success) return;
+          if (result.data.snapshotId !== next.snapshotId) return;
+          statsRef.current = result.data;
+          setStats(result.data);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (statsRequestRef.current === request) statsRequestRef.current = null;
+        });
+    }, 300);
+    const request = {
+      generation,
+      snapshotId: next.snapshotId,
+      cancel: () => {
+        active = false;
+        clearTimeout(timer);
+      },
+    };
+    statsRequestRef.current = request;
+  }, []);
 
   useEffect(
     () => () => {
       generationRef.current += 1;
+      statsRequestRef.current?.cancel();
     },
     [],
   );
@@ -57,6 +93,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
             statsRef.current = null;
             setSnapshot(null);
             setDataRepoPath(repoPath);
+            setStatusRaw(quickStatus.data || '');
             setStatus(parseGitStatusDetailed(quickStatus.data || ''));
             publishRepositoryActivity(
               repoPath,
@@ -87,6 +124,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
         snapshotRef.current = nextSnapshot;
         setSnapshot(nextSnapshot);
         setDataRepoPath(nextSnapshot.repoPath);
+        setStatusRaw(nextSnapshot.statusRaw);
         // Keep the list identity on unchanged polls. Replacing it also starts
         // another LFS inspection and sorts every file again in the renderer.
         setStatus((current) => (sameSnapshot && current ? current : parseGitStatusDetailed(nextSnapshot.statusRaw)));
@@ -98,10 +136,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
         if (statsRef.current?.snapshotId !== nextSnapshot.snapshotId) {
           statsRef.current = null;
           setStats(null);
-          const statsResult = await gitClient.getWorkingTreeStats(nextSnapshot.snapshotId, repoPath);
-          if (generation !== generationRef.current || !statsResult.success || snapshotRef.current?.snapshotId !== statsResult.data.snapshotId) return;
-          statsRef.current = statsResult.data;
-          setStats(statsResult.data);
+          requestStats(nextSnapshot, generation);
         }
         return;
       }
@@ -117,8 +152,11 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
       }
       snapshotRef.current = null;
       statsRef.current = null;
+      statsRequestRef.current?.cancel();
+      statsRequestRef.current = null;
       setSnapshot(null);
       setDataRepoPath(repoPath);
+      setStatusRaw(fallback.data || '');
       setStatus(parseGitStatusDetailed(fallback.data || ''));
       publishRepositoryActivity(
         repoPath,
@@ -149,10 +187,12 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
     });
     inFlightRef.current = { generation, promise: request };
     return request;
-  }, [repoPath]);
+  }, [repoPath, requestStats]);
 
   useLayoutEffect(() => {
     generationRef.current += 1;
+    statsRequestRef.current?.cancel();
+    statsRequestRef.current = null;
     queuedRefreshGenerationRef.current = null;
     const preview = peekResource<IpcResult<WorkingTreeSnapshotDto>>('git', 'getWorkingTreeSnapshot', [repoPath]);
     snapshotRef.current = preview?.success ? preview.data : null;
@@ -160,6 +200,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
     inFlightRef.current = null;
     setSnapshot(null);
     setStatus(null);
+    setStatusRaw('');
     setStats(null);
     setDataRepoPath(null);
     setLoading(false);
@@ -211,6 +252,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
     dataRepoPath: currentDataRepoPath,
     snapshot: currentSnapshot,
     status: currentStatus,
+    statusRaw: localDataMatches ? statusRaw : validPreview?.statusRaw || '',
     stats: currentStats,
     loading: loading || Boolean(repoPath && !currentDataRepoPath),
     refresh,

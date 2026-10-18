@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { FileEntry } from '@/utils/gitParsing';
-import { parseGitStatusDetailed, type GitStatusDetailed } from '@/utils/gitParsing';
+import type { FileEntry, GitStatusDetailed } from '@/utils/gitParsing';
 import type { GitCommandNameDto, WorkingTreeStatsDto } from '@/types/gitDtos';
 import type { DiffRequest } from '@/types/diff';
 import type { ToastMessage } from '@/types/git';
@@ -8,11 +7,12 @@ import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import type { RepositoryPathOpenActionDto } from '@/shared/ipc/contracts/git';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
-import { EMPTY_DIFF_STATS, basename, parseConflictEntries, parseNumstatStats } from './utils';
+import { EMPTY_DIFF_STATS, basename, parseConflictEntries } from './utils';
 import type { ConfirmDialogState, DiffStats, FileSection, GitStatusWithConflicts, InputDialogState, StagingContextMenuState } from './types';
 import { useIgnoreRule } from './useIgnoreRule';
 import { useStagingLfs } from './useStagingLfs';
 import type { TrackWithGitLfsRequest } from '@/shared/ipc/gitLfs';
+import { useWorkingTreeSnapshot } from '@/hooks/useWorkingTreeSnapshot';
 
 type Params = {
   repoPath: string | null;
@@ -48,6 +48,13 @@ export const useFileOperations = ({
   externalRefresh,
 }: Params) => {
   const { t, tr } = useI18n();
+  // The same status-first reader serves standalone staging windows too; a
+  // second polling loop must not run full numstat diffs every three seconds.
+  const localWorkingTree = useWorkingTreeSnapshot(externalRefresh || externalStatus !== undefined ? null : repoPath);
+  const sourceStatus = externalStatus === undefined ? localWorkingTree.status : externalStatus;
+  const sourceRaw = externalStatusRaw ?? localWorkingTree.statusRaw;
+  const sourceRepo = externalStatus === undefined ? localWorkingTree.dataRepoPath : externalRepoPath;
+  const sourceStats = externalStats === undefined ? localWorkingTree.stats : externalStats;
   const [status, setStatus] = useState<GitStatusWithConflicts | null>(null);
   const [stagedStats, setStagedStats] = useState<DiffStats>(EMPTY_DIFF_STATS);
   const [unstagedStats, setUnstagedStats] = useState<DiffStats>(EMPTY_DIFF_STATS);
@@ -56,13 +63,9 @@ export const useFileOperations = ({
   const [mutationStartedAt, setMutationStartedAt] = useState<number | null>(null);
   const [mutationElapsedMs, setMutationElapsedMs] = useState(0);
   const mutationInFlightRef = useRef(false);
-  const externalRefreshRef = useRef(externalRefresh);
   const repoGenerationRef = useRef(0);
   const activeRepoPathRef = useRef<string | null>(repoPath);
   const statusRepoPathRef = useRef<string | null>(null);
-  useLayoutEffect(() => {
-    externalRefreshRef.current = externalRefresh;
-  }, [externalRefresh]);
   useLayoutEffect(() => {
     repoGenerationRef.current += 1;
     activeRepoPathRef.current = repoPath;
@@ -97,105 +100,35 @@ export const useFileOperations = ({
     const repoAtStart = repoPath;
     const generation = repoGenerationRef.current;
     if (!repoAtStart || !gitClient.isAvailable() || !isCurrentRepoGeneration(generation, repoAtStart)) return;
-    if (externalRefresh) {
-      await externalRefresh();
-      return;
-    }
-    try {
-      const [statusResult, stagedResult, unstagedResult] = await Promise.all([
-        gitClient.runGitCommandForRepo(repoAtStart, 'statusPorcelain'),
-        gitClient.runGitCommandForRepo(repoAtStart, 'diff', '--numstat', '--cached'),
-        gitClient.runGitCommandForRepo(repoAtStart, 'diff', '--numstat'),
-      ]);
-      if (!isCurrentRepoGeneration(generation, repoAtStart) || externalRefreshRef.current) return;
-
-      if (statusResult.success) {
-        const rawStatus = statusResult.data || '';
-        const parsed = parseGitStatusDetailed(rawStatus);
-        const conflicts = parseConflictEntries(rawStatus);
-        const conflictPathSet = new Set(conflicts.map((c) => c.path));
-        setStatus({
-          ...parsed,
-          conflicts,
-          staged: parsed.staged.filter((f) => !conflictPathSet.has(f.path)),
-          unstaged: parsed.unstaged.filter((f) => !conflictPathSet.has(f.path)),
-        });
-        statusRepoPathRef.current = repoAtStart;
-      } else {
-        statusRepoPathRef.current = null;
-        setStatus(null);
-      }
-
-      setStagedStats(stagedResult.success ? parseNumstatStats(stagedResult.data || '') : EMPTY_DIFF_STATS);
-      setUnstagedStats(unstagedResult.success ? parseNumstatStats(unstagedResult.data || '') : EMPTY_DIFF_STATS);
-    } catch (e) {
-      console.error(e);
-    }
-  }, [externalRefresh, isCurrentRepoGeneration, repoPath]);
+    await (externalRefresh || localWorkingTree.refresh)();
+  }, [externalRefresh, isCurrentRepoGeneration, localWorkingTree.refresh, repoPath]);
 
   useLayoutEffect(() => {
-    if (externalStatus === undefined) return;
-    if (!repoPath || externalRepoPath === null || (externalRepoPath !== undefined && !isSameRepoPath(externalRepoPath, repoPath)) || !externalStatus) {
+    if (!repoPath || sourceRepo === null || (sourceRepo !== undefined && !isSameRepoPath(sourceRepo, repoPath)) || !sourceStatus) {
       statusRepoPathRef.current = null;
       setStatus(null);
       return;
     }
-    const conflicts = parseConflictEntries(externalStatusRaw || '');
+    const conflicts = parseConflictEntries(sourceRaw);
     const conflictPathSet = new Set(conflicts.map((conflict) => conflict.path));
     setStatus({
-      ...externalStatus,
+      ...sourceStatus,
       conflicts,
-      staged: externalStatus.staged.filter((file) => !conflictPathSet.has(file.path)),
-      unstaged: externalStatus.unstaged.filter((file) => !conflictPathSet.has(file.path)),
+      staged: sourceStatus.staged.filter((file) => !conflictPathSet.has(file.path)),
+      unstaged: sourceStatus.unstaged.filter((file) => !conflictPathSet.has(file.path)),
     });
     statusRepoPathRef.current = repoPath;
-  }, [externalRepoPath, externalStatus, externalStatusRaw, repoPath]);
+  }, [sourceRepo, sourceStatus, sourceRaw, repoPath]);
 
   useLayoutEffect(() => {
-    if (externalStats === undefined) return;
-    if (!repoPath || externalRepoPath === null || (externalRepoPath !== undefined && !isSameRepoPath(externalRepoPath, repoPath))) {
+    if (!repoPath || sourceRepo === null || (sourceRepo !== undefined && !isSameRepoPath(sourceRepo, repoPath))) {
       setStagedStats(EMPTY_DIFF_STATS);
       setUnstagedStats(EMPTY_DIFF_STATS);
       return;
     }
-    setStagedStats(externalStats?.staged || EMPTY_DIFF_STATS);
-    setUnstagedStats(externalStats?.unstaged || EMPTY_DIFF_STATS);
-  }, [externalRepoPath, externalStats, repoPath]);
-
-  useEffect(() => {
-    if (!repoPath) {
-      setStatus(null);
-      setStagedStats(EMPTY_DIFF_STATS);
-      setUnstagedStats(EMPTY_DIFF_STATS);
-      return;
-    }
-    if (externalRefresh) return;
-    const refreshIfVisible = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-        return;
-      }
-      void refresh();
-    };
-    const handleVisibilityChange = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        void refresh();
-      }
-    };
-
-    void refresh();
-    const iv = setInterval(refreshIfVisible, 3000);
-    window.addEventListener('focus', refreshIfVisible);
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-    }
-    return () => {
-      clearInterval(iv);
-      window.removeEventListener('focus', refreshIfVisible);
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-      }
-    };
-  }, [externalRefresh, repoPath, refresh]);
+    setStagedStats(sourceStats?.staged || EMPTY_DIFF_STATS);
+    setUnstagedStats(sourceStats?.unstaged || EMPTY_DIFF_STATS);
+  }, [sourceRepo, sourceStats, repoPath]);
 
   useEffect(() => {
     if (!contextMenu) return;

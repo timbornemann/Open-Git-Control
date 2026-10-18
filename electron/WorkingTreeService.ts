@@ -211,12 +211,15 @@ export class WorkingTreeService {
   private latestSnapshot: WorkingTreeSnapshot | null = null;
   private statsCache = new Map<string, WorkingTreeStats>();
   private statsInFlight = new Map<string, Promise<WorkingTreeStats>>();
+  private statsControllers = new Map<string, AbortController>();
   private volatileFingerprintGeneration = 0;
   private repoGeneration = 0;
 
   constructor(private readonly gitService: GitService) {}
 
   setActiveRepo(): void {
+    for (const controller of this.statsControllers.values()) controller.abort();
+    this.statsControllers.clear();
     this.repoGeneration += 1;
     this.snapshotInFlight = null;
     this.latestSnapshot = null;
@@ -261,6 +264,7 @@ export class WorkingTreeService {
         isBare,
       };
       if (this.repoGeneration === repoGeneration && this.gitService.getRepoPath() === repoPath) {
+        for (const [id, controller] of this.statsControllers) if (id !== snapshotId) controller.abort();
         this.latestSnapshot = snapshot;
       }
       return snapshot;
@@ -299,10 +303,16 @@ export class WorkingTreeService {
       return bareStats;
     }
 
+    const controller = new AbortController();
+    this.statsControllers.set(snapshotId, controller);
+    const readStats = (args: string[], side: string) =>
+      typeof this.gitService.runCommandAtPathWithSignal === 'function'
+        ? this.gitService.runCommandAtPathWithSignal(snapshot.repoPath, args, controller.signal, 'background')
+        : this.gitService.runPollingCommandAtPath(snapshot.repoPath, args, `working-tree-stats:${snapshotId}:${side}`);
     const promise = (async () => {
       const [stagedRaw, unstagedRaw] = await Promise.all([
-        this.gitService.runPollingCommandAtPath(snapshot.repoPath, ['diff', '--numstat', '--cached'], `working-tree-stats:${snapshotId}:staged`),
-        this.gitService.runPollingCommandAtPath(snapshot.repoPath, ['diff', '--numstat'], `working-tree-stats:${snapshotId}:unstaged`),
+        readStats(['diff', '--numstat', '--cached'], 'staged'),
+        readStats(['diff', '--numstat'], 'unstaged'),
       ]);
       const currentState = await this.captureStableState(snapshot.repoPath);
       const currentSnapshotId = this.buildSnapshotId(snapshot.repoPath, currentState.statusIdentity, currentState.contentFingerprint);
@@ -333,6 +343,10 @@ export class WorkingTreeService {
     try {
       return await promise;
     } finally {
+      // A preempted count must not leave its sibling diff consuming a read
+      // slot. The scheduler aborts background reads before interactive writes.
+      controller.abort();
+      if (this.statsControllers.get(snapshotId) === controller) this.statsControllers.delete(snapshotId);
       if (this.statsInFlight.get(snapshotId) === promise) {
         this.statsInFlight.delete(snapshotId);
       }
