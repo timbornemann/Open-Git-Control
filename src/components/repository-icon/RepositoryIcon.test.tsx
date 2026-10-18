@@ -17,6 +17,7 @@ import { LocalReposSidebarContent } from '@/components/layout/sidebar/LocalRepos
 import { LocalRepositoriesView } from '@/components/local-repositories/LocalRepositoriesView';
 import { RepositoryIcon } from './RepositoryIcon';
 import { RepositoryIconDialog, RepositoryIconDialogHost } from './RepositoryIconDialog';
+import { openRepositoryIconDialog } from './repositoryIconDialogEvents';
 
 vi.mock('@/contexts/AppStateContext', () => ({ useGitStore: vi.fn(), useRepositoryContext: vi.fn(), useUIContext: vi.fn(), useUIStore: vi.fn() }));
 vi.mock('@/hooks/useRepoOrigins', () => ({ useCachedRepoOrigins: vi.fn() }));
@@ -41,10 +42,12 @@ const initial = (path = repo): RepositoryIconStateDto => ({
 });
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((done, fail) => {
     resolve = done;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 };
 
 describe('shared repository logos and selection', () => {
@@ -297,6 +300,94 @@ describe('shared repository logos and selection', () => {
     await act(async () => pending.resolve({ success: true, data: initial() }));
     expect(closed).not.toHaveBeenCalled();
     expect(queryClient.getQueryData(repositoryIconKey(repo))).toBeUndefined();
+  });
+  it.each(['Cancel', 'Close', 'Escape', 'backdrop'])('can dismiss with %s while image decoding is pending, without saving a late draft', async (method) => {
+    state = cached();
+    const preview = deferred<string>();
+    vi.mocked(createRepositoryIconThumbnail).mockImplementation(() => preview.promise);
+    await render(dialog());
+    await act(async () => document.querySelector<HTMLButtonElement>('[title="assets/icon.svg"]')!.click());
+    await click('Save');
+    expect(document.querySelector<HTMLButtonElement>('button.is-primary')?.disabled).toBe(true);
+    try {
+      if (method === 'Cancel') await click('Cancel');
+      else if (method === 'Close') await act(async () => document.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!.click());
+      else if (method === 'Escape')
+        await act(async () => document.querySelector('[role="dialog"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+      else await act(async () => document.querySelector('.repository-icon-overlay')!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+      expect(closed).toHaveBeenCalledOnce();
+    } finally {
+      await act(async () => preview.resolve(png));
+    }
+    expect(choose).not.toHaveBeenCalled();
+    expect(closed).toHaveBeenCalledOnce();
+  });
+  it('ignores a native file picker reply after cancelling and reopening the same repository dialog', async () => {
+    state = cached();
+    const picker = deferred<{ success: true; data: string }>();
+    selectFile.mockReturnValueOnce(picker.promise);
+    await render(<RepositoryIconDialogHost />);
+    await act(async () => openRepositoryIconDialog(repo));
+    await click('Choose another image in the repository');
+    await click('Cancel');
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    await act(async () => openRepositoryIconDialog(repo));
+    await act(async () => picker.resolve({ success: true, data: 'custom/late.svg' }));
+    expect(document.querySelector('[role="dialog"]')).toBeTruthy();
+    expect(document.querySelector('[title="custom/late.svg"]')).toBeNull();
+    expect(choose).not.toHaveBeenCalled();
+    await click('Save');
+    expect(choose).toHaveBeenCalledWith(repo, { mode: 'auto', expectedSelectionVersion: 'selection-1' });
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+  it.each(['success', 'cancellation error'])('can close after the icon changes and ignore a late %s save reply after reopening', async (reply) => {
+    state = cached();
+    const saving = deferred<{ success: true; data: RepositoryIconStateDto }>();
+    choose.mockReturnValueOnce(saving.promise);
+    await render(
+      <>
+        <RepositoryIcon repoPath={repo} name="Alpha" />
+        <RepositoryIconDialogHost />
+      </>,
+    );
+    await act(async () => openRepositoryIconDialog(repo));
+    await click('assets/icon.svg');
+    await click('Save');
+    const committed: RepositoryIconStateDto = {
+      ...cached(),
+      mode: 'manual',
+      manualPath: 'assets/icon.svg',
+      selectionVersion: 'saved-selection',
+      revision: 10,
+      thumbnail: { path: 'assets/icon.svg', version: 'source-2', dataUrl: nextPng },
+    };
+    state = committed;
+    await act(async () => listener!(committed));
+    expect(host.querySelector('img')?.getAttribute('src')).toBe(nextPng);
+    await act(async () => document.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!.click());
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    await act(async () => openRepositoryIconDialog(repo));
+    await act(async () => {
+      if (reply === 'success') saving.resolve({ success: true, data: committed });
+      else saving.reject(new Error('CancellationError'));
+    });
+    expect(document.querySelector('[role="dialog"]')).toBeTruthy();
+    expect(document.querySelector<HTMLButtonElement>('button.is-primary')?.disabled).toBe(false);
+    expect(document.querySelector('[role="alert"]')).toBeNull();
+  });
+  it('does not submit the same choice twice before the busy state is rendered', async () => {
+    state = cached();
+    const saving = deferred<{ success: true; data: RepositoryIconStateDto }>();
+    choose.mockReturnValueOnce(saving.promise);
+    await render(dialog());
+    const button = document.querySelector<HTMLButtonElement>('button.is-primary')!;
+    await act(async () => {
+      button.click();
+      button.click();
+    });
+    expect(choose).toHaveBeenCalledOnce();
+    await act(async () => saving.resolve({ success: true, data: state }));
+    expect(closed).toHaveBeenCalledOnce();
   });
   it('background refresh never creates duplicate reads for the same displayed repository', async () => {
     state = cached();

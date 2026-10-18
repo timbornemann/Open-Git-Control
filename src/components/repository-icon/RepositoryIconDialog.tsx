@@ -39,6 +39,7 @@ export function RepositoryIconDialog({ repoPath, onClose }: { repoPath: string; 
   const baseVersion = useRef<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const active = useRef(true);
+  const running = useRef(false);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => {
@@ -68,7 +69,16 @@ export function RepositoryIconDialog({ repoPath, onClose }: { repoPath: string; 
       mounted = false;
     };
   }, [repoPath]);
+  const close = () => {
+    if (!active.current) return;
+    // Invalidate local work before notifying the host. Native pickers, image
+    // decoders and IPC replies can finish after this dialog has been dismissed.
+    active.current = false;
+    closeRef.current();
+  };
   const run = async (operation: () => Promise<void>) => {
+    if (!active.current || running.current) return;
+    running.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -76,6 +86,7 @@ export function RepositoryIconDialog({ repoPath, onClose }: { repoPath: string; 
     } catch (failure) {
       if (active.current) setError(failure instanceof Error ? failure.message : tr('Logo konnte nicht geladen werden.', 'Logo could not be loaded.'));
     } finally {
+      running.current = false;
       if (active.current) setBusy(false);
     }
   };
@@ -95,7 +106,7 @@ export function RepositoryIconDialog({ repoPath, onClose }: { repoPath: string; 
       if (!result.success) throw new Error(result.error || tr('Logo konnte nicht gespeichert werden.', 'Logo could not be saved.'));
       if (active.current) {
         publishRepositoryIcon(result.data);
-        closeRef.current();
+        close();
       }
     });
   const browse = () =>
@@ -114,7 +125,7 @@ export function RepositoryIconDialog({ repoPath, onClose }: { repoPath: string; 
     <div
       className="repository-icon-overlay"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !busy) onClose();
+        if (event.target === event.currentTarget) close();
       }}
     >
       <div
@@ -122,11 +133,12 @@ export function RepositoryIconDialog({ repoPath, onClose }: { repoPath: string; 
         className="repository-icon-dialog"
         role="dialog"
         aria-modal="true"
+        aria-busy={busy}
         aria-labelledby="repository-icon-dialog-title"
         onKeyDown={(event) => {
-          if (event.key === 'Escape' && !busy) {
+          if (event.key === 'Escape') {
             event.stopPropagation();
-            onClose();
+            close();
           }
           if (event.key === 'Tab') {
             const controls = [...(ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)') || [])];
@@ -148,7 +160,7 @@ export function RepositoryIconDialog({ repoPath, onClose }: { repoPath: string; 
             <strong>{repoName(repoPath)}</strong>
             <small>{repoPath}</small>
           </div>
-          <button type="button" disabled={busy} aria-label={tr('Schließen', 'Close')} onClick={onClose}>
+          <button type="button" aria-label={tr('Schließen', 'Close')} onClick={close}>
             <X size={18} />
           </button>
         </header>
@@ -228,7 +240,7 @@ export function RepositoryIconDialog({ repoPath, onClose }: { repoPath: string; 
           </button>
         )}
         <footer>
-          <button type="button" disabled={busy} onClick={onClose}>
+          <button type="button" onClick={close}>
             {tr('Abbrechen', 'Cancel')}
           </button>
           <button type="button" className="is-primary" disabled={busy || !state} onClick={() => void save()}>

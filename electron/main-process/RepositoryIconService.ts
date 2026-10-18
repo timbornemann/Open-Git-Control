@@ -305,7 +305,9 @@ export class RepositoryIconService {
       throw error;
     }
     this.changed(record);
-    return this.get(repo, true);
+    // The choice is already durable. A scan is optional background work and
+    // must not keep Save pending after other views have received the change.
+    return this.snapshot(record);
   }
   async cache(repo: string, request: RepositoryIconCacheRequestDto) {
     const record = await this.record(repo);

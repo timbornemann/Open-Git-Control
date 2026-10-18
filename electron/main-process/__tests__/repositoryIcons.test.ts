@@ -1,9 +1,10 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RepositoryIconService } from '../RepositoryIconService';
 import { discoverRepositoryIcons, readRepositoryIconSource } from '../repositoryIconDiscovery';
+import * as discovery from '../repositoryIconDiscovery';
 import type { RepositoryIconStateDto } from '../../../src/shared/repositoryIcons';
 
 const png = 'data:image/png;base64,thumbnail';
@@ -105,6 +106,62 @@ describe('repository icon discovery', () => {
   });
 });
 describe('persistent repository icon selection', () => {
+  it('acknowledges a persisted choice without waiting for an unrelated image scan', async () => {
+    file('logo.svg');
+    file('custom.svg');
+    const api = service();
+    const initial = await api.get(repo, true);
+    let finishScan!: (value: Awaited<ReturnType<typeof discoverRepositoryIcons>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof discoverRepositoryIcons>>>((resolve) => {
+      finishScan = resolve;
+    });
+    let startScan!: () => void;
+    const started = new Promise<void>((resolve) => {
+      startScan = resolve;
+    });
+    const scan = vi.spyOn(discovery, 'discoverRepositoryIcons').mockImplementationOnce(() => {
+      startScan();
+      return pending;
+    });
+    const refreshing = api.get(repo, true);
+    await started;
+    let announceChoice!: () => void;
+    const announced = new Promise<void>((resolve) => {
+      announceChoice = resolve;
+    });
+    const unsubscribe = api.subscribe((state) => {
+      if (state.manualPath === 'custom.svg' && state.status === 'ready') announceChoice();
+    });
+    let selected: RepositoryIconStateDto | undefined;
+    const saving = api.choose(repo, { mode: 'manual', path: 'custom.svg', expectedSelectionVersion: initial.selectionVersion }).then((result) => {
+      selected = result;
+    });
+    try {
+      await announced;
+      // A committed choice must settle on its own continuation, without
+      // completing the still-blocked filesystem scan.
+      await Promise.resolve();
+      expect(selected?.manualPath).toBe('custom.svg');
+      expect(selected?.status).toBe('ready');
+      const saved = JSON.parse(
+        fs.readFileSync(
+          path.join(
+            directory,
+            fs.readdirSync(directory).find((name) => name.endsWith('.json'))!,
+          ),
+          'utf8',
+        ),
+      );
+      expect(saved.manualPath).toBe('custom.svg');
+      expect(scan).toHaveBeenCalledOnce();
+    } finally {
+      finishScan({ candidates: ['logo.svg'], limited: false });
+      await Promise.all([refreshing, saving]);
+      unsubscribe();
+      scan.mockRestore();
+    }
+    expect((await api.get(repo, true)).manualPath).toBe('custom.svg');
+  });
   it('restores the small thumbnail after restart without copying the original image', async () => {
     file('logo.svg');
     const api = service();
