@@ -15,12 +15,15 @@ export type GitLfsFileState = GitLfsFileRequest & {
 };
 export type GitLfsStatusRequest = { repoPath: string; files: GitLfsFileRequest[] };
 export type GitLfsStatus = { available: boolean; error?: string; files: GitLfsFileState[] };
+export type GitLfsStagingMode = 'none' | 'selected' | 'matching';
 export type TrackWithGitLfsRequest = GitLfsFileRequest & {
   repoPath: string;
   expectedVersion: string;
   scope: 'file' | 'extension';
+  /** Omitted by older clients: retain the selected-file staging behavior. */
+  staging?: GitLfsStagingMode;
 };
-export type TrackWithGitLfsResult = { path: string; attributesPath: string; oid: string; bytes: number };
+export type TrackWithGitLfsResult = { path: string; attributesPath: string; oid?: string; bytes: number; stagedFiles: number };
 export type GitLfsApi = {
   getGitLfsStatus: (request: GitLfsStatusRequest) => Promise<IpcResult<GitLfsStatus>>;
   trackWithGitLfs: (request: TrackWithGitLfsRequest) => Promise<IpcResult<TrackWithGitLfsResult>>;

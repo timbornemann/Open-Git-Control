@@ -23,13 +23,13 @@ export function registerGitLfsHandlers(gitService: GitService, ensureWriteAllowe
     const id = randomUUID();
     let job: ReturnType<typeof repoJobRegistry.begin> | undefined;
     let repoPath = '';
-    const report = (status: 'start' | 'done' | 'failed' | 'cancelled', message?: string) =>
+    const report = (status: 'start' | 'progress' | 'done' | 'failed' | 'cancelled', message?: string) =>
       emitJobEvent(event.sender, { id, operation: IpcChannel.GitTrackWithLfs, status, message, details: { repoPath }, timestamp: Date.now() });
     try {
       repoPath = requireActiveRepositoryPath(input?.repoPath, gitService.getRepoPath(), IpcChannel.GitTrackWithLfs);
       ensureWriteAllowed(repoPath);
       job = repoJobRegistry.begin(repoPath);
-      report('start', 'Converting the selected file to Git LFS…');
+      report('start', input.staging === 'none' ? 'Adding the Git LFS rule…' : 'Preparing files for Git LFS…');
       const data = await service.track(
         { ...input, repoPath },
         () => {
@@ -38,6 +38,7 @@ export function registerGitLfsHandlers(gitService: GitService, ensureWriteAllowe
           ensureWriteAllowed(repoPath);
         },
         job.signal,
+        (completed, total) => report('progress', `Git LFS: ${completed}/${total} files prepared.`),
       );
       report('done');
       return { success: true, data };

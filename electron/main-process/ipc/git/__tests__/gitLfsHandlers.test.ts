@@ -69,6 +69,19 @@ describe('Git LFS IPC authorization and lifecycle', () => {
     });
     expect(track).not.toHaveBeenCalled();
   });
+  it.each(['none', 'selected', 'matching'])('forwards the %s staging mode and reports bulk preparation progress', async (staging) => {
+    const f = fixture();
+    track.mockImplementation(async (request, ensure, _signal, progress) => {
+      ensure();
+      if (request.staging !== 'none') progress(2, 3);
+      return { path: request.path, attributesPath: '.gitattributes', bytes: 10, stagedFiles: request.staging === 'none' ? 0 : 3 };
+    });
+    const request = { ...f.request, scope: 'extension', staging };
+    expect(await handlers.get(IpcChannel.GitTrackWithLfs)!(f.event, request)).toMatchObject({ success: true });
+    expect(track.mock.calls[0][0]).toEqual(request);
+    expect(f.event.sender.send.mock.calls.map((call) => call[1].status)).toEqual(staging === 'none' ? ['start', 'done'] : ['start', 'progress', 'done']);
+    if (staging !== 'none') expect(f.event.sender.send.mock.calls[1][1].message).toContain('2/3');
+  });
   it('cancels conversion after a repository switch before publication', async () => {
     const f = fixture();
     track.mockImplementation(async (_request, ensure) => {

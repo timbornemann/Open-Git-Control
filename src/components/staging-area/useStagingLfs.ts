@@ -1,14 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
-import type { GitLfsFileState, GitLfsStatus, TrackWithGitLfsRequest } from '@/shared/ipc/gitLfs';
+import type { GitLfsFileState, GitLfsStagingMode, GitLfsStatus, TrackWithGitLfsRequest } from '@/shared/ipc/gitLfs';
 import type { FileEntry } from '@/utils/gitParsing';
-import type { FileSection } from './types';
+import type { FileSection, InputDialogState } from './types';
 import { useSystemTools } from '@/app/state/systemToolsStore';
 import { freshRead } from '@/data/clientCache';
 
 type Status = { staged: FileEntry[]; unstaged: FileEntry[]; untracked: FileEntry[] } | null;
-export function useStagingLfs(repoPath: string | null, status: Status, track: (request: TrackWithGitLfsRequest) => Promise<boolean>) {
+export function useStagingLfs(
+  repoPath: string | null,
+  status: Status,
+  track: (request: TrackWithGitLfsRequest) => Promise<boolean>,
+  setInputDialog?: (dialog: InputDialogState | null) => void,
+) {
   const lfsAvailability = useSystemTools((state) => state.status?.tools.find((tool) => tool.id === 'git-lfs')?.state);
   const { tr } = useI18n();
   const [snapshot, setSnapshot] = useState<{ repo: string; status: GitLfsStatus } | null>(null);
@@ -52,16 +57,68 @@ export function useStagingLfs(repoPath: string | null, status: Status, track: (r
       `Git LFS recommended: large ${file.recommendation === 'asset' ? 'media/asset' : 'binary'} file (${size}). Convert through the context menu.`,
     );
   };
+  const trackFile = (entry: FileEntry, section: FileSection, scope: 'file' | 'extension', staging?: GitLfsStagingMode) => {
+    const file = stateFor(entry.path, section);
+    if (!repoPath || !file?.eligible || !data?.available) return Promise.resolve(false);
+    return track({ repoPath, path: entry.path, source: file.source, scope, expectedVersion: file.version, ...(staging ? { staging } : {}) });
+  };
+  const configure = (entry: FileEntry, section: FileSection, scope: 'file' | 'extension') => {
+    const file = stateFor(entry.path, section);
+    if (!repoPath || !file?.eligible || !data?.available || (scope === 'extension' && !file.extension)) return;
+    setInputDialog?.({
+      title:
+        scope === 'extension'
+          ? tr('Dateityp mit Git LFS verwalten', 'Manage file type with Git LFS')
+          : tr('Datei mit Git LFS verwalten', 'Manage file with Git LFS'),
+      message:
+        scope === 'extension'
+          ? tr(
+              `Die Regel *${file.extension} gilt im gesamten Repository. Wähle, ob du zusätzlich Dateien stagen möchtest.`,
+              `The *${file.extension} rule applies throughout the repository. Choose whether to stage files as well.`,
+            )
+          : tr(
+              'Die LFS-Regel gilt nur für diese Datei. Wähle, ob du sie zusätzlich stagen möchtest.',
+              'The LFS rule applies only to this file. Choose whether to stage it as well.',
+            ),
+      contextItems: [{ label: tr('Datei', 'File'), value: entry.path }],
+      fields: [
+        {
+          id: 'staging',
+          label: tr('Staging', 'Staging'),
+          type: 'select',
+          defaultValue: 'none',
+          options: [
+            { value: 'none', label: tr('Nur zur LFS-Konfiguration hinzufügen', 'Add to LFS configuration only') },
+            { value: 'selected', label: tr('Diese Datei zusätzlich stagen', 'Also stage this file') },
+            ...(scope === 'extension' ? [{ value: 'matching', label: tr('Alle passenden Dateien stagen', 'Stage all matching files') }] : []),
+          ],
+          helperText:
+            scope === 'extension'
+              ? tr(
+                  'Die ausgewählte Dateiversion wird verwendet. Bei anderen Dateien bleiben Teil-Stagings erhalten. Ignorierte neue Dateien und LFS-Ausnahmen werden übersprungen.',
+                  'The selected file version is used. Other files retain existing partial staging. Ignored new files and LFS exclusions are skipped.',
+                )
+              : tr('Beim Stagen wird die hier ausgewählte Dateiversion verwendet.', 'Staging uses the file version selected here.'),
+        },
+      ],
+      irreversible: false,
+      consequences: tr(
+        'Nur konfigurieren lässt das Staging unverändert. Beim Stagen wird auch die benötigte .gitattributes-Regel gestagt.',
+        'Configuration only leaves staging unchanged. Staging also includes the required .gitattributes rule.',
+      ),
+      confirmLabel: tr('Übernehmen', 'Apply'),
+      onSubmit: async ({ staging }) => {
+        if (staging === 'none' || staging === 'selected' || (scope === 'extension' && staging === 'matching')) await trackFile(entry, section, scope, staging);
+      },
+    });
+  };
   return {
     available: data?.available ?? false,
     loading: !data,
     error: data?.error,
     stateFor,
     recommendationTitle,
-    track: (entry: FileEntry, section: FileSection, scope: 'file' | 'extension') => {
-      const file = stateFor(entry.path, section);
-      if (!repoPath || !file?.eligible || !data?.available) return Promise.resolve(false);
-      return track({ repoPath, path: entry.path, source: file.source, scope, expectedVersion: file.version });
-    },
+    track: trackFile,
+    configure,
   };
 }

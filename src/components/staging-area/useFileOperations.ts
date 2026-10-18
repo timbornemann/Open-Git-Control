@@ -329,7 +329,16 @@ export const useFileOperations = ({
         const result = await gitClient.trackWithGitLfs(request);
         if (!isCurrentRepoGeneration(generation, request.repoPath)) return false;
         if (!result.success) throw new Error(result.error || tr('Git-LFS-Umstellung fehlgeschlagen.', 'Git LFS conversion failed.'));
-        setToast({ msg: tr(`${basename(request.path)} mit Git LFS gestagt`, `Staged ${basename(request.path)} with Git LFS`), isError: false });
+        const message =
+          request.staging === 'none'
+            ? tr('LFS-Regel hinzugefügt; Staging unverändert', 'LFS rule added; staging unchanged')
+            : request.staging === 'matching'
+              ? tr(
+                  `${result.data?.stagedFiles ?? 0} passende Dateien mit Git LFS gestagt`,
+                  `Staged ${result.data?.stagedFiles ?? 0} matching files with Git LFS`,
+                )
+              : tr(`${basename(request.path)} mit Git LFS gestagt`, `Staged ${basename(request.path)} with Git LFS`);
+        setToast({ msg: message, isError: false });
         onRepoChanged?.();
         await refresh();
         return true;
@@ -343,26 +352,9 @@ export const useFileOperations = ({
     },
     [hasCurrentStatusForRepo, isCurrentRepoGeneration, onRepoChanged, refresh, setToast, tr],
   );
-  const lfs = useStagingLfs(repoPath, status, trackLfs);
+  const lfs = useStagingLfs(repoPath, status, trackLfs, setInputDialog);
   const trackFileTypeWithLfs = (entry: FileEntry, section: FileSection) => {
-    const file = lfs.stateFor(entry.path, section);
-    if (!file?.extension) return;
-    setConfirmDialog({
-      title: tr('Dateityp mit Git LFS verwalten', 'Manage file type with Git LFS'),
-      variant: 'confirm',
-      irreversible: false,
-      consequences: tr('Die zusätzliche Regel wird mit der ausgewählten Datei gestagt.', 'The additional rule is staged with the selected file.'),
-      message: tr(
-        `Die Regel *${file.extension} gilt im gesamten Repository. Jetzt wird nur ${basename(entry.path)} umgestellt und gestagt. Weitere passende Dateien verwenden LFS beim nächsten Stagen.`,
-        `The *${file.extension} rule applies throughout the repository. Only ${basename(entry.path)} is converted and staged now. Other matching files use LFS when next staged.`,
-      ),
-      contextItems: [
-        { label: tr('Repository', 'Repository'), value: repoPath ?? '' },
-        { label: tr('Dateityp', 'File type'), value: `*${file.extension}` },
-      ],
-      confirmLabel: tr('Umstellen und stagen', 'Convert and stage'),
-      onConfirm: () => lfs.track(entry, section, 'extension').then(() => {}),
-    });
+    lfs.configure(entry, section, 'extension');
   };
 
   const stageFile = useCallback((f: string) => stagePathsForCurrentRepo([f]), [stagePathsForCurrentRepo]);

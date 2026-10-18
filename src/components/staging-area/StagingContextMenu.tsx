@@ -88,17 +88,17 @@ export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextM
               title={lfsState?.reason || lfs.error}
               onClick={() => {
                 closeContextMenu();
-                void lfs.track(contextEntry, contextSection, 'file');
+                lfs.configure(contextEntry, contextSection, 'file');
               }}
             >
               <span className="ctx-menu-icon">LFS</span>
               {lfs.loading
                 ? tr('Git LFS wird geprüft…', 'Checking Git LFS…')
                 : lfsState?.needsRestage
-                  ? tr('Für Git LFS erneut stagen', 'Restage for Git LFS')
+                  ? tr('Git-LFS-Optionen…', 'Git LFS options…')
                   : lfsState?.configured && lfsState.pointer
                     ? tr('Git LFS bereits eingerichtet', 'Git LFS already configured')
-                    : tr('Mit Git LFS speichern und stagen', 'Store and stage with Git LFS')}
+                    : tr('Mit Git LFS verwalten…', 'Manage with Git LFS…')}
             </button>
             {lfsState?.extension && (
               <button

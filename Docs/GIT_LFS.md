@@ -2,13 +2,17 @@
 
 Install [Git LFS](https://git-lfs.com/) alongside Git before converting files. Open-Git-Control detects the executable and offers its installation page when it is unavailable; it never installs system software automatically.
 
-## Convert a file
+## Configure a file or file type
 
-Right-click a staged, unstaged or new file and choose **Store and stage with Git LFS**. In the staged section, this converts the exact index version, including a partially staged version. In the other sections, it converts and stages the current working content. The working file retains its complete content.
+Right-click a staged, unstaged or new file and choose **Manage with Git LFS…** or **Manage file type with Git LFS (\*.psd)**. The dialog offers these staging choices:
 
-**Manage file type with Git LFS (\*.psd)** first explains the pattern and its repository-wide scope. Only the selected file is converted immediately. Matching files use the rule when next staged; existing nested exclusions still apply. An incompatible exclusion prevents conversion and points to the individual-file action.
+- **Add to LFS configuration only** (default): add the rule to the working `.gitattributes` file. The index stays unchanged, including any existing partial staging. No file is converted immediately; the rule takes effect when matching content is next staged. Stage the rule separately when ready to commit it.
+- **Also stage this file**: convert and stage the selected version together with the required rule. In the staged section, this uses the exact index version; in the other sections, it uses the current working content.
+- **Stage all matching files** (file types only): convert and stage existing matching files throughout the repository, including tracked files and non-ignored new files. The selected file uses the version from the clicked section. Other already staged files retain their staged version, preserving partial staging; remaining files use their working content. Ignored new files, missing working files and files excluded by effective LFS attributes are skipped. Matching unresolved conflicts must be resolved first.
 
-Individual rules are literal filenames in the file's directory. File-type rules live at the repository root. The required `.gitattributes` rule is also staged. Existing unstaged edits to that attributes file are preserved separately, and unrelated index entries, file modes and partially staged changes are retained. Conversion starts with the next commit; historical commits are not rewritten.
+Individual rules are literal filenames in the file's directory. File-type rules live at the repository root; existing nested exclusions still apply. If an exclusion prevents the selected-file action, use the individual-file action or review the existing attributes.
+
+The working files retain their complete content. When staging, existing unstaged edits to the attributes file are preserved separately from its staged rule. Unrelated index entries and file modes are retained. Conversion starts with the next commit; historical commits are not rewritten.
 
 ## Recommendations
 
@@ -20,7 +24,7 @@ The small warning-colored exclamation mark after a filename explains the reason,
 | Other files detected as binary from a bounded content sample   | 10 MiB                      |
 | Source, text configuration, small icons and empty files        | No automatic recommendation |
 
-Document formats include PDF, Office documents and spreadsheets, OpenDocument files and EPUB. Already configured files and LFS pointers have no recommendation. Configured files whose index still contains ordinary content offer **Restage for Git LFS**. Deleted files, conflicts, symlinks, submodules and Git control files cannot be converted. Other regular files may be converted manually without a recommendation.
+Document formats include PDF, Office documents and spreadsheets, OpenDocument files and EPUB. Already configured files and LFS pointers have no recommendation. Configured files whose index still contains ordinary content offer **Git LFS options…**. Deleted files, conflicts, symlinks, submodules and Git control files cannot be converted. Other regular files may be converted manually without a recommendation.
 
 ## Viewer, safety and transfers
 

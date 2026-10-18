@@ -55,13 +55,13 @@ describe('StagingContextMenu', () => {
   it('offers separate checked LFS actions and retains keyboard navigation and file opening', () => {
     const fileOps = createFileOps();
     const state = { eligible: true, extension: '.psd', configured: false, pointer: false };
-    fileOps.lfs = { available: true, loading: false, stateFor: vi.fn(() => state), track: vi.fn() } as any;
+    fileOps.lfs = { available: true, loading: false, stateFor: vi.fn(() => state), configure: vi.fn() } as any;
     fileOps.trackFileTypeWithLfs = vi.fn();
     const contextMenu: StagingContextMenuState = { x: 10, y: 10, entry: { path: 'design.psd', x: 'A', y: ' ' }, section: 'staged' };
     render(contextMenu, fileOps);
     const buttons = Array.from(host.querySelectorAll<HTMLButtonElement>('button'));
     act(() => buttons[0].click());
-    expect(fileOps.lfs.track).toHaveBeenCalledWith(contextMenu.entry, 'staged', 'file');
+    expect(fileOps.lfs.configure).toHaveBeenCalledWith(contextMenu.entry, 'staged', 'file');
     act(() => buttons[1].click());
     expect(fileOps.trackFileTypeWithLfs).toHaveBeenCalledWith(contextMenu.entry, 'staged');
     expect(buttons.some((button) => button.textContent?.includes('Datei oeffnen'))).toBe(true);
@@ -79,7 +79,7 @@ describe('StagingContextMenu', () => {
       loading: false,
       error: 'Git LFS is not installed',
       stateFor: () => ({ eligible: true, extension: '.psd' }),
-      track: vi.fn(),
+      configure: vi.fn(),
     } as any;
     render({ x: 10, y: 10, entry, section: 'untracked' }, fileOps);
     const buttons = host.querySelectorAll<HTMLButtonElement>('button');
