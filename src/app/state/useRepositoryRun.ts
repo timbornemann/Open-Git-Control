@@ -2,6 +2,7 @@ import { useResourceState } from '@/data/resourceHooks';
 import { invalidateResources, resourceKey } from '@/data/clientCache';
 import { updateResource } from '@/data/queryClient';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
+import { CancelledError } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RepositoryRunActionId, RepositoryRunConfigStateDto, RepositoryRunStateDto } from '@/types/repositoryRun';
 import { repositoryRunClient } from '@/services/repositoryRunClient';
@@ -99,9 +100,15 @@ export const useRepositoryRun = ({
 
       const requestGeneration = configRequestGenerationRef.current + 1;
       configRequestGenerationRef.current = requestGeneration;
-      const result = await repositoryRunClient.getConfig(repoPath);
-      if (requestGeneration !== configRequestGenerationRef.current || repoPath !== activeRepoRef.current) return;
-      if (result.success) setActiveConfig(result.data);
+      try {
+        const result = await repositoryRunClient.getConfig(repoPath);
+        if (requestGeneration !== configRequestGenerationRef.current || repoPath !== activeRepoRef.current) return;
+        if (result.success) setActiveConfig(result.data);
+      } catch (error) {
+        // Watcher invalidation, repository changes and Strict Mode can cancel
+        // a cold read before it has cached data. Its replacement owns the result.
+        if (!(error instanceof CancelledError)) throw error;
+      }
     },
     [setActiveConfig],
   );
