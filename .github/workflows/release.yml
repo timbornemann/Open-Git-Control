@@ -135,7 +135,8 @@ jobs:
 
       - name: Install native Linux dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev xvfb
+        # Winit also loads the X11 keyboard runtime when using software rendering.
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-0 libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev xvfb
 
       - name: Verify native recovery core
         run: npm run recovery:check && npm run recovery:test
