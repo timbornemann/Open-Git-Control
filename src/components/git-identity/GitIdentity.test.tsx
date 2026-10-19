@@ -9,8 +9,9 @@ import { ensureCommitIdentity, finishGitIdentitySetup, useGitIdentityStore } fro
 import { GitIdentityDialog } from './GitIdentityDialog';
 import { GitIdentitySettings } from './GitIdentitySettings';
 import { searchSettingsGroups } from '@/components/layout/settings/settingsNavigation';
+import { rememberIdentitySettingsScope } from './gitIdentityScopePreference';
 
-const mocks = vi.hoisted(() => ({ activeRepo: '/repo' as string | null, toast: vi.fn(), saved: false }));
+const mocks = vi.hoisted(() => ({ activeRepo: '/repo' as string | null, toast: vi.fn(), saved: null as GitIdentityStatus | null }));
 vi.mock('@/contexts/AppStateContext', () => ({ useOptionalActiveRepository: () => mocks.activeRepo }));
 vi.mock('@/hooks/useAppToast', () => ({ useAppToast: () => mocks.toast }));
 const missing: GitIdentityStatus = {
@@ -44,7 +45,9 @@ const render = async (dialog = false) => {
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   mocks.activeRepo = '/repo';
-  mocks.saved = false;
+  mocks.saved = null;
+  const storage = new Map<string, string>();
+  vi.stubGlobal('localStorage', { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value) });
   mocks.toast.mockReset();
   useGitIdentityStore.setState({ activeRepo: undefined, generation: 0, request: null });
   vi.spyOn(gitIdentityClient, 'isAvailable').mockReturnValue(true);
@@ -52,12 +55,20 @@ beforeEach(() => {
     success: true,
     data:
       scope === 'global'
-        ? { ...missing, repoPath, scope, name: 'Global Name', email: 'global@example.invalid', ready: true }
-        : { ...missing, repoPath, ready: mocks.saved },
+        ? {
+            ...missing,
+            name: 'Global Name',
+            email: 'global@example.invalid',
+            ready: true,
+            ...(mocks.saved?.scope === 'global' ? mocks.saved : {}),
+            repoPath,
+            scope,
+          }
+        : { ...missing, ...mocks.saved, repoPath, scope, ready: Boolean(mocks.saved) },
   }));
   vi.spyOn(gitIdentityClient, 'save').mockImplementation(async (request) => {
-    mocks.saved = true;
-    return { success: true, data: { ...missing, ...request, ready: true } };
+    mocks.saved = { ...missing, ...request, ready: true };
+    return { success: true, data: mocks.saved };
   });
   host = document.createElement('div');
   document.body.append(host);
@@ -69,6 +80,7 @@ afterEach(() => {
   act(() => root.unmount());
   host.remove();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('shared Git identity form', () => {
@@ -182,5 +194,96 @@ describe('shared Git identity form', () => {
     expect(await pending).toBe(false);
     expect(mocks.toast).not.toHaveBeenCalled();
     expect(host.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('restores the chosen global scope and saved email after reopening settings with an active repository', async () => {
+    await render();
+    await act(async () => {
+      const scope = host.querySelector('select')!;
+      scope.value = 'global';
+      scope.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    change('email', 'updated-global@example.invalid');
+    await act(async () => button('Save').click());
+    act(() => root.render(null));
+    mocks.activeRepo = '/another-repository';
+    await render();
+    expect(host.querySelector('select')!.value).toBe('global');
+    expect(input('email').value).toBe('updated-global@example.invalid');
+    expect(gitIdentityClient.save).toHaveBeenCalledOnce();
+  });
+
+  it('does not report success when the native readback contains the old identity', async () => {
+    vi.mocked(gitIdentityClient.save).mockResolvedValue({ success: true, data: { ...missing, email: 'old@example.invalid', ready: true } });
+    await render();
+    change('email', 'desired@example.invalid');
+    await act(async () => button('Save').click());
+    expect(input('email').value).toBe('desired@example.invalid');
+    expect(mocks.toast).not.toHaveBeenCalledWith('Git commit identity saved.', false);
+    expect(mocks.toast).toHaveBeenCalledWith(expect.stringContaining('Git did not apply'), true);
+  });
+
+  it('shows the verified normalized values after saving and after a fresh read', async () => {
+    await render();
+    change('name', '  Updated Name  ');
+    change('email', '  updated@example.invalid  ');
+    await act(async () => button('Save').click());
+    expect(input('name').value).toBe('Updated Name');
+    expect(input('email').value).toBe('updated@example.invalid');
+    await act(async () => button('Reload').click());
+    expect(input('email').value).toBe('updated@example.invalid');
+  });
+
+  it('keeps commit setup scoped to its repository even when settings last edited global defaults', async () => {
+    rememberIdentitySettingsScope('global');
+    await render(true);
+    await act(async () => {
+      void ensureCommitIdentity('/repo');
+    });
+    expect(host.querySelector('select')!.value).toBe('repository');
+    expect(gitIdentityClient.save).not.toHaveBeenCalled();
+  });
+
+  it('can still save when the optional settings scope preference cannot be stored', async () => {
+    vi.stubGlobal('localStorage', {
+      getItem: () => {
+        throw new Error('Storage unavailable');
+      },
+      setItem: () => {
+        throw new Error('Storage unavailable');
+      },
+    });
+    await render();
+    change('email', 'new@example.invalid');
+    await act(async () => button('Save').click());
+    expect(mocks.toast).toHaveBeenCalledWith('Git commit identity saved.', false);
+  });
+
+  it('falls back to a valid scope if the saved settings preference is damaged', async () => {
+    vi.stubGlobal('localStorage', { getItem: () => 'invalid-scope', setItem: vi.fn() });
+    await render();
+    expect(host.querySelector('select')!.value).toBe('repository');
+    expect(gitIdentityClient.read).toHaveBeenCalledWith({ repoPath: '/repo', scope: 'repository' });
+  });
+
+  it('does not continue a commit when saved global defaults are still overridden by another valid repository identity', async () => {
+    await render(true);
+    let pending!: Promise<boolean>;
+    await act(async () => {
+      pending = ensureCommitIdentity('/repo');
+    });
+    await act(async () => {
+      const scope = host.querySelector('select')!;
+      scope.value = 'global';
+      scope.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    change('email', 'global-new@example.invalid');
+    vi.mocked(gitIdentityClient.read).mockResolvedValue({ success: true, data: { ...missing, email: 'local-old@example.invalid', ready: true } });
+    await act(async () => button('Save and continue').click());
+    expect(host.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.stringContaining('overrides take precedence'), true);
+    expect(mocks.toast).not.toHaveBeenCalledWith('Git commit identity saved.', false);
+    act(() => button('Cancel').click());
+    expect(await pending).toBe(false);
   });
 });

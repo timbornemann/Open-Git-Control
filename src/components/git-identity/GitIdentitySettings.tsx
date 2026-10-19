@@ -5,7 +5,7 @@ import { GitIdentityFields } from './GitIdentityFields';
 import { useGitIdentityForm } from './useGitIdentityForm';
 
 function IdentitySettings({ repoPath }: { repoPath: string | null }) {
-  const form = useGitIdentityForm(repoPath);
+  const form = useGitIdentityForm(repoPath, undefined, { rememberScope: true });
   const { tr } = useI18n();
   return (
     <div className="git-identity-settings">

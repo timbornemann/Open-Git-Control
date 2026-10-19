@@ -10,8 +10,8 @@ import {
   type GitIdentityStatus,
   type SaveGitIdentityRequest,
 } from '../../src/shared/ipc/gitIdentity';
+import { identityKeys, identityConfigValues, writeIdentityConfig } from './GitIdentityConfig';
 
-const identityKeys = '^(user|author|committer)[.](name|email|useconfigonly)$';
 const parseIdentity = (text: string) => {
   const match = text.trim().match(/^(.*?) <([^<>]*)> \d+ [+-]\d{4}$/);
   return match ? { name: match[1], email: match[2] } : null;
@@ -23,7 +23,7 @@ export class GitIdentityService {
   constructor(private readonly git: Pick<GitRunner, 'runResult' | 'withExclusiveWrite'>) {}
 
   private async config(repoPath: string, global: boolean, run: (cwd: string, args: string[]) => Promise<GitProcessResult>) {
-    const result = await run(repoPath, ['config', ...(global ? ['--global'] : []), '--null', '--get-regexp', identityKeys]);
+    const result = await run(repoPath, ['config', ...(global ? ['--global'] : []), '--includes', '--null', '--get-regexp', identityKeys]);
     if (result.exitCode !== 0 && result.exitCode !== 1) throw new Error(redactGitSensitiveText(result.stderr || 'Git configuration could not be read.'));
     return result.stdout;
   }
@@ -56,15 +56,7 @@ export class GitIdentityService {
       authorIdentity = author.exitCode === 0 ? parseIdentity(author.stdout) : null;
       committerIdentity = committer.exitCode === 0 ? parseIdentity(committer.stdout) : null;
     }
-    const values = new Map(
-      config
-        .split('\0')
-        .filter(Boolean)
-        .map((entry) => {
-          const separator = entry.indexOf('\n');
-          return [entry.slice(0, separator).toLowerCase(), entry.slice(separator + 1).trim()];
-        }),
-    );
+    const values = identityConfigValues(config);
     const name = committerIdentity?.name || values.get('user.name') || values.get('committer.name') || values.get('author.name') || '';
     const email = committerIdentity?.email || values.get('user.email') || values.get('committer.email') || values.get('author.email') || '';
     const missing: GitIdentityStatus['missing'] = [];
@@ -115,15 +107,32 @@ export class GitIdentityService {
         const before = await this.read(request, run);
         current();
         if (before.revision !== request.expectedRevision) throw new Error('Git identity configuration changed. Reload the current values before saving.');
-        for (const [key, value] of [
-          ['user.name', request.name.trim()],
-          ['user.email', request.email.trim()],
-        ]) {
-          current();
-          await git.run(cwd, ['config', request.scope === 'global' ? '--global' : '--local', '--replace-all', key, value]);
+        const desired = { name: request.name.trim(), email: request.email.trim() };
+        const values = identityConfigValues(await this.config(cwd, request.scope === 'global', run));
+        const entries: [string, string][] = [
+          ['user.name', desired.name],
+          ['user.email', desired.email],
+        ];
+        for (const field of ['name', 'email'] as const) {
+          if (desired[field] === before[field]) continue;
+          // A single identity edit must also update an existing role override
+          // for that field, while retaining deliberately different other fields.
+          for (const role of ['author', 'committer']) if (values.has(`${role}.${field}`)) entries.push([`${role}.${field}`, desired[field]]);
         }
+        await writeIdentityConfig(git, cwd, request.scope, entries, current);
         current();
         const result = await this.read(request, run);
+        current();
+        const author = request.scope === 'repository' ? parseIdentity(await git.run(cwd, ['-c', 'user.useConfigOnly=true', 'var', 'GIT_AUTHOR_IDENT'])) : null;
+        if (
+          !result.ready ||
+          result.name !== desired.name ||
+          result.email !== desired.email ||
+          (author && (['name', 'email'] as const).some((field) => desired[field] !== before[field] && author[field] !== desired[field]))
+        )
+          throw new Error(
+            'Git still uses different identity values. An environment or command-line override takes precedence; check GIT_AUTHOR_EMAIL, GIT_COMMITTER_EMAIL and Git configuration.',
+          );
         current();
         return result;
       });

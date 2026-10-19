@@ -34,7 +34,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
-  fs.rmSync(root, { recursive: true, force: true });
+  if (path.dirname(path.resolve(root)) !== path.resolve(os.tmpdir()) || !path.basename(root).startsWith('ogc-identity-')) throw new Error('Unsafe fixture');
+  fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 describe('effective Git commit identity', () => {
@@ -111,4 +112,162 @@ describe('effective Git commit identity', () => {
     await expect(read('repository', root)).rejects.toThrow('usable Git repository');
     await expect(read('repository', null)).rejects.toThrow('Choose a repository');
   }, 15_000);
+
+  it('persists a changed global email across a new service and uses it as author and committer', async () => {
+    await save('global', 'Global Name', 'old@example.invalid', null);
+    await save('global', 'Global Name', 'new@example.invalid', null);
+    service = new GitIdentityService(new GitRunner());
+    expect(await read('global', null)).toMatchObject({ email: 'new@example.invalid', ready: true });
+    expect(await read()).toMatchObject({ email: 'new@example.invalid', ready: true });
+    git(repo, 'commit', '--allow-empty', '-m', 'Verify persisted identity');
+    expect(git(repo, 'show', '-s', '--format=%ae|%ce')).toBe('new@example.invalid|new@example.invalid');
+  }, 30_000);
+
+  it('updates the selected worktree without overwriting the identity shared with another worktree', async () => {
+    git(repo, 'config', 'user.name', 'Shared Name');
+    git(repo, 'config', 'user.email', 'shared@example.invalid');
+    git(repo, 'commit', '--allow-empty', '-m', 'Initial');
+    git(repo, 'config', 'extensions.worktreeConfig', 'true');
+    const other = path.join(root, 'linked');
+    git(repo, 'worktree', 'add', '-b', 'linked', other);
+    git(repo, 'config', '--worktree', 'user.email', 'worktree-old@example.invalid');
+    await save('repository', 'Shared Name', 'worktree-new@example.invalid');
+    service = new GitIdentityService(new GitRunner());
+    expect(await read()).toMatchObject({ email: 'worktree-new@example.invalid', ready: true });
+    expect(await read('repository', other)).toMatchObject({ email: 'shared@example.invalid', ready: true });
+    expect(git(repo, 'config', '--local', '--get', 'user.email')).toBe('shared@example.invalid');
+    expect(fs.readFileSync(globalConfig, 'utf8')).toBe('');
+    git(repo, 'commit', '--allow-empty', '-m', 'Worktree identity');
+    expect(git(repo, 'show', '-s', '--format=%ae|%ce')).toBe('worktree-new@example.invalid|worktree-new@example.invalid');
+  }, 35_000);
+
+  it.each(['global', 'repository'] as const)(
+    'keeps a %s email effective after a later include and after reopening',
+    async (scope) => {
+      const profile = path.join(root, 'profile.gitconfig');
+      git(root, 'config', '--file', profile, 'user.name', 'Profile Name');
+      git(root, 'config', '--file', profile, 'user.email', 'profile-old@example.invalid');
+      git(root, 'config', '--file', profile, 'author.email', 'author-old@example.invalid');
+      git(root, 'config', '--file', profile, 'committer.email', 'committer-old@example.invalid');
+      const originalProfile = fs.readFileSync(profile);
+      const flag = scope === 'global' ? '--global' : '--local';
+      git(repo, 'config', flag, 'user.name', 'Root Name');
+      git(repo, 'config', flag, 'user.email', 'root-old@example.invalid');
+      git(repo, 'config', flag, 'user.signingkey', 'preserved-key');
+      git(repo, 'config', flag, 'include.path', profile.replace(/\\/g, '/'));
+      expect(await read(scope)).toMatchObject({
+        name: 'Profile Name',
+        email: scope === 'global' ? 'profile-old@example.invalid' : 'committer-old@example.invalid',
+      });
+      await save(scope, 'Profile Name', 'new@example.invalid');
+      service = new GitIdentityService(new GitRunner());
+      expect(await read(scope)).toMatchObject({ name: 'Profile Name', email: 'new@example.invalid', ready: true });
+      expect(await read()).toMatchObject({ email: 'new@example.invalid', ready: true });
+      expect(fs.readFileSync(profile)).toEqual(originalProfile);
+      expect(git(repo, 'config', '--get', 'user.signingkey')).toBe('preserved-key');
+      await save(scope, 'Profile Name', 'updated-again@example.invalid');
+      git(repo, 'commit', '--allow-empty', '-m', 'Included identity');
+      expect(git(repo, 'show', '-s', '--format=%ae|%ce')).toBe('updated-again@example.invalid|updated-again@example.invalid');
+      if (scope === 'repository') expect(fs.readFileSync(globalConfig, 'utf8')).toBe('');
+    },
+    45_000,
+  );
+
+  it('updates existing email role overrides locally while preserving deliberately different names and global defaults', async () => {
+    git(repo, 'config', '--global', 'user.name', 'Commit User');
+    git(repo, 'config', '--global', 'user.email', 'default-old@example.invalid');
+    git(repo, 'config', '--global', 'author.name', 'Original Author');
+    git(repo, 'config', '--global', 'author.email', 'author-old@example.invalid');
+    git(repo, 'config', '--global', 'committer.email', 'committer-old@example.invalid');
+    const originalGlobal = fs.readFileSync(globalConfig);
+    await save('repository', 'Commit User', 'new@example.invalid');
+    expect(fs.readFileSync(globalConfig)).toEqual(originalGlobal);
+    service = new GitIdentityService(new GitRunner());
+    expect(await read()).toMatchObject({ name: 'Commit User', email: 'new@example.invalid', ready: true });
+    git(repo, 'commit', '--allow-empty', '-m', 'Role overrides');
+    expect(git(repo, 'show', '-s', '--format=%an|%ae|%cn|%ce')).toBe('Original Author|new@example.invalid|Commit User|new@example.invalid');
+  }, 30_000);
+
+  it.each(['GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_EMAIL'])(
+    'does not report success if %s still overrides the saved email',
+    async (variable) => {
+      git(repo, 'config', 'user.name', 'Configured Name');
+      git(repo, 'config', 'user.email', 'old@example.invalid');
+      vi.stubEnv(variable, 'environment@example.invalid');
+      await expect(save('repository', 'Configured Name', 'new@example.invalid')).rejects.toThrow('still uses different identity values');
+      expect(git(repo, 'config', '--local', '--get', 'user.email')).toBe('new@example.invalid');
+    },
+    25_000,
+  );
+
+  it('detects externally changed included identities and respects an existing config lock', async () => {
+    const profile = path.join(root, 'profile.gitconfig');
+    git(root, 'config', '--file', profile, 'user.name', 'Profile Name');
+    git(root, 'config', '--file', profile, 'user.email', 'old@example.invalid');
+    git(repo, 'config', '--global', 'include.path', profile.replace(/\\/g, '/'));
+    const before = await read('global');
+    git(root, 'config', '--file', profile, 'user.email', 'external@example.invalid');
+    await expect(service.save({ ...before, name: 'Profile Name', email: 'ours@example.invalid', expectedRevision: before.revision }, () => {})).rejects.toThrow(
+      'configuration changed',
+    );
+    fs.writeFileSync(`${globalConfig}.lock`, 'another writer');
+    await expect(save('global', 'Profile Name', 'ours@example.invalid')).rejects.toThrow();
+    expect(fs.readFileSync(`${globalConfig}.lock`, 'utf8')).toBe('another writer');
+    expect(await read('global')).toMatchObject({ email: 'external@example.invalid' });
+  }, 30_000);
+
+  it.each(['cancelled', 'write failure'] as const)(
+    'cleans up interrupted include updates after %s and permits a later save',
+    async (failure) => {
+      const profile = path.join(root, 'profile.gitconfig');
+      git(root, 'config', '--file', profile, 'user.name', 'Profile Name');
+      git(root, 'config', '--file', profile, 'user.email', 'old@example.invalid');
+      git(repo, 'config', '--global', 'user.name', 'Root Name');
+      git(repo, 'config', '--global', 'user.email', 'root@example.invalid');
+      git(repo, 'config', '--global', 'include.path', profile.replace(/\\/g, '/'));
+      const runner = new GitRunner();
+      const exclusive = runner.withExclusiveWrite.bind(runner);
+      let cancelled = false;
+      let candidate = '';
+      const intercept = vi.spyOn(runner, 'withExclusiveWrite').mockImplementation((cwd, command, work, signal) =>
+        exclusive(
+          cwd,
+          command,
+          (git) =>
+            work({
+              ...git,
+              run: async (directory, args, options) => {
+                if (args[0] === 'config' && args[1] === '--file' && args.includes('--add')) {
+                  candidate = args[2];
+                  if (failure === 'write failure') {
+                    fs.writeFileSync(`${candidate}.lock`, 'interrupted helper');
+                    throw new Error('Simulated write failure');
+                  }
+                  const value = await git.run(directory, args, options);
+                  cancelled = true;
+                  return value;
+                }
+                return git.run(directory, args, options);
+              },
+            }),
+          signal,
+        ),
+      );
+      service = new GitIdentityService(runner);
+      const status = await read('global');
+      await expect(
+        service.save({ ...status, email: 'new@example.invalid', expectedRevision: status.revision }, () => {
+          if (cancelled) throw new Error('Repository changed');
+        }),
+      ).rejects.toThrow(failure === 'cancelled' ? 'Repository changed' : 'Simulated write failure');
+      expect(candidate).not.toBe('');
+      expect(fs.existsSync(candidate)).toBe(false);
+      expect(fs.existsSync(`${candidate}.lock`)).toBe(false);
+      expect(fs.existsSync(`${globalConfig}.lock`)).toBe(false);
+      expect(await read('global')).toMatchObject({ email: 'old@example.invalid' });
+      intercept.mockRestore();
+      await expect(save('global', 'Profile Name', 'new@example.invalid')).resolves.toMatchObject({ email: 'new@example.invalid', ready: true });
+    },
+    40_000,
+  );
 });
