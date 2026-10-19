@@ -9,12 +9,12 @@ import { remoteSyncReferenceVersion } from '../RemoteSyncReferences';
 
 vi.mock('electron', () => ({ app: { getPath: () => os.tmpdir() } }));
 const lifecycles: GitIntegrationLifecycle[] = [];
-function setup() {
+function setup({ registerRemote = true } = {}) {
   const lifecycle = new GitIntegrationLifecycle();
   lifecycles.push(lifecycle);
   const f = fixture(lifecycle);
   const target = f.bare('source');
-  git(f.repo, 'remote', 'add', 'source', target);
+  if (registerRemote) git(f.repo, 'remote', 'add', 'source', target);
   return { ...f, target };
 }
 afterEach(async () => {
@@ -70,17 +70,41 @@ describe('combined branch and remote tag synchronization with real Git', () => {
   });
 
   integration('preserves narrow branch mappings, custom destinations and exclusions', async () => {
-    const f = setup();
+    // Seed before registering the remote: some Git versions also update its
+    // default tracking refs when pushing to the matching URL during setup.
+    const f = setup({ registerRemote: false });
     git(f.repo, 'push', f.target, 'HEAD:refs/heads/release/public', 'HEAD:refs/heads/release/private', 'HEAD:refs/heads/other', 'HEAD:refs/tags/version');
+    git(f.repo, 'remote', 'add', 'source', f.target);
     git(f.repo, 'config', '--replace-all', 'remote.source.fetch', '+refs/heads/release/*:refs/custom/releases/*');
     git(f.repo, 'config', '--add', 'remote.source.fetch', '^refs/heads/release/private');
     const before = git(f.repo, 'config', '--get-all', 'remote.source.fetch');
+    expect(git(f.repo, 'for-each-ref', '--format=%(refname)', 'refs/remotes', 'refs/custom')).toBe('');
     await f.service.fetch(f.repo, 'source', f.context, { includeTags: true });
     expect(git(f.repo, 'for-each-ref', '--format=%(refname)', 'refs/custom')).toBe('refs/custom/releases/public');
     expect(git(f.repo, 'for-each-ref', '--format=%(refname)', 'refs/remotes')).toBe('');
     expect(git(f.repo, 'rev-parse', 'refs/ogc/remote-tags/source/version')).toBe(f.initial);
     expect(git(f.repo, 'rev-parse', 'refs/tags/version')).toBe(f.initial);
     expect(git(f.repo, 'config', '--get-all', 'remote.source.fetch')).toBe(before);
+  });
+
+  integration('does not modify tracking refs outside the active custom branch mappings', async () => {
+    const f = setup();
+    git(f.repo, 'push', 'source', 'HEAD:refs/heads/release/public', 'HEAD:refs/heads/release/private', 'HEAD:refs/heads/other');
+    const previous = git(f.repo, 'for-each-ref', '--format=%(refname) %(objectname)', 'refs/remotes/source');
+    expect(previous.split('\n')).toHaveLength(3);
+    const advanced = f.commit('changed public release');
+    git(f.repo, 'push', f.target, `${advanced}:refs/heads/release/public`);
+    // Seed the old refs explicitly, independent of whether the preceding push
+    // also refreshed tracking refs on this Git version.
+    for (const branch of ['release/public', 'release/private', 'other']) git(f.repo, 'update-ref', `refs/remotes/source/${branch}`, f.initial);
+    git(f.repo, 'config', '--replace-all', 'remote.source.fetch', '+refs/heads/release/*:refs/custom/releases/*');
+    git(f.repo, 'config', '--add', 'remote.source.fetch', '^refs/heads/release/private');
+
+    await f.service.fetch(f.repo, 'source', f.context, { includeTags: true });
+
+    expect(git(f.repo, 'rev-parse', 'refs/custom/releases/public')).toBe(advanced);
+    expect(git(f.repo, 'for-each-ref', '--format=%(refname)', 'refs/custom')).toBe('refs/custom/releases/public');
+    expect(git(f.repo, 'for-each-ref', '--format=%(refname) %(objectname)', 'refs/remotes/source')).toBe(previous);
   });
 
   integration('prunes deleted branches and tracked tags without deleting or moving any existing local tags', async () => {

@@ -34,10 +34,11 @@ const flush = () =>
     setImmediate(resolve);
   });
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-  // Real paths avoid macOS /var -> /private/var aliases in watcher expectations.
-  root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-working-watch-')));
+  // Use the watcher's native resolution: unlike realpathSync, it also expands
+  // Windows 8.3 temp paths, as well as macOS /var -> /private/var aliases.
+  root = await fs.promises.realpath(fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-working-watch-')));
   repo = directory(root, 'repo');
   gitDir = directory(repo, '.git');
   commonDir = gitDir;
@@ -124,6 +125,24 @@ describe('native working tree change hints', () => {
     at(repo).change('.git');
     await vi.advanceTimersByTimeAsync(150);
     expect(changed).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
+  it('resolves repository and Git directory aliases before attaching watches', async () => {
+    const physicalRepo = repo;
+    const physicalGitDir = gitDir;
+    repo = path.join(root, 'repo-alias');
+    fs.symlinkSync(physicalRepo, repo, process.platform === 'win32' ? 'junction' : 'dir');
+    gitDir = commonDir = path.join(repo, '.git');
+    const { monitor } = fixture();
+    await monitor.start();
+    expect(at(physicalRepo).recursive).toBe(true);
+    expect(at(physicalGitDir)).toBeDefined();
+    expect(at(path.join(physicalGitDir, 'refs', 'heads', 'feature'))).toBeDefined();
+    expect(watches.some((entry) => entry.directory === repo || entry.directory === gitDir)).toBe(false);
+    at(physicalRepo).change('src/file.txt');
+    at(physicalGitDir).change('index');
+    await vi.advanceTimersByTimeAsync(150);
+    expect(changed).toHaveBeenCalledExactlyOnceWith(false);
   });
 
   it('treats a bare repository as metadata only', async () => {

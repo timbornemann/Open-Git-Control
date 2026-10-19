@@ -1,5 +1,7 @@
+#[cfg(any(windows, target_os = "macos"))]
+use crate::model::Kind;
 use crate::{
-    model::{Control, Installation, Kind, Progress, Report},
+    model::{Control, Installation, Progress, Report},
     safe_io,
 };
 use anyhow::{ensure, Result};

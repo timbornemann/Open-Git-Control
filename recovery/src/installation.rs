@@ -193,10 +193,8 @@ pub fn resolve(
                 return Err(error);
             }
             #[cfg(target_os = "macos")]
-            if !target.exists() {
-                if crate::exchange::previous_bundle(root, &app).is_ok() {
-                    return Ok(app);
-                }
+            if !target.exists() && crate::exchange::previous_bundle(root, &app).is_ok() {
+                return Ok(app);
             }
             if app.kind == Kind::Appimage || !safe_io::no_link(target)?.is_dir() {
                 return Err(error);
