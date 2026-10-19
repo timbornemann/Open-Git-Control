@@ -2,6 +2,9 @@ import { describe, expect, vi } from 'vitest';
 import { inventoryTest, lfsPointer, pointerText } from './lfsInventoryFixture';
 import { classifyLfsObjects } from '../GitLfsPointers';
 import * as childProcess from 'node:child_process';
+import { fastImportHistory } from './gitFixtureHistory';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 type ChildProcessModule = typeof childProcess;
 
 vi.mock('node:child_process', async (importOriginal) => {
@@ -13,7 +16,16 @@ describe('persistent Git object reader', () => {
   inventoryTest('classifies more than two metadata batches using two native processes, without reading large blobs', async (f) => {
     const pointer = lfsPointer('LFS text');
     const files = Object.fromEntries(Array.from({ length: 600 }, (_, index) => [`file-${index}.txt`, `Content ${index}\n`]));
-    await f.commit({ ...files, 'large.bin': 'a'.repeat(2 * 1024 * 1024), 'pointer.bin': pointerText(pointer) });
+    await f.runner.runWithInput(
+      f.repo,
+      ['fast-import', '--quiet'],
+      fastImportHistory(
+        [{ message: 'Batch objects', files: { ...files, 'large.bin': 'a'.repeat(2 * 1024 * 1024), 'pointer.bin': pointerText(pointer) } }],
+        'LFS Inventory <lfs-inventory@example.test>',
+        f.base,
+      ),
+      { signal: f.lifecycle.signal },
+    );
     const oids = (await f.git('ls-tree', '-r', '--format=%(objectname)', 'HEAD')).split(/\r?\n/);
     const spawn = vi.mocked(childProcess.spawn).mockClear();
     const result = await classifyLfsObjects(f.repo, oids, f.runner, { signal: f.lifecycle.signal });
@@ -76,6 +88,45 @@ describe('persistent Git object reader', () => {
     controller.abort();
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
     expect(child.exitCode !== null || child.signalCode !== null).toBe(true);
+  });
+
+  inventoryTest('releases both readers before reporting cancellation between batches and permits repository cleanup', async (f) => {
+    const files = Object.fromEntries(Array.from({ length: 300 }, (_, index) => [`batch-${index}.txt`, `Content ${index}\n`]));
+    await f.runner.runWithInput(
+      f.repo,
+      ['fast-import', '--quiet'],
+      fastImportHistory([{ message: 'Cancel batch', files }], 'Fixture <fixture@example.test>', f.base),
+      {
+        signal: f.lifecycle.signal,
+      },
+    );
+    const oids = (await f.git('ls-tree', '-r', '--format=%(objectname)', 'HEAD')).split(/\r?\n/);
+    const spawn = vi.mocked(childProcess.spawn).mockClear();
+    const controller = new AbortController();
+    let resume!: () => void;
+    let started!: () => void;
+    const paused = new Promise<void>((resolve) => {
+      resume = resolve;
+    });
+    const firstBatch = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const pending = f.runner.inspectLfsObjects(f.repo, oids, { signal: controller.signal }, async () => {
+      started();
+      await paused;
+    });
+    const cancelled = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    await firstBatch;
+    controller.abort();
+    resume();
+    await cancelled;
+    const readers = spawn.mock.results.map(({ value }) => value).filter((child) => child.spawnargs?.[1] === 'cat-file');
+    expect(readers).toHaveLength(2);
+    expect(readers.every((child) => child.exitCode !== null || child.signalCode !== null)).toBe(true);
+    const moved = path.join(f.root, 'released-repo');
+    if (![f.repo, moved].every((target) => path.dirname(path.resolve(target)) === path.resolve(f.root))) throw new Error('Unsafe fixture move');
+    await fs.promises.rename(f.repo, moved);
+    await fs.promises.rename(moved, f.repo);
   });
 
   inventoryTest('rejects malformed metadata and can immediately open a clean reader afterwards', async (f) => {

@@ -22,6 +22,7 @@ fn main() {
     }
     println!("cargo:rerun-if-changed=../src/shared/updateSource.json");
     println!("cargo:rerun-if-changed=ui/recovery.slint");
+    println!("cargo:rerun-if-changed=ui/icon.png");
     if std::env::var_os("CARGO_FEATURE_GUI").is_some() {
         slint_build::compile_with_config(
             "ui/recovery.slint",

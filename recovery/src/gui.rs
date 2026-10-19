@@ -79,12 +79,12 @@ pub fn smoke() -> Result<()> {
             slint::TimerMode::SingleShot,
             Duration::from_millis(1200),
             || {
-                println!("OGC_RECOVERY_SMOKE_OK");
                 let _ = slint::quit_event_loop();
             },
         );
     }
     window.run()?;
+    println!("OGC_RECOVERY_SMOKE_OK");
     Ok(())
 }
 pub fn run(options: Options, root: PathBuf) -> Result<()> {

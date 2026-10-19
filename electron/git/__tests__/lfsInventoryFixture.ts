@@ -8,16 +8,20 @@ import { GitLfsInventory } from '../GitLfsInventory';
 import { GitLfsInventoryStore } from '../GitLfsInventoryStore';
 import type { GitRunner } from '../GitRunner';
 import type { GitLfsPointer } from '../../../src/shared/ipc/gitLfs';
+import { configureFixtureRepository } from './gitFixtureHistory';
 
 const fixtures: { root: string; lifecycle: GitIntegrationLifecycle }[] = [];
 afterEach(async () => {
-  for (const { root, lifecycle } of fixtures.splice(0)) {
-    await lifecycle.close();
-    if (path.dirname(root) !== path.resolve(os.tmpdir()) || !path.basename(root).startsWith('ogc-lfs-inventory-'))
-      throw new Error('Unsafe LFS fixture cleanup');
-    fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  try {
+    for (const { root, lifecycle } of fixtures.splice(0)) {
+      await lifecycle.close();
+      if (path.dirname(root) !== path.resolve(os.tmpdir()) || !path.basename(root).startsWith('ogc-lfs-inventory-'))
+        throw new Error('Unsafe LFS fixture cleanup');
+      await fs.promises.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
+  } finally {
+    vi.restoreAllMocks();
   }
-  vi.restoreAllMocks();
 });
 export const inventoryTest = (name: string, work: (fixture: Awaited<ReturnType<typeof lfsInventoryFixture>>) => Promise<void>) =>
   it(
@@ -45,11 +49,7 @@ async function lfsInventoryFixture(lifecycle: GitIntegrationLifecycle) {
   fs.mkdirSync(repo);
   const git = (...args: string[]) => lifecycle.git(repo, ...args);
   await git('init', '-b', 'main');
-  await git('config', 'user.name', 'LFS Inventory');
-  await git('config', 'user.email', 'lfs-inventory@example.test');
-  await git('config', 'commit.gpgsign', 'false');
-  await git('config', 'core.autocrlf', 'false');
-  await git('config', 'gc.auto', '0');
+  configureFixtureRepository(repo, 'LFS Inventory', 'lfs-inventory@example.test');
   const commit = async (changes: Record<string, string | null>, message = 'Change') => {
     for (const [name, value] of Object.entries(changes)) {
       const file = path.join(repo, name);
