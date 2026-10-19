@@ -13,7 +13,7 @@ export type PushSecretScanScope = {
   summary: SecretScanPushScopeDto;
   notes: string[];
   historyScanIncomplete?: boolean;
-  assertCurrent: () => Promise<void>;
+  assertCurrent: (checkRemote?: boolean) => Promise<void>;
 };
 
 type Dependencies = {
@@ -54,18 +54,20 @@ async function commitBases(dependencies: Dependencies, oids: string[]): Promise<
   context.ensureActive();
   const raw = await git.runWithInput(repoPath, ['cat-file', '--batch-check=%(objectname) %(objecttype)'], `${oids.join('\n')}\n`, {
     envOverrides: localEnvironment,
+    signal: context.signal,
   });
   context.ensureActive();
   const entries = lines(raw);
   if (entries.length !== oids.length) throw new Error('The remote commit objects could not be verified locally.');
   const commits: string[] = [];
   for (let index = 0; index < oids.length; index++) {
-    const [oid, type] = entries[index].split(' ');
-    if (oid !== oids[index] || !['commit', 'blob', 'tree'].includes(type))
+    const [oid, type, extra] = entries[index].split(' ');
+    if (oid !== oids[index] || extra !== undefined || !['commit', 'blob', 'tree', 'tag', 'missing'].includes(type))
       throw new Error('At least one remote history object is unavailable locally. Fetch the selected endpoint to enable an incremental scan.');
     // Tags can legitimately refer to blobs or trees; these exclude no commits.
     if (type === 'commit') commits.push(oid);
   }
+  if (!commits.length) throw new Error('All advertised remote commits are unavailable locally. Fetch the selected endpoint to enable an incremental scan.');
   return commits;
 }
 
@@ -77,6 +79,7 @@ async function outgoingCommits(dependencies: Dependencies, sources: string[], ba
   const revisions = [...new Set(sources), ...bases.map((oid) => `^${oid}`)];
   const raw = await git.runWithInput(repoPath, ['rev-list', '--reverse', '--topo-order', '--stdin'], `${revisions.join('\n')}\n`, {
     envOverrides: localEnvironment,
+    signal: context.signal,
   });
   context.ensureActive();
   const commits = lines(raw);
@@ -174,8 +177,9 @@ export async function readPushSecretScanScope(dependencies: Dependencies): Promi
         : 'No new commits at the selected push endpoints; the history scan was skipped.',
     ],
     historyScanIncomplete: historyScanIncomplete || undefined,
-    assertCurrent: async () => {
+    assertCurrent: async (checkRemote = true) => {
       await validatePlan();
+      if (!checkRemote) return;
       for (const { target, key } of verified) {
         if (advertisementKey(advertisedRefs(await advertise(target))) !== key)
           throw new Error('Remote history changed after the secret scan. Run the secret scan again before pushing.');

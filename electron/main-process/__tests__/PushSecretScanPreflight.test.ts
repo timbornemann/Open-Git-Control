@@ -10,10 +10,10 @@ function fixture() {
   let version = 'original';
   const settings = { secretScanBeforePushEnabled: true, secretScanStrictness: 'low' } as AppSettings;
   const run = vi.fn(async () => head);
-  const scan = vi.fn(async (_options: any) => ({ historyScanIncomplete: undefined }));
+  const scan = vi.fn(async (_options: any) => ({ historyScanIncomplete: undefined as boolean | undefined }));
   const prepare = vi.fn(async () => ({ version, text: `path:${version}` }));
   const preflight = new PushSecretScanPreflight({
-    gitService: { getRepoPath: () => active, runner: { run } } as unknown as GitService,
+    gitService: { getRepoPath: () => active, runner: { run, runWithInput: run } } as unknown as GitService,
     secretScanService: { scanPushDiffs: scan } as unknown as SecretScanService,
     readSettings: () => settings,
     allowlistReader: { prepare, assertVersion: vi.fn() } as any,
@@ -37,6 +37,73 @@ afterEach(() => {
 });
 
 describe('offline idle push preflight scheduling', () => {
+  it('prepares LFS even when secret scanning is disabled, and includes the selected tag and other branch sources', async () => {
+    const f = fixture();
+    const other = 'b'.repeat(40);
+    const sources = vi.fn(async () => [other]);
+    const warmLfs = vi.fn(async () => {});
+    f.preflight.configure({ sources, warmLfs });
+    f.settings.secretScanBeforePushEnabled = false;
+    f.select('/repo');
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(warmLfs).toHaveBeenCalledWith('/repo', [head, other], expect.any(AbortSignal));
+    expect(f.scan).not.toHaveBeenCalled();
+    f.select(null);
+  });
+
+  it('hands a matching push the current checkpoint without aborting it and resumes after the push', async () => {
+    const f = fixture();
+    let finish!: (value: any) => void;
+    f.scan.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    f.select('/repo');
+    await vi.advanceTimersByTimeAsync(1500);
+    const options = f.scan.mock.calls[0][0];
+    const handoff = f.preflight.handoff([head], new AbortController().signal);
+    expect(options.shouldYield()).toBe(true);
+    expect(options.signal.aborted).toBe(false);
+    finish({ historyScanIncomplete: true });
+    const resume = await handoff;
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(f.scan).toHaveBeenCalledOnce();
+    resume();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(f.scan).toHaveBeenCalledTimes(2);
+    f.select(null);
+  });
+
+  it('does not wait for old history that is outside the push endpoint scope', async () => {
+    const f = fixture();
+    f.scan.mockImplementationOnce(async (options) => {
+      options.onHistoryBatch(['b'.repeat(40)]);
+      await new Promise<void>((resolve) => {
+        options.signal.addEventListener('abort', resolve, { once: true });
+      });
+      return { historyScanIncomplete: true };
+    });
+    f.select('/repo');
+    await vi.advanceTimersByTimeAsync(1500);
+    const resume = await f.preflight.handoff([head], new AbortController().signal, [head]);
+    expect(f.scan.mock.calls[0][0].signal.aborted).toBe(true);
+    resume();
+    f.select(null);
+  });
+
+  it('periodically revalidates unchanged sources so changed attributes and evicted scan entries are prepared again', async () => {
+    const f = fixture();
+    f.select('/repo');
+    await vi.advanceTimersByTimeAsync(1500);
+    await vi.advanceTimersByTimeAsync(25_000);
+    expect(f.scan).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(f.scan).toHaveBeenCalledTimes(2);
+    f.select(null);
+  });
+
   it('starts after selection, does no repeated scans for unchanged commits, and refreshes for a new commit or policy', async () => {
     const f = fixture();
     f.select('/repo');
@@ -44,12 +111,8 @@ describe('offline idle push preflight scheduling', () => {
     await vi.advanceTimersByTimeAsync(1500);
     expect(f.scan).toHaveBeenCalledOnce();
     expect(f.scan).toHaveBeenLastCalledWith(expect.objectContaining({ background: true, revisions: [head], allowlistText: 'path:original' }));
-    expect(f.run).toHaveBeenCalledWith('/repo', ['rev-parse', '--verify', 'HEAD'], expect.objectContaining({ requestedKind: 'background' }));
-    expect(f.run).toHaveBeenCalledWith(
-      '/repo',
-      ['rev-list', '--reverse', '--topo-order', head, '--not', '--remotes'],
-      expect.objectContaining({ requestedKind: 'background' }),
-    );
+    expect(f.run).toHaveBeenCalledWith('/repo', ['rev-parse', '--verify', 'HEAD'], expect.objectContaining({ requestedKind: 'preflight' }));
+    expect(f.run).toHaveBeenCalledWith('/repo', ['rev-list', '--topo-order', '--stdin'], `${head}\n`, expect.objectContaining({ requestedKind: 'preflight' }));
     expect(f.scan.mock.calls[0][0].preflightCommits).toEqual([head]);
     await vi.advanceTimersByTimeAsync(10_000);
     expect(f.scan).toHaveBeenCalledOnce();

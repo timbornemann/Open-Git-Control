@@ -1,10 +1,11 @@
 import type { GitRunner } from './GitRunner';
 import type { GitRunOptions } from './GitProcessTypes';
 import { parseGitLfsPointer, type GitLfsPointer } from '../../src/shared/ipc/gitLfs';
+import type { ObjectBatchConsumer } from './GitObjectBatch';
 
 export const LFS_OBJECT_BATCH_SIZE = 256;
 export const gitObjectId = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
-export type LfsObjectReader = Pick<GitRunner, 'runBuffer'>;
+export type LfsObjectReader = Pick<GitRunner, 'runBuffer'> & Partial<Pick<GitRunner, 'inspectLfsObjects'>>;
 export type LfsBlob = { blob: string; pointer: GitLfsPointer };
 type ObjectInfo = { oid: string; type: 'blob' | 'tree' | 'commit' | 'tag'; size: number };
 
@@ -46,6 +47,9 @@ export async function readLfsObjectInfo(
 
 /** Classify immutable object IDs, including verified non-pointers, in bounded batches. */
 export async function classifyLfsObjects(repoPath: string, objects: string[], git: LfsObjectReader, options: GitRunOptions = {}) {
+  options.signal?.throwIfAborted();
+  if (!objects.length) return new Map<string, GitLfsPointer | null>();
+  if (git.inspectLfsObjects) return git.inspectLfsObjects(repoPath, objects, options);
   const result = new Map<string, GitLfsPointer | null>();
   const unique = [...new Set(objects)];
   for (let offset = 0; offset < unique.length; offset += LFS_OBJECT_BATCH_SIZE) {
@@ -78,11 +82,27 @@ export async function classifyLfsObjects(repoPath: string, objects: string[], gi
   return result;
 }
 
+/** Stream bounded classifications while keeping the same two native pipes open. */
+export async function classifyLfsObjectBatches(
+  repoPath: string,
+  objects: string[],
+  git: LfsObjectReader,
+  options: GitRunOptions,
+  consume: ObjectBatchConsumer,
+) {
+  options.signal?.throwIfAborted();
+  if (!objects.length) return;
+  if (git.inspectLfsObjects) {
+    await git.inspectLfsObjects(repoPath, objects, options, consume);
+    return;
+  }
+  for (let offset = 0; offset < objects.length; offset += LFS_OBJECT_BATCH_SIZE)
+    await consume(await classifyLfsObjects(repoPath, objects.slice(offset, offset + LFS_OBJECT_BATCH_SIZE), git, options));
+}
+
 export async function readLfsPointers(repoPath: string, objects: string[], git: LfsObjectReader, options: GitRunOptions = {}): Promise<LfsBlob[]> {
   const result: LfsBlob[] = [];
   const unique = [...new Set(objects)];
-  for (let offset = 0; offset < unique.length; offset += LFS_OBJECT_BATCH_SIZE)
-    for (const [blob, pointer] of await classifyLfsObjects(repoPath, unique.slice(offset, offset + LFS_OBJECT_BATCH_SIZE), git, options))
-      if (pointer) result.push({ blob, pointer });
+  for (const [blob, pointer] of await classifyLfsObjects(repoPath, unique, git, options)) if (pointer) result.push({ blob, pointer });
   return result;
 }

@@ -2,6 +2,7 @@ import type { GitRemoteSnapshotDto, GitPushPlanDto, RemotePreferences, RemoteTra
 import { displayUrl, lines, digest, type Runner } from './remoteTransferModels';
 import { gitConfigurationEnvironment, refName } from './remoteTransferValidation';
 import { lfsConfigurationStamp } from './GitLfsTransfers';
+import { gitConfigurationEntries } from './GitConfigurationEntries';
 
 export async function readPushSource(repoPath: string, git: Runner, currentBranch: string, input: RemoteTransferOperations['planPush']['input']) {
   const sourceBranch = input.sourceBranch === undefined ? currentBranch : refName(input.sourceBranch);
@@ -42,10 +43,11 @@ export async function probePushUrlIsolation(repoPath: string, git: Runner): Prom
 
 export async function remoteConfigurationFingerprint(
   repoPath: string,
-  git: Pick<Runner, 'run' | 'runResult'>,
+  git: Pick<Runner, 'run' | 'runResult'> & Partial<Pick<Runner, 'runBuffer'>>,
   preferences: RemotePreferences,
+  configuration?: string,
 ): Promise<string> {
-  const config = await git.run(repoPath, ['config', '--null', '--list']);
+  const config = configuration ?? (await git.run(repoPath, ['config', '--null', '--list']));
   // Authentication/lock capability caches do not change the captured LFS destination.
   const stable = config
     .split('\0')
@@ -54,28 +56,47 @@ export async function remoteConfigurationFingerprint(
   return digest([stable, preferences, await lfsConfigurationStamp(repoPath, git)]);
 }
 
+/** One request-owned configuration snapshot feeds both selection and validation. */
+export async function readPushPlanningContext(repoPath: string, git: Runner, preferences: RemotePreferences, supportsIsolation: boolean, signal?: AbortSignal) {
+  const config = await git.run(repoPath, ['config', '--null', '--list'], { signal });
+  const [snapshot, fingerprint] = await Promise.all([
+    readRemoteSnapshot(repoPath, git, supportsIsolation, config),
+    remoteConfigurationFingerprint(repoPath, git, preferences, config),
+  ]);
+  return { snapshot, fingerprint };
+}
+
 export async function readRemoteSnapshot(
   repoPath: string,
   git: Pick<Runner, 'run' | 'runResult'>,
   supportsPushUrlIsolation: boolean,
+  configuration?: string,
 ): Promise<GitRemoteSnapshotDto> {
   const optional = async (args: string[]) => {
     const result = await git.runResult(repoPath, args);
     return result.exitCode === 0 ? result.stdout.trim() : '';
   };
-  const names = lines(await git.run(repoPath, ['remote']));
-  const remotes = [];
-  for (const name of names) {
-    const fetchUrls = lines(await git.run(repoPath, ['remote', 'get-url', '--all', name]));
-    const pushUrls = lines(await git.run(repoPath, ['remote', 'get-url', '--push', '--all', name]));
-    remotes.push({ name, fetchUrls: fetchUrls.map(displayUrl), pushUrls: pushUrls.map(displayUrl) });
-  }
-  const branch = await optional(['symbolic-ref', '--quiet', '--short', 'HEAD']);
-  const upstreamRemote = branch ? await optional(['config', '--get', `branch.${branch}.remote`]) : '';
-  const upstreamRef = branch ? await optional(['config', '--get', `branch.${branch}.merge`]) : '';
+  const [rawNames, branch, rawConfig] = await Promise.all([
+    git.run(repoPath, ['remote']),
+    optional(['symbolic-ref', '--quiet', '--short', 'HEAD']),
+    configuration ?? git.run(repoPath, ['config', '--null', '--list']),
+  ]);
+  const names = lines(rawNames);
+  const values = new Map(gitConfigurationEntries(rawConfig));
+  const remotes = await Promise.all(
+    names.map(async (name) => {
+      const [fetch, push] = await Promise.all([
+        git.run(repoPath, ['remote', 'get-url', '--all', name]),
+        git.run(repoPath, ['remote', 'get-url', '--push', '--all', name]),
+      ]);
+      return { name, fetchUrls: lines(fetch).map(displayUrl), pushUrls: lines(push).map(displayUrl) };
+    }),
+  );
+  const upstreamRemote = branch ? (values.get(`branch.${branch}.remote`) ?? '') : '';
+  const upstreamRef = branch ? (values.get(`branch.${branch}.merge`) ?? '') : '';
   const preferred =
-    (branch ? await optional(['config', '--get', `branch.${branch}.pushRemote`]) : '') ||
-    (await optional(['config', '--get', 'remote.pushDefault'])) ||
+    (branch ? values.get(`branch.${branch}.pushremote`) : '') ||
+    values.get('remote.pushdefault') ||
     upstreamRemote ||
     (names.includes('origin') ? 'origin' : names.length === 1 ? names[0] : '');
   return {

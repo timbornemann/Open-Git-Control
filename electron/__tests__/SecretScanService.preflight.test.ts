@@ -57,7 +57,64 @@ function fixture() {
 }
 
 describe('cached background push secret scans with real Git', () => {
-  it('reuses a full-history preflight for a freshly resolved subset, preserves findings and checks new staging', async () => {
+  it('caches complete commits after a finding limit while never reusing a truncated commit as clean', async () => {
+    const f = fixture();
+    const many = f.commit('private.env', 'AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF\n'.repeat(1001));
+    const safe = f.commit('safe.ts', 'export const safe = true;\n');
+    await f.warm();
+    f.stream.mockClear();
+    expect((await f.scan([safe])).findings).toEqual([]);
+    expect(f.shown()).toEqual([]);
+    f.stream.mockClear();
+    expect((await f.scan([many])).findings).toHaveLength(1000);
+    expect(f.shown()).toEqual([many]);
+  }, 20_000);
+
+  it('reuses patches, changed-path metadata and pointer classifications across upstream and identity changes', async () => {
+    const f = fixture();
+    const oid = f.commit('safe.ts', 'export const initial = true;\n');
+    await f.warm();
+    f.git('config', 'branch.main.remote', 'another-remote');
+    f.git('config', 'user.email', 'other@example.invalid');
+    f.stream.mockClear();
+    const blobs = vi.spyOn(f.service.runner, 'runBuffer');
+    const pointers = vi.spyOn(f.service.runner, 'inspectLfsObjects');
+    const result = await f.scan([oid]);
+    expect(f.shown()).toEqual([]);
+    expect(blobs.mock.calls.some(([, args]) => args[0] === 'diff-tree')).toBe(false);
+    expect(pointers.mock.calls.every(([, objects]) => objects.length === 0)).toBe(true);
+    expect(result.notes.join('\n')).toContain('Reused verified secret-scan results for 1 commit');
+  }, 20_000);
+
+  it('invalidates cached patches for diff configuration while keeping transport configuration separate', async () => {
+    const f = fixture();
+    const oid = f.commit('safe.ts', 'export const initial = true;\n');
+    await f.warm();
+    f.git('config', 'diff.algorithm', 'patience');
+    f.stream.mockClear();
+    await f.scan([oid]);
+    expect(f.shown()).toEqual([oid]);
+  }, 20_000);
+
+  it('keeps completed small checkpoints when idle work yields and scans only the unfinished commit on push', async () => {
+    const f = fixture();
+    const oids = Array.from({ length: 9 }, (_, index) => f.commit('safe.ts', `export const value = ${index};\n`));
+    let yieldRequested = false;
+    const stream = GitService.prototype.streamCommandLinesAtPath.bind(f.service);
+    f.stream.mockImplementationOnce(async (...args) => {
+      await stream(...args);
+      yieldRequested = true;
+    });
+    const partial = await f.warm({ preflightCommits: oids, shouldYield: () => yieldRequested });
+    expect(partial.historyScanIncomplete).toBe(true);
+    expect(f.shown()).toEqual(oids.slice(0, 8));
+    f.stream.mockClear();
+    const result = await f.scan(oids);
+    expect(result.historyScanIncomplete).toBeUndefined();
+    expect(f.shown()).toEqual([oids[8]]);
+  }, 30_000);
+
+  it('reuses a full-history preflight for the published subset and leaves new staging to the pre-commit check', async () => {
     const f = fixture();
     f.commit('safe.ts', 'export const initial = true;\n');
     const secret = f.commit('private.env', 'AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF\n');
@@ -72,13 +129,13 @@ describe('cached background push secret scans with real Git', () => {
     f.git('add', 'staged.env');
     const result = await f.scan([secret, removed]);
     expect(result.historyScanIncomplete).toBeUndefined();
-    expect(result.findings.map(({ source, filePath }) => [source, filePath])).toEqual([
-      ['staged', 'staged.env'],
-      ['to-push', 'private.env'],
-    ]);
-    expect(result.stats).toMatchObject({ stagedLines: 1, toPushLines: 2 });
+    expect(result.findings.map(({ source, filePath }) => [source, filePath])).toEqual([['to-push', 'private.env']]);
+    expect(result.stats).toMatchObject({ stagedLines: 0, toPushLines: 2 });
     expect(f.shown()).toEqual([]);
-    expect(f.stream.mock.calls.some(([, args]) => args[0] === 'diff')).toBe(true);
+    expect(f.stream.mock.calls.some(([, args]) => args[0] === 'diff')).toBe(false);
+    expect((await f.scanner.scanStagedDiffs({ repoPath: f.root, strictness: 'low', allowlistText: '' })).findings).toEqual([
+      expect.objectContaining({ source: 'staged', filePath: 'staged.env' }),
+    ]);
   }, 20_000);
 
   it('scans only the new commit after a second commit and reclassifies cached results for tag pushes', async () => {

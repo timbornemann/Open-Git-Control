@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GitPushBatchDto, GitPushPlanDto, GitRemoteSnapshotDto, PullStrategy, RemotePreferences } from '@/types/remoteTransfers';
 import type { SecretScanResultDto } from '@/types/gitDtos';
-import { rememberRemoteTransferSelection } from '@/utils/remoteTransferSelection';
+import { createRemoteSelectionSnapshot, rememberRemoteTransferSelection } from '@/utils/remoteTransferSelection';
 import { RemoteTransferCoordinator, type RemoteTransferContext } from './remoteTransferCoordinator';
 import { initialRemoteTransferState, useRemoteTransferState } from './remoteTransferState';
 
@@ -157,7 +157,16 @@ describe('shared remote transfer coordinator', () => {
     };
     await coordinator.start({ repoPath: '/repo', mode: 'push' });
     expect(actionCalls('planPush')).toEqual([
-      { repoPath: '/repo', remoteNames: ['origin'], destinationBranch: 'main', targetBranches: {}, tagNames: [], force: false },
+      {
+        repoPath: '/repo',
+        remoteNames: ['origin'],
+        destinationBranch: 'main',
+        targetBranches: {},
+        tagNames: [],
+        force: false,
+        expectedBranch: 'main',
+        expectedSelection: createRemoteSelectionSnapshot('push', snapshot, preferences, ['origin']),
+      },
     ]);
     expect(mocked.scan).toHaveBeenCalledWith({ repoPath: '/repo', pushArgs: plan.secretScanArgs, progressId: expect.any(String) });
     expect(actionCalls('executePush')).toHaveLength(1);

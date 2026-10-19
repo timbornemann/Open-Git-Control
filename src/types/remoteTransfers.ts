@@ -128,6 +128,9 @@ export interface RemoteTransferOperations {
       targetUrls?: Record<string, string[]>;
       tagNames?: string[];
       force?: boolean;
+      /** Reviewed UI context; Main compares it with its own fresh snapshot. */
+      expectedBranch?: string;
+      expectedSelection?: RemoteSelectionSnapshot;
     };
     output: GitPushPlanDto;
   };

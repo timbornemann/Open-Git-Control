@@ -7,6 +7,7 @@ import { isolatedPushEnvironment, normalizeTargetBranches, resolvePushTargetUrls
 import { digest, boundCredentialGenerations, PLAN_LIFETIME, type Runner, type StoredPlan, type RemoteTransferContext } from './remoteTransferModels';
 import type { PublishedRef } from './remotePushResults';
 import type { GitRemoteSnapshotDto, GitPushPlanDto, GitPushTargetDto, RemotePreferences, RemoteTransferOperations } from '../../src/types/remoteTransfers';
+import { createRemoteSelectionSnapshot } from '../../src/shared/git/remoteTransferSelection';
 
 type Dependencies = {
   git: Runner;
@@ -16,7 +17,23 @@ type Dependencies = {
   getCredentialGeneration?: (id: string) => number;
   advertised: (target: GitPushTargetDto, refs: PublishedRef[]) => Promise<Map<string, string>>;
   connectionId: (name: string, url: string) => string | null;
+  prepare?: () => Promise<{ snapshot: GitRemoteSnapshotDto; fingerprint: string }>;
 };
+
+async function planningContext(dependencies: Dependencies) {
+  if (dependencies.prepare) return dependencies.prepare();
+  const fingerprint = await dependencies.fingerprint();
+  return { fingerprint, snapshot: await dependencies.getRemotes() };
+}
+
+function assertReviewedSelection(input: RemoteTransferOperations['planPush']['input'], snapshot: GitRemoteSnapshotDto, preferences: RemotePreferences) {
+  if (
+    (input.expectedBranch !== undefined && input.expectedBranch !== snapshot.branch) ||
+    (input.expectedSelection !== undefined &&
+      JSON.stringify(input.expectedSelection) !== JSON.stringify(createRemoteSelectionSnapshot('push', snapshot, preferences, input.remoteNames)))
+  )
+    throw new Error('The branch, remote, or account binding changed. Open the selection again.');
+}
 
 export async function createPushPlan(
   repoPath: string,
@@ -24,14 +41,15 @@ export async function createPushPlan(
   context: RemoteTransferContext,
   dependencies: Dependencies,
 ): Promise<StoredPlan> {
-  const initialFingerprint = await dependencies.fingerprint();
+  context.onProgress?.('Preparing push: checking repository settings.');
+  const { snapshot, fingerprint: initialFingerprint } = await planningContext(dependencies);
   const credentialGenerations = Object.fromEntries(
     (dependencies.getPreferences().bindings ?? [])
       .filter((binding) => binding.repository && binding.credentialMode !== 'system')
       .map((binding) => [binding.repository!.connectionId, dependencies.getCredentialGeneration?.(binding.repository!.connectionId) ?? 0]),
   );
-  const snapshot = await dependencies.getRemotes();
   if (!Array.isArray(input.remoteNames) || !input.remoteNames.length || input.remoteNames.length > 32) throw new Error('Select at least one push remote.');
+  assertReviewedSelection(input, snapshot, dependencies.getPreferences());
   const targetUrls = resolvePushTargetUrls(input.targetUrls, snapshot, input.remoteNames);
   const targetBranches = input.targetBranches ? normalizeTargetBranches(input.targetBranches, input.remoteNames) : {};
   if (input.force !== undefined && typeof input.force !== 'boolean') throw new Error('Invalid push mode.');
@@ -42,6 +60,7 @@ export async function createPushPlan(
     input,
   );
   const id = randomUUID();
+  context.onProgress?.('Preparing push: checking Git LFS files.');
   const lfsObjects = await referencedLfsObjects(
     repoPath,
     refs.map((ref) => ref.sourceOid),
@@ -91,6 +110,7 @@ export async function createPushPlan(
     ...(lfsObjects.length ? { lfsObjects } : {}),
   };
   const fingerprint = await dependencies.fingerprint();
+  context.onProgress?.('Preparing push: verifying the selected sources and destinations.');
   if (fingerprint !== initialFingerprint) throw new Error('Remote configuration or account bindings changed while planning. Review the push again.');
   context.ensureActive();
   await assertPushSourceUnchanged(repoPath, dependencies.git, dto);

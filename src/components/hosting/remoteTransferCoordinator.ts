@@ -162,11 +162,11 @@ export class RemoteTransferCoordinator {
     const intent = this.state.intent;
     if (!intent) return;
     this.set({ phase: 'running', busy: true, selection, error: '', failedPull: null });
-    await this.verifyTargets();
     if (intent.mode === 'push') {
       await this.preparePush();
       return;
     }
+    await this.verifyTargets();
     const remote = selection.selectedRemoteNames[0];
     this.set({ transferStage: 'transferring' });
     if (intent.mode === 'fetch') {
@@ -211,6 +211,8 @@ export class RemoteTransferCoordinator {
       transferClient.request('planPush', {
         repoPath: intent.repoPath,
         remoteNames: selection.selectedRemoteNames,
+        expectedBranch: this.state.snapshot!.branch,
+        expectedSelection: createRemoteSelectionSnapshot('push', this.state.snapshot!, this.state.preferences, selection.selectedRemoteNames),
         ...(intent.sourceBranch ? { sourceBranch: intent.sourceBranch } : {}),
         ...(intent.constrainedTargetUrls ? { targetUrls: intent.constrainedTargetUrls } : {}),
         ...(intent.branchTargets

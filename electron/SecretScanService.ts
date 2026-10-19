@@ -14,11 +14,40 @@ export type SecretScanSource = 'staged' | 'to-push' | 'tag';
 // Keep batched `git show` invocations well below Windows' command-line limit,
 // including SHA-256 object IDs and all fixed diff flags.
 const MAX_COMMITS_PER_DIFF_PROCESS = 96;
-const scanReadOptions = (options: Pick<GitRunOptions, 'signal' | 'envOverrides'> & { background?: boolean }): GitRunOptions => ({
+const scanReadOptions = (options: Pick<GitRunOptions, 'signal' | 'envOverrides'> & { background?: boolean; preflight?: boolean }): GitRunOptions => ({
   signal: options.signal,
   envOverrides: options.envOverrides,
-  requestedKind: options.background ? 'background' : undefined,
+  requestedKind: options.preflight ? 'preflight' : options.background ? 'background' : undefined,
 });
+type PreparedHistory = Awaited<ReturnType<SecretScanHistoryCache['prepare']>>;
+const includeStagedInScan = (options: { background?: boolean; pushScanScope?: PushSecretScanScope; pushArgs?: string[] }) =>
+  !options.background && !options.pushScanScope && !options.pushArgs;
+function historyBatchPlan(background: boolean | undefined, cache: PreparedHistory, commits: string[], history: SecretScanHistoryCache) {
+  const idleCached = Boolean(background && cache && commits.every((oid) => history.get(cache.keys.get(oid))));
+  return { idleCached, batchSize: idleCached ? commits.length : background ? 8 : MAX_COMMITS_PER_DIFF_PROCESS };
+}
+const reuseNotes = (count: number) => (count ? [`Reused verified secret-scan results for ${count} commit(s).`] : []);
+function appendCachedFindings(findings: SecretScanFinding[], cached: HistoryScanEntry, source: SecretScanSource): boolean {
+  for (const finding of cached.findings) {
+    if (findings.length >= 1000) return true;
+    findings.push({ ...finding, source, id: `${source}:${finding.filePath}:${finding.lineNumber}:${finding.ruleId}:${findings.length + 1}` });
+  }
+  return false;
+}
+function recordHistoryFinding(entry: HistoryScanEntry | undefined, finding: SecretScanFinding) {
+  if (!entry) return;
+  if (entry.findings.length >= 1000) entry.truncated = true;
+  else entry.findings.push(finding);
+}
+function completeHistoryCheckpoint(progress: SecretScanProgress, count: number, notify?: (count: number) => void) {
+  progress.completeBatch(count);
+  notify?.(count);
+}
+async function verifyHistoryCheckpoint(cache: PreparedHistory, batch: string[], last: boolean) {
+  // Earlier checkpoints protect just their own entries. The final checkpoint
+  // must revalidate every path, including files from previously finished batches.
+  await cache?.assertCurrent(last ? undefined : batch);
+}
 type SecretSeverity = 'medium' | 'high' | 'critical';
 
 type PatternDefinition = {
@@ -413,6 +442,11 @@ export class SecretScanService {
     background?: boolean;
     /** Local warm-up hint only. Never used as the authorized scope of a push. */
     preflightCommits?: string[];
+    /** Durable idle jobs yield at a verified checkpoint when a push takes over. */
+    preflight?: boolean;
+    shouldYield?: () => boolean;
+    onHistoryBatch?: (commits: string[]) => void;
+    onHistoryBatchComplete?: (count: number) => void;
   }): Promise<SecretScanResult> {
     options = { ...options, envOverrides: { ...options.envOverrides, ...SECRET_SCAN_HISTORY_ENV } };
     const readOptions = scanReadOptions(options);
@@ -438,14 +472,16 @@ export class SecretScanService {
       if (pushPlan && options.includePushHistory !== false) notes.push('Full history scan: this request has no verified endpoint-bound push plan.');
       const scannedCommits = new Set<string>();
       const scannedLfs = new Set<string>();
-      const scanLfs = async (commits: string[] | null, source: SecretScanSource) => {
+      const mediaCache: { value?: Promise<string> } = {};
+      let reusedCommits = 0;
+      const scanLfs = async (commits: string[] | null, source: SecretScanSource, cache?: Awaited<ReturnType<SecretScanHistoryCache['prepare']>>) => {
         const lfsNotes = await scanLfsSecrets(
           options.repoPath,
           this.gitService.runner,
           commits,
           scannedLfs,
           (candidate) => scanCandidate({ ...candidate, source }),
-          { ...options, ...readOptions },
+          { ...options, ...readOptions, mediaCache, ...(commits && cache ? { paths: cache.lfsPaths(commits), pointers: cache.pointers } : {}) },
         );
         if (lfsNotes.length) {
           notes.push(...lfsNotes);
@@ -462,7 +498,7 @@ export class SecretScanService {
           else toPushLines += 1;
         }
         const checkedLines = stagedLines + toPushLines + tagLines;
-        if (options.background && checkedLines % 128 === 0 && Date.now() - lastBackgroundYield >= 8) {
+        if (checkedLines % 128 === 0 && Date.now() - lastBackgroundYield >= 8) {
           await new Promise<void>((resolve) => {
             setImmediate(resolve);
           });
@@ -484,14 +520,7 @@ export class SecretScanService {
           if (fragment ? isAllowlisted(finding, longLineAllowlistRules) : matcher ? await matcher.test(finding) : isAllowlisted(finding, allowlistRules))
             continue;
           fragment?.seen.add(pattern.id);
-          if (findings.length >= 1000) {
-            if (!findingLimitNoted) {
-              notes.push('Secret scan finding limit reached (1000); additional findings were omitted.');
-              findingLimitNoted = true;
-            }
-            continue;
-          }
-          findings.push({
+          const detected: SecretScanFinding = {
             id: `${candidate.source}:${candidate.filePath}:${candidate.lineNumber}:${pattern.id}:${findings.length + 1}`,
             ruleId: pattern.id,
             severity: pattern.severity,
@@ -501,8 +530,16 @@ export class SecretScanService {
             // A credential can begin in an earlier fragment. Never expose its
             // unrecognizable tail as context for another finding on that line.
             contextLine: fragment ? '[REDACTED_SECRET] (long-line preview omitted)' : sanitizeContextLine(candidate.line),
-          });
-          activeHistoryEntry?.findings.push(findings[findings.length - 1]);
+          };
+          recordHistoryFinding(activeHistoryEntry, detected);
+          if (findings.length >= 1000) {
+            if (!findingLimitNoted) {
+              notes.push('Secret scan finding limit reached (1000); additional findings were omitted.');
+              findingLimitNoted = true;
+            }
+            continue;
+          }
+          findings.push(detected);
         }
       };
 
@@ -635,16 +672,18 @@ export class SecretScanService {
             // Cache failure never replaces or skips the ordinary secret scan.
           }
         }
-        for (let offset = 0; offset < commitsToScan.length; offset += MAX_COMMITS_PER_DIFF_PROCESS) {
-          if (options.signal?.aborted) {
-            const aborted = new Error('Secret scan was aborted.');
-            aborted.name = 'AbortError';
-            throw aborted;
+        const { idleCached, batchSize } = historyBatchPlan(options.background, cache, commitsToScan, this.historyCache);
+        for (let offset = 0; offset < commitsToScan.length; offset += batchSize) {
+          if (options.shouldYield?.()) {
+            historyScanIncomplete = true;
+            break;
           }
-          const batch = commitsToScan.slice(offset, offset + MAX_COMMITS_PER_DIFF_PROCESS);
+          options.signal?.throwIfAborted();
+          const batch = commitsToScan.slice(offset, offset + batchSize);
+          options.onHistoryBatch?.(batch);
           // LFS files are mutable outside Git's object store. Always recheck
           // their availability and integrity, including when patches are cached.
-          await scanLfs(batch, source);
+          if (!idleCached) await scanLfs(batch, source, cache);
           const missing: string[] = [];
           let reusedLines = 0;
           for (const oid of batch) {
@@ -656,13 +695,9 @@ export class SecretScanService {
             if (source === 'tag') tagLines += cached.checkedLines;
             else toPushLines += cached.checkedLines;
             reusedLines += cached.checkedLines;
-            for (const finding of cached.findings) {
-              if (findings.length >= 1000) {
-                if (!findingLimitNoted) notes.push('Secret scan finding limit reached (1000); additional findings were omitted.');
-                findingLimitNoted = true;
-                break;
-              }
-              findings.push({ ...finding, source, id: `${source}:${finding.filePath}:${finding.lineNumber}:${finding.ruleId}:${findings.length + 1}` });
+            if (appendCachedFindings(findings, cached, source)) {
+              if (!findingLimitNoted) notes.push('Secret scan finding limit reached (1000); additional findings were omitted.');
+              findingLimitNoted = true;
             }
             if (cached.longLines && !notes.some((note) => note.startsWith('Very long lines')))
               notes.push('Very long lines were scanned in overlapping segments; only path allowlist rules apply to these lines.');
@@ -686,11 +721,13 @@ export class SecretScanService {
               captured,
             );
           options.signal?.throwIfAborted();
-          await cache?.assertCurrent();
-          if (captured && !findingLimitNoted && !matcher?.timedOutCount)
-            for (const [oid, entry] of captured) this.historyCache.put(cache!.keys.get(oid)!, entry);
+          await verifyHistoryCheckpoint(cache, batch, offset + batch.length >= commitsToScan.length);
+          if (captured && !matcher?.timedOutCount)
+            for (const [oid, entry] of captured) if (!entry.truncated) this.historyCache.put(cache!.keys.get(oid)!, entry);
           if (reusedLines) progress.lines(stagedLines + toPushLines + tagLines);
-          progress.completeBatch(batch.length);
+          reusedCommits += batch.length - missing.length;
+          progress.reused(batch.length - missing.length);
+          completeHistoryCheckpoint(progress, batch.length, options.onHistoryBatchComplete);
         }
       };
 
@@ -800,7 +837,8 @@ export class SecretScanService {
       };
 
       if (options.stagedBaseTree && !/^[0-9a-f]{40,64}$/.test(options.stagedBaseTree)) throw new Error('Invalid scan base tree.');
-      if (!options.background) {
+      const includeStaged = includeStagedInScan(options);
+      if (includeStaged) {
         progress.phase('staged');
         await streamDiff(
           ['diff', '--cached', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0', ...(options.stagedBaseTree ? [options.stagedBaseTree] : [])],
@@ -820,12 +858,13 @@ export class SecretScanService {
           await scanTagCommits();
         }
       }
-      if (!options.background) {
+      if (includeStaged) {
         progress.phase('lfs');
         await scanLfs(null, 'staged');
       }
 
       options.onProgress?.(stagedLines + toPushLines + tagLines);
+      notes.push(...reuseNotes(reusedCommits));
       options.signal?.throwIfAborted();
       progress.phase('verifying');
       const timedOutAllowlistRules = matcher?.timedOutCount ?? 0;

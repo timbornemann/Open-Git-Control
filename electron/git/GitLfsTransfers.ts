@@ -89,13 +89,41 @@ export function lfsTransferEnvironment(base: NodeJS.ProcessEnv, remote: string, 
   );
 }
 
-export async function lfsConfigurationStamp(repoPath: string, git: Pick<GitRunner, 'runResult'>): Promise<string> {
+export async function lfsConfigurationStamp(repoPath: string, git: Pick<GitRunner, 'runResult'> & Partial<Pick<GitRunner, 'runBuffer'>>): Promise<string> {
   try {
     const file = resolveExistingRepositoryPathWithoutSymlinks(repoPath, '.lfsconfig');
     if (fs.statSync(file).size > 1024 * 1024) throw new Error('Git LFS configuration is too large.');
     return fs.readFileSync(file).toString('base64');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    if (git.runBuffer) {
+      const revisions = [':.lfsconfig', 'HEAD:.lfsconfig'];
+      const data = await git.runBuffer(repoPath, ['cat-file', '--batch'], {
+        input: `${revisions.join('\n')}\n`,
+        maxBytes: 2 * 1024 * 1024 + 1024,
+        tooLargeMessage: 'Git LFS configuration is too large.',
+      });
+      let position = 0;
+      const values: Array<string | undefined> = [];
+      for (const revision of revisions) {
+        const end = data.indexOf(10, position);
+        if (end < 0) throw new Error('Invalid Git LFS configuration response.');
+        const header = data.subarray(position, end).toString('utf8');
+        position = end + 1;
+        if (header === `${revision} missing`) {
+          values.push(undefined);
+          continue;
+        }
+        const match = /^[a-f0-9]{40,64} blob (\d+)$/.exec(header);
+        const size = Number(match?.[1]);
+        if (!match || !Number.isSafeInteger(size) || size > 1024 * 1024 || position + size >= data.length || data[position + size] !== 10)
+          throw new Error('Invalid or oversized Git LFS configuration.');
+        values.push(data.subarray(position, position + size).toString('base64'));
+        position += size + 1;
+      }
+      if (position !== data.length) throw new Error('Invalid Git LFS configuration response.');
+      return values[0] ?? values[1] ?? '';
+    }
     const index = await git.runResult(repoPath, ['show', ':.lfsconfig']);
     if (index.exitCode === 0) return index.stdout;
     const head = await git.runResult(repoPath, ['show', 'HEAD:.lfsconfig']);

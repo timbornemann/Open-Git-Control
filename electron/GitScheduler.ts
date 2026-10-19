@@ -3,7 +3,7 @@ import * as path from 'path';
 import { repositoryCommonDirectory, physicalPathKey } from './git/RepositoryCommonDirectory';
 import { BackgroundFetchPreemptedError } from './git/BackgroundFetchPreemptedError';
 
-export type GitJobKind = 'write' | 'interactive' | 'polling' | 'background' | 'network' | 'network-read' | 'background-fetch';
+export type GitJobKind = 'write' | 'interactive' | 'polling' | 'background' | 'preflight' | 'network' | 'network-read' | 'background-fetch';
 
 export type GitSchedulerDiagnostic = {
   repoPath: string;
@@ -39,6 +39,7 @@ const PRIORITY: Record<GitJobKind, number> = {
   interactive: 1,
   polling: 2,
   background: 3,
+  preflight: 3,
   // Network jobs run in their own lane and are picked by kind, so this value
   // only affects tie-break ordering among queued jobs.
   network: 4,
@@ -75,7 +76,7 @@ export class GitScheduler {
     }
 
     if (kind === 'write' || kind === 'interactive') {
-      this.abortBackground(state);
+      this.abortBackground(state, kind === 'write');
     }
     if (kind === 'write' || kind === 'network' || kind === 'network-read') {
       this.preemptBackgroundFetch(state);
@@ -184,12 +185,12 @@ export class GitScheduler {
     entry.reject(abortError());
   }
 
-  private abortBackground(state: RepoState): void {
+  private abortBackground(state: RepoState, includePreflight: boolean): void {
     for (const entry of state.activeReads) {
-      if (entry.kind === 'background') entry.controller.abort();
+      if (entry.kind === 'background' || (includePreflight && entry.kind === 'preflight')) entry.controller.abort();
     }
     state.queue = state.queue.filter((entry) => {
-      if (entry.kind !== 'background') return true;
+      if (entry.kind !== 'background' && !(includePreflight && entry.kind === 'preflight')) return true;
       entry.controller.abort();
       this.finishCoalesced(state, entry);
       entry.reject(abortError());
@@ -251,11 +252,11 @@ export class GitScheduler {
     }
 
     while (state.activeReads.size < MAX_CONCURRENT_READS) {
-      const activeBackgroundCount = [...state.activeReads].filter((entry) => entry.kind === 'background').length;
+      const activeBackgroundCount = [...state.activeReads].filter((entry) => entry.kind === 'background' || entry.kind === 'preflight').length;
       const hasActiveInteractiveRead = [...state.activeReads].some((entry) => entry.kind === 'interactive');
       const nextIndex = state.queue.findIndex((entry) => {
         if (entry.kind === 'write' || entry.kind === 'network' || entry.kind === 'network-read' || entry.kind === 'background-fetch') return false;
-        if (entry.kind === 'background') {
+        if (entry.kind === 'background' || entry.kind === 'preflight') {
           return !hasActiveInteractiveRead && activeBackgroundCount < MAX_BACKGROUND_READS;
         }
         return true;

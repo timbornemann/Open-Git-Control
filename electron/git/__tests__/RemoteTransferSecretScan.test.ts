@@ -105,6 +105,41 @@ function fixture(content = 'Clean initial content\n', usePathAlias = false) {
 }
 
 describe('single remote push with the real secret scan and IPC guard', () => {
+  it('pushes an explicitly selected branch even when the current branch has no first commit yet', async () => {
+    const f = fixture();
+    const source = git(f.repoPath, 'rev-parse', 'HEAD');
+    git(f.repoPath, 'checkout', '--orphan', 'unborn');
+    const { plan } = await f.prepare({ sourceBranch: 'main', destinationBranch: 'release' });
+    expect(await f.request('executePush', { planId: plan.id })).toMatchObject({ success: true, data: { state: 'success' } });
+    expect(git(f.remotePath, 'rev-parse', 'refs/heads/release')).toBe(source);
+  }, 30_000);
+
+  it('reuses prepared commits, ignores unpublished staging and queries each endpoint only initially and before publication', async () => {
+    const f = fixture();
+    await f.scanner.scanPushDiffs({ repoPath: f.repoPath, strictness: 'low', allowlistText: '', revisions: ['HEAD'], background: true });
+    fs.writeFileSync(path.join(f.repoPath, 'staged.env'), 'AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF\n');
+    git(f.repoPath, 'add', 'staged.env');
+    f.stream.mockClear();
+    const commands = vi.spyOn(f.gitService.runner, 'run');
+    const { plan, resultScan } = await f.prepare();
+    expect(resultScan.findings).toEqual([]);
+    expect(resultScan.stats.stagedLines).toBe(0);
+    expect(await f.request('executePush', { planId: plan.id })).toMatchObject({ success: true, data: { state: 'success' } });
+    expect(f.showCommits()).toEqual([]);
+    expect(commands.mock.calls.filter(([, args]) => args[0] === 'ls-remote')).toHaveLength(2);
+    expect(commands.mock.calls.some(([, args]) => ['status', 'ls-files'].includes(args[0]))).toBe(false);
+    expect(git(f.repoPath, 'diff', '--cached', '--name-only')).toBe('staged.env');
+  }, 30_000);
+
+  it('rejects a changed remote address while making the plan from the reviewed selection', async () => {
+    const f = fixture();
+    const snapshot = (await f.request('getRemotes')).data;
+    const expectedSelection = { remotes: [{ name: 'origin', urls: snapshot.remotes[0].pushUrls, bindings: [] }] };
+    git(f.repoPath, 'remote', 'set-url', 'origin', f.bare('other'));
+    const result = await f.request('planPush', { remoteNames: ['origin'], expectedBranch: snapshot.branch, expectedSelection });
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining('remote, or account binding changed') });
+  }, 30_000);
+
   it('reuses a background preflight through a new push plan while retaining the findings dialog and one-shot approval', async () => {
     const f = fixture('AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF\n');
     await f.scanner.scanPushDiffs({ repoPath: f.repoPath, strictness: 'low', allowlistText: '', revisions: ['HEAD'], background: true });
@@ -291,7 +326,7 @@ describe('fresh endpoint secret-scan reachability', () => {
     expect((await f.prepare()).resultScan.findings.length).toBeGreaterThan(0);
   }, 30_000);
 
-  it('does not issue an approval when the advertised baseline changes during inspection', async () => {
+  it('rejects publication in the final validation when the advertised baseline changed during inspection', async () => {
     const f = fixture();
     const initial = git(f.repoPath, 'rev-parse', 'HEAD');
     f.commit('Remote version\n');
@@ -303,8 +338,13 @@ describe('fresh endpoint secret-scan reachability', () => {
       git(f.remotePath, 'update-ref', 'refs/heads/main', initial);
       return scanned;
     });
-    expect(await f.scanPlan(result.data)).toMatchObject({ success: false, error: expect.stringContaining('Remote history changed') });
+    expect(await f.scanPlan(result.data)).toMatchObject({ success: true });
     expect(await handlers.get(IpcChannel.GitApproveSecretScanPush)!(f.event, result.data.secretScanArgs, f.repoPath)).toEqual({ success: false });
+    expect(await f.request('executePush', { planId: result.data.id })).toMatchObject({
+      success: false,
+      error: expect.stringContaining('Remote history changed'),
+    });
+    expect(git(f.remotePath, 'rev-parse', 'refs/heads/main')).toBe(initial);
   }, 30_000);
 
   it('falls back visibly to full history when the advertised tip is missing locally', async () => {

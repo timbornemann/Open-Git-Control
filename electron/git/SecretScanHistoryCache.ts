@@ -5,11 +5,14 @@ import type { GitRunner } from './GitRunner';
 import type { GitRunOptions } from './GitProcessTypes';
 import { physicalPathKey, repositoryCommonDirectory } from './RepositoryCommonDirectory';
 import type { SecretScanFinding } from '../SecretScanService';
+import type { GitLfsPointer } from '../../src/shared/ipc/gitLfs';
+import { secretScanConfiguration } from './GitConfigurationEntries';
 
 export type HistoryScanEntry = {
   checkedLines: number;
   findings: SecretScanFinding[];
   longLines: boolean;
+  truncated?: boolean;
 };
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -44,6 +47,9 @@ async function readBoundaryFile(file: string): Promise<string> {
 export class SecretScanHistoryCache {
   private readonly entries = new Map<string, { value: HistoryScanEntry; bytes: number }>();
   private bytes = 0;
+  private readonly metadata = new Map<string, { paths: string[]; blobs: Array<[string, string]> }>();
+  private metadataBytes = 0;
+  private readonly pointers = new Map<string, Map<string, GitLfsPointer | null>>();
 
   get(key: string | undefined): HistoryScanEntry | undefined {
     if (!key) return undefined;
@@ -80,31 +86,43 @@ export class SecretScanHistoryCache {
     const readContext = async () => {
       const config = await git.run(repoPath, ['config', '--null', '--list'], options);
       const files = await Promise.all(['shallow', 'info/grafts'].map((name) => readBoundaryFile(path.join(common, name))));
-      return hash([config, files, options.envOverrides]);
+      return hash([secretScanConfiguration(config), files, options.envOverrides]);
     };
     const context = await readContext();
-    const raw = await git.runBuffer(repoPath, ['diff-tree', '--stdin', '--root', '-r', '-m', '--no-renames', '--raw', '-z'], {
-      ...options,
-      input: `${commits.join('\n')}\n`,
-      maxBytes: MAX_METADATA_BYTES,
-      tooLargeMessage: 'Secret scan cache metadata exceeds its limit.',
-    });
-    const paths = new Map(commits.map((oid) => [oid, new Set<string>()]));
+    const repoKey = physicalPathKey(repoPath);
+    const metadataKey = (oid: string) => hash([repoKey, context, oid]);
+    const details = new Map(commits.map((oid) => [oid, this.metadata.get(metadataKey(oid))]));
+    const missing = commits.filter((oid) => !details.get(oid));
+    const raw = missing.length
+      ? await git.runBuffer(repoPath, ['diff-tree', '--stdin', '--root', '-r', '-m', '--no-renames', '--no-abbrev', '--raw', '-z'], {
+          ...options,
+          input: `${missing.join('\n')}\n`,
+          maxBytes: MAX_METADATA_BYTES,
+          tooLargeMessage: 'Secret scan cache metadata exceeds its limit.',
+        })
+      : Buffer.alloc(0);
+    const fresh = new Map(missing.map((oid) => [oid, { paths: [] as string[], blobs: [] as Array<[string, string]> }]));
     const parts = new TextDecoder('utf-8', { fatal: true }).decode(raw).split('\0');
-    let current: Set<string> | undefined;
+    let current: { paths: string[]; blobs: Array<[string, string]> } | undefined;
     for (let index = 0; index < parts.length; index++) {
       const field = parts[index];
       if (!field) continue;
-      if (objectId.test(field) && paths.has(field)) current = paths.get(field);
-      else if (/^:\d{6} \d{6} [a-f0-9]{40,64} [a-f0-9]{40,64} [A-Z][0-9]*$/.test(field) && current && parts[index + 1]) current.add(parts[++index]);
-      else throw new Error('Secret scan cache metadata is invalid.');
+      if (objectId.test(field) && fresh.has(field)) current = fresh.get(field);
+      else {
+        const delta = /^:\d{6} (\d{6}) [a-f0-9]{40,64} ([a-f0-9]{40,64}) [A-Z][0-9]*$/.exec(field);
+        if (!delta || !current || !parts[index + 1]) throw new Error('Secret scan cache metadata is invalid.');
+        const file = parts[++index];
+        current.paths.push(file);
+        if (['100644', '100755'].includes(delta[1]) && !/^0+$/.test(delta[2])) current.blobs.push([delta[2], file]);
+      }
     }
-    const allPaths = [...new Set([...paths.values()].flatMap((files) => [...files]))].sort();
+    for (const [oid, value] of fresh) details.set(oid, value);
+    const allPaths = [...new Set([...details.values()].flatMap((value) => value!.paths))].sort();
     const pathSet = new Set(allPaths);
-    const readAttributes = async () => {
+    const readAttributes = async (files = allPaths) => {
       const attributes = new Map<string, string[]>();
-      if (!allPaths.length) return attributes;
-      const data = await git.runWithInput(repoPath, ['check-attr', '--all', '-z', '--stdin'], `${allPaths.join('\0')}\0`, options);
+      if (!files.length) return attributes;
+      const data = await git.runWithInput(repoPath, ['check-attr', '--all', '-z', '--stdin'], `${files.join('\0')}\0`, options);
       const fields = data.split('\0');
       if (fields.pop() !== '' || fields.length % 3 !== 0) throw new Error('Secret scan cache attributes are invalid.');
       for (let index = 0; index + 2 < fields.length; index += 3) {
@@ -115,18 +133,44 @@ export class SecretScanHistoryCache {
       return attributes;
     };
     const attributes = await readAttributes();
-    const attributeKey = (values: Map<string, string[]>) => hash(allPaths.map((file) => [file, values.get(file) ?? []]));
-    const before = attributeKey(attributes);
-    const repoKey = physicalPathKey(repoPath);
+    const attributeKey = (values: Map<string, string[]>, files: string[]) => hash(files.map((file) => [file, values.get(file) ?? []]));
     const keys = new Map(
-      commits.map((oid) => [oid, hash([repoKey, policy, context, oid, [...paths.get(oid)!].sort().map((file) => [file, attributes.get(file) ?? []])])]),
+      commits.map((oid) => [
+        oid,
+        hash([repoKey, policy, context, oid, [...new Set(details.get(oid)!.paths)].sort().map((file) => [file, attributes.get(file) ?? []])]),
+      ]),
     );
+    const pointerKey = hash([repoKey, context]);
+    if (!this.pointers.has(pointerKey)) this.pointers.set(pointerKey, new Map());
+    while (this.pointers.size > 4) this.pointers.delete(this.pointers.keys().next().value!);
+    let publishedMetadata = false;
     return {
       keys,
-      assertCurrent: async () => {
+      pointers: this.pointers.get(pointerKey)!,
+      lfsPaths: (oids: string[]) => {
+        const paths = new Map<string, string[]>();
+        for (const oid of oids) for (const [blob, file] of details.get(oid)!.blobs) paths.set(blob, [...(paths.get(blob) ?? []), file]);
+        return paths;
+      },
+      assertCurrent: async (oids = commits) => {
         options.signal?.throwIfAborted();
-        if (context !== (await readContext()) || before !== attributeKey(await readAttributes()))
+        const files = [...new Set(oids.flatMap((oid) => details.get(oid)!.paths))].sort();
+        if (context !== (await readContext()) || attributeKey(attributes, files) !== attributeKey(await readAttributes(files), files))
           throw new Error('Git attributes or scan configuration changed during the secret scan. Run the scan again.');
+        // Publish immutable path metadata only after the same consistency check
+        // that protects the findings. An interrupted read publishes no metadata.
+        for (const [oid, value] of publishedMetadata ? [] : fresh) {
+          const key = metadataKey(oid);
+          if (this.metadata.has(key)) continue;
+          this.metadata.set(key, value);
+          this.metadataBytes += Buffer.byteLength(JSON.stringify(value)) + key.length;
+        }
+        publishedMetadata = true;
+        while (this.metadataBytes > MAX_METADATA_BYTES) {
+          const key = this.metadata.keys().next().value!;
+          this.metadataBytes -= Buffer.byteLength(JSON.stringify(this.metadata.get(key))) + key.length;
+          this.metadata.delete(key);
+        }
       },
     };
   }

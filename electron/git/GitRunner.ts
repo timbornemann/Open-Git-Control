@@ -9,6 +9,7 @@ import type { CommitEditGit } from './CommitEditGit';
 import { runCommitEditProcess } from './CommitEditProcess';
 import { runGitChunkStream } from './GitChunkStream';
 import { gitPollingKey } from './GitPollingKey';
+import { inspectLfsObjectBatch, type ObjectBatchConsumer } from './GitObjectBatch';
 const commandToken = (value: string | undefined): string =>
   String(value || '')
     .trim()
@@ -277,6 +278,19 @@ export class GitRunner {
     return this.schedule(repoPath, kind, options.commandName ?? args[0] ?? 'git', (signal) => this.spawnOperations.runBuffer(repoPath, args, options, signal), {
       signal: options.signal,
     });
+  }
+
+  async inspectLfsObjects(repoPath: string, objects: string[], options: GitRunOptions = {}, consume?: ObjectBatchConsumer) {
+    this.assertRepoPathAvailable(repoPath);
+    return this.schedule(
+      repoPath,
+      options.requestedKind ?? 'interactive',
+      'cat-file',
+      (signal) => inspectLfsObjectBatch(repoPath, objects, options, signal, consume),
+      {
+        signal: options.signal,
+      },
+    );
   }
 
   async runWithInput(repoPath: string, args: string[], input: string | Buffer, options: GitInputRunOptions = {}): Promise<string> {

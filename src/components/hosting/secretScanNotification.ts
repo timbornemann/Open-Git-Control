@@ -43,7 +43,17 @@ export function secretScanNotification(
   const fallback = secretScanFallbackDetail(scope, tr);
   return {
     msg: messages[phase],
-    detail: [counts, scopeDetail, fallback].filter(Boolean).join('\n') || undefined,
+    detail:
+      [
+        counts,
+        scan?.reusedCommits
+          ? tr(`${count(scan.reusedCommits)} vorbereitete Commit-Prüfungen wiederverwendet`, `${count(scan.reusedCommits)} prepared commit checks reused`)
+          : undefined,
+        scopeDetail,
+        fallback,
+      ]
+        .filter(Boolean)
+        .join('\n') || undefined,
     progress: {
       label: knownTotal ? tr('Fortschritt der Commit-Prüfung', 'Commit scan progress') : tr('Fortschritt des Secret-Scans', 'Secret scan progress'),
       value: knownTotal ? Math.floor((completed / total) * 100) : phase === 'complete' ? 100 : null,

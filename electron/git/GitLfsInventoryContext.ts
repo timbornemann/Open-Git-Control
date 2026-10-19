@@ -12,7 +12,10 @@ export async function lfsHistoryContext(common: string | null, options: GitRunOp
   if (!common) return;
   const environment = Object.fromEntries(
     Object.entries({ ...process.env, ...options.envOverrides })
-      .filter(([key]) => key.toUpperCase().startsWith('GIT_'))
+      // A complete local inventory is identical with or without permission to
+      // lazily fetch. Missing objects never publish a snapshot. Excluding this
+      // transport flag lets offline idle preparation serve a foreground push.
+      .filter(([key]) => key.toUpperCase().startsWith('GIT_') && key.toUpperCase() !== 'GIT_NO_LAZY_FETCH')
       .sort(([a], [b]) => a.localeCompare(b)),
   );
   // Redirected Git directories or custom boundary files are scanned afresh;

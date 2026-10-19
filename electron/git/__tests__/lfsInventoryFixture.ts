@@ -67,7 +67,10 @@ async function lfsInventoryFixture(lifecycle: GitIntegrationLifecycle) {
   const inspect = vi.spyOn(runner, 'runBuffer');
   const newInventory = (disk = false) => new GitLfsInventory(disk ? (namespace) => new GitLfsInventoryStore(() => profile, namespace) : undefined);
   const inventory = newInventory();
-  const read = (refs: string[], cache = inventory, cwd = repo, signal = lifecycle.signal) => cache.read(cwd, refs, runner, { signal });
+  // Exercise the bounded facade fallback as well as the native persistent reader
+  // covered by GitObjectBatch.test.ts. These spies inspect individual batches.
+  const read = (refs: string[], cache = inventory, cwd = repo, signal = lifecycle.signal) =>
+    cache.read(cwd, refs, { runBuffer: (...args) => runner.runBuffer(...args) }, { signal });
   const objectWalks = () => inspect.mock.calls.filter(([, args]) => args[0] === 'rev-list' && args.includes('--objects'));
   const blobReads = () =>
     inspect.mock.calls
@@ -76,7 +79,7 @@ async function lfsInventoryFixture(lifecycle: GitIntegrationLifecycle) {
         String(options?.input || '')
           .trim()
           .split('\n')
-          .filter(Boolean),
+          .filter((value) => /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value)),
       );
   return { root, repo, profile, base, lifecycle, git, commit, runner, runBuffer, inspect, inventory, newInventory, read, objectWalks, blobReads };
 }

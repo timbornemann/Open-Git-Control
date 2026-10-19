@@ -47,16 +47,11 @@ const createHarness = (scanPushDiffs: ReturnType<typeof vi.fn>) => {
         return [`refs/heads/main\0${state.head}\0\0`, `refs/remotes/origin/main\0${state.remoteRef}\0\0`].join('\n');
       case 'config':
         return [
-          'remote.origin.url',
-          state.remoteUrl,
-          'remote.origin.fetch',
-          '+refs/heads/*:refs/remotes/origin/*',
-          'branch.main.remote',
-          'origin',
-          'branch.main.merge',
-          'refs/heads/main',
-          'push.default',
-          'simple',
+          `remote.origin.url\n${state.remoteUrl}`,
+          'remote.origin.fetch\n+refs/heads/*:refs/remotes/origin/*',
+          'branch.main.remote\norigin',
+          'branch.main.merge\nrefs/heads/main',
+          'push.default\nsimple',
           '',
         ].join('\0');
       default:

@@ -1,5 +1,6 @@
 import { app, ipcMain } from 'electron';
-import { configureLfsInventory } from '../../git/GitLfsTransfers';
+import { configureLfsInventory, referencedLfsObjects } from '../../git/GitLfsTransfers';
+import { pushPreflightSources } from '../../git/PushPreflightSources';
 import { GitLfsInventory } from '../../git/GitLfsInventory';
 import { GitLfsInventoryStore } from '../../git/GitLfsInventoryStore';
 import type { GitService } from '../../GitService';
@@ -59,6 +60,17 @@ export function registerRemoteTransferHandlers({
 }: Dependencies): RemoteTransferService {
   configureLfsInventory(gitService.runner, lfsInventory);
   const service = new RemoteTransferService(gitService.runner, preferencesStore, createCredentialEnvironment, getCredentialGeneration);
+  pushGuard.configurePreflight?.({
+    sources: (repo, signal) => pushPreflightSources(repo, gitService.runner, service.getPreferences(repo), signal),
+    warmLfs: async (repo, sources, signal) => {
+      for (const source of sources)
+        await referencedLfsObjects(repo, [source], gitService.runner, {
+          requestedKind: 'preflight',
+          signal,
+          envOverrides: { GIT_NO_LAZY_FETCH: '1' },
+        });
+    },
+  });
   pushGuard.setPushScanResolver?.((repoPath, args, context) => service.getPushScanScope(repoPath, args, context));
   const running = new Map<string, Set<AbortController>>();
   // Each window retains its own completed version through failed/deferred

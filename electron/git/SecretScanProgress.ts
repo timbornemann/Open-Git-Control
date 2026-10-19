@@ -6,6 +6,7 @@ export class SecretScanProgress {
   private lastEmittedAt = 0;
   private lastEmittedLines = 0;
   private completedCommits = 0;
+  private reusedCommits = 0;
   constructor(
     private readonly notify?: (progress: SecretScanProgressDto) => void,
     private readonly pushScope?: SecretScanPushScopeDto,
@@ -13,7 +14,11 @@ export class SecretScanProgress {
   private emit() {
     this.lastEmittedAt = Date.now();
     this.lastEmittedLines = this.state.checkedLines;
-    this.notify?.({ ...this.state, ...(this.pushScope ? { pushScope: this.pushScope } : {}) });
+    this.notify?.({
+      ...this.state,
+      ...(this.reusedCommits ? { reusedCommits: this.reusedCommits } : {}),
+      ...(this.pushScope ? { pushScope: this.pushScope } : {}),
+    });
   }
   phase(phase: SecretScanProgressDto['phase']) {
     this.state = { phase, checkedLines: this.state.checkedLines };
@@ -36,5 +41,8 @@ export class SecretScanProgress {
     this.state.processedCommits = Math.min(this.state.totalCommits ?? 0, (this.state.processedCommits ?? 0) + count);
     this.completedCommits = this.state.processedCommits;
     this.emit();
+  }
+  reused(count: number) {
+    this.reusedCommits += count;
   }
 }

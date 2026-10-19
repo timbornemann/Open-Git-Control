@@ -1,7 +1,7 @@
 import { setImmediate } from 'node:timers/promises';
 import type { GitLfsPointer } from '../../src/shared/ipc/gitLfs';
 import type { GitRunOptions } from './GitProcessTypes';
-import { classifyLfsObjects, gitObjectId, LFS_OBJECT_BATCH_SIZE, readLfsObjectInfo, type LfsBlob, type LfsObjectReader } from './GitLfsPointers';
+import { classifyLfsObjectBatches, gitObjectId, readLfsObjectInfo, type LfsBlob, type LfsObjectReader } from './GitLfsPointers';
 import { physicalPathKey, repositoryCommonDirectory } from './RepositoryCommonDirectory';
 import { lfsHistoryContext, lfsInventoryOptions } from './GitLfsInventoryContext';
 import {
@@ -24,6 +24,7 @@ type State = {
   loaded: boolean;
   pending: Promise<void>;
   users: number;
+  requests: Set<{ controller: AbortController; background: boolean; key: string }>;
 };
 type Transaction = Pick<State, 'namespace' | 'objects' | 'snapshots'> & { context: string; dirty: boolean };
 const objectLines = (data: Buffer): string[] => {
@@ -62,13 +63,24 @@ export class GitLfsInventory {
         loaded: false,
         pending: Promise.resolve(),
         users: 0,
+        requests: new Set(),
       };
     }
     this.repositories.delete(namespace);
     this.repositories.set(namespace, state);
     state.users++;
     const current = state;
-    const work = current.pending.then(() => this.scan(repoPath, common, refs, git, lfsInventoryOptions(requestedOptions), current));
+    const request = {
+      controller: new AbortController(),
+      background: ['background', 'preflight'].includes(requestedOptions.requestedKind ?? ''),
+      key: [...refs].sort().join('\n'),
+    };
+    // An unrelated idle inventory must not hold a foreground push behind other
+    // branches/tags. Matching work can finish and its complete snapshot is reused.
+    if (!request.background) for (const pending of current.requests) if (pending.background && pending.key !== request.key) pending.controller.abort();
+    current.requests.add(request);
+    const signal = AbortSignal.any([request.controller.signal, ...(requestedOptions.signal ? [requestedOptions.signal] : [])]);
+    const work = current.pending.then(() => this.scan(repoPath, common, refs, git, lfsInventoryOptions({ ...requestedOptions, signal }), current));
     current.pending = work
       .then(
         () => undefined,
@@ -76,6 +88,7 @@ export class GitLfsInventory {
       )
       .finally(() => {
         current.users--;
+        current.requests.delete(request);
         this.trimRepositories();
       });
     return abortable(work, requestedOptions.signal);
@@ -226,25 +239,32 @@ export class GitLfsInventory {
       }),
     );
     if (!objects.includes(root)) throw new Error('Incomplete Git LFS object inventory.');
-    for (let offset = 0; offset < objects.length; offset += LFS_OBJECT_BATCH_SIZE) {
+    const known = new Map<string, GitLfsPointer | null>();
+    for (const oid of objects) {
+      const value = transaction.objects.get(oid);
+      if (value !== undefined) known.set(oid, value);
+    }
+    let classifiedCount = 0;
+    const remember = async (values: Map<string, GitLfsPointer | null>) => {
       options.signal?.throwIfAborted();
-      const group = objects.slice(offset, offset + LFS_OBJECT_BATCH_SIZE);
-      // Keep a stable batch view: inserting a new object may evict a known
-      // pointer that occurs later in this same batch from the bounded LRU.
-      const values = new Map(group.map((oid) => [oid, transaction.objects.get(oid)]));
-      const unknown = group.filter((oid) => values.get(oid) === undefined);
-      const inspected = await classifyLfsObjects(repo, unknown, git, options);
-      for (const [oid, pointer] of inspected) values.set(oid, pointer);
-      for (const oid of group) {
-        const pointer = values.get(oid);
-        if (pointer === undefined) throw new Error('Incomplete Git LFS object classification.');
+      classifiedCount += values.size;
+      for (const [oid, pointer] of values) {
         if (pointer) pointers.set(oid, pointer);
         transaction.objects.delete(oid);
         transaction.objects.set(oid, pointer);
         if (transaction.objects.size > MAX_LFS_CACHE_OBJECTS) transaction.objects.delete(transaction.objects.keys().next().value!);
       }
       await setImmediate();
-    }
+    };
+    await classifyLfsObjectBatches(
+      repo,
+      objects.filter((oid) => !known.has(oid)),
+      git,
+      options,
+      remember,
+    );
+    await remember(known);
+    if (classifiedCount !== objects.length) throw new Error('Incomplete Git LFS object classification.');
     const inventory = [...pointers].map(([blob, pointer]) => ({ blob, pointer }));
     if (inventory.length <= MAX_LFS_CACHE_OBJECTS) transaction.snapshots.set(root, { root, kind, pointers: inventory });
     while (transaction.snapshots.size > MAX_LFS_SNAPSHOTS) transaction.snapshots.delete(transaction.snapshots.keys().next().value!);

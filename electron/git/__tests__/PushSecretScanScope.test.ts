@@ -33,6 +33,18 @@ function fixture(advertisement = `${base}\trefs/heads/main\n`) {
 }
 
 describe('Main-owned push secret-scan scope safety', () => {
+  it('keeps the verified destination base when an unrelated advertised branch has not been fetched', async () => {
+    const f = fixture(`${base}\trefs/heads/main\n${absent}\trefs/heads/unfetched`);
+    f.runWithInput.mockImplementation(async (_repo, args) => (args[0] === 'cat-file' ? `${base} commit\n${absent} missing\n` : source));
+    const scope = await readPushSecretScanScope(f.dependencies);
+    expect(scope.summary).toMatchObject({ mode: 'incremental', totalCommits: 1, fallbackReasons: [] });
+    expect(f.runWithInput).toHaveBeenCalledWith('/repo', expect.arrayContaining(['rev-list']), `${source}\n^${base}\n`, expect.anything());
+    await scope.assertCurrent(false);
+    expect(f.advertise).toHaveBeenCalledOnce();
+    await scope.assertCurrent();
+    expect(f.advertise).toHaveBeenCalledTimes(2);
+  });
+
   it.each([
     'invalid\trefs/heads/main',
     `${base}\trefs/heads/main\n${source}\trefs/heads/main`,

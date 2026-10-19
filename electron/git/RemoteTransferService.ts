@@ -2,7 +2,7 @@ import { createPushPlan } from './createPushPlan';
 import { randomUUID } from 'crypto';
 import { readPushSecretScanScope, type PushSecretScanScope } from './PushSecretScanScope';
 import { pullStrategyArguments, readGitPullConfiguration } from './GitPullConfiguration';
-import { readRemoteSnapshot, assertPushSourceUnchanged, probePushUrlIsolation, remoteConfigurationFingerprint } from './remoteSnapshot';
+import * as remoteSnapshot from './remoteSnapshot';
 import { lfsEndpoint, lfsTransferEnvironment, uploadLfsObjects } from './GitLfsTransfers';
 import { gitPushProgress } from './GitLfsTransferProgress';
 import { fetchRemoteReferences, type FetchOptions } from './RemoteFetch';
@@ -65,12 +65,12 @@ export class RemoteTransferService {
 
   private async isolationCapability(repoPath: string): Promise<boolean> {
     if (this.isolationSupported !== undefined) return this.isolationSupported;
-    this.isolationSupported = await probePushUrlIsolation(repoPath, this.git);
+    this.isolationSupported = await remoteSnapshot.probePushUrlIsolation(repoPath, this.git);
     return this.isolationSupported ?? false;
   }
 
   async getRemotes(repoPath: string): Promise<GitRemoteSnapshotDto> {
-    return readRemoteSnapshot(repoPath, this.git, await this.isolationCapability(repoPath));
+    return remoteSnapshot.readRemoteSnapshot(repoPath, this.git, await this.isolationCapability(repoPath));
   }
 
   getPreferences(repoPath: string): RemotePreferences {
@@ -237,7 +237,7 @@ export class RemoteTransferService {
   }
 
   private async fingerprint(repoPath: string): Promise<string> {
-    return remoteConfigurationFingerprint(repoPath, this.git, this.getPreferences(repoPath));
+    return remoteSnapshot.remoteConfigurationFingerprint(repoPath, this.git, this.getPreferences(repoPath));
   }
 
   private async advertised(repoPath: string, target: GitPushTargetDto, refs: PublishedRef[], context: RemoteTransferContext): Promise<Map<string, string>> {
@@ -257,6 +257,8 @@ export class RemoteTransferService {
       getCredentialGeneration: this.getCredentialGeneration,
       advertised: (target, refs) => this.advertised(repoPath, target, refs, context),
       connectionId: (name, url) => this.connectionId(repoPath, name, url),
+      prepare: async () =>
+        remoteSnapshot.readPushPlanningContext(repoPath, this.git, this.getPreferences(repoPath), await this.isolationCapability(repoPath), context.signal),
     });
     this.plans.set(plan.dto.id, plan);
     return structuredClone(plan.dto);
@@ -266,7 +268,8 @@ export class RemoteTransferService {
     if (!args[0]?.startsWith('__ogc_transfer_scan_')) return null;
     const id = /^__ogc_transfer_scan_([a-f0-9-]{36})__$/.exec(args[0])?.[1];
     if (!id) throw new Error('Invalid secret-scan push plan.');
-    const plan = await this.validatePlan(repoPath, id, context);
+    const plan = this.plans.get(id);
+    if (!plan) throw new Error('Push plan expired. Create a new push plan.');
     if (digest(args) !== digest(plan.dto.secretScanArgs)) throw new Error('Secret-scan sources no longer match the reviewed push plan.');
     return readPushSecretScanScope({
       repoPath,
@@ -308,7 +311,7 @@ export class RemoteTransferService {
     if (plan.fingerprint !== (await this.fingerprint(repoPath))) throw new Error('Remote configuration or account bindings changed. Create a new push plan.');
     if ((await this.optional(repoPath, ['symbolic-ref', '--quiet', '--short', 'HEAD'])) !== plan.dto.branch)
       throw new Error('The current branch changed. Create a new push plan.');
-    await assertPushSourceUnchanged(repoPath, this.git, plan.dto);
+    await remoteSnapshot.assertPushSourceUnchanged(repoPath, this.git, plan.dto);
     if (this.getCredentialGeneration && Object.entries(plan.credentialGenerations).some(([id, generation]) => this.getCredentialGeneration!(id) !== generation))
       throw new Error('Hosting authentication changed. Review the push with the current account again.');
     for (const ref of plan.refs) await this.git.run(repoPath, ['cat-file', '-e', ref.sourceOid]);

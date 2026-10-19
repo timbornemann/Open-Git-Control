@@ -11,6 +11,7 @@ export interface SecretScanProgressDto {
   checkedLines: number;
   processedCommits?: number;
   totalCommits?: number;
+  reusedCommits?: number;
   pushScope?: SecretScanPushScopeDto;
 }
 
