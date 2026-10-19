@@ -61,7 +61,7 @@ async function fixture(reject = false) {
       for await (const chunk of request) {
         chunks.push(Buffer.from(chunk));
         await new Promise<void>((resolve) => {
-          setTimeout(resolve, 25);
+          setTimeout(resolve, 5);
         });
       }
       const oid = request.url!.split('/').at(-1)!;
@@ -100,7 +100,9 @@ async function fixture(reject = false) {
   }))
     await git(repo, 'config', key, value);
   await git(repo, 'remote', 'add', 'origin', pathToFileURL(bare).href);
-  const content = Buffer.alloc(4 * 1024 * 1024, 'actual LFS data');
+  // Exceed loopback socket buffers: otherwise Linux can send the entire body
+  // before LFS's meter throttle elapses, despite the server consuming it slowly.
+  const content = Buffer.alloc(16 * 1024 * 1024, 'actual LFS data');
   const oid = createHash('sha256').update(content).digest('hex');
   const object = path.join(repo, '.git', 'lfs', 'objects', oid.slice(0, 2), oid.slice(2, 4), oid);
   fs.mkdirSync(path.dirname(object), { recursive: true });

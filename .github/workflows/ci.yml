@@ -61,6 +61,11 @@ jobs:
 
   recovery:
     name: Native recovery (${{ matrix.os }})
+    permissions:
+      contents: read
+    env:
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
     strategy:
       fail-fast: false
       matrix:
@@ -78,6 +83,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: recovery
+          shared-key: recovery-x64
+          cache-on-failure: true
       - name: Install Linux native UI dependencies
         if: runner.os == 'Linux'
         # Winit also loads the X11 keyboard runtime when using software rendering.
@@ -93,3 +100,5 @@ jobs:
         run: xvfb-run -a npm run recovery:smoke
       - name: Update, repair and restore official packages in isolation
         run: node scripts/test-recovery-installation.js
+        env:
+          OGC_RECOVERY_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

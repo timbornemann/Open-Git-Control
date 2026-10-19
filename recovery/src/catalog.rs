@@ -1,6 +1,6 @@
 use crate::{model::Control, policy};
 use anyhow::{ensure, Context, Result};
-use reqwest::{Client, Response};
+use reqwest::{header, Client, RequestBuilder, Response};
 use semver::Version;
 use serde::Deserialize;
 use std::{future::Future, time::Duration};
@@ -61,8 +61,24 @@ impl Release {
 pub struct Network {
     http: Client,
     runtime: tokio::runtime::Runtime,
+    api_authorization: Option<header::HeaderValue>,
 }
 impl Network {
+    fn request(&self, url: Url, timeout: Duration) -> RequestBuilder {
+        // Never put API credentials in client-wide default headers: release
+        // assets redirect to separate download hosts and must remain anonymous.
+        let authorized = policy::allowed_api(&url);
+        let mut request = self
+            .http
+            .get(url)
+            .header(header::ACCEPT, "application/vnd.github+json")
+            .timeout(timeout);
+        if let Some(value) = self.api_authorization.as_ref().filter(|_| authorized) {
+            request = request.header(header::AUTHORIZATION, value.clone());
+        }
+        request
+    }
+
     fn wait<T>(
         &self,
         future: impl Future<Output = reqwest::Result<T>>,
@@ -75,17 +91,7 @@ impl Network {
     fn get(&self, url: Url, timeout: Duration, control: &Control) -> Result<Response> {
         // reqwest creates its timeout when send() is called, so construct the
         // request future inside the owned runtime, not before block_on().
-        self.wait(
-            async {
-                self.http
-                    .get(url)
-                    .header("Accept", "application/vnd.github+json")
-                    .timeout(timeout)
-                    .send()
-                    .await
-            },
-            control,
-        )
+        self.wait(async { self.request(url, timeout).send().await }, control)
     }
     pub fn chunk(&self, response: &mut Response, control: &Control) -> Result<Option<Vec<u8>>> {
         Ok(self
@@ -95,6 +101,19 @@ impl Network {
 }
 
 pub fn client() -> Result<Network> {
+    client_with_token(std::env::var("OGC_RECOVERY_GITHUB_TOKEN").ok().as_deref())
+}
+fn client_with_token(token: Option<&str>) -> Result<Network> {
+    let api_authorization = token
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
+        .map(|token| {
+            let mut value = header::HeaderValue::from_str(&format!("Bearer {token}"))
+                .context("Invalid recovery GitHub API authorization header.")?;
+            value.set_sensitive(true);
+            Ok::<_, anyhow::Error>(value)
+        })
+        .transpose()?;
     let http = Client::builder()
         .user_agent(concat!(
             "Open-Git-Control-Recovery/",
@@ -108,7 +127,11 @@ pub fn client() -> Result<Network> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
-    Ok(Network { http, runtime })
+    Ok(Network {
+        http,
+        runtime,
+        api_authorization,
+    })
 }
 pub fn api<T: serde::de::DeserializeOwned>(
     client: &Network,
@@ -237,5 +260,36 @@ mod tests {
                 &Control::default()
             )
             .is_err());
+    }
+
+    #[test]
+    fn scopes_optional_credentials_to_the_official_release_api() {
+        let network = client_with_token(Some("test-token")).unwrap();
+        let request = |url| {
+            network
+                .request(url, Duration::from_secs(1))
+                .build()
+                .unwrap()
+        };
+        let api = request(policy::api_url("releases/tags/v3.0.5"));
+        let value = api.headers().get(header::AUTHORIZATION).unwrap();
+        assert_eq!(value, "Bearer test-token");
+        assert!(value.is_sensitive());
+        for url in [
+            policy::asset_url(&Version::new(3, 0, 5), "latest.yml").unwrap(),
+            Url::parse("https://release-assets.githubusercontent.com/download").unwrap(),
+            Url::parse("https://api.github.com/repos/other/project/releases").unwrap(),
+            Url::parse("https://example.com/releases").unwrap(),
+        ] {
+            assert!(!request(url).headers().contains_key(header::AUTHORIZATION));
+        }
+        let anonymous = client_with_token(None).unwrap();
+        assert!(!anonymous
+            .request(policy::api_url("releases/latest"), Duration::from_secs(1))
+            .build()
+            .unwrap()
+            .headers()
+            .contains_key(header::AUTHORIZATION));
+        assert!(client_with_token(Some("invalid\nheader")).is_err());
     }
 }

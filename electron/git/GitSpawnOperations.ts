@@ -379,9 +379,8 @@ const createProgressCollector = (onLine: (line: string) => void, maxPendingBytes
     for (let index = 0; index < pending.length; index += 1) {
       const character = pending[index];
       if (character !== '\n' && character !== '\r') continue;
-      // A CR at the end of a chunk may be the first half of CRLF. Keep it
-      // until the next chunk so CRLF never produces a spurious empty update.
-      if (character === '\r' && index === pending.length - 1 && !final) break;
+      // Progress can end in a bare CR while the peer waits for acknowledgement.
+      // Deliver it immediately; emit ignores an empty line from a later split LF.
       onLine(pending.slice(lineStart, index));
       if (character === '\r' && pending[index + 1] === '\n') index += 1;
       lineStart = index + 1;

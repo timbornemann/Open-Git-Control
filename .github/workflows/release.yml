@@ -82,7 +82,7 @@ jobs:
             fi
           fi
 
-  build:
+  verify:
     name: Build + verify (${{ matrix.label }})
     needs: prepare
     runs-on: ${{ matrix.os }}
@@ -93,15 +93,12 @@ jobs:
           - os: windows-latest
             label: Windows
             platform: windows
-            script: dist:win
           - os: ubuntu-22.04
             label: Linux
             platform: linux
-            script: dist:linux
           - os: macos-15-intel
             label: macOS
             platform: macos
-            script: dist:mac
 
     steps:
       - name: Checkout release tag
@@ -124,6 +121,54 @@ jobs:
       - name: Prepare Electron runtime
         run: npx --no-install install-electron
 
+      - name: Verify Git LFS test dependency
+        run: git lfs version
+
+      - name: Run release quality gate
+        run: npm run test:ci
+
+      - name: Upload verified application build
+        uses: actions/upload-artifact@v6
+        with:
+          name: compiled-${{ matrix.platform }}
+          path: |
+            dist/
+            dist-electron/
+          if-no-files-found: error
+
+  recovery:
+    name: Native recovery (${{ matrix.platform }})
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    env:
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+          - os: ubuntu-22.04
+            platform: linux
+          - os: macos-15-intel
+            platform: macos
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Prepare package version
+        run: node scripts/prepare-release-version.js "${{ needs.prepare.outputs.version }}"
+
       - name: Install pinned Rust
         uses: dtolnay/rust-toolchain@1.93.1
         with:
@@ -132,6 +177,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: recovery
+          shared-key: recovery-x64
+          cache-on-failure: true
 
       - name: Install native Linux dependencies
         if: runner.os == 'Linux'
@@ -141,16 +188,8 @@ jobs:
       - name: Verify native recovery core
         run: npm run recovery:check && npm run recovery:test
 
-      - name: Run release quality gate
-        run: npm run test:ci
-
-      - name: Build release assets
-        run: npm run ${{ matrix.script }}
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-
-      - name: Validate release artifacts
-        run: node scripts/validate-release-assets.js "${{ needs.prepare.outputs.version }}" "${{ matrix.platform }}"
+      - name: Build independent recovery helper
+        run: npm run recovery:build
 
       - name: Verify independent recovery UI
         if: runner.os != 'Linux'
@@ -162,6 +201,81 @@ jobs:
 
       - name: Verify actual recovery installation cycles
         run: node scripts/test-recovery-installation.js
+        env:
+          OGC_RECOVERY_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload verified recovery helper
+        uses: actions/upload-artifact@v6
+        with:
+          name: native-recovery-${{ matrix.platform }}
+          path: build/recovery/
+          if-no-files-found: error
+
+  build:
+    name: Package verified builds (${{ matrix.platform }})
+    needs: [prepare, verify, recovery]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            builder: --win nsis
+          - os: ubuntu-22.04
+            platform: linux
+            builder: --linux AppImage deb
+          - os: macos-15-intel
+            platform: macos
+            builder: --mac dmg zip
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare package version
+        run: node scripts/prepare-release-version.js "${{ needs.prepare.outputs.version }}"
+
+      - name: Prepare Electron runtime
+        run: npx --no-install install-electron
+
+      - name: Download verified application build
+        uses: actions/download-artifact@v6
+        with:
+          name: compiled-${{ matrix.platform }}
+
+      - name: Download verified recovery helper
+        uses: actions/download-artifact@v6
+        with:
+          name: native-recovery-${{ matrix.platform }}
+          path: build/recovery
+
+      - name: Restore native executable permissions after artifact download
+        if: runner.os != 'Windows'
+        run: chmod 755 build/recovery/open-git-control-recovery
+
+      - name: Prepare distribution license files
+        run: npm run legal:prepare
+
+      # test:ci already built the app, and the parallel native job built and
+      # tested recovery. Package those exact outputs without compiling again.
+      - name: Build release assets
+        run: npx --no-install electron-builder ${{ matrix.builder }} --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Validate release artifacts
+        run: node scripts/validate-release-assets.js "${{ needs.prepare.outputs.version }}" "${{ matrix.platform }}"
 
       - name: Verify packaged Windows startup and restart
         if: matrix.platform == 'windows'

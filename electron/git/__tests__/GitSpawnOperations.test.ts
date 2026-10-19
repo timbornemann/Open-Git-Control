@@ -34,6 +34,10 @@ describe('GitSpawnOperations stream limits', () => {
       completed = true;
     });
     child.stdout.emit('data', Buffer.from('Uploading LFS objects: 50% (4/8), 4 MB | 1 MB/s\r'));
+    // The peer can wait for acknowledgement here without writing another chunk.
+    expect(progress).toHaveBeenCalledExactlyOnceWith('Uploading LFS objects: 50% (4/8), 4 MB | 1 MB/s');
+    child.stdout.emit('data', Buffer.from('\n'));
+    expect(progress).toHaveBeenCalledTimes(1);
     child.stdout.emit('data', Buffer.from('Uploading LFS objects: 100% (8/8), 8 MB | 0 B/s, done.\r\n'));
     expect(progress).toHaveBeenCalledWith('Uploading LFS objects: 50% (4/8), 4 MB | 1 MB/s');
     expect(completed).toBe(false);

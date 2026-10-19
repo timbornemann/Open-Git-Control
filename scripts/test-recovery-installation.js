@@ -17,10 +17,14 @@ const artifact = output
 assert.ok(artifact?.executable, 'Cargo did not build the isolated installation test binary.');
 const env = { ...process.env, OGC_RECOVERY_E2E: '1' };
 if (process.platform === 'linux')
-  execFileSync('sudo', ['-n', '--preserve-env=OGC_RECOVERY_E2E,CI,GITHUB_ACTIONS', artifact.executable, '--ignored', '--nocapture', '--test-threads=1'], {
-    env,
-    windowsHide: true,
-    stdio: 'inherit',
-    timeout: 30 * 60 * 1000,
-  });
+  execFileSync(
+    'sudo',
+    ['-n', '--preserve-env=OGC_RECOVERY_E2E,OGC_RECOVERY_GITHUB_TOKEN,CI,GITHUB_ACTIONS', artifact.executable, '--ignored', '--nocapture', '--test-threads=1'],
+    {
+      env,
+      windowsHide: true,
+      stdio: 'inherit',
+      timeout: 30 * 60 * 1000,
+    },
+  );
 else execFileSync(artifact.executable, ['--ignored', '--nocapture', '--test-threads=1'], { env, windowsHide: true, stdio: 'inherit', timeout: 30 * 60 * 1000 });
