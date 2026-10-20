@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { buildCouplingScene, type CouplingPair } from '../analyticsCouplingGeometry';
 import { relaxCouplingScene, relaxCouplingSceneAsync } from '../analyticsCouplingForce';
 import { couplingLabelLayout, couplingPairKey } from '../analyticsCouplingLayout';
+import { relaxCouplingInWorker } from './couplingForceWorker';
 
 const pairs = [
   { first: 'src/api.ts', second: 'src/view.ts' },
@@ -11,6 +12,17 @@ const pairs = [
 const fan = (length: number): CouplingPair[] =>
   Array.from({ length }, (_, index) => ({ first: 'hub.ts', second: `src/peer-${String(index).padStart(4, '0')}.ts` }));
 describe('organic coupling layout', () => {
+  it('produces the same complete layout in the production worker without mutating the seed or anchors', async () => {
+    const seed = buildCouplingScene(pairs);
+    const anchors = [Object.freeze({ ...seed.nodes[0] })];
+    for (const node of seed.nodes) Object.freeze(node);
+    Object.freeze(seed.nodes);
+    Object.freeze(seed);
+    Object.freeze(anchors);
+    const snapshot = structuredClone(seed);
+    expect(await relaxCouplingInWorker({ pairs, seed, anchors })).toEqual(relaxCouplingScene(pairs, seed, anchors));
+    expect(seed).toEqual(snapshot);
+  });
   it('preserves all positions and anchors across cooperative fallback slices', async () => {
     const seed = buildCouplingScene(pairs);
     const anchors = [seed.nodes[0]];
@@ -37,9 +49,9 @@ describe('organic coupling layout', () => {
     expect(relaxCouplingScene(input.map((pair) => ({ ...pair, commits: 90, share: 0.8 })))).toEqual(value);
     expect(input).toEqual(pairs);
   });
-  it('spreads thousands of files into a cloud instead of an edge row or a rigid grid', () => {
+  it('spreads thousands of files into a cloud instead of an edge row or a rigid grid', async () => {
     const rows = fan(1200);
-    const scene = relaxCouplingScene(rows);
+    const scene = await relaxCouplingInWorker({ pairs: rows, seed: buildCouplingScene(rows), anchors: [] });
     expect(scene.nodes).toHaveLength(1201);
     expect(scene.width / scene.height).toBeGreaterThan(0.5);
     expect(scene.width / scene.height).toBeLessThan(2);
@@ -49,11 +61,11 @@ describe('organic coupling layout', () => {
     expect(new Set(scene.nodes.map((node) => Math.round(node.y / 20))).size).toBeGreaterThan(30);
     expect(scene.nodes.every((node) => Number.isFinite(node.x) && Number.isFinite(node.y))).toBe(true);
   }, 30000);
-  it('keeps old files anchored while hundreds of newly loaded partners settle on every side', () => {
+  it('keeps old files anchored while hundreds of newly loaded partners settle on every side', async () => {
     const old = relaxCouplingScene(fan(90));
     const rows = fan(600);
     const seed = buildCouplingScene(rows, old);
-    const value = relaxCouplingScene(rows, seed, old.nodes);
+    const value = await relaxCouplingInWorker({ pairs: rows, seed, anchors: old.nodes });
     for (const node of old.nodes) expect(value.nodes.find((next) => next.path === node.path)).toMatchObject({ x: node.x, y: node.y });
     const added = value.nodes.filter((node) => !old.nodes.some((previous) => previous.path === node.path));
     expect(new Set(added.map((node) => Math.round(node.y / 20))).size).toBeGreaterThan(25);
@@ -75,9 +87,9 @@ describe('organic coupling layout', () => {
       expect(own.reduce((sum, node) => sum + Math.hypot(node.x - center.x, node.y - center.y), 0) / own.length).toBeLessThan(400);
     }
   });
-  it('handles disconnected groups and unusual full paths without omitting any file', () => {
+  it('handles disconnected groups and unusual full paths without omitting any file', async () => {
     const rows = Array.from({ length: 220 }, (_, index) => ({ first: `dir ${index}/same \"\n.ts`, second: `tests ${index}/same \"\n.ts` }));
-    const scene = relaxCouplingScene(rows);
+    const scene = await relaxCouplingInWorker({ pairs: rows, seed: buildCouplingScene(rows), anchors: [] });
     expect(scene.nodes).toHaveLength(440);
     expect(scene.width / scene.height).toBeLessThan(2);
     expect(scene.width / scene.height).toBeGreaterThan(0.5);
