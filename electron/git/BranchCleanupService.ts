@@ -139,7 +139,7 @@ export class BranchCleanupService {
       throw new Error('Invalid cleanup selection.');
     const selected = request.selectedIds.map((id) => {
       const candidate = plan.analysis.candidates.find((entry) => entry.id === id);
-      if (!candidate || candidate.blocks.length || candidate.classification === 'other')
+      if (!candidate || candidate.blocks.length || (candidate.kind === 'server' && candidate.classification === 'other'))
         throw new Error('The selection contains a protected or unknown branch.');
       if (candidate.requiresForce && !request.confirmedUnmergedIds.includes(id)) throw new Error('Unmerged branches require explicit additional confirmation.');
       return candidate;

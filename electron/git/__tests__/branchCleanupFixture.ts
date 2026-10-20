@@ -20,6 +20,7 @@ export function cleanupFixture(lifecycle: GitIntegrationLifecycle, withRemote = 
   const state = {
     account: 'account-v1',
     complete: true,
+    defaultBranch: 'main',
     now: Date.now(),
     protected: new Set(['main']),
     openRequests: [] as BranchCleanupHostingMetadata['openRequests'],
@@ -27,7 +28,7 @@ export function cleanupFixture(lifecycle: GitIntegrationLifecycle, withRemote = 
   };
   const metadata = vi.fn(async (endpoint: CleanupEndpoint): Promise<BranchCleanupHostingMetadata> => ({
     repository: { connectionId: 'test', repositoryId: '42', fullPath: 'team/repo' },
-    defaultBranch: 'main',
+    defaultBranch: state.defaultBranch,
     branches: git(endpoint.url, 'for-each-ref', '--format=%(refname:strip=2)%00%(objectname)', 'refs/heads/')
       .split('\n')
       .filter(Boolean)

@@ -8,6 +8,7 @@ export type BranchCleanupReasonCode =
   | 'remote-removed'
   | 'inactive'
   | 'not-candidate'
+  | 'manual-review'
   | 'current'
   | 'worktree'
   | 'protected'

@@ -97,7 +97,7 @@ describe('BranchCleanupService with real Git', () => {
     expect(f.preferences.read(active).protectedPatterns).toContain('release/*');
   });
 
-  test('retains diverged branches without upstreams and identifies branches whose remote was removed', async (lifecycle) => {
+  test('offers diverged local branches only for manual review and identifies branches whose remote was removed', async (lifecycle) => {
     const f = cleanupFixture(lifecycle);
     git(f.repo, 'checkout', '-b', 'unpublished');
     f.commit('ongoing unpublished work');
@@ -106,8 +106,15 @@ describe('BranchCleanupService with real Git', () => {
     git(f.repo, 'config', 'branch.lost-remote.merge', 'refs/heads/lost-remote');
     git(f.repo, 'checkout', 'main');
     const plan = await f.inspect();
-    expect(plan.candidates.find((entry) => entry.name === 'unpublished')).toMatchObject({ classification: 'other', selectedByDefault: false });
+    const unpublished = plan.candidates.find((entry) => entry.name === 'unpublished')!;
+    expect(unpublished).toMatchObject({ classification: 'other', selectedByDefault: false, requiresForce: true, unmergedCommitCount: 1, blocks: [] });
+    expect(unpublished.reasons).toContainEqual({ code: 'manual-review' });
     expect(plan.candidates.find((entry) => entry.name === 'lost-remote')).toMatchObject({ classification: 'orphaned', requiresForce: true, blocks: [] });
+    await expect(f.execute(plan, [unpublished])).rejects.toThrow('additional confirmation');
+    expect(f.hasRef(f.repo, unpublished.ref)).toBe(true);
+    expect((await f.execute(plan, [unpublished], [unpublished.id])).outcomes[0].status).toBe('deleted');
+    expect(f.hasRef(f.repo, unpublished.ref)).toBe(false);
+    expect(f.hasRef(f.repo, 'refs/heads/lost-remote')).toBe(true);
   });
 
   test('keeps local results available offline while never inferring missing upstreams from an unreachable server', async (lifecycle) => {

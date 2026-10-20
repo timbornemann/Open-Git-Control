@@ -3,7 +3,7 @@ import { CheckCircle2, Loader2, RefreshCw, Shield, AlertTriangle } from 'lucide-
 import { DialogFrame } from '@/components/DialogFrame';
 import { Button } from '@/components/ui/Button';
 import { useI18n } from '@/i18n';
-import { BranchCleanupCandidates } from './BranchCleanupCandidates';
+import { BranchCleanupGroups } from './BranchCleanupGroups';
 import { useBranchCleanup } from './useBranchCleanup';
 import { branchCleanupMessage, branchCleanupPhase } from './branchCleanupText';
 import './branchCleanup.css';
@@ -44,7 +44,6 @@ export function BranchCleanupDialog({ repoPath, onClose, onChanged }: Props) {
     if (forced.length && !forceConfirmed) return;
     void model.execute(forced.map((candidate) => candidate.id));
   };
-  const kept = inspection?.candidates.filter((candidate) => candidate.blocks.length) ?? [];
   const disabled = Boolean(busy) || (!result && (!chosen.length || protectionDirty || (forceReview && !forceConfirmed)));
 
   return (
@@ -138,8 +137,8 @@ export function BranchCleanupDialog({ repoPath, onClose, onChanged }: Props) {
               <AlertTriangle size={20} />
               <p>
                 {tr(
-                  'Diese Branches enthalten Commits, die im Vergleichsziel nicht übernommen wurden. Das Löschen entfernt ihre Branch-Referenzen; Arbeit kann dadurch verloren gehen.',
-                  'These branches contain commits that have not been integrated into the comparison target. Deletion removes their branch references; work may be lost.',
+                  'Diese Branches enthalten Commits außerhalb des Vergleichsziels. Eine Übernahme ihrer Änderungen konnte nicht nachgewiesen werden. Beim Löschen kann Arbeit verloren gehen.',
+                  'These branches contain commits outside the comparison target. Integration of their changes could not be verified. Deletion may lose work.',
                 )}
               </p>
             </div>
@@ -208,43 +207,13 @@ export function BranchCleanupDialog({ repoPath, onClose, onChanged }: Props) {
               <p className="branch-cleanup-summary">
                 {tr(`${localCount} lokale und ${serverCount} Server-Branches ausgewählt.`, `${localCount} local and ${serverCount} server branches selected.`)}
               </p>
-              {(['local', 'server'] as const).map((kind) => {
-                const candidates = inspection.candidates.filter((candidate) => candidate.kind === kind && !candidate.blocks.length);
-                return (
-                  <section key={kind} className="branch-cleanup-group">
-                    <div className="branch-cleanup-group-header">
-                      <h3>
-                        {kind === 'local' ? tr('Lokale Vorschläge', 'Local suggestions') : tr('Server-Vorschläge', 'Server suggestions')} ({candidates.length})
-                      </h3>
-                      {candidates.some((candidate) => candidate.classification === 'merged') && (
-                        <Button variant="ghost" size="sm" disabled={Boolean(busy)} onClick={() => model.selectMerged(kind)}>
-                          {tr('Zusammengeführte auswählen', 'Select merged')}
-                        </Button>
-                      )}
-                    </div>
-                    {!candidates.length ? (
-                      <p>{tr('Keine löschbaren Vorschläge.', 'No deletable suggestions.')}</p>
-                    ) : (
-                      <BranchCleanupCandidates
-                        candidates={candidates}
-                        targets={inspection.targets}
-                        selected={selected}
-                        disabled={Boolean(busy)}
-                        onToggle={model.toggle}
-                      />
-                    )}
-                  </section>
-                );
-              })}
-              {kept.length > 0 && (
-                <details className="branch-cleanup-kept">
-                  <summary>
-                    <Shield size={15} />
-                    {tr('Beibehalten / gesperrt', 'Keep / blocked')} ({kept.length})
-                  </summary>
-                  <BranchCleanupCandidates candidates={kept} targets={inspection.targets} selected={selected} disabled onToggle={model.toggle} />
-                </details>
-              )}
+              <BranchCleanupGroups
+                inspection={inspection}
+                selected={selected}
+                disabled={Boolean(busy)}
+                onToggle={model.toggle}
+                onSelectMerged={model.selectMerged}
+              />
               <details className="branch-cleanup-protection">
                 <summary>
                   <Shield size={15} />

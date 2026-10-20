@@ -27,7 +27,7 @@ export type CleanupAnalysisInput = {
   now: number;
 };
 
-function makeTargets(input: CleanupAnalysisInput) {
+async function makeTargets(git: CleanupGit, repo: string, input: CleanupAnalysisInput) {
   const targets: CleanupInternalTarget[] = [];
   const add = (comparisonId: string, branch: string, oid: string, name: string, extra: Pick<CleanupInternalTarget, 'localRef' | 'endpointId'>) => {
     const target = { id: cleanupDigest([comparisonId, branch, extra]).slice(0, 32), comparisonId, branch, name, oid, ...extra };
@@ -51,10 +51,16 @@ function makeTargets(input: CleanupAnalysisInput) {
     remotes.find((remote) => remote.endpoint.remoteName === 'origin') ??
     (new Set(remotes.map((remote) => remote.endpoint.remoteName)).size === 1 ? remotes[0] : undefined);
   const mainCandidates = input.local.branches.filter((branch) => ['main', 'master'].includes(branch.name));
-  const localDefault =
-    (preferred &&
-      targets.find((target) => target.comparisonId === 'local' && target.endpointId === preferred.endpoint.id && target.branch === preferred.defaultBranch)) ||
+  const remoteDefault =
+    preferred &&
+    targets.find((target) => target.comparisonId === 'local' && target.endpointId === preferred.endpoint.id && target.branch === preferred.defaultBranch);
+  let localDefault =
+    (remoteDefault && targets.find((target) => target.localRef && target.branch === remoteDefault.branch)) ||
+    remoteDefault ||
     (mainCandidates.length === 1 ? targets.find((target) => target.localRef === mainCandidates[0].ref) : undefined);
+  // Prefer local integrations, but retain the newer server history when local main is simply behind it.
+  if (localDefault?.localRef && remoteDefault && localDefault.oid !== remoteDefault.oid)
+    if ((await countOutside(git, repo, localDefault.oid, remoteDefault, input.local.incomplete)) === 0) localDefault = remoteDefault;
   const comparisons = [{ id: 'local', label: 'local', targetId: choose('local', localDefault?.id) }];
   for (const remote of input.remotes.filter((entry) => entry.endpoint.canDelete))
     comparisons.push({
@@ -137,8 +143,8 @@ function decorateLocal(candidate: BranchCleanupCandidate, branch: CleanupLocalBr
       if (requests.length) candidate.blocks.push(reason('open-request', requests.join(', ')));
     }
   }
-  if (candidate.classification === 'other') candidate.blocks.push(reason('not-candidate'));
-  candidate.requiresForce = candidate.classification === 'orphaned' && candidate.unmergedCommitCount !== 0;
+  if (candidate.classification === 'other') candidate.reasons.push(reason('manual-review'));
+  candidate.requiresForce = candidate.classification !== 'merged' && candidate.unmergedCommitCount !== 0;
   candidate.selectedByDefault = candidate.classification === 'merged' && !candidate.blocks.length;
 }
 
@@ -174,7 +180,7 @@ function decorateServer(candidate: BranchCleanupCandidate, remote: CleanupRemote
 }
 
 export async function analyzeBranchCleanup(git: CleanupGit, repo: string, input: CleanupAnalysisInput, context: CleanupContext): Promise<CleanupAnalysis> {
-  const { targets, comparisons } = makeTargets(input);
+  const { targets, comparisons } = await makeTargets(git, repo, input);
   const candidates: BranchCleanupCandidate[] = [];
   const dates = await commitDates(git, repo, input);
   const protectedNames = new Set(input.remotes.flatMap((remote) => [remote.defaultBranch, remote.metadata?.defaultBranch ?? '']).filter(Boolean));

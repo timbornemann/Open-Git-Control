@@ -41,7 +41,9 @@ export function BranchCleanupCandidates({ candidates, targets, selected, disable
                     ? tr('Zusammengeführt', 'Merged')
                     : candidate.classification === 'orphaned'
                       ? tr('Möglicherweise verwaist', 'Possibly orphaned')
-                      : tr('Beibehalten', 'Keep')}
+                      : candidate.blocks.length
+                        ? tr('Beibehalten', 'Keep')
+                        : tr('Manuell prüfen', 'Manual review')}
                 </span>
               </label>
               <div className="branch-cleanup-details">

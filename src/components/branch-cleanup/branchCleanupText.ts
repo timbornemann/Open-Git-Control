@@ -12,6 +12,10 @@ export function branchCleanupReasonText(reason: BranchCleanupReason, tr: Transla
       'No commit for at least 90 days, no local counterpart or open request',
     ),
     'not-candidate': tr('Noch nicht zusammengeführt; kein verwaister Branch nachgewiesen', 'Not merged; no evidence of an orphaned branch'),
+    'manual-review': tr(
+      'Keine Zusammenführung nachgewiesen; Löschen nur mit Zusatzbestätigung',
+      'No integration could be verified; deletion requires additional confirmation',
+    ),
     current: tr('Aktuell ausgecheckter Branch', 'Currently checked-out branch'),
     worktree: tr('Einem Worktree zugeordnet', 'Assigned to a worktree'),
     protected: tr('Geschützter Branch oder Vergleichsziel', 'Protected branch or comparison target'),

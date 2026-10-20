@@ -87,6 +87,10 @@
   border-top: 1px solid var(--border-color);
   padding-top: 12px;
 }
+.branch-cleanup-group > p {
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
 .branch-cleanup-group-header {
   display: flex;
   justify-content: space-between;

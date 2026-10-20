@@ -7,7 +7,7 @@ import { gitClient } from '@/services/gitClient';
 import type { BranchCleanupInspection, BranchCleanupResult } from '@/shared/ipc/branchCleanup';
 import type { IpcResult } from '@/types/ipc';
 import { BranchCleanupDialog } from './BranchCleanupDialog';
-import { cleanupInspection } from './__tests__/fixtures';
+import { cleanupCandidate, cleanupInspection } from './__tests__/fixtures';
 
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
@@ -98,6 +98,39 @@ describe('branch cleanup review dialog', () => {
     act(() => host.querySelector<HTMLInputElement>('.branch-cleanup-force-confirm input')!.click());
     await act(async () => confirm().click());
     expect(execute.mock.calls[0][0].confirmedUnmergedIds).toEqual(['orphaned']);
+  });
+
+  it.each(['de', 'en'] as const)('allows manual local selection with additional confirmation while preserving hard blocks (%s)', async (language) => {
+    plan.candidates.push(
+      cleanupCandidate('unmerged-local', {
+        classification: 'other',
+        unmergedCommitCount: 3,
+        selectedByDefault: false,
+        requiresForce: true,
+        reasons: [{ code: 'manual-review' }],
+      }),
+    );
+    const execute = vi.spyOn(gitClient, 'executeBranchCleanup').mockResolvedValue({ success: true, data: { outcomes: [], cancelled: false } });
+    await render('C:/repo', language);
+    const choice = (name: string) =>
+      host.querySelector<HTMLInputElement>(`input[aria-label="${language === 'de' ? `${name} zum Löschen auswählen` : `Select ${name} for deletion`}"]`)!;
+    const manual = choice('unmerged-local');
+    expect(manual.disabled).toBe(false);
+    expect(manual.checked).toBe(false);
+    expect(manual.closest('section')?.querySelector('h3')?.textContent).toContain(language === 'de' ? 'Weitere lokale Branches' : 'Other local branches');
+    expect(manual.closest('article')?.textContent).toContain(language === 'de' ? 'Keine Zusammenführung nachgewiesen' : 'No integration could be verified');
+    expect(choice('main').disabled).toBe(true);
+    act(() => {
+      choice('local-done').click();
+      manual.click();
+    });
+    act(() => confirm().click());
+    expect(execute).not.toHaveBeenCalled();
+    expect(confirm().disabled).toBe(true);
+    expect(host.textContent).toContain(language === 'de' ? '3 nicht übernommene Commits' : '3 unmerged commits');
+    act(() => host.querySelector<HTMLInputElement>('.branch-cleanup-force-confirm input')!.click());
+    await act(async () => confirm().click());
+    expect(execute.mock.calls[0][0]).toMatchObject({ selectedIds: ['unmerged-local'], confirmedUnmergedIds: ['unmerged-local'] });
   });
 
   it('rechecks changed comparison targets and drops explicit server selections on new inspection', async () => {
