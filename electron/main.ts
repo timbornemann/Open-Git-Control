@@ -10,6 +10,7 @@ import { buildDiagnosticsReportFactory } from './main-process/diagnostics';
 import { setupIPC } from './main-process/ipc/setupIPC';
 import { getGeminiApiKeyFromSecureStore, getOpenAiApiKeyFromSecureStore, readSettingsWithMigration } from './main-process/settingsStore';
 import { UpdaterManager } from './main-process/updaterManager';
+import { UserNotesManager } from './main-process/UserNotesManager';
 import { prepareRecoveryUpdater, registerRecoveryShortcuts } from './main-process/recoveryUpdater';
 import { createMainWindow } from './main-process/windowFactory';
 import type { PlanningApiServerHandle } from './main-process/planningApiServer';
@@ -49,6 +50,7 @@ if (isPrimaryInstance) {
   registerHtmlPreviewScheme();
   installIpcSenderValidation({ isDev, mainProcessDir: __dirname });
   const updaterManager = new UpdaterManager(isDev);
+  let userNotesManager: UserNotesManager | null = null;
   let planningApiServer: PlanningApiServerHandle | null = null;
   let planningApiError: string | null = null;
   let repositoryRunService: { dispose: () => void } | null = null;
@@ -145,6 +147,7 @@ if (isPrimaryInstance) {
     }
 
     configureCodeCache(isDev);
+    userNotesManager = new UserNotesManager();
     recordStartup('code-cache-ready');
     ({ repositoryRunService, disposeStorageMaintenance, disposeSecretScans } = setupIPC({
       gitService,
@@ -154,6 +157,7 @@ if (isPrimaryInstance) {
       commitStatsService,
       workingTreeService,
       updaterManager,
+      userNotesManager,
       readSettingsWithMigration,
       getGeminiApiKeyFromSecureStore,
       getOpenAiApiKeyFromSecureStore,
@@ -171,7 +175,9 @@ if (isPrimaryInstance) {
           .catch((error) => console.warn('[recovery-updater]', String(error)));
       });
     }
-    updaterManager.configureAutoUpdates(readSettingsWithMigration().autoUpdateEnabled);
+    const startupSettings = readSettingsWithMigration();
+    updaterManager.configureAutoUpdates(startupSettings.autoUpdateEnabled, startupSettings.autoUpdateCheckEnabled);
+    userNotesManager.setChecksEnabled(startupSettings.userNotesCheckEnabled);
     recordStartup('startup-services-ready');
     if (process.env.OPEN_GIT_CONTROL_API_DISABLED !== 'true') {
       void startPlanningApiServer({
@@ -201,6 +207,7 @@ if (isPrimaryInstance) {
     await systemToolsService.dispose();
     repositoryRunService?.dispose();
     updaterManager.dispose();
+    await userNotesManager?.dispose();
     if (planningApiServer) {
       void planningApiServer.close().catch((error) => {
         console.error('[planning-api] Failed to stop:', error);

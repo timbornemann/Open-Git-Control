@@ -23,17 +23,6 @@
       "updatedAt": 1782821503810
     },
     {
-      "id": "4febcdfe-caff-4919-ac38-38aaa2c08535",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Einstellungen. show config",
-      "description": "in open git conrol die möglichkeit haben direkt die konfig zu öffen um sie bearbetein zu könenn",
-      "priority": "medium",
-      "status": "idea",
-      "tags": [],
-      "createdAt": 1784044075550,
-      "updatedAt": 1784044075550
-    },
-    {
       "id": "0c2b6746-40c6-4fc6-b5a3-17885bba2188",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Chat with Codebase",
@@ -43,17 +32,6 @@
       "tags": [],
       "createdAt": 1784044408308,
       "updatedAt": 1784044413717
-    },
-    {
-      "id": "9f2665dd-9e6a-44cd-9fac-d8d551df6c1e",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Time Tracking & Activity Log",
-      "description": "Die App trackt im Hintergrund (optional), wie viel Zeit in welchem Branch oder an welchem Planner-Ticket verbracht wurde. Am Ende der Woche lässt sich ein Report exportieren (z.B. für Freelancer zur Rechnungsstellung).\nnicht nur tiektbasiert auch start spot system möglich oder solage repo offen ist und app an ist",
-      "priority": "medium",
-      "status": "idea",
-      "tags": [],
-      "createdAt": 1784045021411,
-      "updatedAt": 1784045021411
     },
     {
       "id": "ea0d6656-903c-479b-8cd1-887b03ee1ad8",
@@ -87,6 +65,248 @@
       "tags": [],
       "createdAt": 1792355261758,
       "updatedAt": 1792355261758
+    },
+    {
+      "id": "1bc62dac-578f-4c25-9e51-20aec74635c1",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Notes to Users",
+      "description": "Notes to Users: einen Order im Repositorien einrichten in dem Notizen oder Informationen für Nutzer hinterlegt werden können, das Programm checkt regelmäßig ähnlich wie Updates ob Informationen in form von Markdown Dateien daliegen im .Open-Git-Control Order soll ein unter Order sein, hier können markdown Dateien angelegt werden, der Inhalt wird den Nutzern ähnlich wie ein update angezeigt als popup welches den markdown code ordentlich rendert. das programm soll auch die notizen als kleines icon mit einem \"i\" anzeigen ähnlich wei updates in der seiten menü lsiste, es verschwindet wenn der nutzer es bestätigt, dann wird es nur noch über die einstellungen noch lesbar sein. auch soll es wei bei den updatws möglich sein, dass man die überprüfung und suche abstellt, wenn amn die app also ganz offline nutzen will ohne das sie checkt und aufrufe zu github macht. wenn mehrere dateien in dem github order sind, dann sollen diese als seiten angelegt werde die man im popup durhcblättern kann. es sollen auch bilder oder sonsige inhalte in dem markdown gerendert werdne, Open-git-control lädt sich also die inhalte runter wenn sie auf git hub verschwinden soll das system sie automatisch bereinigen, damit sich lokal nicht die ganzen dateien aufsammeln",
+      "priority": "medium",
+      "status": "idea",
+      "tags": [],
+      "createdAt": 1792500961225,
+      "updatedAt": 1792502721128
+    },
+    {
+      "id": "447fc595-f9dc-46f0-a397-016bb24924f7",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Aufgaben erst beim tatsächlichen Abschluss erledigen",
+      "description": "Aktuell setzt die [Planner-Aktion (line 78)](D:/Projects/Software/Open-Git-Control/src/components/project-planner/usePlannerAiActions.ts:78) Aufgaben bereits beim Erzeugen eines Commit-Entwurfs auf „Done“. Den Abschluss stattdessen an einen erfolgreichen Commit, Merge oder eine ausdrückliche Freigabe knüpfen. So verschwinden unerledigte Aufgaben nicht vorzeitig aus dem Arbeitsvorrat.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792501026457,
+      "updatedAt": 1792502640868
+    },
+    {
+      "id": "fc1e7cb2-92bc-4fd6-b21f-52afb06eaf64",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Aufgabe → Branch → Commit → PR verbinden",
+      "description": "Im Planner „Bearbeitung starten“ anbieten: Branchname vorschlagen, Branch erstellen und Aufgabe zuordnen. Commits und PR anschließend verknüpfen. Dafür die [Aufgabendaten (line 15)](D:/Projects/Software/Open-Git-Control/src/types/projectPlanner.ts:15) um strukturierte Referenzen erweitern. Das spart Namensgebung, Suchen und manuelle Statuspflege.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792501044485,
+      "updatedAt": 1792502644954
+    },
+    {
+      "id": "24836c97-af92-44db-9ce6-2e1c1df11b7b",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Geführter Abschluss eines Arbeitsschritts",
+      "description": "Einen Ablauf „Prüfen → Committen → Pushen → PR erstellen“ aus den bestehenden Funktionen zusammensetzen. Bei Fehlern am betroffenen Schritt bleiben. Prüfergebnisse an den geprüften Dateistand binden, damit spätere Änderungen erneut geprüft werden.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792501055349,
+      "updatedAt": 1792502658123
+    },
+    {
+      "id": "57717967-fe1e-4d28-8755-be401316c0fa",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Entwicklungsserver und Tests gleichzeitig ausführen",
+      "description": "Die [Run-Verwaltung (line 79)](D:/Projects/Software/Open-Git-Control/electron/main-process/RepositoryRunService.ts:79) erlaubt momentan insgesamt nur einen laufenden Workflow. Mehrere Läufe mit eigenen Konsolen ermöglichen, beispielsweise Entwicklungsserver plus Tests. Schreibende Abläufe wie Formatierung gezielt koordinieren.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792501076309,
+      "updatedAt": 1792502654874
+    },
+    {
+      "id": "a05e09cb-faf4-4c81-99f3-73d68181df01",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "KI-Commit-Plan vor Ausführung bearbeiten",
+      "description": "Der bestehende KI-Ablauf geht nach der Planung direkt zum Committen über. Dazwischen eine bearbeitbare Vorschau anbieten: Gruppen verändern, Dateien ausschließen, Nachrichten bearbeiten und einzelne Commits auswählen. Ansatzpunkt ist die [Planungs-/Ausführungsgrenze (line 73)](D:/Projects/Software/Open-Git-Control/electron/ai/AiAutoCommitRunSession.ts:73).",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792501086451,
+      "updatedAt": 1792502665319
+    },
+    {
+      "id": "5b1c2fb3-49c1-45bc-b4a8-1899de1d0443",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Änderungen beim Branchwechsel geführt mitnehmen oder parken",
+      "description": "Neben den vorhandenen Warnungen einen zusammenhängenden Ablauf anbieten: Änderungen prüfen → benannten Stash erstellen → wechseln → bei Bedarf wiederherstellen. Gestagte und ungestagte Änderungen sowie neue Dateien sichtbar unterscheiden. Das erspart mehrere manuelle Stash-Aktionen.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792501100579,
+      "updatedAt": 1792502675244
+    },
+    {
+      "id": "c765bece-a65b-4b38-93f7-d5a28f534ecc",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Konsolenfehler direkt als Aufgabe übernehmen",
+      "description": "Im Probleme-Tab „Als Bug aufnehmen“ ergänzen. Fehlermeldung, Dateiposition, ausgeführter Befehl und ein begrenzter Logauszug werden als bearbeitbarer Planner-Entwurf übernommen.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792501116276,
+      "updatedAt": 1792502679090
+    },
+    {
+      "id": "fef11401-94ff-4855-a0f7-d014394c50eb",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Command Palette an den aktuellen Zustand anpassen",
+      "description": "Einige Befehle erscheinen auch ohne aktives Repository und führen dann keine Aktion aus. Die [Palette (line 4)](D:/Projects/Software/Open-Git-Control/src/components/CommandPalette.tsx:4) um Voraussetzungen und deren Erklärung ergänzen; zuletzt verwendete Aktionen und tolerantere Suche hinzufügen. Das bestehende Muster zur Erklärung fehlender Voraussetzungen lässt sich wiederverwenden.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792501190345,
+      "updatedAt": 1792502682304
+    },
+    {
+      "id": "40b5596c-9c43-480d-85ee-f5d97a60c897",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "CI-Status direkt an PRs anzeigen",
+      "description": "Aktuell wird der Status [erst nach einem Klick geladen (line 17)](D:/Projects/Software/Open-Git-Control/src/components/hosting/HostingChangeRequestChecks.tsx:17). Für sichtbare PRs automatisch einen kompakten Status laden, mit geprüftem Commit und Aktualisierungszeit. Laufende Prüfungen begrenzt aktualisieren. Das spart einzelne Statusabfragen.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792501609973,
+      "updatedAt": 1792501609973
+    },
+    {
+      "id": "49f8d95b-ab3c-497f-811a-1f8525589818",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "PRs vollständig in der App reviewen",
+      "description": "Die vorhandenen PR-Aktionen um Dateidiffs, Zeilenkommentare, Review-Entwürfe und Freigaben erweitern. Dafür den gemeinsamen [Hosting-Adapter (line 13)](D:/Projects/Software/Open-Git-Control/electron/hosting/HostingAdapter.ts:13) um entsprechende Fähigkeiten ergänzen und Anbieterunterschiede sichtbar machen.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792501912964,
+      "updatedAt": 1792501912964
+    },
+    {
+      "id": "db7b013f-7a16-4a93-b769-1525c7ea4905",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Repository-Übersicht mit Handlungsbedarf",
+      "description": "Die vorhandene Anzeige geänderter Repositories um ausstehende Pushes, neue Remote-Commits, fehlgeschlagene CI-Läufe und offene PRs ergänzen. Nach „Hier ist etwas zu tun“ filtern und nach Projekt oder Kunde gruppieren. in der lokalen repository seite oder auch im hosting bereich zusätzliche filter einstellungen und so weiter",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792501993133,
+      "updatedAt": 1792501993133
+    },
+    {
+      "id": "aa5c40b7-be80-40de-95a5-5512c4249e8e",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Frei benennbare Run-Aktionen und Monorepo-Unterstützung",
+      "description": "Zusätzlich zu den fünf festen Aktionen eigene Abläufe wie „Integrationstests“, „Dokumentation“ oder „Migration“ erlauben. Arbeitsverzeichnis und Parameter pro Schritt ergänzen, damit Teilprojekte ohne lange Shell-Konstruktionen ausführbar werden. dabei soll mann auch eigenen anlegen dürfen oder entferne können damit man leicht seine eigene workflows anlegen kann, man soll dann mit einem schalter sagen könenn welcher der sachen im button im reposittory bereich angezeigt wird",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792502108453,
+      "updatedAt": 1792502108453
+    },
+    {
+      "id": "ebb43dbd-48f5-430e-b08e-7ee9a3c6d0e3",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Einzelne Zeilen stagen",
+      "description": "Die vorhandenen Aktionen für ganze Änderungsblöcke um eine Zeilenauswahl ergänzen. Das erleichtert saubere Commits, wenn mehrere Themen denselben Block betreffen.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792502128090,
+      "updatedAt": 1792502128090
+    },
+    {
+      "id": "68868582-9d66-423c-903b-3bd7ce03e6a2",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Lokale Sicherung vor dem Verwerfen",
+      "description": "Vor Datei-Verwerfen oder größeren destruktiven Aktionen begrenzte lokale Sicherungen anbieten. Das Recovery Center könnte dann auch uncommittete Inhalte wiederherstellen. Beim Wiederherstellen zuerst Unterschiede anzeigen.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792502157882,
+      "updatedAt": 1792502157882
+    },
+    {
+      "id": "1168ffc8-9664-4320-8a9d-fe5acb8a5383",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Branch-Aufräumassistent",
+      "description": "Zusammengeführte und verwaiste Branches mit nachvollziehbarer Begründung vorschlagen. Geschützte Branches, laufende Arbeit und Worktree-Zuordnungen berücksichtigen. Die Auswahl vor dem Löschen gemeinsam prüfen lassen.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792502175127,
+      "updatedAt": 1792502175127
+    },
+    {
+      "id": "7595b0a6-9610-4335-b639-93e33ce062a0",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Konfliktlösung mit mehr Kontext",
+      "description": "Neben „current/incoming“ die gemeinsame Ausgangsversion anzeigen, Branchrollen klar benennen und früher verwendete Lösungen bei passenden Konflikten wieder vorschlagen.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792502230492,
+      "updatedAt": 1792502230492
+    },
+    {
+      "id": "c9aa6552-e9af-42f9-a782-487c29d0cdb2",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Hosting-Issues und Planner verknüpfen",
+      "description": "Issues zunächst als lokale Aufgaben importieren oder verlinken. Später ausgewählte Felder synchronisieren und Änderungen bei Konflikten gegenüberstellen. Checklisten und Aufgabenabhängigkeiten würden längere Vorhaben zusätzlich erleichtern.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792502277069,
+      "updatedAt": 1792502277069
+    },
+    {
+      "id": "b77fd51f-9d8b-42ed-ba7b-42208bf500a3",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Hosting-Daten gezielter aktualisieren",
+      "description": "Der [Hosting-Client (line 100)](D:/Projects/Software/Open-Git-Control/src/services/hostingClient.ts:100) entfernt nach vielen Aktionen sämtliche Cache-Einträge der Verbindung. Stattdessen nur betroffene Repositories, PR-Listen, Runs oder Releases aktualisieren. Dadurch könnten andere Ansichten ihren bereits geladenen Inhalt behalten.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792502328619,
+      "updatedAt": 1792502328619
+    },
+    {
+      "id": "dc642928-eca8-42a5-8d9b-b8b4e591c11f",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Große Übersichtslisten virtualisieren",
+      "description": "Lokale Repositories, Hosting-Katalog und Planner-Karten werden direkt als vollständige Listen gerendert. Bei großen Datenmengen nur sichtbare Einträge plus Reserve rendern. Den Nutzen mit mehreren hundert Repositories beziehungsweise vielen Aufgaben prüfen.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792502362933,
+      "updatedAt": 1792502362933
+    },
+    {
+      "id": "0dadd403-cd81-427e-b224-0413c381d86c",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Inaktive Repositories bedarfsgerechter prüfen",
+      "description": "Der [Aktivitätskoordinator (line 7)](D:/Projects/Software/Open-Git-Control/src/data/repositoryActivityCoordinator.ts:7) verwendet für erfolgreiche Prüfungen grundsätzlich 15 Sekunden. Bei wiederholt unverändertem Zustand das Intervall verlängern; zuletzt verwendete oder sichtbare Projekte bevorzugen.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792502427914,
+      "updatedAt": 1792502427914
+    },
+    {
+      "id": "6a5b52e7-4625-4c1e-ad8f-a44312227661",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Messbare Performance-Ziele ergänzen",
+      "description": "Die vorhandenen Diagnosen für feste Szenarien auswerten: Kaltstart, Repository-Wechsel, große Historie, viele geänderte Dateien und längere Sitzungen. Weitere Optimierungen anschließend anhand der gemessenen Verzögerungen priorisieren.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "createdAt": 1792502701083,
+      "updatedAt": 1792502701083
     }
   ]
 }

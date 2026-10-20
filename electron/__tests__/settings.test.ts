@@ -2,6 +2,21 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, normalizeSettings } from '../settings';
 
 describe('normalizeSettings', () => {
+  it('defaults background checks on independently of downloads and preserves explicit offline choices', () => {
+    expect(normalizeSettings({ autoUpdateEnabled: false })).toMatchObject({
+      autoUpdateEnabled: false,
+      autoUpdateCheckEnabled: true,
+      userNotesCheckEnabled: true,
+    });
+    expect(normalizeSettings({ autoUpdateCheckEnabled: false, userNotesCheckEnabled: false })).toMatchObject({
+      autoUpdateCheckEnabled: false,
+      userNotesCheckEnabled: false,
+    });
+    expect(normalizeSettings({ autoUpdateCheckEnabled: 'false' as never, userNotesCheckEnabled: null as never })).toMatchObject({
+      autoUpdateCheckEnabled: true,
+      userNotesCheckEnabled: true,
+    });
+  });
   it('returns defaults when input is missing', () => {
     expect(normalizeSettings(undefined)).toEqual(DEFAULT_SETTINGS);
     expect(normalizeSettings(null)).toEqual(DEFAULT_SETTINGS);

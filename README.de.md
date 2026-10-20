@@ -722,7 +722,9 @@ Uncommittete Dateien werden angezeigt und nicht automatisch committed. Ohne Comm
   - Updater-Status
   - verfuegbare Version
   - Download-Fortschritt
-  - Background-Update-Toggle
+  - getrennte automatische Prüfungen für App-Updates und Nutzerhinweise
+  - automatische Update-Downloads
+  - gespeicherte Nutzerhinweise einschließlich bestätigter Seiten
   - One-click Update
   - Release Notes
   - kopierbarer, bereinigter Diagnosebericht
@@ -741,6 +743,13 @@ Uncommittete Dateien werden angezeigt und nicht automatisch committed. Ohne Comm
   - stash branch
   - secret scan
   - AI auto-commit
+
+### Nutzerhinweise
+
+- Nachrichten des Entwicklers stammen aus `.Open-Git-Control/notes-to-user/` im offiziellen Open-Git-Control-Repository. Die App prüft beim Start und alle vier Stunden, ohne dass eine GitHub-Anmeldung nötig ist.
+- Neue oder geänderte Nachrichten erscheinen als Markdown-Seiten mit Bildern und GIFs. Die Seiten lassen sich durchblättern und gemeinsam mit **Alle bestätigen** bestätigen; anschließend verschwindet das `i`-Symbol in der Seitenleiste.
+- Bestätigte Nachrichten bleiben unter **Einstellungen → App & Diagnose → Nutzerhinweise** auch offline lesbar. Erfolgreiche vollständige Prüfungen entfernen gelöschte Nachrichten und nicht mehr benötigte Bilder aus dem lokalen Cache.
+- Automatische Hinweis- und Update-Prüfungen haben getrennte Schalter. Ausschalten beendet die jeweiligen GitHub-Hintergrundabfragen; manuelle Prüfungen bleiben verfügbar. Die [Veröffentlichungsanleitung](.Open-Git-Control/README.md#publishing-user-notices) beschreibt das Anlegen neuer Hinweise.
 
 ### Shortcuts und Produktivitaet
 

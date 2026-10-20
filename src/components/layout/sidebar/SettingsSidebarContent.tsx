@@ -2,6 +2,7 @@ import React from 'react';
 import type { AppSidebarProps } from './AppSidebar.types';
 import { SettingsDiagnosticsSection } from '@/components/layout/settings/SettingsDiagnosticsSection';
 import { SettingsStorageSection } from '@/components/layout/settings/SettingsStorageSection';
+import { SettingsUserNotesSection } from '@/components/layout/settings/SettingsUserNotesSection';
 import {
   SettingsAiSection,
   SettingsGeneralSection,
@@ -25,6 +26,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({ 
       <SettingsGithubSection settings={settings} onUpdateSettings={onUpdateSettings} variant="sidebar" />
       <SettingsAiSection settings={settings} onUpdateSettings={onUpdateSettings} variant="sidebar" ai={aiUpdater} />
       <SettingsUpdatesSection settings={settings} onUpdateSettings={onUpdateSettings} variant="sidebar" ai={aiUpdater} locale={locale} />
+      <SettingsUserNotesSection settings={settings} onUpdateSettings={onUpdateSettings} variant="sidebar" />
       <SettingsFeedbackSection settings={settings} onUpdateSettings={onUpdateSettings} variant="sidebar" />
       <SettingsDiagnosticsSection />
       <SettingsStorageSection settings={settings} onUpdateSettings={onUpdateSettings} variant="sidebar" />

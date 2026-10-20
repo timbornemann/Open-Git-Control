@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useRef } from 'react';
 import { useI18n } from '@/i18n';
 import './dialog.css';
+import { registerOpenDialog } from './ui/notificationDialogs';
 
 interface DialogFrameProps {
   open: boolean;
@@ -70,6 +71,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
     const dialogId = dialogIdRef.current;
     if (dialogId === null) return;
     openDialogIds.push(dialogId);
+    const unregister = registerOpenDialog(dialogId);
 
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
@@ -131,6 +133,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
       const index = openDialogIds.lastIndexOf(dialogId);
       if (index >= 0) openDialogIds.splice(index, 1);
       previousFocusRef.current?.focus();
+      unregister();
     };
   }, [open, initialFocusRef, focusConfirm]);
 

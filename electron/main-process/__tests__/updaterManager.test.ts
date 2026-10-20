@@ -76,6 +76,57 @@ describe('UpdaterManager', () => {
     vi.useRealTimers();
   });
 
+  it('makes no automatic network checks when availability checks are disabled, while manual checks still work', async () => {
+    autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined);
+    const manager = new UpdaterManager(false);
+    manager.configureAutoUpdates(true, false);
+    await vi.advanceTimersByTimeAsync(4 * 60 * 60 * 1000);
+    expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled();
+    expect(autoUpdaterMock.autoInstallOnAppQuit).toBe(false);
+    await manager.checkForAppUpdates();
+    expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledOnce();
+    manager.dispose();
+  });
+
+  it('does not start a follow-up download when a check finishes after automatic checking was disabled', async () => {
+    let finish!: () => void;
+    autoUpdaterMock.checkForUpdates.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const manager = new UpdaterManager(false);
+    manager.configureAutoUpdates(true);
+    manager.setAutomaticChecksEnabled(false);
+    autoUpdaterMock.on.mock.calls.find(([event]) => event === 'update-available')?.[1](updateInfo());
+    finish();
+    await Promise.resolve();
+    expect(autoUpdaterMock.downloadUpdate).not.toHaveBeenCalled();
+    expect(manager.getStatus().state).toBe('update-available');
+    manager.dispose();
+  });
+
+  it('cancels an active download and stops future periodic checks when checks are disabled', async () => {
+    autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined);
+    autoUpdaterMock.downloadUpdate.mockImplementation(
+      (token) =>
+        new Promise((_resolve, reject) => {
+          token.onCancel(() => reject(new Error('cancelled')));
+        }),
+    );
+    const manager = new UpdaterManager(false);
+    manager.configureAutoUpdates(true);
+    autoUpdaterMock.on.mock.calls.find(([event]) => event === 'update-available')?.[1](updateInfo());
+    manager.setAutomaticChecksEnabled(false);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(manager.getStatus()).toMatchObject({ state: 'update-available', error: null });
+    autoUpdaterMock.checkForUpdates.mockClear();
+    await vi.advanceTimersByTimeAsync(4 * 60 * 60 * 1000);
+    expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled();
+    manager.dispose();
+  });
+
   it('waits for an already-running download instead of turning it into a five-second error', async () => {
     const manager = new UpdaterManager(false);
     setStatus(manager, { state: 'downloading', error: null });

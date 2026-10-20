@@ -722,7 +722,9 @@ Uncommitted files are shown but not committed automatically. Without a commit, *
   - updater status
   - available version
   - download progress
-  - background update toggle
+  - independent automatic check switches for app updates and user notices
+  - automatic update downloads
+  - saved user notices, including acknowledged pages
   - one-click update
   - release notes
   - copyable, redacted diagnostics report
@@ -741,6 +743,13 @@ Uncommitted files are shown but not committed automatically. Without a commit, *
   - stash branch
   - secret scan
   - AI auto-commit
+
+### User Notices
+
+- Developer messages come from `.Open-Git-Control/notes-to-user/` in the official Open-Git-Control repository. The app checks at startup and every four hours without requiring GitHub sign-in.
+- New or changed messages open as Markdown pages with images and GIFs. Browse the pages and choose **Acknowledge all**; the sidebar `i` icon then disappears.
+- Acknowledged messages remain under **Settings → App & diagnostics → User notices**, including offline. Successful complete checks remove deleted messages and unused images from the local cache.
+- Automatic notice checks and app-update checks have separate switches. Disabling them stops those background GitHub requests; manual checks remain available. See the [publishing guide](.Open-Git-Control/README.md#publishing-user-notices) for authoring notices.
 
 ### Shortcuts and Productivity
 

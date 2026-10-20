@@ -95,6 +95,32 @@ describe('platform IPC handlers', () => {
     clearSavedOpenAiApiKeySecurelyMock.mockReset();
   });
 
+  it('saves the two independent check preferences and disables checking before changing downloads', async () => {
+    const { registerRepoSettingsHandlers } = await import('../registerRepoSettingsHandlers');
+    const { DEFAULT_SETTINGS } = await import('../../../settings');
+    const handlers = getRegisteredHandlers();
+    const calls: string[] = [];
+    const updaterManager = { setAutoUpdatesEnabled: vi.fn(() => calls.push('downloads')), setAutomaticChecksEnabled: vi.fn(() => calls.push('checks')) };
+    const userNotesManager = { setChecksEnabled: vi.fn() };
+    readSettingsWithMigrationMock.mockReturnValue({ ...DEFAULT_SETTINGS });
+    registerRepoSettingsHandlers({ updaterManager: updaterManager as any, userNotesManager, githubService: { logout: vi.fn() } });
+    await handlers.get(IpcChannel.SettingsSet)?.({}, { autoUpdateCheckEnabled: false, userNotesCheckEnabled: false, autoUpdateEnabled: false });
+    expect(calls).toEqual(['checks', 'downloads']);
+    expect(updaterManager.setAutomaticChecksEnabled).toHaveBeenLastCalledWith(false);
+    expect(userNotesManager.setChecksEnabled).toHaveBeenLastCalledWith(false);
+    readSettingsWithMigrationMock.mockReturnValue({
+      ...DEFAULT_SETTINGS,
+      autoUpdateCheckEnabled: false,
+      userNotesCheckEnabled: false,
+      autoUpdateEnabled: false,
+    });
+    calls.length = 0;
+    await handlers.get(IpcChannel.SettingsSet)?.({}, { autoUpdateCheckEnabled: true, userNotesCheckEnabled: true, autoUpdateEnabled: true });
+    expect(calls).toEqual(['downloads', 'checks']);
+    expect(updaterManager.setAutomaticChecksEnabled).toHaveBeenLastCalledWith(true);
+    expect(userNotesManager.setChecksEnabled).toHaveBeenLastCalledWith(true);
+  });
+
   it('wraps diagnostics report success and failure responses', async () => {
     const { registerDiagnosticsHandlers } = await import('../registerDiagnosticsHandlers');
     const handlers = getRegisteredHandlers();

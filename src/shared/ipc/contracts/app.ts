@@ -4,6 +4,7 @@ import type { IpcResult } from '../../../types/ipc';
 import type { ElectronStorageAPI } from '../storageMaintenance';
 import type { FeedbackReportCapabilityDto, FeedbackReportInputDto, FeedbackReportSubmissionResultDto } from '../../../types/feedbackDtos';
 import type { InstallSystemToolRequest, SystemToolInstallEvent, SystemToolsStatus } from '../systemTools';
+import type { ElectronUserNotesAPI } from './userNotes';
 
 export type DirectoryOpenResultDto = {
   path: string;
@@ -15,7 +16,7 @@ export type BasicActionResultDto = {
   error?: string;
 };
 
-export interface ElectronAppAPI extends ElectronStorageAPI {
+export interface ElectronAppAPI extends ElectronStorageAPI, ElectronUserNotesAPI {
   getSystemToolsStatus: () => Promise<SystemToolsStatus>;
   recheckSystemTools: () => Promise<SystemToolsStatus>;
   installSystemTool: (request: InstallSystemToolRequest) => Promise<IpcResult<SystemToolInstallEvent>>;

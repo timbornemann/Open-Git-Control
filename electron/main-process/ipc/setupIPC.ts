@@ -9,6 +9,8 @@ import type { CommitStatsService } from '../../CommitStatsService';
 import type { WorkingTreeService } from '../../WorkingTreeService';
 import type { AppSettings } from '../../settings';
 import type { UpdaterManager } from '../updaterManager';
+import type { UserNotesManager } from '../UserNotesManager';
+import { registerUserNotesHandlers } from './registerUserNotesHandlers';
 import { registerAiHandlers } from './registerAiHandlers';
 import { registerDiagnosticsHandlers } from './registerDiagnosticsHandlers';
 import { registerDialogHandlers } from './registerDialogHandlers';
@@ -41,6 +43,7 @@ type SetupIpcDeps = {
   commitStatsService: CommitStatsService;
   workingTreeService: WorkingTreeService;
   updaterManager: UpdaterManager;
+  userNotesManager: UserNotesManager;
   readSettingsWithMigration: () => AppSettings;
   getGeminiApiKeyFromSecureStore: () => string;
   getOpenAiApiKeyFromSecureStore: () => string;
@@ -61,6 +64,7 @@ export function setupIPC({
   commitStatsService,
   workingTreeService,
   updaterManager,
+  userNotesManager,
   readSettingsWithMigration,
   getGeminiApiKeyFromSecureStore,
   getOpenAiApiKeyFromSecureStore,
@@ -82,6 +86,7 @@ export function setupIPC({
   const locationService = new RepositoryLocationService(gitService.runner);
   registerRepoSettingsHandlers({
     updaterManager,
+    userNotesManager,
     githubService,
     canonicalize: async (operation) => {
       const data = await locationService.canonicalize(operation.path, operation.canonicalPath);
@@ -97,6 +102,7 @@ export function setupIPC({
   registerRepositorySecretScanAllowlistHandlers({ gitService, repoJobRegistry, readSettingsWithMigration });
   registerProjectPlannerHandlers({ gitService });
   registerUpdaterHandlers({ updaterManager });
+  registerUserNotesHandlers(userNotesManager);
   registerAiHandlers({
     aiService,
     readSettingsWithMigration,

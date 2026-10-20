@@ -3,7 +3,13 @@ import type { ResourceDomain } from '@/shared/cache/resource';
 export type ReadPolicy = { staleTime: number; repoArgument?: number; repoProperty?: boolean; refreshOnRead?: boolean };
 const read = (staleTime: number, repoArgument?: number): ReadPolicy => ({ staleTime, repoArgument });
 export const readPolicies: Record<ResourceDomain, Record<string, ReadPolicy>> = {
-  app: { getSettings: read(Infinity), getStoredRepos: read(Infinity), getAppVersion: read(Infinity), getUpdaterStatus: read(30_000) },
+  app: {
+    getSettings: read(Infinity),
+    getStoredRepos: read(Infinity),
+    getAppVersion: read(Infinity),
+    getUpdaterStatus: read(30_000),
+    getUserNotesStatus: read(30_000),
+  },
   planner: { getData: read(30_000) },
   runs: { getConfig: read(30_000, 0), getState: read(1000) },
   github: {

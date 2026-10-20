@@ -16,11 +16,13 @@ import {
 } from '../secureStore';
 import { readSettingsWithMigration, writeSettings } from '../settingsStore';
 import type { UpdaterManager } from '../updaterManager';
+import type { UserNotesManager } from '../UserNotesManager';
 import type { GitHubService } from '../../GitHubService';
 import { clearGithubCatalogCache } from '../githubCatalogCache';
 
 type RegisterRepoSettingsHandlersDeps = {
   updaterManager: UpdaterManager;
+  userNotesManager?: Pick<UserNotesManager, 'setChecksEnabled'>;
   githubService: Pick<GitHubService, 'logout'>;
   canonicalize?: (operation: Extract<RepositoryMutation, { kind: 'canonicalize' }>) => Promise<StoredData>;
 };
@@ -44,7 +46,7 @@ function getValidOpenAiEndpointOrigin(value: unknown): string | null {
   }
 }
 
-export function registerRepoSettingsHandlers({ updaterManager, githubService, canonicalize }: RegisterRepoSettingsHandlersDeps): void {
+export function registerRepoSettingsHandlers({ updaterManager, userNotesManager, githubService, canonicalize }: RegisterRepoSettingsHandlersDeps): void {
   ipcMain.handle(IpcChannel.ReposGetStored, async () => {
     return readStoreData();
   });
@@ -114,8 +116,17 @@ export function registerRepoSettingsHandlers({ updaterManager, githubService, ca
       githubService.logout();
       void clearGithubCatalogCache();
     }
+    if (!next.autoUpdateCheckEnabled && current.autoUpdateCheckEnabled !== false) {
+      updaterManager.setAutomaticChecksEnabled(false);
+    }
     if (next.autoUpdateEnabled !== current.autoUpdateEnabled) {
       updaterManager.setAutoUpdatesEnabled(next.autoUpdateEnabled);
+    }
+    if (next.autoUpdateCheckEnabled && current.autoUpdateCheckEnabled === false) {
+      updaterManager.setAutomaticChecksEnabled(true);
+    }
+    if (next.userNotesCheckEnabled !== (current.userNotesCheckEnabled !== false)) {
+      userNotesManager?.setChecksEnabled(next.userNotesCheckEnabled);
     }
     return next;
   });

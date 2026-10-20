@@ -5,6 +5,7 @@ import { createRepositoryLocationApi } from './createRepositoryLocationApi';
 import { createSystemToolsApi } from './createSystemToolsApi';
 import { createStorageApi } from './createStorageApi';
 import { createUpdaterApi } from './createUpdaterApi';
+import { createUserNotesApi } from './createUserNotesApi';
 import type { RepositoryMutation } from '../../src/shared/ipc/storageMaintenance';
 import type { PreviewSnapshot, ReadRequest } from '../../src/shared/cache/resource';
 import type { IpcRenderer, IpcRendererEvent } from 'electron';
@@ -340,6 +341,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     clearPlanningApiToken: () => ipcRenderer.invoke(IpcChannel.PlanningApiClearSavedToken),
     getAppVersion: () => ipcRenderer.invoke(IpcChannel.AppGetVersion),
     ...createUpdaterApi(ipcRenderer),
+    ...createUserNotesApi(ipcRenderer),
     aiTestConnection: () => ipcRenderer.invoke(IpcChannel.AiTestConnection),
     aiListModels: () => ipcRenderer.invoke(IpcChannel.AiListModels),
     ollamaTestConnection: () => ipcRenderer.invoke(IpcChannel.AiTestConnection),
@@ -471,6 +473,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       clearPlanningApiToken: flatApi.clearPlanningApiToken,
       getAppVersion: flatApi.getAppVersion,
       ...createUpdaterApi(ipcRenderer),
+      ...createUserNotesApi(ipcRenderer),
       getDiagnosticsReport: flatApi.getDiagnosticsReport,
       writeClipboardText: flatApi.writeClipboardText,
     },

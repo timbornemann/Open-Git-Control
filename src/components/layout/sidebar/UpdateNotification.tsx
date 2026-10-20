@@ -8,6 +8,7 @@ import { useAppToast } from '@/hooks/useAppToast';
 import { useI18n } from '@/i18n';
 import { appClient } from '@/services/appClient';
 import type { UpdaterStatusDto } from '@/types/appDtos';
+import { useNotificationDialog } from '@/components/ui/notificationDialogs';
 
 const updateStates = new Set<UpdaterStatusDto['state']>(['update-available', 'downloading', 'downloaded']);
 
@@ -17,9 +18,10 @@ export const UpdateNotification: React.FC = () => {
   const { t } = useI18n();
   const showToast = useAppToast();
   const autoUpdateEnabled = useSettingsStore((state) => state.settings.autoUpdateEnabled);
+  const autoUpdateCheckEnabled = useSettingsStore((state) => state.settings.autoUpdateCheckEnabled !== false);
   const onUpdateSettings = useSettingsStore((state) => state.onUpdateSettings);
   const [status, setStatus] = React.useState<UpdaterStatusDto | null>(() => peekResource<UpdaterStatusDto>('app', 'getUpdaterStatus') || null);
-  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const { dialogOpen, openDialog, closeDialog, cancelPendingDialog } = useNotificationDialog(0);
   const [dismissedVersion, setDismissedVersion] = React.useState<string | null>(null);
   const [working, setWorking] = React.useState(false);
   const announcedPendingReleaseRef = React.useRef<string | null>(null);
@@ -27,7 +29,9 @@ export const UpdateNotification: React.FC = () => {
   const activeUpdateState = Boolean(status && updateStates.has(status.state));
   const releasePending = status?.state === 'release-pending';
   const updateErrorVisible = Boolean(status?.state === 'error' && status.availableVersion);
-  const iconVisible = Boolean(releasePending || status?.state === 'downloaded' || (!autoUpdateEnabled && activeUpdateState) || updateErrorVisible);
+  const iconVisible = Boolean(
+    releasePending || status?.state === 'downloaded' || ((!autoUpdateEnabled || !autoUpdateCheckEnabled) && activeUpdateState) || updateErrorVisible,
+  );
   const currentVersionKey = status ? versionKey(status) : null;
 
   React.useEffect(() => {
@@ -66,13 +70,14 @@ export const UpdateNotification: React.FC = () => {
   }, [showToast, t]);
 
   React.useEffect(() => {
-    if (!autoUpdateEnabled || status?.state !== 'downloaded' || !currentVersionKey || dismissedVersion === currentVersionKey) return;
-    setDialogOpen(true);
-  }, [autoUpdateEnabled, currentVersionKey, dismissedVersion, status?.state]);
+    if (!autoUpdateEnabled || !autoUpdateCheckEnabled || status?.state !== 'downloaded' || !currentVersionKey || dismissedVersion === currentVersionKey) return;
+    openDialog(true);
+    return cancelPendingDialog;
+  }, [autoUpdateEnabled, autoUpdateCheckEnabled, currentVersionKey, dismissedVersion, status?.state, openDialog, cancelPendingDialog]);
 
   const dismissDialog = () => {
     if (currentVersionKey) setDismissedVersion(currentVersionKey);
-    setDialogOpen(false);
+    closeDialog();
   };
 
   const installUpdate = async () => {
@@ -140,7 +145,7 @@ export const UpdateNotification: React.FC = () => {
         <button
           className={`icon-btn activity-update-btn activity-update-btn--${status.state}`}
           onClick={() => {
-            setDialogOpen(true);
+            openDialog();
           }}
           title={iconLabel}
           aria-label={iconLabel}

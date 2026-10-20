@@ -8,6 +8,24 @@ export const appClient = cachedClient('app', {
   getSystemToolsStatus() {
     return requireElectronAppApi().getSystemToolsStatus();
   },
+  getUserNotesStatus() {
+    return requireElectronAppApi().getUserNotesStatus();
+  },
+  getUserNote(...args: Parameters<ElectronAPI['getUserNote']>) {
+    return requireElectronAppApi().getUserNote(...args);
+  },
+  checkUserNotes() {
+    return requireElectronAppApi().checkUserNotes();
+  },
+  acknowledgeUserNotes(...args: Parameters<ElectronAPI['acknowledgeUserNotes']>) {
+    return requireElectronAppApi().acknowledgeUserNotes(...args);
+  },
+  onUserNotesChanged(...args: Parameters<ElectronAPI['onUserNotesChanged']>) {
+    return requireElectronAppApi().onUserNotesChanged((status) => {
+      updateResource(resourceKey('app', 'getUserNotesStatus'), status);
+      args[0](status);
+    });
+  },
   recheckSystemTools() {
     return requireElectronAppApi().recheckSystemTools();
   },

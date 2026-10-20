@@ -129,6 +129,13 @@ export const getSettingsGroups = (tr: Translate) =>
       keywords: 'update download install version automatic automatisch aktualisierung',
     },
     {
+      id: 'user-notes',
+      tab: 'system',
+      title: tr('Nutzerhinweise', 'User notices'),
+      description: tr('Nachrichten des Entwicklers und gespeicherte Informationen nachlesen.', 'Read developer messages and saved information.'),
+      keywords: 'notes notices information users messages offline hinweise nutzer informationen nachrichten info',
+    },
+    {
       id: 'tools',
       tab: 'system',
       title: tr('Werkzeuge', 'System tools'),

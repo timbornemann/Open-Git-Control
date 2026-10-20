@@ -18,9 +18,11 @@ export async function canPersistAuxiliary(root: string, file: string, bytes: num
   let total = 0;
   for (const name of ['repository-icons', 'hosting-catalogs', 'GPUCache', 'DawnCache', 'DawnGraphiteCache', 'DawnWebGPUCache'])
     total += await directoryBytesAsync(path.join(root, name));
-  const legacy = path.join(root, 'github-catalog.json');
-  await assertManagedPathAsync(root, legacy);
-  total += await size(legacy);
+  for (const name of ['github-catalog.json', 'user-notes-v1.json']) {
+    const file = path.join(root, name);
+    await assertManagedPathAsync(root, file);
+    total += await size(file);
+  }
   return total - prior + bytes <= STORAGE_BUDGETS.auxiliary;
 }
 

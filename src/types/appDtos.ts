@@ -68,6 +68,8 @@ export interface AppSettingsDto {
   showSecondaryHistory: boolean;
   commitSignoffByDefault: boolean;
   autoUpdateEnabled: boolean;
+  autoUpdateCheckEnabled: boolean;
+  userNotesCheckEnabled: boolean;
   automaticMaintenanceEnabled?: boolean;
   secretScanBeforeCommitEnabled: boolean;
   secretScanBeforePushEnabled: boolean;

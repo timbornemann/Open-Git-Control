@@ -3,6 +3,30 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { createElectronApi } from '../createElectronApi';
 
 describe('createElectronApi', () => {
+  it('exposes user notes and removable change events through both app and flat namespaces', async () => {
+    const ipc = { invoke: vi.fn().mockResolvedValue({ success: true }), on: vi.fn(), removeListener: vi.fn() };
+    const api = createElectronApi(ipc as any);
+    const identity = { id: 'info.md', revision: 'a'.repeat(64) };
+    await api.app.getUserNotesStatus();
+    await api.getUserNote(identity);
+    await api.app.checkUserNotes();
+    await api.acknowledgeUserNotes([identity]);
+    expect(ipc.invoke.mock.calls).toEqual([
+      [IpcChannel.UserNotesGetStatus],
+      [IpcChannel.UserNotesGetNote, identity],
+      [IpcChannel.UserNotesCheck],
+      [IpcChannel.UserNotesAcknowledge, [identity]],
+    ]);
+    const callback = vi.fn();
+    const stop = api.app.onUserNotesChanged(callback);
+    const [channel, receive] = ipc.on.mock.calls[0];
+    const status = { state: 'ready', notes: [] };
+    receive({}, status);
+    expect(channel).toBe(IpcChannel.UserNotesChanged);
+    expect(callback).toHaveBeenCalledExactlyOnceWith(status);
+    stop();
+    expect(ipc.removeListener).toHaveBeenCalledExactlyOnceWith(channel, receive);
+  });
   it('opens the recovery helper through a parameterless typed IPC action in both namespaces', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

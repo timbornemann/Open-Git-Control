@@ -22,6 +22,7 @@ import {
 import { useSettingsPanelModel } from './settings/useSettingsPanelModel';
 import { SettingsDiagnosticsSection } from './settings/SettingsDiagnosticsSection';
 import { SettingsStorageSection } from './settings/SettingsStorageSection';
+import { SettingsUserNotesSection } from './settings/SettingsUserNotesSection';
 import { getSettingsCategories, searchSettingsGroups } from './settings/settingsNavigation';
 import { clearSettingsDestination, useSettingsNavigation } from '@/app/state/settingsNavigationStore';
 
@@ -175,6 +176,7 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
             <div className="settings-grid">
               <SettingsToolsSection />
               <SettingsUpdatesSection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" ai={aiUpdater} locale={locale} />
+              <SettingsUserNotesSection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" />
               <SettingsReleaseNotesCard releaseNotes={aiUpdater.updaterStatus?.releaseNotes} />
               <SettingsFeedbackSection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" />
               <SettingsDiagnosticsSection variant="main" />

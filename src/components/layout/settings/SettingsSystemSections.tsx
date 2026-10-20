@@ -103,12 +103,20 @@ export const SettingsUpdatesSection = ({
       <SettingsSwitch
         variant={variant}
         compact={variant === 'sidebar'}
+        checked={settings.autoUpdateCheckEnabled !== false}
+        label={tr('Automatisch nach App-Updates suchen', 'Automatically check for app updates')}
+        description={tr(
+          'Beim Ausschalten werden keine automatischen Update-Abfragen an GitHub gesendet.',
+          'When disabled, no automatic update checks are sent to GitHub.',
+        )}
+        onChange={(checked) => void onUpdateSettings({ autoUpdateCheckEnabled: checked })}
+      />
+      <SettingsSwitch
+        variant={variant}
+        compact={variant === 'sidebar'}
         checked={settings.autoUpdateEnabled}
-        label={
-          variant === 'sidebar'
-            ? t('generated.components.layout.sidebar.settingssidebarcontent.automatically_check_and_download_updates_6ffcd411')
-            : t('generated.components.layout.settingsmaincontent.automatically_check_and_download_updates_in_the_backgrou_dbe47c67')
-        }
+        label={tr('Gefundene Updates automatisch herunterladen', 'Automatically download available updates')}
+        description={tr('Gilt bei aktivierter automatischer Update-Suche.', 'Applies while automatic update checks are enabled.')}
         onChange={(checked) => void onUpdateSettings({ autoUpdateEnabled: checked })}
       />
       <div className={actionRowClass(variant)}>

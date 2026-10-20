@@ -33,6 +33,7 @@ export class UpdaterManager {
   private autoUpdateInterval: NodeJS.Timeout | null = null;
 
   private automaticDownloadsEnabled = true;
+  private automaticChecksEnabled = true;
 
   private updaterStatus: UpdaterStatusPayload;
 
@@ -41,7 +42,7 @@ export class UpdaterManager {
   private availableUpdateInfo: UpdateInfo | null = null;
   private readonly recoveryGuard = new UpdaterRecoveryGuard((blocked) => {
     if (blocked) this.activeDownloadCancellationToken?.cancel();
-    autoUpdater.autoInstallOnAppQuit = !blocked && this.automaticDownloadsEnabled && process.platform !== 'darwin';
+    autoUpdater.autoInstallOnAppQuit = !blocked && this.automaticChecksEnabled && this.automaticDownloadsEnabled && process.platform !== 'darwin';
     this.setUpdaterStatus({ recoveryActive: blocked });
   });
 
@@ -91,15 +92,15 @@ export class UpdaterManager {
   }
 
   private ensureUpdateCheckInterval(): void {
-    if (this.autoUpdateInterval) return;
+    if (this.autoUpdateInterval || !this.automaticChecksEnabled) return;
     this.autoUpdateInterval = setInterval(() => {
-      void this.checkForAppUpdates();
+      if (this.automaticChecksEnabled) void this.checkForAppUpdates();
     }, AUTO_UPDATE_CHECK_INTERVAL_MS);
     this.autoUpdateInterval.unref();
   }
 
   private maybeDownloadAvailableUpdate(): void {
-    if (!this.automaticDownloadsEnabled || !this.updaterStatus.isSupported) return;
+    if (!this.automaticChecksEnabled || !this.automaticDownloadsEnabled || !this.updaterStatus.isSupported) return;
     if (this.updaterStatus.state !== 'update-available') return;
 
     void this.downloadAvailableUpdate();
@@ -231,6 +232,10 @@ export class UpdaterManager {
       );
       return { success: true };
     } catch (error: unknown) {
+      if (cancellationToken.cancelled && !this.automaticChecksEnabled) {
+        this.setUpdaterStatus({ state: 'update-available', error: null, downloadPercent: null });
+        return { success: false, error: 'Update download cancelled.' };
+      }
       const message = formatUpdaterError(error);
       this.setUpdaterStatus({
         state: 'error',
@@ -345,11 +350,8 @@ export class UpdaterManager {
 
     // Squirrel.Mac cannot undo native update staging. Defer it until an
     // explicit install request so disabling updates can still skip the update.
-    autoUpdater.autoInstallOnAppQuit = enabled && process.platform !== 'darwin' && !this.recoveryGuard.refresh();
-
-    // Availability checks remain active even when automatic downloads are
-    // disabled, so the renderer can still advertise a new version. The user
-    // setting also controls installation on quit where it can be cancelled.
+    autoUpdater.autoInstallOnAppQuit = enabled && this.automaticChecksEnabled && process.platform !== 'darwin' && !this.recoveryGuard.refresh();
+    if (!this.automaticChecksEnabled) return;
     this.ensureUpdateCheckInterval();
 
     if (enabled && this.updaterStatus.state === 'update-available') {
@@ -362,8 +364,20 @@ export class UpdaterManager {
     }
   }
 
-  configureAutoUpdates(autoUpdatesEnabled = true): void {
+  setAutomaticChecksEnabled(enabled: boolean): void {
+    this.automaticChecksEnabled = enabled;
+    if (!enabled) {
+      this.clearAutoUpdateInterval();
+      this.activeDownloadCancellationToken?.cancel();
+      autoUpdater.autoInstallOnAppQuit = false;
+    } else {
+      this.setAutoUpdatesEnabled(this.automaticDownloadsEnabled);
+    }
+  }
+
+  configureAutoUpdates(autoUpdatesEnabled = true, automaticChecksEnabled = true): void {
     this.automaticDownloadsEnabled = autoUpdatesEnabled;
+    this.automaticChecksEnabled = automaticChecksEnabled;
 
     if (this.isDev) {
       this.setUpdaterStatus({
@@ -450,6 +464,7 @@ export class UpdaterManager {
     });
 
     autoUpdater.on('error', (error: Error) => {
+      if (!this.automaticChecksEnabled && this.activeDownloadCancellationToken?.cancelled) return;
       this.applyUpdaterFailure(error);
     });
 

@@ -3,6 +3,7 @@ import { BarChart3, Settings, FolderOpen, FolderGit2, Globe, ListTodo, PanelLeft
 import type { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '@/i18n';
 import { UpdateNotification } from './UpdateNotification';
+import { UserNotesNotification } from '@/components/user-notes/UserNotesNotification';
 import { RepositoryActivityRail } from './RepositoryActivityRail';
 import { SystemToolsWarning } from '@/components/system-tools/SystemToolsWarning';
 import { preloadViewModule } from '@/data/viewModules';
@@ -78,6 +79,7 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({ activeTa
         <RepositoryActivityRail />
       </div>
       <UpdateNotification />
+      <UserNotesNotification />
       <SystemToolsWarning />
       <button
         {...tabPreloadHandlers('settings')}

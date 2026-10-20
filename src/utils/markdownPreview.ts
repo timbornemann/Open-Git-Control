@@ -1,6 +1,7 @@
 import createDOMPurify from 'dompurify';
 import { Marked } from 'marked';
 import { MAX_HTML_PREVIEW_BYTES } from '@/shared/htmlPreviewSecurity';
+import { USER_NOTE_IMAGE_DATA_URL } from '@/shared/userNotes';
 
 const MARKDOWN_EXTENSIONS = new Set(['md', 'markdown', 'mdown', 'mkd', 'mkdn']);
 const markdownParser = new Marked({
@@ -79,7 +80,7 @@ export const resolveMarkdownPreviewAssetPath = (markdownFilePath: string, rawAss
   return normalizeRepoRelativePath(joined);
 };
 
-export const renderMarkdownToSanitizedHtml = (markdown: string): string => {
+export const renderMarkdownToSanitizedHtml = (markdown: string, localImages?: { dataUrls: Record<string, string>; missingLabel: string }): string => {
   const rawHtml = String(markdownParser.parse(markdown || ''));
 
   if (typeof window === 'undefined') {
@@ -87,6 +88,27 @@ export const renderMarkdownToSanitizedHtml = (markdown: string): string => {
   }
 
   const purifier = createDOMPurify(window);
+  if (localImages) {
+    let imageBytes = 0;
+    // Strip fetch-capable attributes before even parsing the sanitized HTML.
+    purifier.addHook('afterSanitizeAttributes', (element) => {
+      const reference = element.getAttribute('src') || '';
+      for (const attribute of Array.from(element.attributes)) {
+        if (['src', 'srcset', 'poster', 'background', 'xlink:href', 'ping'].includes(attribute.name)) element.removeAttribute(attribute.name);
+      }
+      if (element.tagName.toLowerCase() !== 'img') return;
+      const dataUrl = Object.prototype.hasOwnProperty.call(localImages.dataUrls, reference) ? localImages.dataUrls[reference] : '';
+      const size = new TextEncoder().encode(dataUrl || '').byteLength;
+      if (dataUrl && USER_NOTE_IMAGE_DATA_URL.test(dataUrl) && imageBytes + size <= MAX_HTML_PREVIEW_BYTES / 2) {
+        imageBytes += size;
+        element.setAttribute('src', dataUrl);
+        element.setAttribute('loading', 'lazy');
+      } else {
+        element.setAttribute('alt', element.getAttribute('alt') || localImages.missingLabel);
+        element.setAttribute('title', localImages.missingLabel);
+      }
+    });
+  }
   const sanitized = purifier.sanitize(rawHtml, {
     ADD_ATTR: ['checked', 'disabled', 'rel', 'target'],
     ADD_TAGS: ['input'],
@@ -94,7 +116,18 @@ export const renderMarkdownToSanitizedHtml = (markdown: string): string => {
     // Inline styles would let untrusted Markdown cover the whole app window
     // (position: fixed) with a fake interface.
     FORBID_ATTR: ['style'],
-    FORBID_TAGS: ['button', 'embed', 'form', 'iframe', 'meta', 'object', 'script', 'style', 'template'],
+    FORBID_TAGS: [
+      'button',
+      'embed',
+      'form',
+      'iframe',
+      'meta',
+      'object',
+      'script',
+      'style',
+      'template',
+      ...(localImages ? ['svg', 'math', 'audio', 'video', 'picture', 'source', 'link', 'image', 'use'] : []),
+    ],
     // Prefix id/name values so Markdown cannot clobber or collide with app
     // element IDs (for example the React root).
     SANITIZE_NAMED_PROPS: true,

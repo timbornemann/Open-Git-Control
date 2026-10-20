@@ -65,7 +65,10 @@ try {
     assert.equal(probe.status, 0, `The packaged Electron runtime must start: ${probe.stderr || probe.error || ''}`);
     assert.equal(probe.stdout.trim(), require('electron/package.json').version, 'Test the same Electron version as the packaged application.');
   }
-  fs.writeFileSync(path.join(root, 'settings.json'), JSON.stringify({ autoUpdateEnabled: false, automaticMaintenanceEnabled: false }));
+  fs.writeFileSync(
+    path.join(root, 'settings.json'),
+    JSON.stringify({ autoUpdateEnabled: false, autoUpdateCheckEnabled: false, userNotesCheckEnabled: false, automaticMaintenanceEnabled: false }),
+  );
   run(true);
   assert.equal(fs.readFileSync(path.join(root, 'cleanup-finished'), 'utf8'), 'preserved');
   run(false);
