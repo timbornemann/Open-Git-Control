@@ -221,17 +221,6 @@
       "updatedAt": 1792502157882
     },
     {
-      "id": "1168ffc8-9664-4320-8a9d-fe5acb8a5383",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Branch-Aufräumassistent",
-      "description": "Zusammengeführte und verwaiste Branches mit nachvollziehbarer Begründung vorschlagen. Geschützte Branches, laufende Arbeit und Worktree-Zuordnungen berücksichtigen. Die Auswahl vor dem Löschen gemeinsam prüfen lassen.",
-      "priority": "medium",
-      "status": "in-progress",
-      "tags": [],
-      "createdAt": 1792502175127,
-      "updatedAt": 1792508043531
-    },
-    {
       "id": "7595b0a6-9610-4335-b639-93e33ce062a0",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Konfliktlösung mit mehr Kontext",
@@ -274,17 +263,6 @@
       "tags": [],
       "createdAt": 1792502362933,
       "updatedAt": 1792502362933
-    },
-    {
-      "id": "0dadd403-cd81-427e-b224-0413c381d86c",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Inaktive Repositories bedarfsgerechter prüfen",
-      "description": "Der [Aktivitätskoordinator (line 7)](D:/Projects/Software/Open-Git-Control/src/data/repositoryActivityCoordinator.ts:7) verwendet für erfolgreiche Prüfungen grundsätzlich 15 Sekunden. Bei wiederholt unverändertem Zustand das Intervall verlängern; zuletzt verwendete oder sichtbare Projekte bevorzugen.",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1792502427914,
-      "updatedAt": 1792502427914
     },
     {
       "id": "6a5b52e7-4625-4c1e-ad8f-a44312227661",

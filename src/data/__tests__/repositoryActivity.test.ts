@@ -39,7 +39,7 @@ afterEach(async () => {
 });
 
 describe('repository activity coordinator', () => {
-  it('waits for restoration, skips the active repo, and polls inactive repos every 15 seconds', async () => {
+  it('waits for restoration, skips the active repo, and schedules the first recheck after 15 seconds', async () => {
     coordinator.setRepositories(['/a', '/b'], '/a', false);
     await advance();
     expect(gitClient.getRepositoryChangeSummary).not.toHaveBeenCalled();

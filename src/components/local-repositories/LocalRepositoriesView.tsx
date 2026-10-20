@@ -8,6 +8,7 @@ import { useI18n } from '@/i18n';
 import { LocalRepositoryContextMenu, type LocalRepositoryMenuState } from './LocalRepositoryContextMenu';
 import { repoName, selectLocalRepositories } from './localRepositorySelectors';
 import { RepositoryIcon } from '@/components/repository-icon/RepositoryIcon';
+import { useRepositoryActivityVisibility } from '@/hooks/useRepositoryActivityVisibility';
 
 export const LocalRepositoriesView: React.FC = () => {
   const repository = useRepositoryContext();
@@ -23,6 +24,7 @@ export const LocalRepositoriesView: React.FC = () => {
     () => selectLocalRepositories(repository.openRepos, repository.repoMeta, search, pinnedOnly),
     [repository.openRepos, repository.repoMeta, search, pinnedOnly],
   );
+  const visibilityRef = useRepositoryActivityVisibility<HTMLElement>(visible);
   const closeMenu = useCallback(() => setMenu(null), []);
   const menuPath = menu && repository.openRepos.includes(menu.path) ? menu.path : null;
   const sortOptions: Array<{ value: RepoSortByDto; label: string }> = [
@@ -60,7 +62,7 @@ export const LocalRepositoriesView: React.FC = () => {
   };
 
   return (
-    <main className="local-repositories-view">
+    <main className="local-repositories-view" ref={visibilityRef}>
       <header className="local-repositories-view__hero">
         <div>
           <span className="local-repositories-view__eyebrow">LOCAL WORKSPACE</span>
@@ -124,6 +126,7 @@ export const LocalRepositoriesView: React.FC = () => {
               return (
                 <article
                   key={path}
+                  data-repository-activity-path={path}
                   className={`local-repositories-view__row${isActive ? ' is-active' : ''}`}
                   onContextMenu={(event) => {
                     event.preventDefault();

@@ -58,7 +58,8 @@ const validRepositorySummary = (data: unknown, key: PreviewSnapshot['key']) =>
   key[1] === 'git' &&
   key.length === 4 &&
   object(data) &&
-  Object.keys(data).length === 3 &&
+  Object.keys(data).every((field) => ['repoPath', 'changeCount', 'checkedAt', 'statusFingerprint'].includes(field)) &&
+  (data.statusFingerprint === undefined || (typeof data.statusFingerprint === 'string' && /^[a-f0-9]{64}$/.test(data.statusFingerprint))) &&
   typeof data.repoPath === 'string' &&
   data.repoPath.length > 0 &&
   data.repoPath.length <= 4096 &&

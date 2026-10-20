@@ -36,6 +36,21 @@ afterEach(async () => {
 });
 
 describe('persistent preview cache', () => {
+  it('roundtrips signed repository summaries while rejecting malformed optional fingerprints', async () => {
+    const entry: PreviewSnapshot = {
+      ...preview(),
+      key: ['resource', 'git', '/repo', 'getRepositoryChangeSummary'],
+      data: { success: true, data: { repoPath: '/repo', changeCount: 1, checkedAt: Date.now(), statusFingerprint: 'a'.repeat(64) } },
+    };
+    expect(validatePreview(entry)).toBe(true);
+    await savePreviewCache([entry], () => true);
+    expect(await readPreviewCache(() => true)).toEqual([entry]);
+    for (const statusFingerprint of [null, 1, '', 'a'.repeat(65), 'G'.repeat(64)])
+      expect(
+        validatePreview({ ...entry, data: { success: true, data: { repoPath: '/repo', changeCount: 1, checkedAt: Date.now(), statusFingerprint } } }),
+      ).toBe(false);
+  });
+
   it('persists bounded repository summaries and rejects malformed or mismatched counts', async () => {
     const entry: PreviewSnapshot = {
       ...preview(),

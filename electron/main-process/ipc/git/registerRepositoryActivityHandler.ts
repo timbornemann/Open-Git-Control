@@ -1,4 +1,5 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { createHash } from 'node:crypto';
 import type { GitService } from '../../../GitService';
 import { IpcChannel } from '../../../../src/types/ipcContract';
 import type { ReadRequest } from '../../../../src/shared/cache/resource';
@@ -25,7 +26,10 @@ export function registerRepositoryActivityHandler({ gitService, readStoredRepoPa
       const bare = (await run(['rev-parse', '--is-bare-repository'])).trim() === 'true';
       const raw = bare ? '' : await run(['status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignore-submodules=none']);
       signal.throwIfAborted();
-      return { success: true, data: { repoPath, changeCount: countPorcelainChanges(raw), checkedAt: Date.now() } };
+      return {
+        success: true,
+        data: { repoPath, changeCount: countPorcelainChanges(raw), checkedAt: Date.now(), statusFingerprint: createHash('sha256').update(raw).digest('hex') },
+      };
     } catch (error) {
       return { success: false, error: deadline.signal.aborted ? 'Repository status check timed out.' : error instanceof Error ? error.message : String(error) };
     } finally {

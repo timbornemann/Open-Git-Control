@@ -35,6 +35,21 @@ afterEach(() => {
 });
 
 describe('repository activity IPC', () => {
+  it('fingerprints the existing status output independently of timestamps and file counts', async () => {
+    const { runner } = mocks();
+    const first = await invoke('C:/inactive');
+    expect(first.data.statusFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    vi.spyOn(Date, 'now').mockReturnValue(first.data.checkedAt + 1000);
+    const same = await invoke('C:/inactive');
+    expect(same.data.checkedAt).not.toBe(first.data.checkedAt);
+    expect(same.data.statusFingerprint).toBe(first.data.statusFingerprint);
+    runner.run.mockImplementation(async (_path, args) => (args.includes('rev-parse') ? 'false\n' : 'MM other.ts\0?? renamed.ts\0'));
+    const changed = await invoke('C:/inactive');
+    expect(changed.data.changeCount).toBe(first.data.changeCount);
+    expect(changed.data.statusFingerprint).not.toBe(first.data.statusFingerprint);
+    expect(runner.run).toHaveBeenCalledTimes(6);
+  });
+
   it('only reads exact registered or active roots and never activates an inactive repository', async () => {
     const { runner, gitService } = mocks();
     expect(await invoke('C:/inactive')).toMatchObject({ success: true, data: { repoPath: 'C:/inactive', changeCount: 2 } });

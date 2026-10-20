@@ -1,20 +1,26 @@
 import { useEffect, useState } from 'react';
 import { skipToken, useQueries } from '@tanstack/react-query';
 import { queryClient } from '@/data/queryClient';
-import { RepositoryActivityCoordinator } from '@/data/repositoryActivityCoordinator';
+import { RepositoryActivityCoordinator, type RepositoryActivityMetadata } from '@/data/repositoryActivityCoordinator';
 import { repositoryActivityKey, type RepositoryActivityResult } from '@/data/repositoryActivityCache';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { repoName } from '@/components/local-repositories/localRepositorySelectors';
 
 export type RepositoryActivityEntry = { path: string; name: string; changeCount: number; checkedAt: number; failed: boolean };
+const EMPTY_METADATA: RepositoryActivityMetadata = {};
 
-export function useRepositoryActivity(repositories: string[], activeRepo: string | null, restoring: boolean): RepositoryActivityEntry[] {
+export function useRepositoryActivity(
+  repositories: string[],
+  activeRepo: string | null,
+  restoring: boolean,
+  metadata: RepositoryActivityMetadata = EMPTY_METADATA,
+): RepositoryActivityEntry[] {
   const [coordinator] = useState(() => new RepositoryActivityCoordinator());
   useEffect(() => {
     coordinator.start();
     return () => coordinator.dispose();
   }, [coordinator]);
-  useEffect(() => coordinator.setRepositories(repositories, activeRepo, !restoring), [coordinator, repositories, activeRepo, restoring]);
+  useEffect(() => coordinator.setRepositories(repositories, activeRepo, !restoring, metadata), [coordinator, repositories, activeRepo, restoring, metadata]);
   const queries = useQueries(
     { queries: repositories.map((path) => ({ queryKey: repositoryActivityKey(path), queryFn: skipToken, enabled: false })) },
     queryClient,

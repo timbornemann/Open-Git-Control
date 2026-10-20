@@ -176,6 +176,7 @@ Tests und Builds als strukturiertes Protokoll lesen, Probleme prüfen und genann
 - Ordner, die noch kein Git-Repository sind, mit `git init` initialisieren und dabei optional ein Start-README sowie eine Lizenz anlegen.
 - Persistenter Repository-Workspace mit zuletzt genutzten Repositories, Favoriten, aktivem Repo und Sortierung.
 - Gespeicherte Repositories ohne leeren Zwischenzustand wiederherstellen: das aktive Repository wird zuerst vorbereitet, waehrend die restlichen Eintraege im Hintergrund validiert werden.
+- Inaktive Repositories bei unverändertem Status schrittweise seltener prüfen, von 15 Sekunden bis maximal fünf Minuten. Sichtbare Repository-Einträge und die drei zuletzt verwendeten inaktiven Repositories behalten den 15-Sekunden-Takt. Bei verborgenem App-Fenster pausieren die Prüfungen; sie verwenden lokalen Git-Status ohne Server-Fetch.
 - Lokale Repositories suchen und nach zuletzt geoeffnet, Name, Erstellzeit, aufsteigend oder absteigend sortieren.
 - Repositories anhand lokal gefundener Icons und Logos in Seitenleiste und Repository-Liste erkennen. Über das Kontextmenü **Repository-Logo** lässt sich ein anderes Bild auswählen, auf Buchstaben umstellen oder erneut suchen. Kleine Vorschaubilder und Einstellungen bleiben lokal über Neustarts erhalten; Originalbilder und Repository-Konfiguration bleiben unverändert.
 - Repositories anpinnen, schliessen und schnell zwischen bekannten Repositories wechseln.

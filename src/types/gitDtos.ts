@@ -78,6 +78,8 @@ export interface RepositoryChangeSummaryDto {
   repoPath: string;
   changeCount: number;
   checkedAt: number;
+  /** Hash of the porcelain status, independent of the check time. Older previews may omit it. */
+  statusFingerprint?: string;
 }
 
 export interface WorkingTreeStatsDto {

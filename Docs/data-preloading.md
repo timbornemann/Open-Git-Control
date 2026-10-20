@@ -67,6 +67,37 @@ Platzhalter im Seitenaufbau.
   privaten Vorschauen. Der bestehende GitHub-Katalog bleibt lesbar; unvollständige
   Kataloge werden im Hintergrund erneuert.
 
+## Bedarfsgerechte Aktivitätsprüfungen
+
+Der Aktivitätskoordinator prüft inaktive Repositories seriell über die gemeinsame
+Hintergrundqueue. Das aktive Repository bleibt beim vorhandenen Arbeitsbaum-Leser.
+Nach der ersten erfolgreichen Prüfung folgt die nächste nach 15 Sekunden. Weitere
+unveränderte Erfolgsstände verlängern den Abstand auf 30, 60, 120, 240 und höchstens
+300 Sekunden. Eine Änderung setzt ihn auf 15 Sekunden zurück.
+
+Sichtbare Zeilen in **Lokale Repositories** und sichtbare Symbole der
+Aktivitätsleiste behalten den 15-Sekunden-Takt. Maßgeblich ist der tatsächliche
+Bildausschnitt einschließlich der Scrollgrenzen. Ebenso bevorzugt werden die drei
+zuletzt verwendeten inaktiven Repositories nach `lastOpened`, zusätzlich zum aktiven
+Repository. Unter fälligen Prüfungen werden sie bevorzugt; nach höchstens drei
+bevorzugten Durchläufen erhält ein wartendes übriges Repository einen Platz.
+Sichtbarkeitshinweise beider Oberflächen werden vereinigt und beim Ausblenden oder
+Entfernen wieder freigegeben. Ohne `IntersectionObserver` gelten die gerenderten
+Einträge als sichtbar.
+
+Eine SHA-256-Signatur der bereits gelesenen Porcelain-Ausgabe erkennt unterschiedliche
+Dateien oder Statuscodes auch bei gleicher Dateianzahl. Der Prüfzeitpunkt beeinflusst
+den Vergleich nicht. Alte Vorschauen ohne Signatur bleiben lesbar und werden frisch
+geprüft; Wiederherstellung und manuelle Statusveröffentlichungen erhöhen die
+Stabilitätsstufe nicht. Die Stufen bleiben nur im Sitzungsspeicher.
+
+Fehler behalten den letzten gültigen Anzeigestand und eine Wiederholungsfrist von
+60 Sekunden, auch nach einem Sichtbarkeitswechsel. Cache-Invalidierungen und neue
+Statusveröffentlichungen setzen die Stabilitätsbewertung zurück. Verborgene Fenster
+pausieren die Prüfungen. Repository-Wechsel, Entfernen und Aufräumen der Komponenten
+brechen nicht mehr benötigte Abrufe ab. Es entstehen keine zusätzlichen Git-Abfragen,
+Server-Fetches oder neuen Einstellungen.
+
 ## Einen weiteren Datenadapter ergänzen
 
 1. Leseoperation und Aktualität in `clientPolicies.ts` eintragen; bei Bedarf den

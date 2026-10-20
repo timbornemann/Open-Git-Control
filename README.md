@@ -176,6 +176,7 @@ Read test and build output as a structured transcript, inspect Problems and open
 - Initialize folders that are not yet Git repositories with `git init`, optionally including a starter README and license.
 - Keep a persistent repository workspace with recent repositories, favorites, active repository, and sorting.
 - Restore stored repositories without an empty-state flash: the active repository is prepared first while the remaining entries are validated in the background.
+- Check inactive repositories less often when their status stays unchanged, from 15 seconds up to five minutes. Visible repository entries and the three most recently used inactive repositories retain a 15-second interval. Checks pause while the app window is hidden and use local Git status without fetching from servers.
 - Search and sort local repositories by last opened date, name, creation date, ascending, or descending order.
 - Recognize repositories by locally discovered icons and logos in the sidebar and repository list. Right-click a repository and choose **Repository logo** to select another image, use initials, or search again. Small thumbnails and preferences are cached locally across restarts; original images and repository configuration stay unchanged.
 - Pin repositories, close repositories, and switch between known repositories quickly.

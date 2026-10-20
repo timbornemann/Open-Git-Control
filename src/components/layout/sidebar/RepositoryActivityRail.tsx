@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useGitStore, useUIStore } from '@/contexts/AppStateContext';
 import { useRepositoryActivity } from '@/hooks/useRepositoryActivity';
+import { useRepositoryActivityVisibility } from '@/hooks/useRepositoryActivityVisibility';
 import { useAppToast } from '@/hooks/useAppToast';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { useI18n } from '@/i18n';
@@ -11,10 +12,12 @@ export function RepositoryActivityRail() {
   const repositories = useGitStore((state) => state.openRepos);
   const activeRepo = useGitStore((state) => state.activeRepo);
   const restoring = useGitStore((state) => state.isRestoringRepos);
+  const metadata = useGitStore((state) => state.repoMeta);
   const switchRepo = useGitStore((state) => state.onSwitchRepo);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
   const closeRunConfig = useUIStore((state) => state.onCloseRunConfig);
-  const entries = useRepositoryActivity(repositories, activeRepo, restoring);
+  const entries = useRepositoryActivity(repositories, activeRepo, restoring, metadata);
+  const visibilityRef = useRepositoryActivityVisibility<HTMLDivElement>(entries.map((entry) => entry.path));
   const { tr, locale } = useI18n();
   const toast = useAppToast();
   const switching = useRef(false);
@@ -41,7 +44,7 @@ export function RepositoryActivityRail() {
   if (!entries.length) return null;
   return (
     <div className="repository-activity-group" role="group" aria-label={tr('Repositories mit Änderungen', 'Repositories with changes')}>
-      <div className="repository-activity-rail">
+      <div className="repository-activity-rail" ref={visibilityRef}>
         {entries.map((entry) => {
           const active = normalizeRepoPathKey(entry.path) === normalizeRepoPathKey(activeRepo || '');
           const countLabel =
@@ -53,6 +56,7 @@ export function RepositoryActivityRail() {
             <button
               type="button"
               key={normalizeRepoPathKey(entry.path)}
+              data-repository-activity-path={entry.path}
               className={`icon-btn repository-activity-button${active ? ' active' : ''}`}
               title={title}
               aria-label={`${entry.name}: ${countLabel}${active ? tr(', aktives Repository', ', active repository') : ''}`}

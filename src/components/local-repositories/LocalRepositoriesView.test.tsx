@@ -9,6 +9,7 @@ import { useAppToast } from '@/hooks/useAppToast';
 import type { RepositoryContextValue, UIContextValue } from '@/contexts/AppStateContext';
 import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';
+import { repositoryActivityDemand } from '@/data/repositoryActivityDemand';
 import { LocalRepositoriesView } from './LocalRepositoriesView';
 
 vi.mock('@/contexts/AppStateContext', () => ({ useRepositoryContext: vi.fn(), useUIContext: vi.fn() }));
@@ -91,12 +92,16 @@ describe('LocalRepositoriesView', () => {
     repository.isRestoringRepos = true;
     await render();
     expect(host.querySelectorAll('.local-repositories-view__row')).toHaveLength(2);
+    expect(repositoryActivityDemand.has(first)).toBe(true);
+    expect(repositoryActivityDemand.has(second)).toBe(true);
     expect(host.textContent).toContain('C:/Code/alpha');
     expect(repository.onSwitchRepo).not.toHaveBeenCalled();
     expect(setActiveTab).not.toHaveBeenCalled();
 
     repository.openRepos = [];
     await render();
+    expect(repositoryActivityDemand.has(first)).toBe(false);
+    expect(repositoryActivityDemand.has(second)).toBe(false);
     expect(host.querySelector('.local-repositories-view__placeholder')).toBeTruthy();
     expect(host.textContent).not.toContain('Noch keine Repositories');
   });
@@ -180,10 +185,14 @@ describe('LocalRepositoriesView', () => {
     });
     expect(host.querySelectorAll('.local-repositories-view__row')).toHaveLength(1);
     expect(host.textContent).toContain('Beta');
+    expect(repositoryActivityDemand.has(first)).toBe(false);
+    expect(repositoryActivityDemand.has(second)).toBe(true);
 
     const pinnedFilter = host.querySelector<HTMLButtonElement>('.local-repositories-view__toolbar > button')!;
     await click(pinnedFilter);
     expect(host.querySelectorAll('.local-repositories-view__row')).toHaveLength(0);
+    expect(repositoryActivityDemand.has(first)).toBe(false);
+    expect(repositoryActivityDemand.has(second)).toBe(false);
     await click(pinnedFilter);
     await click(host.querySelector('.local-repositories-view__row-action'));
     expect(repository.onToggleRepoPin).toHaveBeenCalledWith(second);
