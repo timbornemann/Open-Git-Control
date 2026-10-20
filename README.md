@@ -200,6 +200,7 @@ Read test and build output as a structured transcript, inspect Problems and open
 - List local and remote branches with search/filtering.
 - Create branches, check out local branches, rename branches, and delete branches.
 - Force-delete unmerged branches only after an explicit confirmation.
+- Open **Branch actions (⋯) → Clean up branches …** beside the branch add button to review merged and orphaned local/server branches. Worktrees, protected branches and open pull/merge requests are respected; unmerged work requires additional confirmation. See [Branch cleanup assistant](Docs/BRANCH_CLEANUP.md).
 - Create branches from the graph and from selected commits.
 - Merge branches from the topbar or context menu with:
   - default merge

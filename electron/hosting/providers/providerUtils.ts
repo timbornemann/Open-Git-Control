@@ -12,6 +12,7 @@ import type {
 import type { CredentialGetter, HostingAdapter } from '../HostingAdapter';
 import { HostingHttpError, HostingHttpTransport } from './HostingHttpTransport';
 import { listCreationTargets, verifyCreationTarget, updateDefaultBranch } from './creationTargets';
+import { readHostingBranchCleanupMetadata } from '../BranchCleanupMetadata';
 
 export type Input<K extends keyof HostingOperations> = HostingOperations[K]['input'];
 export type Output<K extends keyof HostingOperations> = HostingOperations[K]['output'];
@@ -142,6 +143,11 @@ export abstract class BaseHostingAdapter implements HostingAdapter {
   readonly http: HostingHttpTransport;
   protected readonly connection: HostingConnection;
   protected readonly credentials: CredentialGetter;
+
+  async branchCleanupMetadata(repository: HostedRepositoryRef, signal?: AbortSignal) {
+    this.assertRepository(repository);
+    return readHostingBranchCleanupMetadata(this.connection, this.http, this.credentials, repository, signal);
+  }
 
   constructor(connection: HostingConnection, credentials: CredentialGetter, transport?: HostingHttpTransport) {
     this.connection = connection;

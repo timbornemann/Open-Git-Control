@@ -1,4 +1,5 @@
 import type { HostingOperations } from '../../src/shared/ipc/contracts/hosting';
+import type { BranchCleanupHostingMetadata } from '../../src/shared/ipc/branchCleanup';
 import type { HostedRepository, HostedRepositoryRef, HostingCapabilities, HostingConnection, HostingReleaseAsset } from '../../src/types/hostingDtos';
 
 export interface ProviderCredential {
@@ -11,6 +12,7 @@ export type CredentialGetter = () => Promise<ProviderCredential>;
 type Input<K extends keyof HostingOperations> = HostingOperations[K]['input'];
 type Output<K extends keyof HostingOperations> = HostingOperations[K]['output'];
 export interface HostingAdapter {
+  branchCleanupMetadata(repository: HostedRepositoryRef, signal?: AbortSignal): Promise<BranchCleanupHostingMetadata>;
   authenticate(): Promise<{ id: string; username: string; serverVersion?: string }>;
   capabilities(repository?: HostedRepositoryRef, targetBranch?: string): Promise<HostingCapabilities>;
   resolveRepository(url: string): Promise<HostedRepository | null>;

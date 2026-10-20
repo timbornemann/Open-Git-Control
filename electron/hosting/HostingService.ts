@@ -421,6 +421,14 @@ export class HostingService {
     return result as HostingOperations[K]['output'];
   }
 
+  async branchCleanupMetadata(repository: HostedRepositoryRef, signal?: AbortSignal) {
+    signal?.throwIfAborted();
+    this.validateRepository(repository);
+    const adapter = await this.authenticatedAdapter(repository.connectionId);
+    signal?.throwIfAborted();
+    return adapter.branchCleanupMetadata(repository, signal);
+  }
+
   private async execute(operation: HostingOperation, input: unknown): Promise<unknown> {
     const params = (input || {}) as Record<string, unknown>;
     const id = String(params.connectionId || (params.repository as HostedRepositoryRef | undefined)?.connectionId || '');

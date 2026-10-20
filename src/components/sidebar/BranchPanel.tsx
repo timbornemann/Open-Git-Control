@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { GitBranch, Plus, Search } from 'lucide-react';
+import { GitBranch, Plus, Search, Brush } from 'lucide-react';
 import type { BranchInfo } from '@/types/git';
 import { useI18n } from '@/i18n';
 import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardToolbar } from './RepoCard';
+import { SidebarActionsMenu } from './SidebarActionsMenu';
 
 type ContextMenuState = { x: number; y: number; branch: string; isHead: boolean } | null;
 
@@ -15,6 +16,7 @@ type Props = {
   onSetBranchContextMenu: (value: ContextMenuState) => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  onCleanup?: () => void;
 };
 
 export const BranchPanel: React.FC<Props> = ({
@@ -26,8 +28,9 @@ export const BranchPanel: React.FC<Props> = ({
   onSetBranchContextMenu,
   collapsed,
   onToggleCollapsed,
+  onCleanup,
 }) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   const [query, setQuery] = useState('');
   const [newBranchName, setNewBranchName] = useState('');
   const newBranchInputRef = useRef<HTMLInputElement | null>(null);
@@ -86,15 +89,29 @@ export const BranchPanel: React.FC<Props> = ({
             : t('generated.components.sidebar.branchpanel.collapse_branches_b4d0333a')
         }
         actions={
-          <button
-            className="icon-btn sidebar-row-action-icon"
-            onClick={() => {
-              onSetCreatingBranch(true);
-            }}
-            title={t('generated.components.sidebar.branchpanel.create_new_branch_7f015dbf')}
-          >
-            <Plus size={13} />
-          </button>
+          <>
+            <SidebarActionsMenu
+              actions={[
+                {
+                  id: 'cleanup',
+                  label: tr('Branches aufräumen …', 'Clean up branches …'),
+                  icon: <Brush size={14} />,
+                  disabled: !onCleanup,
+                  run: () => onCleanup?.(),
+                },
+              ]}
+            />
+            <button
+              type="button"
+              className="icon-btn sidebar-row-action-icon"
+              onClick={() => {
+                onSetCreatingBranch(true);
+              }}
+              title={t('generated.components.sidebar.branchpanel.create_new_branch_7f015dbf')}
+            >
+              <Plus size={13} />
+            </button>
+          </>
         }
       />
 

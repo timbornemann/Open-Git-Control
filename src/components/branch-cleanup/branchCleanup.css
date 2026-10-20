@@ -1,0 +1,281 @@
+.dialog-modal:has(.branch-cleanup-dialog) {
+  width: min(920px, 100%);
+}
+.dialog-modal:has(.branch-cleanup-dialog) .dialog-footer {
+  flex-wrap: wrap;
+}
+.branch-cleanup-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-size: 0.82rem;
+  min-width: 0;
+}
+.branch-cleanup-dialog p {
+  margin: 0;
+  line-height: 1.5;
+}
+.branch-cleanup-repository {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  font-family: monospace;
+}
+.branch-cleanup-progress,
+.branch-cleanup-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.branch-cleanup-progress {
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--bg-dark);
+}
+.branch-cleanup-progress svg {
+  flex-shrink: 0;
+}
+.branch-cleanup-spin {
+  animation: branch-cleanup-spin 1s linear infinite;
+}
+@keyframes branch-cleanup-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .branch-cleanup-spin {
+    animation: none;
+  }
+}
+.branch-cleanup-targets {
+  display: grid;
+  gap: 10px;
+}
+.branch-cleanup-targets label,
+.branch-cleanup-protection label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.branch-cleanup-targets label > span {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+.branch-cleanup-targets select,
+.branch-cleanup-protection textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 7px 9px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  font: inherit;
+}
+.branch-cleanup-protection textarea {
+  resize: vertical;
+  font-family: monospace;
+}
+.branch-cleanup-targets select:focus-visible,
+.branch-cleanup-protection textarea:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+.branch-cleanup-group {
+  border-top: 1px solid var(--border-color);
+  padding-top: 12px;
+}
+.branch-cleanup-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.branch-cleanup-group-header h3 {
+  font-size: 0.85rem;
+  margin: 0;
+}
+.branch-cleanup-candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.branch-cleanup-candidate {
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  padding: 10px;
+  background: var(--bg-dark);
+}
+.branch-cleanup-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  cursor: pointer;
+  flex-wrap: wrap;
+}
+.branch-cleanup-choice input {
+  margin: 3px 0 0;
+  accent-color: var(--accent-primary);
+}
+.branch-cleanup-choice input:focus-visible,
+.branch-cleanup-force-confirm input:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+.branch-cleanup-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 100px;
+  overflow-wrap: anywhere;
+  flex-wrap: wrap;
+}
+.branch-cleanup-name svg {
+  flex-shrink: 0;
+}
+.branch-cleanup-name code {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+.branch-cleanup-badge {
+  padding: 2px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+}
+.branch-cleanup-badge.merged {
+  color: var(--accent-success, #65c58c);
+}
+.branch-cleanup-badge.orphaned {
+  color: var(--accent-warning, #efbb61);
+}
+.branch-cleanup-details {
+  margin: 8px 0 0 23px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.branch-cleanup-details ul {
+  margin: 5px 0 0;
+  padding-left: 17px;
+}
+.branch-cleanup-worktrees {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.branch-cleanup-candidate.is-blocked {
+  background: transparent;
+}
+.branch-cleanup-candidate.is-blocked .branch-cleanup-choice {
+  cursor: default;
+}
+.branch-cleanup-warnings,
+.branch-cleanup-error,
+.branch-cleanup-force-warning {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid var(--accent-warning, #efbb61);
+}
+.branch-cleanup-error {
+  border-color: var(--accent-danger, #df6a6a);
+  color: var(--accent-danger, #df6a6a);
+  overflow-wrap: anywhere;
+}
+.branch-cleanup-warnings summary,
+.branch-cleanup-kept > summary,
+.branch-cleanup-protection summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 3px 0;
+}
+.branch-cleanup-dialog summary svg {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 5px;
+}
+.branch-cleanup-warnings p,
+.branch-cleanup-protection p {
+  color: var(--text-secondary);
+  margin: 8px 0;
+}
+.branch-cleanup-warnings ul {
+  overflow-wrap: anywhere;
+  padding-left: 18px;
+}
+.branch-cleanup-kept .branch-cleanup-candidates {
+  margin-top: 8px;
+}
+.branch-cleanup-protection {
+  border-top: 1px solid var(--border-color);
+  padding-top: 8px;
+}
+.branch-cleanup-protection label {
+  margin-top: 8px;
+}
+.branch-cleanup-force-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.branch-cleanup-force-warning svg {
+  flex-shrink: 0;
+  color: var(--accent-warning, #efbb61);
+}
+.branch-cleanup-force-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.5;
+}
+.branch-cleanup-force-confirm input {
+  margin-top: 3px;
+  accent-color: var(--accent-danger, #df6a6a);
+}
+.branch-cleanup-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.branch-cleanup-results li {
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+.branch-cleanup-results small {
+  display: block;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  margin-top: 5px;
+}
+.branch-cleanup-outcome {
+  display: block;
+  margin-top: 5px;
+  font-weight: 600;
+}
+.branch-cleanup-outcome.deleted {
+  color: var(--accent-success, #65c58c);
+}
+.branch-cleanup-outcome.failed,
+.branch-cleanup-outcome.unknown {
+  color: var(--accent-warning, #efbb61);
+}
+@media (max-width: 600px) {
+  .branch-cleanup-dialog {
+    font-size: 0.77rem;
+  }
+  .branch-cleanup-details {
+    margin-left: 0;
+  }
+}

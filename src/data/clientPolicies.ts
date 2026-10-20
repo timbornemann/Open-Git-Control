@@ -80,6 +80,7 @@ export function isReadCommand(command: unknown, args: unknown[]): boolean {
 }
 
 export function isMutation(domain: ResourceDomain, name: string) {
+  if (domain === 'git' && name === 'executeBranchCleanup') return true;
   if (domain === 'planner') return /^(ensure|create|update|delete|materialize)/.test(name);
   if (domain === 'github') return /^(create|fork|merge|rerun|cancelWorkflow|uploadReleaseAsset)/.test(name);
   if (domain === 'runs') return ['saveConfig', 'start', 'stop'].includes(name);

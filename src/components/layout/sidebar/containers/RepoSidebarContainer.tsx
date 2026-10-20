@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { FolderOpen, UploadCloud } from 'lucide-react';
 import { IconButton } from '@/components/ui/IconButton';
 import { useRepositoryContext, useUIContext } from '@/contexts/AppStateContext';
@@ -10,11 +10,14 @@ import { HostingSidebar } from '@/components/hosting/HostingSidebar';
 import { gitClient } from '@/services/gitClient';
 import { useI18n } from '@/i18n';
 import { requestRemoteTransfer } from '@/components/hosting/remoteTransferDialogState';
+import { BranchCleanupDialog } from '@/components/branch-cleanup/BranchCleanupDialog';
 
 export const RepoSidebarContainer: React.FC = React.memo(() => {
   const ui = useUIContext();
   const repository = useRepositoryContext();
   const { tr } = useI18n();
+  const [cleanupRepo, setCleanupRepo] = useState<string | null>(null);
+  useEffect(() => setCleanupRepo(null), [repository.activeRepo]);
   if (!repository.activeRepo) return <button onClick={() => ui.setActiveTab('localRepos')}>{tr('Lokales Repository öffnen', 'Open local repository')}</button>;
   return (
     <div className="repo-cockpit">
@@ -52,6 +55,7 @@ export const RepoSidebarContainer: React.FC = React.memo(() => {
         onSetBranchContextMenu={repository.onSetBranchContextMenu}
         collapsed={ui.isBranchPanelCollapsed}
         onToggleCollapsed={ui.onToggleBranchPanelCollapsed}
+        onCleanup={() => setCleanupRepo(repository.activeRepo)}
       />
       <TagPanel
         tags={repository.tags}
@@ -71,6 +75,17 @@ export const RepoSidebarContainer: React.FC = React.memo(() => {
         collapsed={ui.isSubmodulePanelCollapsed}
         onToggleCollapsed={ui.onToggleSubmodulePanelCollapsed}
       />
+      {cleanupRepo === repository.activeRepo && (
+        <BranchCleanupDialog
+          key={repository.activeRepo}
+          repoPath={repository.activeRepo}
+          onClose={() => setCleanupRepo(null)}
+          onChanged={() => {
+            repository.triggerRefresh();
+            repository.triggerCommitRefresh();
+          }}
+        />
+      )}
     </div>
   );
 });

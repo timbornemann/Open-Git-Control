@@ -67,17 +67,6 @@
       "updatedAt": 1792355261758
     },
     {
-      "id": "1bc62dac-578f-4c25-9e51-20aec74635c1",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Notes to Users",
-      "description": "Notes to Users: einen Order im Repositorien einrichten in dem Notizen oder Informationen für Nutzer hinterlegt werden können, das Programm checkt regelmäßig ähnlich wie Updates ob Informationen in form von Markdown Dateien daliegen im .Open-Git-Control Order soll ein unter Order sein, hier können markdown Dateien angelegt werden, der Inhalt wird den Nutzern ähnlich wie ein update angezeigt als popup welches den markdown code ordentlich rendert. das programm soll auch die notizen als kleines icon mit einem \"i\" anzeigen ähnlich wei updates in der seiten menü lsiste, es verschwindet wenn der nutzer es bestätigt, dann wird es nur noch über die einstellungen noch lesbar sein. auch soll es wei bei den updatws möglich sein, dass man die überprüfung und suche abstellt, wenn amn die app also ganz offline nutzen will ohne das sie checkt und aufrufe zu github macht. wenn mehrere dateien in dem github order sind, dann sollen diese als seiten angelegt werde die man im popup durhcblättern kann. es sollen auch bilder oder sonsige inhalte in dem markdown gerendert werdne, Open-git-control lädt sich also die inhalte runter wenn sie auf git hub verschwinden soll das system sie automatisch bereinigen, damit sich lokal nicht die ganzen dateien aufsammeln",
-      "priority": "medium",
-      "status": "idea",
-      "tags": [],
-      "createdAt": 1792500961225,
-      "updatedAt": 1792502721128
-    },
-    {
       "id": "447fc595-f9dc-46f0-a397-016bb24924f7",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Aufgaben erst beim tatsächlichen Abschluss erledigen",
@@ -237,10 +226,10 @@
       "title": "Branch-Aufräumassistent",
       "description": "Zusammengeführte und verwaiste Branches mit nachvollziehbarer Begründung vorschlagen. Geschützte Branches, laufende Arbeit und Worktree-Zuordnungen berücksichtigen. Die Auswahl vor dem Löschen gemeinsam prüfen lassen.",
       "priority": "medium",
-      "status": "planned",
+      "status": "in-progress",
       "tags": [],
       "createdAt": 1792502175127,
-      "updatedAt": 1792502175127
+      "updatedAt": 1792508043531
     },
     {
       "id": "7595b0a6-9610-4335-b639-93e33ce062a0",

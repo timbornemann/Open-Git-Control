@@ -236,6 +236,10 @@ if (process.env.OGC_STARTUP_TEST_LIFECYCLE === '1') {
           assert.ok(saved.success && saved.data.markdown.includes('available **offline**'), 'Acknowledged notice content remains readable locally.');
           console.log('Acknowledged notices stayed hidden and remained readable after restart.');
         }
+        if (process.env.OGC_STARTUP_TEST_REPOSITORY === '1') {
+          const { verifyBranchCleanup } = require('./branch-cleanup-electron-smoke');
+          await verifyBranchCleanup(window, profile, applicationPath, captureReadyPage);
+        }
         const clicked = await window.webContents.executeJavaScript(`(() => {
           const settings = document.querySelector('.activity-bar button[title="Settings"]');
           if (!settings) return false;

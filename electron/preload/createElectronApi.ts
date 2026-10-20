@@ -1,6 +1,7 @@
 import { createRepositorySecretScanAllowlistApi } from './createRepositorySecretScanAllowlistApi';
 import { createWorkingTreeWatchApi } from './createWorkingTreeWatchApi';
 import { createRepositoryAnalyticsApi } from './createRepositoryAnalyticsApi';
+import { createBranchCleanupApi } from './createBranchCleanupApi';
 import { createRepositoryLocationApi } from './createRepositoryLocationApi';
 import { createSystemToolsApi } from './createSystemToolsApi';
 import { createStorageApi } from './createStorageApi';
@@ -86,6 +87,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
   };
 
   const flatApi = {
+    ...createBranchCleanupApi(ipcRenderer),
     ...createSystemToolsApi(ipcRenderer),
     ...createRepositorySecretScanAllowlistApi(ipcRenderer),
     ...createRepositoryIconApi(ipcRenderer),
@@ -359,6 +361,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     hosting: { hostingRequest: flatApi.hostingRequest },
     transfers: { remoteTransferRequest: flatApi.remoteTransferRequest },
     git: {
+      ...createBranchCleanupApi(ipcRenderer),
       ...createRepositoryAnalyticsApi(ipcRenderer),
       getGitIdentity: flatApi.getGitIdentity,
       saveGitIdentity: flatApi.saveGitIdentity,

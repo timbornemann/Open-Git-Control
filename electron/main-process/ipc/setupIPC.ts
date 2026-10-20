@@ -28,6 +28,8 @@ import { registerFeedbackHandlers } from './registerFeedbackHandlers';
 import { registerHostingHandlers } from '../../hosting/registerHostingHandlers';
 import { hostingService } from '../../hosting/HostingService';
 import { registerRemoteTransferHandlers } from './registerRemoteTransferHandlers';
+import { registerBranchCleanupHandlers } from './git/registerBranchCleanupHandlers';
+import type { CredentialEnvironmentFactory } from '../../git/remoteTransferModels';
 import { registerRepositoryIconHandlers } from './registerRepositoryIconHandlers';
 import { registerRepositorySecretScanAllowlistHandlers } from './registerRepositorySecretScanAllowlistHandlers';
 import { registerGitIdentityHandlers } from './registerGitIdentityHandlers';
@@ -113,23 +115,25 @@ export function setupIPC({
     repoJobRegistry,
   });
   registerHostingHandlers({ gitService, pushGuard });
-  registerRemoteTransferHandlers({
+  const createCredentialEnvironment: CredentialEnvironmentFactory = (request) => {
+    if (!request.connectionId) return Promise.resolve({ envOverrides: request.envOverrides || {}, signal: request.signal, dispose: () => {} });
+    if (!request.urls.some((url) => url.startsWith('https://'))) {
+      const connectionSignal = hostingService.getConnectionSignal(request.connectionId);
+      return Promise.resolve({
+        envOverrides: request.envOverrides || {},
+        signal: request.signal ? AbortSignal.any([request.signal, connectionSignal]) : connectionSignal,
+        dispose: () => {},
+      });
+    }
+    return hostingService.createGitCredentialEnvironment({ ...request, connectionId: request.connectionId });
+  };
+  const transfers = registerRemoteTransferHandlers({
     gitService,
     pushGuard,
     getCredentialGeneration: (id) => hostingService.generation(id),
-    createCredentialEnvironment: (request) => {
-      if (!request.connectionId) return Promise.resolve({ envOverrides: request.envOverrides || {}, signal: request.signal, dispose: () => {} });
-      if (!request.urls.some((url) => url.startsWith('https://'))) {
-        const connectionSignal = hostingService.getConnectionSignal(request.connectionId);
-        return Promise.resolve({
-          envOverrides: request.envOverrides || {},
-          signal: request.signal ? AbortSignal.any([request.signal, connectionSignal]) : connectionSignal,
-          dispose: () => {},
-        });
-      }
-      return hostingService.createGitCredentialEnvironment({ ...request, connectionId: request.connectionId });
-    },
+    createCredentialEnvironment,
   });
+  registerBranchCleanupHandlers({ gitService, transfers, hosting: hostingService, credentials: createCredentialEnvironment });
   registerDiagnosticsHandlers({ buildDiagnosticsReport });
   registerFeedbackHandlers({
     githubService,
