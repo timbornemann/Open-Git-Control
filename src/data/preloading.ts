@@ -10,6 +10,7 @@ import type { PreviewSnapshot } from '@/shared/cache/resource';
 import type { IpcResult } from '@/types/ipc';
 import type { CommitLogPageDto } from '@/types/gitDtos';
 import { historyRevision } from './historyRevision';
+import { reconcileCommitRefs } from '@/components/commit-graph/reconcileCommitRefs';
 
 /** Disk previews can prepare a graph while the first live Git request is still
  * pending. This only computes layout and never selects or reads a repository. */
@@ -22,7 +23,7 @@ export async function prepareRestoredGraphs(snapshots: PreviewSnapshot[]) {
     const mode = (snapshot.key[4] as { scope?: string })?.scope === 'all';
     const key = getGraphCacheKey(snapshot.key[2], mode);
     const before = queryClient.getQueryState(['resource', 'git', snapshot.key[2], 'graph', mode ? 'all' : 'head'])?.dataUpdatedAt || 0;
-    const commits = applyCachedStats(parseGitLog(result.data.raw), result.data.stats || {});
+    const commits = reconcileCommitRefs(applyCachedStats(parseGitLog(result.data.raw), result.data.stats || {}), result.data.refs);
     const layout = await prepareGraphLayout(snapshot.key[2], commits);
     const after = queryClient.getQueryState(['resource', 'git', snapshot.key[2], 'graph', mode ? 'all' : 'head'])?.dataUpdatedAt || 0;
     if (revision === historyRevision(snapshot.key[2]) && after === before && queryClient.getQueryData(snapshot.key) === result)
@@ -39,7 +40,7 @@ export async function preloadRepositoryGraph(repoPath: string, showSecondaryHist
   const source = queryClient.getQueryData(sourceKey);
   const graphKey = getGraphCacheKey(repoPath, showSecondaryHistory);
   const previousGraph = queryClient.getQueryData(graphQueryKey(graphKey));
-  const commits = applyCachedStats(parseGitLog(result.data.raw), result.data.stats || {});
+  const commits = reconcileCommitRefs(applyCachedStats(parseGitLog(result.data.raw), result.data.stats || {}), result.data.refs);
   const layout = await prepareGraphLayout(repoPath, commits);
   const current = queryClient.getQueryState(sourceKey);
   if (

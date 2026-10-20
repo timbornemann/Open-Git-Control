@@ -19,12 +19,12 @@ export const useGraphLayoutEngine = (setLayout: Dispatch<SetStateAction<GraphLay
     [],
   );
   return useCallback(
-    async (commits: GitCommit[]) => {
+    async (commits: GitCommit[], previous?: GraphLayout) => {
       if (currentScope.current !== scopeKey) return;
       const request = ++generation.current;
       const revision = historyRevision(repoPath);
       try {
-        const layout = await prepareGraphLayout(repoPath, commits);
+        const layout = await prepareGraphLayout(repoPath, commits, previous);
         if (generation.current !== request || historyRevision(repoPath) !== revision) return;
         setLayout((current) => {
           if (generation.current !== request || historyRevision(repoPath) !== revision) return current;

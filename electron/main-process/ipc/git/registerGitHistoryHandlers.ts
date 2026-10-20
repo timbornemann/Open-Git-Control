@@ -52,8 +52,9 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
         const readKind = !params.readRequest || params.readRequest.priority === 'visible' ? 'interactive' : 'background';
         request.signal.throwIfAborted();
 
+        let headHash: string;
         try {
-          await gitService.runCommandAtPathWithSignal(repoPath, ['rev-parse', '--verify', '--quiet', 'HEAD'], request.signal, readKind);
+          headHash = await gitService.runCommandAtPathWithSignal(repoPath, ['rev-parse', '--verify', '--quiet', 'HEAD'], request.signal, readKind);
         } catch (error: unknown) {
           request.signal.throwIfAborted();
           const message = error instanceof Error ? error.message : String(error);
@@ -80,7 +81,10 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
         const hashes = [...raw.matchAll(/(?:^|\x00)([0-9a-f]{7,64})\x1f/gi)].map((match) => match[1]);
         const hasMore = hashes.length > limit;
         const visibleHashes = hashes.slice(0, limit);
-        const stats = await commitStatsService.getCachedStats(visibleHashes, repoPath);
+        const [stats, refs] = await Promise.all([
+          commitStatsService.getCachedStats(visibleHashes, repoPath),
+          gitService.history.getGraphRefs(repoPath, request.signal, readKind, headHash),
+        ]);
         request.signal.throwIfAborted();
         return {
           success: true,
@@ -89,6 +93,7 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
             hasMore,
             stats,
             repoPath,
+            refs,
           },
         };
       } catch (error: unknown) {

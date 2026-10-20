@@ -7,6 +7,7 @@ import { isRepoUnavailableError, parseGitLog, type GitStatusDetailed } from '@/u
 import { gitClient } from '@/services/gitClient';
 import { useCommitGraphStats } from './useCommitGraphStats';
 import { mergeQuickRefreshCommits } from './mergeQuickRefreshCommits';
+import { reconcileCommitRefs } from './reconcileCommitRefs';
 import {
   applyCachedStats,
   getGraphCacheEntry,
@@ -184,23 +185,24 @@ export const useCommitGraphData = ({
           const hasMore = data.hasMore;
           const cacheKey = getGraphCacheKey(repoPath, showSecondaryHistory);
           if (isAppend) {
-            const merged = mergeUniqueCommits(layoutRef.current?.nodes.map((node) => node.commit) ?? [], visibleChunk);
+            const previous = layoutRef.current;
+            const merged = reconcileCommitRefs(mergeUniqueCommits(previous?.nodes.map((node) => node.commit) ?? [], visibleChunk), data.refs);
             const nextCount = merged.length;
             commitCountRef.current = nextCount;
             setCommitCount(nextCount);
             setHasMoreCommits(hasMore);
             storeGraphCache(cacheKey, merged, hasMore);
-            await updateLayout(merged);
+            await updateLayout(merged, previous ?? undefined);
           } else if (isQuick || isSync) {
             const existing = layoutRef.current?.nodes.map((node) => node.commit) ?? [];
-            const merged = mergeQuickRefreshCommits(existing, visibleChunk);
+            const merged = mergeQuickRefreshCommits(existing, visibleChunk, data.refs ? { refs: data.refs, scope } : undefined);
             commitCountRef.current = merged.length;
             setCommitCount(merged.length);
             setHasMoreCommits(hasMore || merged.length > visibleChunk.length);
             storeGraphCache(cacheKey, merged, hasMore || merged.length > visibleChunk.length);
-            await updateLayout(merged);
+            await updateLayout(merged, layoutRef.current ?? undefined);
           } else {
-            const normalized = mergeUniqueCommits([], visibleChunk);
+            const normalized = reconcileCommitRefs(mergeUniqueCommits([], visibleChunk), data.refs);
             commitCountRef.current = normalized.length;
             setCommitCount(normalized.length);
             setHasMoreCommits(hasMore);

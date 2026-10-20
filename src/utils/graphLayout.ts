@@ -1,4 +1,5 @@
 import type { GitCommit } from './gitParsing';
+import { routeGraphEdges } from './graphRouting';
 
 // Brand-aligned lane colors for branch graph readability
 export const LANE_COLORS = [
@@ -21,6 +22,9 @@ export interface GraphEdge {
   toLane: number;
   color: string;
   kind: 'primary' | 'merge' | 'truncated';
+  parentHash?: string;
+  /** Vertical track between turns; omitted when it is the source lane. */
+  viaLane?: number;
 }
 
 export interface GraphNode {
@@ -37,6 +41,21 @@ export interface GraphLayout {
   maxLane: number;
 }
 
+export type GraphLayoutSeed = { anchorHash: string; lanes: number[] };
+
+/** A seed is valid only for an unchanged prefix, never a rewrite or reorder. */
+export function graphLayoutSeed(commits: GitCommit[], previous?: GraphLayout): GraphLayoutSeed | undefined {
+  if (!previous?.nodes.length || previous.nodes.length > commits.length) return;
+  for (let row = 0; row < previous.nodes.length; row++) {
+    const old = previous.nodes[row].commit;
+    const next = commits[row];
+    if (old.hash !== next.hash || old.parentHashes.length !== next.parentHashes.length || old.parentHashes.some((hash, i) => hash !== next.parentHashes[i]))
+      return;
+  }
+  const anchor = previous.nodes.find((node) => node.lane === 0) ?? previous.nodes[0];
+  return { anchorHash: anchor.commit.hash, lanes: previous.nodes.map((node) => node.lane) };
+}
+
 const LANE_REUSE_COOLDOWN_ROWS = 40;
 const DEFAULT_TRUNK_REFS = ['main', 'master', 'origin/main', 'origin/master'];
 
@@ -50,7 +69,7 @@ function refMatchesTarget(ref: string, target: string): boolean {
   return headArrowMatch[1].trim() === target;
 }
 
-function* graphLayoutMetadata(commits: GitCommit[]) {
+function* graphLayoutMetadata(commits: GitCommit[], seed?: GraphLayoutSeed) {
   const visibleHashes = new Set<string>();
   const commitByHash = new Map<string, GitCommit>();
   const refCandidates = new Map<string, GitCommit>();
@@ -66,7 +85,7 @@ function* graphLayoutMetadata(commits: GitCommit[]) {
     if (row % 256 === 255) yield;
   }
   const anchorRef = DEFAULT_TRUNK_REFS.find((ref) => refCandidates.has(ref));
-  const trunkStartCommit = (anchorRef && refCandidates.get(anchorRef)) || headCommitCandidate || commits[0];
+  const trunkStartCommit = (seed && commitByHash.get(seed.anchorHash)) || (anchorRef && refCandidates.get(anchorRef)) || headCommitCandidate || commits[0];
   return { visibleHashes, commitByHash, trunkStartCommit };
 }
 
@@ -74,11 +93,11 @@ function* graphLayoutMetadata(commits: GitCommit[]) {
  * Assigns lanes (columns) to commits and computes edges.
  *
  * Goals for readability in complex merge graphs:
- * - Keep the active first-parent chain on lane 0.
+ * - Keep the chosen trunk's first-parent chain on lane 0.
  * - Keep first-parent continuity for side branches.
  * - Avoid immediate lane recycling so unrelated branches do not visually "stack".
  */
-function* graphLayoutSteps(commits: GitCommit[]): Generator<void, GraphLayout> {
+function* graphLayoutSteps(commits: GitCommit[], seed?: GraphLayoutSeed): Generator<void, GraphLayout> {
   if (commits.length === 0) {
     return { nodes: [], edges: [], maxLane: 0 };
   }
@@ -87,7 +106,7 @@ function* graphLayoutSteps(commits: GitCommit[]): Generator<void, GraphLayout> {
   const edges: GraphEdge[] = [];
   const activeLanes: (string | null)[] = [];
   const laneFreedAtRow: number[] = [];
-  const { visibleHashes, commitByHash, trunkStartCommit } = yield* graphLayoutMetadata(commits);
+  const { visibleHashes, commitByHash, trunkStartCommit } = yield* graphLayoutMetadata(commits, seed);
 
   const trunkHashes = new Set<string>();
   for (let current = trunkStartCommit; current && !trunkHashes.has(current.hash);) {
@@ -168,7 +187,7 @@ function* graphLayoutSteps(commits: GitCommit[]): Generator<void, GraphLayout> {
     const commit = commits[row];
     const commitOnTrunk = trunkHashes.has(commit.hash);
 
-    let myLane = commitOnTrunk ? 0 : activeLanes.indexOf(commit.hash);
+    let myLane = seed?.lanes[row] ?? (commitOnTrunk ? 0 : activeLanes.indexOf(commit.hash));
     if (myLane === -1) {
       myLane = findFreeLane(1, row);
     }
@@ -205,10 +224,8 @@ function* graphLayoutSteps(commits: GitCommit[]): Generator<void, GraphLayout> {
   }
 
   const nodeByHash = new Map<string, GraphNode>();
-  let maxLane = 0;
   for (const node of nodes) {
     nodeByHash.set(node.commit.hash, node);
-    maxLane = Math.max(maxLane, node.lane);
     if (node.row % 256 === 255) yield;
   }
   for (const node of nodes) {
@@ -225,33 +242,36 @@ function* graphLayoutSteps(commits: GitCommit[]): Generator<void, GraphLayout> {
           toLane: parentNode.lane,
           color: pi === 0 ? node.color : parentNode.color,
           kind: pi === 0 ? 'primary' : 'merge',
+          parentHash,
         });
       } else if (!visibleHashes.has(parentHash)) {
         edges.push({
           fromRow: node.row,
           fromLane: node.lane,
           toRow: commits.length,
-          toLane: node.lane,
-          color: node.color,
+          toLane: Math.max(0, activeLanes.indexOf(parentHash)),
+          color: LANE_COLORS[Math.max(0, activeLanes.indexOf(parentHash)) % LANE_COLORS.length],
           kind: 'truncated',
+          parentHash,
         });
       }
     }
   }
 
+  const maxLane = yield* routeGraphEdges(nodes, edges);
   return { nodes, edges, maxLane };
 }
 
-export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
-  const steps = graphLayoutSteps(commits);
+export function computeGraphLayout(commits: GitCommit[], seed?: GraphLayoutSeed): GraphLayout {
+  const steps = graphLayoutSteps(commits, seed);
   let step = steps.next();
   while (!step.done) step = steps.next();
   return step.value;
 }
 
 /** Worker fallback: let input and paint events run between slices of a large graph. */
-export async function computeGraphLayoutAsync(commits: GitCommit[], signal?: AbortSignal): Promise<GraphLayout> {
-  const steps = graphLayoutSteps(commits);
+export async function computeGraphLayoutAsync(commits: GitCommit[], signal?: AbortSignal, seed?: GraphLayoutSeed): Promise<GraphLayout> {
+  const steps = graphLayoutSteps(commits, seed);
   let sliceStarted = performance.now();
   for (;;) {
     signal?.throwIfAborted();

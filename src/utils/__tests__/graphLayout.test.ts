@@ -39,6 +39,7 @@ describe('computeGraphLayout', () => {
         toLane: 0,
         color: graph.nodes[0].color,
         kind: 'primary',
+        parentHash: 'bbbbbbb',
       },
       {
         fromRow: 1,
@@ -47,6 +48,7 @@ describe('computeGraphLayout', () => {
         toLane: 0,
         color: graph.nodes[1].color,
         kind: 'primary',
+        parentHash: 'ccccccc',
       },
     ]);
     expect(graph.maxLane).toBe(0);

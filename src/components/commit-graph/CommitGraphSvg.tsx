@@ -1,6 +1,7 @@
 import React from 'react';
 import type { GraphEdge, GraphNode } from '@/utils/graphLayout';
-import { GRAPH_PADDING, LANE_WIDTH, MERGE_NODE_RADIUS, NODE_RADIUS, ROW_HEIGHT, SECONDARY_GRAPH_ACCENT } from './commitGraphConstants';
+import { MERGE_NODE_RADIUS, NODE_RADIUS, ROW_HEIGHT, SECONDARY_GRAPH_ACCENT } from './commitGraphConstants';
+import { buildGraphEdgePath, laneX, workingTreeLane } from './commitGraphPaths';
 
 export const graphEdgeKey = (edge: GraphEdge) => `${edge.fromRow}:${edge.fromLane}->${edge.toRow}:${edge.toLane}:${edge.kind}`;
 
@@ -27,8 +28,6 @@ type CommitGraphSvgProps = {
   hasPassiveHeadFocus: boolean;
 };
 
-const laneX = (lane: number) => GRAPH_PADDING + lane * LANE_WIDTH + LANE_WIDTH / 2;
-
 export const CommitGraphSvg: React.FC<CommitGraphSvgProps> = ({
   maxLane,
   graphWidth,
@@ -51,25 +50,12 @@ export const CommitGraphSvg: React.FC<CommitGraphSvgProps> = ({
   selectedPathEdgeKeys,
   hasPassiveHeadFocus,
 }) => {
-  const buildEdgePath = (edge: GraphEdge): string => {
-    const x1 = laneX(edge.fromLane);
-    const y1 = (edge.fromRow + workingTreeRowOffset) * ROW_HEIGHT + ROW_HEIGHT / 2;
-    const x2 = laneX(edge.toLane);
-    const y2 = Math.min((edge.toRow + workingTreeRowOffset) * ROW_HEIGHT + ROW_HEIGHT / 2, totalHeight);
-
-    if (x1 === x2) {
-      return `M ${x1} ${y1} L ${x2} ${y2}`;
-    }
-
-    const verticalSpan = Math.max(8, y2 - y1);
-    const turnOffset = Math.min(ROW_HEIGHT * 0.8, Math.max(10, verticalSpan * 0.42));
-    const rawTurnY = y2 - turnOffset;
-    const turnY = Math.max(y1 + 8, Math.min(y2 - 8, rawTurnY));
-    const direction = x2 > x1 ? 1 : -1;
-    const controlInset = Math.min(14, Math.abs(x2 - x1) * 0.45);
-
-    return `M ${x1} ${y1} L ${x1} ${turnY} C ${x1 + direction * controlInset} ${turnY}, ${x2 - direction * controlInset} ${turnY}, ${x2} ${turnY} L ${x2} ${y2}`;
-  };
+  const buildEdgePath = (edge: GraphEdge) => buildGraphEdgePath(edge, workingTreeRowOffset, totalHeight);
+  const hasVisibleHead = headNode?.commit.refs.some((ref) => ref === 'HEAD' || ref.startsWith('HEAD ->'));
+  const workLane = workingTreeLane(headNode.row, headNode.lane);
+  const workingTreePath = hasVisibleHead
+    ? buildEdgePath({ fromRow: -1, fromLane: workLane, toRow: headNode.row, toLane: headNode.lane, color: headNode.color, kind: 'primary' })
+    : undefined;
 
   const isSecondaryCommit = (hash: string) => !reachableFromHead.has(hash);
   const isEdgeOnCurrentPath = (edge: GraphEdge) => currentPathEdgeKeys.has(graphEdgeKey(edge));
@@ -132,23 +118,9 @@ export const CommitGraphSvg: React.FC<CommitGraphSvgProps> = ({
       })}
       {hasWorkingTreeChanges && headNode && (
         <>
-          <path
-            d={`M ${laneX(headNode.lane)} ${ROW_HEIGHT / 2} L ${laneX(headNode.lane)} ${ROW_HEIGHT + ROW_HEIGHT / 2}`}
-            stroke={headNode.color}
-            strokeWidth={5}
-            strokeOpacity={0.1}
-            fill="none"
-            strokeLinecap="round"
-          />
-          <path
-            d={`M ${laneX(headNode.lane)} ${ROW_HEIGHT / 2} L ${laneX(headNode.lane)} ${ROW_HEIGHT + ROW_HEIGHT / 2}`}
-            stroke={headNode.color}
-            strokeWidth={2.2}
-            strokeOpacity={0.92}
-            fill="none"
-            strokeLinecap="round"
-          />
-          <circle cx={laneX(headNode.lane)} cy={ROW_HEIGHT / 2} r={NODE_RADIUS + 2} fill="var(--bg-darker)" stroke="var(--status-warning)" strokeWidth={2.2} />
+          <path d={workingTreePath} stroke={headNode.color} strokeWidth={5} strokeOpacity={0.1} fill="none" strokeLinecap="round" />
+          <path d={workingTreePath} stroke={headNode.color} strokeWidth={2.2} strokeOpacity={0.92} fill="none" strokeLinecap="round" />
+          <circle cx={laneX(workLane)} cy={ROW_HEIGHT / 2} r={NODE_RADIUS + 2} fill="var(--bg-darker)" stroke="var(--status-warning)" strokeWidth={2.2} />
         </>
       )}
       {visibleEdges.map((edge, i) => (
@@ -160,7 +132,7 @@ export const CommitGraphSvg: React.FC<CommitGraphSvgProps> = ({
           strokeOpacity={getEdgeOpacity(edge, 'glow')}
           fill="none"
           strokeLinecap="round"
-          strokeDasharray={edge.kind === 'merge' ? '4 4' : undefined}
+          strokeDasharray={edge.kind === 'truncated' ? '2 4' : edge.kind === 'merge' ? '4 4' : undefined}
         />
       ))}
       {visibleEdges.map((edge, i) => (
@@ -172,7 +144,7 @@ export const CommitGraphSvg: React.FC<CommitGraphSvgProps> = ({
           strokeOpacity={getEdgeOpacity(edge, 'core')}
           fill="none"
           strokeLinecap="round"
-          strokeDasharray={edge.kind === 'merge' ? '4 4' : undefined}
+          strokeDasharray={edge.kind === 'truncated' ? '2 4' : edge.kind === 'merge' ? '4 4' : undefined}
         />
       ))}
       {visibleNodes.map((node) => {

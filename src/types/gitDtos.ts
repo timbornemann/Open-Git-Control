@@ -53,6 +53,8 @@ export interface CommitLogPageDto {
   hasMore: boolean;
   stats: Record<string, CommitStatsDto>;
   repoPath: string;
+  /** Current decorations for all ref tips, including HEAD outside this page. */
+  refs?: Record<string, string[]>;
 }
 
 export interface CommitStatsUpdateDto {

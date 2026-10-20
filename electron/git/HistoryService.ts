@@ -1,4 +1,5 @@
 import { normalizeRepositoryRelativePath, toLiteralPathspec } from './RepositoryPathSafety';
+import { readGraphRefs } from './GraphRefSnapshot';
 
 const COMMIT_HASH_RE = /^[0-9a-f]{7,64}$/i;
 
@@ -104,6 +105,10 @@ export class HistoryService {
     }
 
     return this.execute(args, repoPath, signal, kind);
+  }
+
+  async getGraphRefs(repoPath: string, signal: AbortSignal, kind: HistoryReadKind = 'interactive', headHash?: string): Promise<Record<string, string[]>> {
+    return readGraphRefs((args) => this.execute(args, repoPath, signal, kind), headHash);
   }
 
   async getForensicHistoryByString(search: string, filePath: string, limit: number = 200): Promise<string> {

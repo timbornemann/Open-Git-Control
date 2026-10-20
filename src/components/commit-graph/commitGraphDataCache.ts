@@ -27,7 +27,20 @@ export const storeGraphCache = (key: string, commits: GitCommit[], hasMore: bool
     hasMore,
     touchedAt: Date.now(),
     layout:
-      layout || (old?.commits.length === commits.length && old.commits.every((commit, index) => commit.hash === commits[index].hash) ? old.layout : undefined),
+      layout ||
+      (old?.commits.length === commits.length &&
+      old.commits.every((commit, index) => {
+        const next = commits[index];
+        return (
+          commit.hash === next.hash &&
+          commit.parentHashes.length === next.parentHashes.length &&
+          commit.parentHashes.every((hash, i) => hash === next.parentHashes[i]) &&
+          commit.refs.length === next.refs.length &&
+          commit.refs.every((ref, i) => ref === next.refs[i])
+        );
+      })
+        ? old.layout
+        : undefined),
   }));
 };
 

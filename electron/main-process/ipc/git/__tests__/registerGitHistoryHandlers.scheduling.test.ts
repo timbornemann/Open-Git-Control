@@ -39,6 +39,7 @@ describe('commit history request scheduling', () => {
     scheduler = new GitScheduler();
     logs = [];
     service = new GitService(async (_file: string, args: string[], options: GitExecFileOptions) => {
+      if (args[0] === 'for-each-ref') return { stdout: `${hash}\x00commit\x00\x00\x00refs/heads/main\x00*`, stderr: '' };
       if (args[0] !== 'log') return { stdout: hash, stderr: '' };
       const signal = options.signal!;
       const finish = deferred<string>();

@@ -1,4 +1,4 @@
-import { computeGraphLayoutAsync, type GraphLayout } from '@/utils/graphLayout';
+import { computeGraphLayoutAsync, graphLayoutSeed, type GraphLayout, type GraphLayoutSeed } from '@/utils/graphLayout';
 import type { GitCommit } from '@/utils/gitParsing';
 import { queryClient } from './queryClient';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
@@ -12,6 +12,7 @@ type PendingLayout = {
   signal: AbortSignal;
   abort: () => void;
   worker: Worker | null;
+  seed?: GraphLayoutSeed;
 };
 const pending = new Map<number, PendingLayout>();
 function complete(id: number, result: { layout: GraphLayout } | { error: unknown }) {
@@ -29,15 +30,15 @@ function fallback(failedWorker: Worker) {
   for (const [id, entry] of pending) {
     if (entry.worker !== failedWorker) continue;
     entry.worker = null;
-    void computeGraphLayoutAsync(entry.commits, entry.signal).then(
+    void computeGraphLayoutAsync(entry.commits, entry.signal, entry.seed).then(
       (layout) => complete(id, { layout }),
       (error) => complete(id, { error }),
     );
   }
 }
-function calculate(commits: GitCommit[], signal: AbortSignal): Promise<GraphLayout> {
+function calculate(commits: GitCommit[], signal: AbortSignal, seed?: GraphLayoutSeed): Promise<GraphLayout> {
   signal.throwIfAborted();
-  if (typeof Worker === 'undefined') return computeGraphLayoutAsync(commits, signal);
+  if (typeof Worker === 'undefined') return computeGraphLayoutAsync(commits, signal, seed);
   if (!worker) {
     try {
       const created = new Worker(new URL('../workers/graphLayout.worker.ts', import.meta.url), { type: 'module' });
@@ -51,7 +52,7 @@ function calculate(commits: GitCommit[], signal: AbortSignal): Promise<GraphLayo
       };
       created.onmessageerror = () => fallback(created);
     } catch {
-      return computeGraphLayoutAsync(commits, signal);
+      return computeGraphLayoutAsync(commits, signal, seed);
     }
   }
   const currentWorker = worker;
@@ -64,21 +65,22 @@ function calculate(commits: GitCommit[], signal: AbortSignal): Promise<GraphLayo
         worker = null;
       }
     };
-    pending.set(id, { resolve, reject, commits, signal, abort, worker: currentWorker });
+    pending.set(id, { resolve, reject, commits, signal, abort, worker: currentWorker, seed });
     signal.addEventListener('abort', abort, { once: true });
     try {
-      currentWorker.postMessage({ generation: id, commits });
+      currentWorker.postMessage({ generation: id, commits, seed });
     } catch {
       fallback(currentWorker);
     }
   });
 }
 
-export function prepareGraphLayout(repoPath: string, commits: GitCommit[]) {
+export function prepareGraphLayout(repoPath: string, commits: GitCommit[], previous?: GraphLayout) {
+  const seed = graphLayoutSeed(commits, previous);
   const signature = commits.map((commit) => [commit.hash, commit.parentHashes, commit.refs, commit.stats, commit.statsState]);
   return queryClient.fetchQuery({
-    queryKey: ['resource', 'git', normalizeRepoPathKey(repoPath), 'layout', signature],
+    queryKey: ['resource', 'git', normalizeRepoPathKey(repoPath), 'layout', signature, seed ?? null],
     staleTime: Infinity,
-    queryFn: ({ signal }) => calculate(commits, signal),
+    queryFn: ({ signal }) => calculate(commits, signal, seed),
   });
 }

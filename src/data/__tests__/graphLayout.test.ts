@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CancelledError } from '@tanstack/react-query';
 import type { GitCommit } from '@/utils/gitParsing';
-import { computeGraphLayout, type GraphLayout } from '@/utils/graphLayout';
+import { computeGraphLayout, graphLayoutSeed, type GraphLayout, type GraphLayoutSeed } from '@/utils/graphLayout';
 import { prepareGraphLayout } from '../graphLayout';
 import { queryClient } from '../queryClient';
 
@@ -12,19 +12,19 @@ class LayoutWorker {
   onmessage: ((event: { data: { generation: number; layout: GraphLayout } }) => void) | null = null;
   onerror: ((event: { preventDefault: () => void }) => void) | null = null;
   onmessageerror: (() => void) | null = null;
-  messages: { generation: number; commits: GitCommit[] }[] = [];
+  messages: { generation: number; commits: GitCommit[]; seed?: GraphLayoutSeed }[] = [];
   terminate = vi.fn();
   constructor() {
     if (LayoutWorker.failCreation) throw new Error('Worker unavailable');
     LayoutWorker.instances.push(this);
   }
-  postMessage(message: { generation: number; commits: GitCommit[] }) {
+  postMessage(message: { generation: number; commits: GitCommit[]; seed?: GraphLayoutSeed }) {
     if (LayoutWorker.failMessage) throw new Error('Cannot clone message');
     this.messages.push(message);
   }
   finish(index: number) {
     const message = this.messages[index];
-    this.onmessage?.({ data: { generation: message.generation, layout: computeGraphLayout(message.commits) } });
+    this.onmessage?.({ data: { generation: message.generation, layout: computeGraphLayout(message.commits, message.seed) } });
   }
 }
 const commits = (hash: string): GitCommit[] => [
@@ -43,6 +43,22 @@ afterEach(() => {
 });
 
 describe('graph layout worker ownership', () => {
+  it.each(['worker', 'fallback'] as const)('preserves page positions through the %s and separates differently seeded cache entries', async (mode) => {
+    const rows = commits('a');
+    rows[0].parentHashes = ['c'];
+    rows[0].refs = ['origin/topic'];
+    const more = [...rows, { ...commits('b')[0], parentHashes: ['c'], refs: ['HEAD -> main'] }, commits('c')[0]];
+    const previous = computeGraphLayout(rows);
+    if (mode === 'fallback') LayoutWorker.failCreation = true;
+    const result = prepareGraphLayout('/pages', more, previous);
+    if (mode === 'worker') LayoutWorker.instances[0].finish(0);
+    expect(await result).toEqual(computeGraphLayout(more, graphLayoutSeed(more, previous)));
+    const fresh = prepareGraphLayout('/pages', more);
+    if (mode === 'worker') LayoutWorker.instances[0].finish(1);
+    expect(await fresh).toEqual(computeGraphLayout(more));
+    expect((await result).nodes[0].lane).toBe(previous.nodes[0].lane);
+    expect((await fresh).nodes[0].lane).not.toBe(previous.nodes[0].lane);
+  });
   it('matches concurrent out-of-order responses to their own graph', async () => {
     const first = prepareGraphLayout('/first', commits('a'));
     const second = prepareGraphLayout('/second', commits('b'));

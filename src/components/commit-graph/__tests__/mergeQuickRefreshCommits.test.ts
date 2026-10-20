@@ -40,4 +40,27 @@ describe('mergeQuickRefreshCommits', () => {
 
     expect(hashes(mergeQuickRefreshCommits(existing, refreshedHead))).toEqual(['x', 'y']);
   });
+
+  it('removes obsolete decorations and unreachable cached branches using the current refs', () => {
+    const existing = [commit('head'), commit('base'), commit('old-remote'), commit('root')];
+    existing[0].parentHashes = ['base'];
+    existing[1].parentHashes = ['root'];
+    existing[2].parentHashes = ['root'];
+    existing[2].refs = ['origin/topic'];
+    const snapshot = { refs: { head: ['HEAD -> main', 'origin/topic'] }, scope: 'all' as const };
+    const result = mergeQuickRefreshCommits(existing, existing.slice(0, 2), snapshot);
+    expect(hashes(result)).toEqual(['head', 'base', 'root']);
+    expect(result[0].refs).toEqual(['HEAD -> main', 'origin/topic']);
+    expect(existing[2].refs).toEqual(['origin/topic']);
+  });
+
+  it('retains a branch beyond the refreshed page when it is still referenced', () => {
+    const existing = [commit('head'), commit('base'), commit('remote'), commit('root')];
+    existing[0].parentHashes = ['base'];
+    existing[1].parentHashes = ['root'];
+    existing[2].parentHashes = ['root'];
+    const refs = { head: ['HEAD -> main'], remote: ['origin/older'] };
+    expect(hashes(mergeQuickRefreshCommits(existing, existing.slice(0, 2), { refs, scope: 'all' }))).toEqual(hashes(existing));
+    expect(hashes(mergeQuickRefreshCommits(existing, existing.slice(0, 2), { refs, scope: 'head' }))).toEqual(['head', 'base', 'root']);
+  });
 });
