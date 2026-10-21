@@ -19,6 +19,7 @@ import { QuickRepositoryTodoDialog } from './components/project-planner/QuickRep
 import { requestRemoteTransfer } from './components/hosting/remoteTransferDialogState';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { SystemToolsRuntime } from './components/system-tools/SystemToolsRuntime';
+import { PlannerWorkRuntime } from './components/project-planner/PlannerWorkRuntime';
 
 const App: React.FC = () => {
   const state = useAppState();
@@ -139,6 +140,7 @@ const App: React.FC = () => {
               setConfirmDialog={state.setConfirmDialog}
             >
               <QuickRepositoryTodoDialog requestId={quickTodoRequestId} activeRepo={state.activeRepo} />
+              <PlannerWorkRuntime activeRepo={state.activeRepo} refreshSignal={state.refreshTrigger} onChanged={state.triggerRefresh} />
               <div
                 className={`app-container${isSidebarCollapsed ? ' sidebar-collapsed' : ''}`}
                 style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}

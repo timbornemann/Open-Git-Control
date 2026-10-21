@@ -44,14 +44,14 @@ export async function deleteCleanupLocal(
   candidate: BranchCleanupCandidate,
   target: CleanupInternalTarget,
   context: CleanupContext,
-  validatePreferences: () => void,
+  validatePreferences: () => void | Promise<void>,
 ): Promise<void> {
   await runner.withExclusiveWrite(
     repo,
     'branch-cleanup',
     async (git) => {
       context.ensureActive();
-      validatePreferences();
+      await validatePreferences();
       const release = lockCleanupHeads(snapshot.commonDir, snapshot.gitDir);
       try {
         const current = await readCleanupLocal(git, repo);

@@ -182,8 +182,8 @@ describe('usePlannerAiActions', () => {
     expect(aiClient.generateCommitMessage).not.toHaveBeenCalled();
     expect(markItemsDone).not.toHaveBeenCalled();
     const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
-    expect(dialog.message).toContain('2 sichtbaren Eintraege');
-    expect(dialog.message).toContain('"Erledigt"');
+    expect(dialog.message).toContain('2 sichtbaren Einträge');
+    expect(dialog.message).toContain('2 unverknüpfte Einträge');
     expect(dialog.contextItems).toContainEqual({ label: 'Betroffene Eintraege', value: 'Urgent priority, High priority' });
     await act(async () => {
       await dialog.onConfirm();
@@ -192,6 +192,32 @@ describe('usePlannerAiActions', () => {
 
     expect(aiClient.generateCommitMessage).toHaveBeenCalledOnce();
     expect(markItemsDone).toHaveBeenCalledWith(visibleItems);
+  });
+  it('separates linked and unlinked counts in the bulk confirmation', () => {
+    render();
+    const linked = {
+      ...item,
+      references: {
+        activeWorkflowId: 'workflow',
+        branches: [
+          {
+            id: 'workflow',
+            projectId: item.projectId,
+            name: 'task/work',
+            baseRef: 'refs/heads/main',
+            baseSha: 'a'.repeat(40),
+            startedAt: 1,
+            automationPaused: false,
+          },
+        ],
+        pullRequests: [],
+      },
+    };
+    act(() => actions!.generateCommitMessageForStatus([item, linked]));
+    const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
+    expect(dialog.message).toContain('1 unverknüpfte Einträge');
+    expect(dialog.message).toContain('1 verknüpfte Einträge warten auf den PR-Merge');
+    expect(aiClient.generateCommitMessage).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -203,8 +229,8 @@ describe('usePlannerAiActions', () => {
 
     act(() => actions!.generateCommitMessageForStatus([item]));
     expect(host.querySelector('[role="dialog"]')).toBeTruthy();
-    expect(host.textContent).toContain(language === 'de' ? '1 sichtbaren Eintraege' : '1 visible items');
-    expect(host.textContent).toContain(language === 'de' ? 'Erledigt' : 'Done');
+    expect(host.textContent).toContain(language === 'de' ? '1 sichtbaren Einträge' : '1 visible items');
+    expect(host.textContent).toContain(language === 'de' ? 'erledigt' : 'done');
     act(() => {
       if (closeAction === 'escape') document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       else host.querySelector<HTMLButtonElement>('.dialog-btn-secondary')!.click();

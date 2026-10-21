@@ -536,6 +536,18 @@ Uncommittete Dateien werden angezeigt und nicht automatisch committed. Ohne Comm
 - Agentenfertigen Umsetzungs-Prompt fuer einen Eintrag oder alle aktuell sichtbaren Eintraege einer Status-Spalte kopieren. Spalten-Prompts behalten die sichtbare, nach Prioritaet sortierte Reihenfolge.
 - KI-Commit-Message aus einem Eintrag oder einer sichtbaren Status-Spalte generieren. Das Ergebnis wird als Commit-Entwurf des Repositories gespeichert und oeffnet die Staging-Ansicht.
 
+#### Aufgabe → Branch → Commit → Pull Request
+
+**Bearbeitung starten** im Kontextmenü oder Aufgabendialog öffnet die Prüfung des bearbeitbaren Vorschlags `task/<kurze-id>-<titel>` und der Ausgangsbasis. Erst nach erfolgreichem Erstellen, Auschecken und Zuordnen des Branches wechselt die Aufgabe auf **In Arbeit**. **Bearbeitung fortsetzen** checkt den zugeordneten Branch aus. Ist dieser in einem anderen Worktree belegt, lässt sich stattdessen zu diesem Worktree wechseln.
+
+Der bekannte Standardbranch wird ohne Fetch vorbelegt. Bei gemeinsamer Historie wird der weiter fortgeschrittene lokale oder Remote-Stand verwendet; bei Divergenz oder unbekanntem Standardbranch ist eine ausdrückliche Auswahl nötig. Lokale Änderungen werden aufgelistet und nur nach Bestätigung mitgenommen. Es gibt kein automatisches Stash oder Verwerfen. Veränderte Vorschauen, Checkout-Konflikte und widersprüchliche Planungsdaten verlangen eine erneute Prüfung. Gelingt der Checkout, aber die Zuordnung scheitert, bietet der Dialog eine Wiederherstellung an, auch nach einem Neustart.
+
+Der Aufgabendialog zeigt Branch, Commitverlauf entlang der ersten Elternlinie und geprüfte Pull-/Merge-Requests. Commits öffnen die vorhandene Commitansicht; PR-Links öffnen erst nach Klick den Browser. **Branch veröffentlichen** und **PR erstellen** bleiben ausdrückliche Aktionen in den vorhandenen Transfer- und Hosting-Dialogen. Titel, Beschreibung, Quell- und Zielbranch werden vorbelegt. Mehrdeutige PR-Treffer verlangen eine Auswahl; entscheidend sind Quellrepository, Branch und Commit, niemals ein ähnlicher Titel.
+
+Nur ein serverbestätigter Merge eines zugeordneten PRs schließt die Aufgabe automatisch ab. Neuere Branch-Arbeit und unvollständige Historien verhindern diesen Abschluss. Manuelle Statusänderungen pausieren die Automatik; sie lässt sich im Aufgabendialog ausdrücklich fortsetzen. Ein bereits verarbeiteter Merge überschreibt keine spätere manuelle Änderung. Die bestätigte KI-Sammelaktion schließt ausschließlich unverknüpfte Aufgaben sofort ab; verknüpfte Aufgaben warten auf ihren PR-Merge.
+
+Branch-/PR-Zuordnungen und Workflow-Historie werden als optionale portable `references` in `planning.json` mit Dateiversion 1 geteilt. Commitlisten und Prüfstände liegen in einem begrenzten lokalen, über Worktrees gemeinsamen Cache. Reine Verlaufserkennung verändert die versionierte Datei daher nicht. Bestehende Repository- und Hosting-Aktualisierungen stoßen die Erkennung an; Hosting-Abfragen werden mindestens 60 Sekunden gebündelt. Eine zusätzliche Polling-Schleife gibt es nicht. Gespeicherte Verläufe und Links bleiben offline lesbar. Der Aufräumassistent schützt Branches laufender Aufgaben. Hintergrundaktualisierungen erhalten offene Bearbeitungsentwürfe; widersprüchliche Änderungen müssen abgeglichen werden.
+
 ### Funktionen der lokalen Planning API und MCP
 
 - Lokaler HTTP-Server, gebunden an `127.0.0.1`.

@@ -25,6 +25,7 @@ type Dependencies = {
   repoJobRegistry?: RepoJobRegistry;
   preferences?: BranchCleanupPreferencesStore;
   service?: BranchCleanupService;
+  taskBranches?: (repo: string) => Promise<Array<{ branch: string; title: string }>>;
 };
 
 export function registerBranchCleanupHandlers(deps: Dependencies) {
@@ -38,7 +39,7 @@ export function registerBranchCleanupHandlers(deps: Dependencies) {
     accountVersion: () => cleanupAccountVersion(deps.hosting),
     metadata: (endpoint, signal) => cleanupHostingMetadata(deps.hosting, endpoint, signal),
   });
-  const service = deps.service ?? new BranchCleanupService({ git: deps.gitService.runner, remotes, preferences });
+  const service = deps.service ?? new BranchCleanupService({ git: deps.gitService.runner, remotes, preferences, taskBranches: deps.taskBranches });
   const active = new Map<string, { ownerId: number; controller: AbortController }>();
   const authorize = (repo: unknown) => requireActiveRepositoryPath(repo, deps.gitService.getRepoPath(), 'git:branchCleanup');
   const failure = (error: unknown) => ({ success: false as const, error: redactGitSensitiveText(error instanceof Error ? error.message : String(error)) });

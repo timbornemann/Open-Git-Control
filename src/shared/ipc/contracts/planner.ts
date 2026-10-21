@@ -1,7 +1,21 @@
 import type { IpcResult } from '../../../types/ipc';
 import type { PlannerItem, PlannerItemInput, PlannerProject, PlannerProjectInput, ProjectPlannerData } from '../../../types/projectPlanner';
+import type {
+  PlannerWorkRequest,
+  PlannerWorkGetRequest,
+  PlannerWorkInspection,
+  PlannerStartWorkRequest,
+  PlannerStartWorkResult,
+  PlannerWorkDetails,
+  PlannerUpdateWorkRequest,
+} from '../../../types/plannerWork';
 
 export interface ElectronPlannerAPI {
+  plannerInspectWork: (request: PlannerWorkRequest) => Promise<IpcResult<PlannerWorkInspection>>;
+  plannerStartWork: (request: PlannerStartWorkRequest) => Promise<IpcResult<PlannerStartWorkResult>>;
+  plannerGetWork: (request: PlannerWorkGetRequest) => Promise<IpcResult<PlannerWorkDetails>>;
+  plannerRefreshWork: (request: PlannerWorkRequest) => Promise<IpcResult<PlannerWorkDetails>>;
+  plannerUpdateWork: (request: PlannerUpdateWorkRequest) => Promise<IpcResult<PlannerItem>>;
   plannerGetData: () => Promise<IpcResult<ProjectPlannerData>>;
   onPlannerDataChanged: (callback: () => void) => () => void;
   plannerEnsureRepositoryProject: (repoPath: string) => Promise<IpcResult<PlannerProject>>;

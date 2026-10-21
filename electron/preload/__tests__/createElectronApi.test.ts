@@ -3,6 +3,25 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { createElectronApi } from '../createElectronApi';
 
 describe('createElectronApi', () => {
+  it('exposes planner work operations in both namespaces', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+    const request = { repoPath: 'C:/repo', itemId: 'task' };
+    const start = { ...request, planId: 'plan', branchName: 'task/work', baseRef: 'refs/heads/main', acceptChanges: false };
+    const update = { ...request, action: 'automation' as const, paused: true, expectedRevision: 'revision' };
+    await api.planner.plannerInspectWork(request);
+    await api.plannerStartWork(start);
+    await api.planner.plannerGetWork(request);
+    await api.plannerRefreshWork(request);
+    await api.planner.plannerUpdateWork(update);
+    expect(invoke.mock.calls).toEqual([
+      [IpcChannel.PlannerInspectWork, request],
+      [IpcChannel.PlannerStartWork, start],
+      [IpcChannel.PlannerGetWork, request],
+      [IpcChannel.PlannerRefreshWork, request],
+      [IpcChannel.PlannerUpdateWork, update],
+    ]);
+  });
   it('exposes user notes and removable change events through both app and flat namespaces', async () => {
     const ipc = { invoke: vi.fn().mockResolvedValue({ success: true }), on: vi.fn(), removeListener: vi.fn() };
     const api = createElectronApi(ipc as any);

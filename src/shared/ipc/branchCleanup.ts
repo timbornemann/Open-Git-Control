@@ -19,7 +19,8 @@ export type BranchCleanupReasonCode =
   | 'remote-unavailable'
   | 'unknown-protection'
   | 'endpoint-isolation'
-  | 'local-work';
+  | 'local-work'
+  | 'planner-work';
 export type BranchCleanupReason = { code: BranchCleanupReasonCode; detail?: string };
 export type BranchCleanupTarget = { id: string; comparisonId: string; name: string; oid: string };
 export type BranchCleanupComparison = { id: string; label: string; targetId: string | null };

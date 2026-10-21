@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/Button';
-import { TextField } from '@/components/ui/TextField';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { GitPullRequest, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -7,11 +6,11 @@ import { hostingClient } from '@/services/hostingClient';
 import { appClient } from '@/services/appClient';
 import { useGitStore } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
-import type { HostedRepository, HostedRepositoryRef, HostingCapabilities, HostingChangeRequest, HostingPage } from '@/types/hostingDtos';
+import type { HostedRepository, HostingCapabilities, HostingChangeRequest, HostingPage } from '@/types/hostingDtos';
 import { hostedRepositoryKey, useHostingState } from './hostingState';
 import { useHostingTask } from './useHostingTask';
 import { HostingChangeRequestChecks } from './HostingChangeRequestChecks';
-import { HostingRepositoryPicker } from './HostingRepositoryPicker';
+import { HostingCreateChangeRequest } from './HostingCreateChangeRequest';
 import { HostingStateBadge } from './HostingStateBadge';
 
 export function HostingChangeRequests({
@@ -31,12 +30,6 @@ export function HostingChangeRequests({
   const task = useHostingTask(`${hostedRepositoryKey(repository)}/${filter}`);
   const { run } = task;
   const [page, setPage] = useState<HostingPage<HostingChangeRequest>>({ items: [], nextCursor: null });
-  const [target, setTarget] = useState<HostedRepositoryRef>(repository.ref);
-  const [source, setSource] = useState<HostedRepositoryRef>(repository.ref);
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [sourceBranch, setSourceBranch] = useState(currentBranch || repository.defaultBranch);
-  const [targetBranch, setTargetBranch] = useState(repository.defaultBranch);
   const [method, setMethod] = useState(capabilities.mergeMethods[0] ?? 'merge');
   const [mergeMethods, setMergeMethods] = useState(capabilities.mergeMethods);
   const [message, setMessage] = useState('');
@@ -46,11 +39,6 @@ export function HostingChangeRequests({
     setPage({ items: [], nextCursor: null });
     if (capabilities.changeRequests) void run(reload, setPage);
   }, [capabilities.changeRequests, reload, revision, run]);
-  const resolveRef = async (url: string) => {
-    const resolved = await hostingClient.request('resolveRepository', { connectionId: repository.ref.connectionId, url });
-    if (!resolved) throw new Error(tr('Repository gehört nicht zu diesem Server und Konto.', 'Repository does not belong to this server and account.'));
-    return resolved.ref;
-  };
   const inspectMergeOptions = (change: HostingChangeRequest) =>
     void task.run(
       () => hostingClient.request('capabilities', { connectionId: change.target.connectionId, repository: change.target, targetBranch: change.targetBranch }),
@@ -187,68 +175,14 @@ export function HostingChangeRequests({
         <summary>
           {capabilities.changeRequestLabel} {tr('erstellen', 'create')}
         </summary>
-        <form
-          className="hosting-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void task.run(
-              async () => {
-                const created = await hostingClient.request('createChangeRequest', { repository: target, source, sourceBranch, targetBranch, title, body });
-                return created;
-              },
-              (created) => {
-                setMessage(`#${created.number}: ${created.title}`);
-                setTitle('');
-                setBody('');
-                void task.run(reload, setPage);
-              },
-            );
+        <HostingCreateChangeRequest
+          repository={repository}
+          initialDraft={{ title: '', body: '', sourceBranch: currentBranch || repository.defaultBranch, targetBranch: repository.defaultBranch }}
+          onCreated={(created) => {
+            setMessage(`#${created.number}: ${created.title}`);
+            void task.run(reload, setPage);
           }}
-        >
-          <div className="hosting-form-grid">
-            <HostingRepositoryPicker
-              label={tr('Quellrepository', 'Source repository')}
-              selected={source}
-              defaultUrl={repository.htmlUrl}
-              busy={task.busy}
-              onResolve={(url) => void task.run(() => resolveRef(url), setSource)}
-            />
-            <HostingRepositoryPicker
-              label={tr('Zielrepository', 'Target repository')}
-              selected={target}
-              defaultUrl={repository.htmlUrl}
-              busy={task.busy}
-              onResolve={(url) => void task.run(() => resolveRef(url), setTarget)}
-            >
-              {repository.parent && (
-                <Button type="button" onClick={() => setTarget(repository.parent!)}>
-                  {tr('Übergeordnetes Repository', 'Parent repository')}
-                </Button>
-              )}
-            </HostingRepositoryPicker>
-          </div>
-          <div className="hosting-form-grid">
-            <label>
-              {tr('Quellbranch', 'Source branch')}
-              <TextField required value={sourceBranch} onChange={(e) => setSourceBranch(e.target.value)} />
-            </label>
-            <label>
-              {tr('Zielbranch', 'Target branch')}
-              <TextField required value={targetBranch} onChange={(e) => setTargetBranch(e.target.value)} />
-            </label>
-          </div>
-          <label>
-            {tr('Titel', 'Title')}
-            <TextField required value={title} onChange={(e) => setTitle(e.target.value)} />
-          </label>
-          <label>
-            {tr('Beschreibung', 'Description')}
-            <TextField as="textarea" value={body} onChange={(e) => setBody(e.target.value)} />
-          </label>
-          <Button type="submit" variant="primary" disabled={task.busy}>
-            {tr('Erstellen', 'Create')}
-          </Button>
-        </form>
+        />
       </details>
       {message && (
         <p className="hosting-notice" role="status">

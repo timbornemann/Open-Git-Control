@@ -8,9 +8,13 @@ import { useI18n } from '@/i18n';
 import type { PlannerItem, PlannerPriority, PlannerStatus } from '@/types/projectPlanner';
 import { ItemDialog, MaterializeDialog, PRIORITY_OPTIONS, ProjectDialog, STATUS_OPTIONS, usePlannerLabels } from './PlannerDialogs';
 import { appClient } from '@/services/appClient';
-import { usePlannerAiActions, type PlannerCommitMessageItem } from './usePlannerAiActions';
+import { usePlannerAiActions } from './usePlannerAiActions';
 import { PlannerItemContextMenu, type PlannerItemContextMenuState } from './PlannerItemContextMenu';
 import '@/styles/project-planner.css';
+import { usePlannerCompletion } from './usePlannerCompletion';
+import { requestPlannerWork } from './plannerWorkDialogState';
+import { PlannerItemWorkPanel } from './PlannerItemWorkPanel';
+import { plannerDraftPatch } from './plannerDraftPatch';
 
 const statusIcons: Record<PlannerStatus, React.ReactNode> = {
   idea: <Lightbulb size={14} />,
@@ -62,16 +66,7 @@ export const ProjectPlannerView: React.FC = () => {
   const projectDialogProjectIdRef = React.useRef<string | null>(null);
   const itemDialogProjectIdRef = React.useRef<string | null>(null);
   const materializeProjectIdRef = React.useRef<string | null>(null);
-  const markItemsDone = React.useCallback(
-    async (items: PlannerCommitMessageItem[]) => {
-      for (const item of items) {
-        if (item.id && (item.persistedStatus ?? item.status) !== 'done') {
-          await updateItem(item.id, { status: 'done' });
-        }
-      }
-    },
-    [updateItem],
-  );
+  const markItemsDone = usePlannerCompletion(itemsForSelectedProject, updateItem);
   const plannerAiActions = usePlannerAiActions({
     project: selectedProject,
     settings: settingsState.settings,
@@ -148,10 +143,8 @@ export const ProjectPlannerView: React.FC = () => {
   React.useLayoutEffect(() => {
     if (!itemDialogOpen || !editingItem) return;
     const projectId = itemDialogProjectIdRef.current;
-    // An external API/MCP update may edit or move the item while this dialog
-    // contains an older draft. Close it instead of silently overwriting newer
-    // data with stale form fields.
-    if (!liveEditingItem || liveEditingItem.projectId !== projectId || liveEditingItem.updatedAt !== editingItem.updatedAt) {
+    // Keep open drafts when background detection updates references or status.
+    if (!liveEditingItem || liveEditingItem.projectId !== projectId) {
       itemDialogProjectIdRef.current = null;
       setItemDialogOpen(false);
       setEditingItem(null);
@@ -395,6 +388,7 @@ export const ProjectPlannerView: React.FC = () => {
         onChangePriority={(itemId, priority) => void updateItem(itemId, { priority })}
         onChangeStatus={(itemId, status) => void updateItem(itemId, { status })}
         onDelete={requestDeleteItem}
+        onStartWork={(item) => (selectedProject.repoPath ? requestPlannerWork(selectedProject.repoPath, item) : void handleSelectParent())}
       />
 
       <ProjectDialog
@@ -439,13 +433,23 @@ export const ProjectPlannerView: React.FC = () => {
         onSubmit={async (input) => {
           const projectId = itemDialogProjectIdRef.current;
           if (!projectId || projectId !== selectedProjectIdRef.current) return;
-          if (editingItem && (!liveEditingItem || liveEditingItem.projectId !== projectId || liveEditingItem.updatedAt !== editingItem.updatedAt)) {
-            itemDialogProjectIdRef.current = null;
-            setItemDialogOpen(false);
-            setEditingItem(null);
-            return;
+          let patch = input as Partial<typeof input>;
+          if (editingItem) {
+            if (!liveEditingItem || liveEditingItem.projectId !== projectId) return;
+            try {
+              patch = plannerDraftPatch(editingItem, liveEditingItem, input);
+            } catch {
+              notify(
+                tr(
+                  'Die Aufgabe wurde zwischenzeitlich geändert. Entwurf prüfen oder neu laden.',
+                  'The task changed in the meantime. Review the draft or reload it.',
+                ),
+                true,
+              );
+              return;
+            }
           }
-          const ok = editingItem ? await updateItem(editingItem.id, input) : await createItem(projectId, input);
+          const ok = editingItem ? await updateItem(editingItem.id, patch) : await createItem(projectId, input);
           if (ok) {
             itemDialogProjectIdRef.current = null;
             setItemDialogOpen(false);
@@ -454,6 +458,21 @@ export const ProjectPlannerView: React.FC = () => {
         onCopyAgentPrompt={(item) => void plannerAiActions.copyItemPrompt(item)}
         onGenerateCommitMessage={selectedProject.repoPath ? (item) => plannerAiActions.generateCommitMessageForItem(item) : undefined}
         isAiCommitGenerating={plannerAiActions.isAiCommitGenerating}
+        workPanel={
+          liveEditingItem && editingItem ? (
+            <PlannerItemWorkPanel
+              item={liveEditingItem}
+              original={editingItem}
+              repoPath={selectedProject.repoPath}
+              onReload={() => setEditingItem(liveEditingItem)}
+              onNavigate={() => setItemDialogOpen(false)}
+              onMaterialize={() => {
+                setItemDialogOpen(false);
+                void handleSelectParent();
+              }}
+            />
+          ) : undefined
+        }
       />
 
       <MaterializeDialog

@@ -81,12 +81,12 @@
       "id": "fc1e7cb2-92bc-4fd6-b21f-52afb06eaf64",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Aufgabe → Branch → Commit → PR verbinden",
-      "description": "Im Planner „Bearbeitung starten“ anbieten: Branchname vorschlagen, Branch erstellen und Aufgabe zuordnen. Commits und PR anschließend verknüpfen. Dafür die [Aufgabendaten (line 15)](D:/Projects/Software/Open-Git-Control/src/types/projectPlanner.ts:15) um strukturierte Referenzen erweitern. Das spart Namensgebung, Suchen und manuelle Statuspflege.",
+      "description": "Aufgabe → Branch → Commit → PR verbinden: Im Planner „Bearbeitung starten“ anbieten: Branchname vorschlagen, Branch erstellen und Aufgabe zuordnen. Commits und PR anschließend verknüpfen. Dafür die [Aufgabendaten (line 15)](D:/Projects/Software/Open-Git-Control/src/types/projectPlanner.ts:15) um strukturierte Referenzen erweitern. Das spart Namensgebung, Suchen und manuelle Statuspflege.",
       "priority": "medium",
       "status": "planned",
       "tags": [],
       "createdAt": 1792501044485,
-      "updatedAt": 1792502644954
+      "updatedAt": 1792576902450
     },
     {
       "id": "24836c97-af92-44db-9ce6-2e1c1df11b7b",
@@ -131,17 +131,6 @@
       "tags": [],
       "createdAt": 1792501100579,
       "updatedAt": 1792502675244
-    },
-    {
-      "id": "c765bece-a65b-4b38-93f7-d5a28f534ecc",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Konsolenfehler direkt als Aufgabe übernehmen",
-      "description": "Im Probleme-Tab „Als Bug aufnehmen“ ergänzen. Fehlermeldung, Dateiposition, ausgeführter Befehl und ein begrenzter Logauszug werden als bearbeitbarer Planner-Entwurf übernommen.",
-      "priority": "medium",
-      "status": "done",
-      "tags": [],
-      "createdAt": 1792501116276,
-      "updatedAt": 1792575940069
     },
     {
       "id": "fef11401-94ff-4855-a0f7-d014394c50eb",

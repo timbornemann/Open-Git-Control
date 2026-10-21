@@ -1,39 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
-
-export type PlannerProjectKind = 'repository' | 'planned';
-export type PlannerPriority = 'low' | 'medium' | 'high' | 'urgent';
-export type PlannerStatus = 'idea' | 'bug' | 'planned' | 'in-progress' | 'blocked' | 'done';
-
-export interface PlannerProject {
-  id: string;
-  name: string;
-  description: string;
-  kind: PlannerProjectKind;
-  repoPath: string | null;
-  createdAt: number;
-  updatedAt: number;
-}
-
-export interface PlannerItem {
-  id: string;
-  projectId: string;
-  title: string;
-  description: string;
-  priority: PlannerPriority;
-  status: PlannerStatus;
-  tags: string[];
-  createdAt: number;
-  updatedAt: number;
-}
-
-export interface ProjectPlannerData {
-  version: 1;
-  projects: PlannerProject[];
-  items: PlannerItem[];
-}
+import { normalizePlannerReferences } from './plannerReferences';
+import type { PlannerItem, PlannerPriority, PlannerProject, PlannerProjectKind, PlannerStatus, ProjectPlannerData } from '../../src/types/projectPlanner';
+export type { PlannerItem, PlannerPriority, PlannerProject, PlannerProjectKind, PlannerStatus, ProjectPlannerData } from '../../src/types/projectPlanner';
 
 export type PlannerItemInput = {
+  expectedUpdatedAt?: number;
   title: string;
   description?: string;
   priority?: PlannerPriority;
@@ -136,6 +108,7 @@ export function normalizeProjectPlannerData(input: unknown): ProjectPlannerData 
       priority: isPlannerPriority(source.priority) ? source.priority : 'medium',
       status: isPlannerStatus(source.status) ? source.status : 'idea',
       tags: normalizePlannerTags(source.tags),
+      ...(source.references === undefined ? {} : { references: normalizePlannerReferences(source.references) }),
       createdAt,
       updatedAt: cleanTimestamp(source.updatedAt, createdAt),
     });

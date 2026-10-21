@@ -27,6 +27,7 @@ export function branchCleanupReasonText(reason: BranchCleanupReason, tr: Transla
     'unknown-protection': tr('Schutzregeln oder offene Requests sind nicht zuverlässig geprüft', 'Protection rules or open requests could not be verified'),
     'endpoint-isolation': tr('Dieses Git kann das Server-Ziel nicht einzeln ansprechen', 'This Git cannot isolate the server endpoint'),
     'local-work': tr('Das lokale Gegenstück wird gerade verwendet', 'The local counterpart is in use'),
+    'planner-work': tr('Einer laufenden Planner-Aufgabe zugeordnet', 'Assigned to an ongoing planner task'),
   };
   return reason.detail && reason.code !== 'inactive' ? `${labels[reason.code]}: ${reason.detail}` : labels[reason.code];
 }

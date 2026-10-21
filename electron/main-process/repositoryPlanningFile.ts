@@ -119,6 +119,18 @@ export function renumberRepositoryPlannerData(data: ProjectPlannerData): Project
   return {
     version: 1,
     projects: [{ ...project, id: projectId }],
-    items: data.items.map((item) => ({ ...item, id: randomUUID(), projectId })),
+    items: data.items.map((item) => ({
+      ...item,
+      id: randomUUID(),
+      projectId,
+      ...(item.references
+        ? {
+            references: {
+              ...item.references,
+              branches: item.references.branches.map((branch) => (branch.projectId === project.id ? { ...branch, projectId } : branch)),
+            },
+          }
+        : {}),
+    })),
   };
 }

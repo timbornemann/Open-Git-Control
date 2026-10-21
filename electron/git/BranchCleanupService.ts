@@ -30,7 +30,13 @@ import { physicalPathKey } from './RepositoryCommonDirectory';
 import { redactGitSensitiveText } from './GitErrorFormatter';
 
 type Plan = { inspection: BranchCleanupInspection; analysis: CleanupAnalysis; ownerId: number; generation: number; preferencesVersion: string; used: boolean };
-type Dependencies = { git: GitRunner; remotes: BranchCleanupRemotes; preferences: BranchCleanupPreferencesStore; now?: () => number };
+type Dependencies = {
+  git: GitRunner;
+  remotes: BranchCleanupRemotes;
+  preferences: BranchCleanupPreferencesStore;
+  now?: () => number;
+  taskBranches?: (repo: string) => Promise<Array<{ branch: string; title: string }>>;
+};
 
 export class BranchCleanupService {
   private readonly plans = new Map<string, Plan>();
@@ -85,6 +91,18 @@ export class BranchCleanupService {
       context,
     );
     const checked = await this.deps.remotes.configuration(request.repoPath);
+    const taskBranches = (await this.deps.taskBranches?.(request.repoPath)) || [];
+    for (const candidate of analysis.candidates) {
+      const assigned = taskBranches.find(
+        (entry) =>
+          entry.branch === candidate.name ||
+          candidate.linkedLocalIds.some((id) => analysis.candidates.some((local) => local.id === id && local.name === entry.branch)),
+      );
+      if (assigned) {
+        candidate.blocks.push({ code: 'planner-work', detail: assigned.title });
+        candidate.selectedByDefault = false;
+      }
+    }
     const current = await readCleanupLocal(this.reader(context), request.repoPath);
     context.ensureActive();
     if (
@@ -151,6 +169,17 @@ export class BranchCleanupService {
 
   private validatePreferences(plan: Plan, repo: string) {
     if (cleanupDigest(this.deps.preferences.read(repo)) !== plan.preferencesVersion) throw new Error('changed');
+  }
+  private async validateTask(candidate: BranchCleanupCandidate, plan: Plan, repo: string) {
+    const tasks = (await this.deps.taskBranches?.(repo)) || [];
+    if (
+      tasks.some(
+        (entry) =>
+          entry.branch === candidate.name ||
+          candidate.linkedLocalIds.some((id) => plan.analysis.candidates.some((local) => local.id === id && local.name === entry.branch)),
+      )
+    )
+      throw new Error('changed');
   }
 
   private async refreshForCandidate(plan: Plan, candidate: BranchCleanupCandidate, repo: string, context: CleanupContext) {
@@ -271,6 +300,7 @@ export class BranchCleanupService {
         )
           throw new Error('server-not-deleted');
         const fresh = await this.refreshForCandidate(plan, candidate, request.repoPath, context);
+        await this.validateTask(candidate, plan, request.repoPath);
         const names = this.deps.preferences.read(request.repoPath).protectedPatterns;
         if (
           names.some((pattern) => cleanupPatternMatches(candidate.name, pattern)) ||
@@ -288,9 +318,10 @@ export class BranchCleanupService {
         } else {
           this.validateLocal(candidate, fresh.local, fresh.remotes, fresh.preferences.pushBranches ?? {});
           context.progress(`deleting: ${candidate.name}`);
-          await deleteCleanupLocal(this.deps.git, request.repoPath, plan.analysis.local, candidate, fresh.target, context, () =>
-            this.validatePreferences(plan, request.repoPath),
-          );
+          await deleteCleanupLocal(this.deps.git, request.repoPath, plan.analysis.local, candidate, fresh.target, context, async () => {
+            this.validatePreferences(plan, request.repoPath);
+            await this.validateTask(candidate, plan, request.repoPath);
+          });
           outcome.status = 'deleted';
           outcome.message = 'deleted';
         }

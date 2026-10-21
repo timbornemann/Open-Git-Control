@@ -111,6 +111,7 @@ type ItemDialogProps = {
   onCopyAgentPrompt?: (item: PlannerPromptItem) => void;
   onGenerateCommitMessage?: (item: PlannerCommitMessageItem) => void;
   isAiCommitGenerating?: boolean;
+  workPanel?: React.ReactNode;
 };
 
 export const ItemDialog: React.FC<ItemDialogProps> = ({
@@ -124,6 +125,7 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({
   onCopyAgentPrompt,
   onGenerateCommitMessage,
   isAiCommitGenerating = false,
+  workPanel,
 }) => {
   const { t, tr } = useI18n();
   const labels = usePlannerLabels();
@@ -181,7 +183,9 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({
       .map((tag) => tag.trim())
       .filter(Boolean),
   };
-  const commitMessageItem: PlannerCommitMessageItem = item ? { ...promptItem, id: item.id, persistedStatus: item.status } : promptItem;
+  const commitMessageItem: PlannerCommitMessageItem = item
+    ? { ...promptItem, id: item.id, projectId: item.projectId, references: item.references, persistedStatus: item.status }
+    : promptItem;
   const canRunAiAction = Boolean(promptItem.title);
 
   return (
@@ -270,6 +274,7 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({
             )}
           </div>
         )}
+        {workPanel}
       </div>
     </DialogFrame>
   );

@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronRight, Copy, Flag, ListTodo, Sparkles, Trash2 } from 'lucide-react';
+import { ChevronRight, Copy, Flag, GitBranch, ListTodo, Sparkles, Trash2 } from 'lucide-react';
+import { activePlannerBranch } from '@/shared/plannerWork';
 import { useI18n } from '@/i18n';
 import type { PlannerItem, PlannerPriority, PlannerStatus } from '@/types/projectPlanner';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS, usePlannerLabels } from './PlannerDialogs';
@@ -22,6 +23,7 @@ type PlannerItemContextMenuProps = {
   onChangePriority: (itemId: string, priority: PlannerPriority) => void;
   onChangeStatus: (itemId: string, status: PlannerStatus) => void;
   onDelete: (itemId: string) => void;
+  onStartWork?: (item: PlannerItem) => void;
 };
 
 type Submenu = 'priority' | 'status' | null;
@@ -41,6 +43,7 @@ export const PlannerItemContextMenu: React.FC<PlannerItemContextMenuProps> = ({
   onChangePriority,
   onChangeStatus,
   onDelete,
+  onStartWork,
 }) => {
   const { tr } = useI18n();
   const labels = usePlannerLabels();
@@ -192,6 +195,14 @@ export const PlannerItemContextMenu: React.FC<PlannerItemContextMenuProps> = ({
         <div className="planner-item-context-header" title={item.title}>
           {item.title}
         </div>
+        {onStartWork && (
+          <button type="button" role="menuitem" className="planner-item-context-action" disabled={busy} onClick={() => runAction(() => onStartWork(item))}>
+            <GitBranch size={14} />
+            {activePlannerBranch(item) && !activePlannerBranch(item)?.completedBy
+              ? tr('Bearbeitung fortsetzen', 'Resume work')
+              : tr('Bearbeitung starten', 'Start work')}
+          </button>
+        )}
         <button type="button" role="menuitem" className="planner-item-context-action" onClick={() => runAction(() => onCopyAgentPrompt(item))}>
           <Copy size={14} />
           {tr('Agent-Prompt kopieren', 'Copy agent prompt')}

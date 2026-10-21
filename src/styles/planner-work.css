@@ -1,0 +1,63 @@
+.planner-work {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.planner-work h3 {
+  margin: 0.25rem 0;
+}
+:where(.planner-work) button:not([class]) {
+  padding: 6px 9px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+:where(.planner-work) button:not([class]):focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+:where(.planner-work) button:not([class]):disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.planner-work-list {
+  max-height: 200px;
+  overflow: auto;
+  padding-left: 22px;
+}
+.planner-work-checkbox {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+}
+.planner-work-checkbox input {
+  width: auto;
+}
+.planner-work-panel {
+  border-top: 1px solid var(--border-color);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.planner-work-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+.planner-work-history {
+  max-height: 220px;
+  overflow: auto;
+  padding-left: 20px;
+}
+.planner-work-history button {
+  text-align: left;
+}
+.planner-work-history small {
+  opacity: 0.7;
+  margin-left: 6px;
+}
+.planner-work-panel code {
+  overflow-wrap: anywhere;
+}

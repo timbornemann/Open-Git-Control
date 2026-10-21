@@ -5,12 +5,15 @@ import { getCommitFormDraft, updateCommitFormDraft } from '@/components/staging-
 import { useI18n } from '@/i18n';
 import { aiClient } from '@/services/aiClient';
 import type { AppSettingsDto } from '@/types/appDtos';
-import type { PlannerProject } from '@/types/projectPlanner';
+import type { PlannerProject, PlannerItem } from '@/types/projectPlanner';
+import { activePlannerBranch } from '@/shared/plannerWork';
 import { copyTextToClipboard } from '@/utils/clipboard';
 import { openStagingCommitArea } from '@/utils/layoutPreferences';
 import { buildPlannerAgentPrompt, buildPlannerCommitNotes, sortPlannerPromptItemsByPriority, type PlannerPromptItem } from '@/utils/plannerAiPrompts';
 
 export type PlannerCommitMessageItem = PlannerPromptItem & {
+  projectId?: string;
+  references?: PlannerItem['references'];
   id?: string;
   persistedStatus?: PlannerPromptItem['status'];
 };
@@ -86,6 +89,7 @@ export const usePlannerAiActions = ({ project, settings, activateRepositoryProje
       };
 
       const draft = getCommitFormDraft(repoPath, settings.commitTemplate);
+      const linkedCount = items.filter((item) => item.projectId && activePlannerBranch(item as PlannerItem)).length;
       const hasDraft = Boolean(draft.commitMsg.trim() || draft.commitDescription.trim() || draft.subject.type || draft.subject.scope.trim());
       if (!confirmStatusAction && !hasDraft) {
         void run();
@@ -99,8 +103,8 @@ export const usePlannerAiActions = ({ project, settings, activateRepositoryProje
           : tr('Commit-Entwurf ersetzen?', 'Replace commit draft?'),
         message: confirmStatusAction
           ? tr(
-              `Fuer alle ${items.length} sichtbaren Eintraege dieser Kategorie wird eine gemeinsame KI-Commit-Nachricht erstellt. Nach erfolgreicher Erstellung werden diese Eintraege nach "Erledigt" verschoben. Fortfahren?`,
-              `A shared AI commit message will be generated for all ${items.length} visible items in this category. After successful generation, these items will be moved to "Done". Continue?`,
+              `Für alle ${items.length} sichtbaren Einträge wird eine gemeinsame KI-Commit-Nachricht erstellt. ${items.length - linkedCount} unverknüpfte Einträge werden danach als erledigt markiert; ${linkedCount} verknüpfte Einträge warten auf den PR-Merge. Fortfahren?`,
+              `A shared AI commit message will be generated for all ${items.length} visible items. Afterwards, ${items.length - linkedCount} unlinked items will be marked as done; ${linkedCount} linked items will wait for their PR merge. Continue?`,
             )
           : tr(
               'In der Staging-Ansicht gibt es bereits einen Commit-Entwurf. Die KI-Nachricht ersetzt Titel und Beschreibung erst nach deiner Bestaetigung.',
@@ -134,7 +138,9 @@ export const usePlannerAiActions = ({ project, settings, activateRepositoryProje
               'The AI message will be added to the staging view as a commit draft.',
             ),
         confirmLabel: confirmStatusAction
-          ? tr('Erstellen und als erledigt markieren', 'Generate and mark as done')
+          ? linkedCount
+            ? tr('Nachricht erstellen und unverknüpfte abschließen', 'Generate and complete unlinked items')
+            : tr('Erstellen und als erledigt markieren', 'Generate and mark as done')
           : tr('KI-Nachricht erstellen', 'Create AI message'),
         onConfirm: run,
       });
