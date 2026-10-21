@@ -14,7 +14,8 @@ function lockCleanupHeads(commonDir: string, gitDir: string) {
   const worktreesDir = path.join(commonDir, 'worktrees');
   const registered = fs.existsSync(worktreesDir) ? fs.readdirSync(worktreesDir).map((name) => path.join(worktreesDir, name)) : [];
   if (registered.some((directory) => fs.lstatSync(directory).isSymbolicLink())) throw new Error('Refusing to lock a redirected worktree registration.');
-  const directories = [...new Set([commonDir, gitDir, ...registered])];
+  // Git may report the same directory through OS aliases (8.3 paths, /var, junctions).
+  const directories = [...new Map([commonDir, gitDir, ...registered].map((directory) => [physicalPathKey(directory), directory])).values()];
   const owned: string[] = [];
   const token = `Open-Git-Control branch cleanup ${randomUUID()}\n`;
   const release = () => {
@@ -43,14 +44,14 @@ export async function deleteCleanupLocal(
   candidate: BranchCleanupCandidate,
   target: CleanupInternalTarget,
   context: CleanupContext,
-  validatePreferences: () => void,
+  validatePreferences: () => void | Promise<void>,
 ): Promise<void> {
   await runner.withExclusiveWrite(
     repo,
     'branch-cleanup',
     async (git) => {
       context.ensureActive();
-      validatePreferences();
+      await validatePreferences();
       const release = lockCleanupHeads(snapshot.commonDir, snapshot.gitDir);
       try {
         const current = await readCleanupLocal(git, repo);

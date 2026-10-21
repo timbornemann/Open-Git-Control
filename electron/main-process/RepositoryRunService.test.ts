@@ -77,6 +77,31 @@ afterEach(() => {
 });
 
 describe('RepositoryRunService', () => {
+  it.each([
+    ['win32', 'windows'],
+    ['darwin', 'macos'],
+    ['linux', 'linux'],
+  ] as const)('captures the original %s command even if run.json changes later', async (platform, commandPlatform) => {
+    setPlatform(platform);
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));
+    directories.push(repoPath);
+    prepareConfig(repoPath, [0]);
+    const configService = new RepositoryRunConfigService();
+    const config = configService.read(repoPath).config!;
+    config.actions.test.steps[0][commandPlatform]!.command = `echo original-${platform}`;
+    configService.write(repoPath, config);
+    spawnMock.mockImplementation(() => createChild(0));
+    const service = new RepositoryRunService(configService);
+    const initial = await service.start(repoPath, 'test');
+
+    expect(initial.steps[0]).toMatchObject({ command: `echo original-${platform}`, shell: config.actions.test.steps[0][commandPlatform]!.shell });
+    config.actions.test.steps[0][commandPlatform]!.command = 'echo changed';
+    configService.write(repoPath, config);
+    const finished = await waitForCompletion(service);
+    expect(finished.steps[0].command).toBe(`echo original-${platform}`);
+    expect(spawnMock.mock.calls[0][1].at(-1)).toContain(`echo original-${platform}`);
+  });
+
   it('blocks all steps before approval or execution when a later known template needs a missing program', async () => {
     const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));
     directories.push(repoPath);

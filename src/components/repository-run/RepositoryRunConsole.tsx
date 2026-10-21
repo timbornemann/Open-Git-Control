@@ -1,12 +1,14 @@
 import React, { useEffect, useId, useMemo, useState } from 'react';
 import { AlertCircle, Copy, FileWarning, Square, Terminal } from 'lucide-react';
 import type { RepositoryRunStateDto } from '@/types/repositoryRun';
-import { parseRepositoryRunOutput } from '@/utils/repositoryRunOutput';
+import { parseRepositoryRunOutput, type RepositoryRunProblem } from '@/utils/repositoryRunOutput';
 import { cleanRepositoryRunLines } from '@/utils/repositoryRunMessages';
 import { createRunConsoleEntries } from '@/utils/repositoryRunPresentation';
 import { copyTextToClipboard } from '@/utils/clipboard';
 import { useI18n } from '@/i18n';
 import { useRepositoryContext } from '@/contexts/AppStateContext';
+import { requestRepositoryTodoDraft } from '@/components/project-planner/repositoryTodoDraftState';
+import { buildRepositoryRunBugDraft } from '@/utils/repositoryRunBugDraft';
 import { RepositoryRunOutputPane } from './RepositoryRunOutputPane';
 import { RepositoryRunProblemHint, RepositoryRunProblems } from './RepositoryRunProblems';
 import { RepositoryRunLinkedText, type RepositoryRunFileLinkProps } from './RepositoryRunLinkedText';
@@ -16,7 +18,7 @@ type Props = { run: RepositoryRunStateDto; onStop: () => void; onBack: () => voi
 type ConsoleTab = 'output' | 'problems' | 'summary';
 
 export const RepositoryRunConsole: React.FC<Props> = ({ run, onStop, onBack, onOpenFile }) => {
-  const { tr, locale } = useI18n();
+  const { tr, locale, language } = useI18n();
   const { onToast } = useRepositoryContext();
   const tabId = useId();
   const [tab, setTab] = useState<ConsoleTab>('output');
@@ -65,6 +67,8 @@ export const RepositoryRunConsole: React.FC<Props> = ({ run, onStop, onBack, onO
     setFocusSequence(sequence);
     setTab('output');
   };
+  const createBug = (problem: RepositoryRunProblem) =>
+    requestRepositoryTodoDraft({ repoPath: run.repoPath, input: buildRepositoryRunBugDraft(run, problem, language) });
   return (
     <section className="repository-run-console">
       <header className="repository-run-console__header">
@@ -160,7 +164,9 @@ export const RepositoryRunConsole: React.FC<Props> = ({ run, onStop, onBack, onO
             onOpenFile={onOpenFile}
           />
         )}
-        {tab === 'problems' && <RepositoryRunProblems problems={problems} onShowOutput={showOutput} repoPath={run.repoPath} onOpenFile={onOpenFile} />}
+        {tab === 'problems' && (
+          <RepositoryRunProblems problems={problems} onShowOutput={showOutput} onCreateBug={createBug} repoPath={run.repoPath} onOpenFile={onOpenFile} />
+        )}
         {tab === 'summary' && (
           <div className="repository-run-console__summary">
             <dl>
@@ -195,7 +201,7 @@ export const RepositoryRunConsole: React.FC<Props> = ({ run, onStop, onBack, onO
             </dl>
             {run.message && <p>{run.message}</p>}
             <h3>{tr('Erkannte Probleme', 'Detected problems')}</h3>
-            <RepositoryRunProblems problems={problems} onShowOutput={showOutput} repoPath={run.repoPath} onOpenFile={onOpenFile} />
+            <RepositoryRunProblems problems={problems} onShowOutput={showOutput} onCreateBug={createBug} repoPath={run.repoPath} onOpenFile={onOpenFile} />
           </div>
         )}
       </div>

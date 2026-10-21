@@ -17,6 +17,7 @@ import { registerDialogHandlers } from './registerDialogHandlers';
 import { registerGitHandlers } from './registerGitHandlers';
 import { registerRepoSettingsHandlers } from './registerRepoSettingsHandlers';
 import { registerProjectPlannerHandlers } from './registerProjectPlannerHandlers';
+import { registerPlannerWorkHandlers } from './registerPlannerWorkHandlers';
 import { registerUpdaterHandlers } from './registerUpdaterHandlers';
 import { registerExternalLinkHandlers } from '../externalLinks';
 import { repoJobRegistry } from '../repoJobRegistry';
@@ -103,6 +104,7 @@ export function setupIPC({
   registerRepositoryLocationHandlers(gitService, locationService, (oldPath) => maintenance.service.repositoryRelocated(oldPath));
   registerRepositorySecretScanAllowlistHandlers({ gitService, repoJobRegistry, readSettingsWithMigration });
   registerProjectPlannerHandlers({ gitService });
+  const plannerWork = registerPlannerWorkHandlers(gitService);
   registerUpdaterHandlers({ updaterManager });
   registerUserNotesHandlers(userNotesManager);
   registerAiHandlers({
@@ -133,7 +135,13 @@ export function setupIPC({
     getCredentialGeneration: (id) => hostingService.generation(id),
     createCredentialEnvironment,
   });
-  registerBranchCleanupHandlers({ gitService, transfers, hosting: hostingService, credentials: createCredentialEnvironment });
+  registerBranchCleanupHandlers({
+    gitService,
+    transfers,
+    hosting: hostingService,
+    credentials: createCredentialEnvironment,
+    taskBranches: (repo) => plannerWork.protectedBranches(repo),
+  });
   registerDiagnosticsHandlers({ buildDiagnosticsReport });
   registerFeedbackHandlers({
     githubService,

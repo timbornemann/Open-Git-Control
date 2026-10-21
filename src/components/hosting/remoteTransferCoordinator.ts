@@ -7,6 +7,7 @@ import type { RemoteTransferDialog } from './remoteTransferDialogState';
 import { initialRemoteTransferState, useRemoteTransferState, type RemoteTransferSelection, type RemoteTransferState } from './remoteTransferState';
 import { syncRemoteTags } from './syncRemoteTags';
 import { notifyRemoteSyncSuccess } from '@/data/remoteSyncEvents';
+import { normalizeRepoPathKey } from '@/utils/repoPath';
 
 export interface RemoteTransferContext {
   repoPath: string | null;
@@ -21,7 +22,8 @@ export interface RemoteTransferEnvironment {
   openConfiguration: (repoPath: string) => void;
   tr: (de: string, en: string) => string;
 }
-const contextKey = ({ repoPath, branch, accounts }: RemoteTransferContext) => JSON.stringify([repoPath, branch, accounts]);
+export const remoteTransferContextKey = ({ repoPath, branch, accounts }: RemoteTransferContext) =>
+  JSON.stringify([repoPath ? normalizeRepoPathKey(repoPath) : null, branch, accounts]);
 const unresolved = (status: string) => !['success', 'up-to-date'].includes(status);
 
 /** A mounted host owns this coordinator; closing an editor never starts a transfer. */
@@ -38,7 +40,8 @@ export class RemoteTransferCoordinator {
     useRemoteTransferState.setState(update);
   }
   private assertContext(generation: number) {
-    if (generation !== this.generation || this.context !== contextKey(this.environment.getContext())) throw new Error('Transfer context changed.');
+    if (generation !== this.generation || this.context !== remoteTransferContextKey(this.environment.getContext()))
+      throw new Error('Transfer context changed.');
     if (this.cancelled) throw new Error(this.environment.tr('Übertragung abgebrochen.', 'Transfer cancelled.'));
   }
   private async scoped<T>(operation: () => Promise<T>, generation = this.generation) {
@@ -52,7 +55,7 @@ export class RemoteTransferCoordinator {
     try {
       await operation();
     } catch (reason) {
-      if (generation !== this.generation || this.context !== contextKey(this.environment.getContext())) return;
+      if (generation !== this.generation || this.context !== remoteTransferContextKey(this.environment.getContext())) return;
       const error = this.cancelled
         ? this.environment.tr('Übertragung abgebrochen.', 'Transfer cancelled.')
         : reason instanceof Error
@@ -69,12 +72,17 @@ export class RemoteTransferCoordinator {
     }
     if (this.state.busy) return;
     this.generation++;
-    this.context = contextKey(this.environment.getContext());
+    this.context = remoteTransferContextKey(this.environment.getContext());
     this.cancelled = false;
     this.set({ ...initialRemoteTransferState(), phase: 'preparing', busy: true, intent });
     await this.run(async () => {
-      if (intent.repoPath !== this.environment.getContext().repoPath)
-        throw new Error(this.environment.tr('Repository wurde gewechselt.', 'Repository changed.'));
+      if (normalizeRepoPathKey(intent.repoPath) !== normalizeRepoPathKey(this.environment.getContext().repoPath || ''))
+        throw new Error(
+          this.environment.tr(
+            'Übertragung nicht gestartet: Inzwischen ist ein anderes Repository ausgewählt. Öffne das gewünschte Repository und versuche es erneut.',
+            'Transfer not started: a different repository is now selected. Open the intended repository and try again.',
+          ),
+        );
       const [snapshot, preferences] = await this.scoped(() =>
         Promise.all([
           transferClient.request('getRemotes', { repoPath: intent.repoPath }),
@@ -187,7 +195,7 @@ export class RemoteTransferCoordinator {
     try {
       await this.scoped(() => transferClient.request('pull', input));
     } catch (error) {
-      if (generation === this.generation && this.context === contextKey(this.environment.getContext())) {
+      if (generation === this.generation && this.context === remoteTransferContextKey(this.environment.getContext())) {
         if (!this.cancelled) this.set({ failedPull: input });
         this.environment.refresh();
       }
@@ -309,12 +317,14 @@ export class RemoteTransferCoordinator {
           })
         : await transferClient.request('executePush', { repoPath: intent.repoPath, planId: plan.id });
     // A cancelled push can still return successful endpoints; keep its full result visible.
-    if (generation !== this.generation || this.context !== contextKey(this.environment.getContext())) return;
+    if (generation !== this.generation || this.context !== remoteTransferContextKey(this.environment.getContext())) return;
     this.set({ batch: next, busy: false, cancelling: false, resultVisible: false, phase: next.state === 'success' ? 'idle' : 'result' });
     this.environment.refresh();
     const message =
       next.state === 'success'
-        ? this.environment.tr('Push abgeschlossen.', 'Push completed.')
+        ? next.targets.length > 0 && next.targets.every((target) => target.status === 'up-to-date')
+          ? this.environment.tr('Alle ausgewählten Push-Ziele sind bereits aktuell.', 'All selected push targets are already up to date.')
+          : this.environment.tr('Push abgeschlossen.', 'Push completed.')
         : next.state === 'cancelled'
           ? this.environment.tr('Push abgebrochen.', 'Push cancelled.')
           : next.state === 'partial'

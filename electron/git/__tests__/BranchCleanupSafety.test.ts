@@ -31,6 +31,42 @@ afterEach(async () => {
 }, 60_000);
 
 describe('branch cleanup snapshot and deletion safeguards', () => {
+  test('locks aliased common and per-worktree Git directories only once', async (lifecycle) => {
+    const f = cleanupFixture(lifecycle, false);
+    git(f.repo, 'branch', 'done');
+    const physicalGitDir = fs.realpathSync.native(path.join(f.repo, '.git'));
+    const commonAlias = path.join(f.root, 'common-alias');
+    fs.symlinkSync(physicalGitDir, commonAlias, process.platform === 'win32' ? 'junction' : 'dir');
+    const run = lifecycle.runner.run.bind(lifecycle.runner);
+    vi.spyOn(lifecycle.runner, 'run').mockImplementation((repo, args, options) => {
+      // Git can mix logical/physical paths, e.g. /var vs /private/var or Windows 8.3 names.
+      if (args[0] === 'rev-parse' && args[1] === '--git-common-dir') return Promise.resolve(commonAlias);
+      if (args[0] === 'rev-parse' && args[1] === '--absolute-git-dir') return Promise.resolve(physicalGitDir);
+      return run(repo, args, options);
+    });
+    const plan = await f.inspect();
+    const candidate = plan.candidates.find((entry) => entry.name === 'done')!;
+    expect((await f.execute(plan, [candidate])).outcomes[0]).toMatchObject({ status: 'deleted', message: 'deleted' });
+    expect(f.hasRef(f.repo, candidate.ref)).toBe(false);
+    expect(fs.existsSync(path.join(physicalGitDir, 'HEAD.lock'))).toBe(false);
+  });
+
+  test('preserves foreign worktree HEAD locks and releases only locks acquired by cleanup', async (lifecycle) => {
+    const f = cleanupFixture(lifecycle, false);
+    git(f.repo, 'branch', 'done');
+    git(f.repo, 'branch', 'occupied');
+    const worktree = path.join(f.root, 'occupied-worktree');
+    git(f.repo, 'worktree', 'add', worktree, 'occupied');
+    const foreignLock = path.join(git(worktree, 'rev-parse', '--absolute-git-dir'), 'HEAD.lock');
+    fs.writeFileSync(foreignLock, 'owned by another Git operation\n');
+    const plan = await f.inspect();
+    const candidate = plan.candidates.find((entry) => entry.name === 'done')!;
+    expect((await f.execute(plan, [candidate])).outcomes[0].status).toBe('failed');
+    expect(f.hasRef(f.repo, candidate.ref)).toBe(true);
+    expect(fs.readFileSync(foreignLock, 'utf8')).toBe('owned by another Git operation\n');
+    expect(fs.existsSync(path.join(f.repo, '.git', 'HEAD.lock'))).toBe(false);
+  });
+
   test('binds plans to their window, generation and lifetime and rejects protected selections', async (lifecycle) => {
     const f = cleanupFixture(lifecycle, false);
     git(f.repo, 'branch', 'done');

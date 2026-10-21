@@ -1,6 +1,6 @@
 import { DataPlaceholder } from '@/components/common/DataPlaceholder';
 import React from 'react';
-import { AlertTriangle, Bug, CheckCircle2, CircleDot, Copy, FolderGit2, Lightbulb, Pencil, Plus, Rocket, Search, Sparkles, Tag } from 'lucide-react';
+import { AlertTriangle, Bug, CheckCircle2, CircleDot, Copy, FolderGit2, Lightbulb, Pencil, Plus, Rocket, Search, Sparkles } from 'lucide-react';
 import { EmptyState } from '@/components/EmptyState';
 import { useSettingsContext, useUIContext } from '@/contexts/AppStateContext';
 import { useProjectPlanner } from '@/contexts/ProjectPlannerContext';
@@ -8,9 +8,14 @@ import { useI18n } from '@/i18n';
 import type { PlannerItem, PlannerPriority, PlannerStatus } from '@/types/projectPlanner';
 import { ItemDialog, MaterializeDialog, PRIORITY_OPTIONS, ProjectDialog, STATUS_OPTIONS, usePlannerLabels } from './PlannerDialogs';
 import { appClient } from '@/services/appClient';
-import { usePlannerAiActions, type PlannerCommitMessageItem } from './usePlannerAiActions';
+import { usePlannerAiActions } from './usePlannerAiActions';
 import { PlannerItemContextMenu, type PlannerItemContextMenuState } from './PlannerItemContextMenu';
 import '@/styles/project-planner.css';
+import { usePlannerCompletion } from './usePlannerCompletion';
+import { requestPlannerWork, usePlannerWorkDialogState } from './plannerWorkDialogState';
+import { PlannerItemWorkPanel } from './PlannerItemWorkPanel';
+import { PlannerItemCard } from './PlannerItemCard';
+import { plannerDraftPatch } from './plannerDraftPatch';
 
 const statusIcons: Record<PlannerStatus, React.ReactNode> = {
   idea: <Lightbulb size={14} />,
@@ -52,6 +57,7 @@ export const ProjectPlannerView: React.FC = () => {
   const [projectDialogOpen, setProjectDialogOpen] = React.useState(false);
   const [editingProject, setEditingProject] = React.useState(false);
   const [itemDialogOpen, setItemDialogOpen] = React.useState(false);
+  const workflowOpen = usePlannerWorkDialogState((state) => Boolean(state.target));
   const [editingItem, setEditingItem] = React.useState<PlannerItem | null>(null);
   const [newItemStatus, setNewItemStatus] = React.useState<PlannerStatus>('idea');
   const [itemContextMenu, setItemContextMenu] = React.useState<PlannerItemContextMenuState | null>(null);
@@ -62,16 +68,7 @@ export const ProjectPlannerView: React.FC = () => {
   const projectDialogProjectIdRef = React.useRef<string | null>(null);
   const itemDialogProjectIdRef = React.useRef<string | null>(null);
   const materializeProjectIdRef = React.useRef<string | null>(null);
-  const markItemsDone = React.useCallback(
-    async (items: PlannerCommitMessageItem[]) => {
-      for (const item of items) {
-        if (item.id && (item.persistedStatus ?? item.status) !== 'done') {
-          await updateItem(item.id, { status: 'done' });
-        }
-      }
-    },
-    [updateItem],
-  );
+  const markItemsDone = usePlannerCompletion(itemsForSelectedProject, updateItem);
   const plannerAiActions = usePlannerAiActions({
     project: selectedProject,
     settings: settingsState.settings,
@@ -148,10 +145,8 @@ export const ProjectPlannerView: React.FC = () => {
   React.useLayoutEffect(() => {
     if (!itemDialogOpen || !editingItem) return;
     const projectId = itemDialogProjectIdRef.current;
-    // An external API/MCP update may edit or move the item while this dialog
-    // contains an older draft. Close it instead of silently overwriting newer
-    // data with stale form fields.
-    if (!liveEditingItem || liveEditingItem.projectId !== projectId || liveEditingItem.updatedAt !== editingItem.updatedAt) {
+    // Keep open drafts when background detection updates references or status.
+    if (!liveEditingItem || liveEditingItem.projectId !== projectId) {
       itemDialogProjectIdRef.current = null;
       setItemDialogOpen(false);
       setEditingItem(null);
@@ -344,34 +339,19 @@ export const ProjectPlannerView: React.FC = () => {
               </div>
               <div className="planner-column-list">
                 {statusItems.map((item) => (
-                  <article
+                  <PlannerItemCard
                     key={item.id}
-                    className={`planner-card planner-priority-${item.priority}`}
+                    item={item}
                     onContextMenu={(event) => {
                       event.preventDefault();
                       setItemContextMenu({ x: event.clientX, y: event.clientY, item });
                     }}
-                    onClick={() => {
+                    onEdit={() => {
                       itemDialogProjectIdRef.current = selectedProject.id;
                       setEditingItem(item);
                       setItemDialogOpen(true);
                     }}
-                  >
-                    <div className="planner-card-header">
-                      <span className={`planner-priority-badge ${item.priority}`}>{labels.priority[item.priority]}</span>
-                    </div>
-                    <h3>{item.title}</h3>
-                    {item.description && <p>{item.description}</p>}
-                    {item.tags.length > 0 && (
-                      <div className="planner-card-tags">
-                        {item.tags.map((tag) => (
-                          <span key={tag}>
-                            <Tag size={10} /> {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </article>
+                  />
                 ))}
                 {statusItems.length === 0 && (
                   <button className="planner-column-empty" onClick={() => openNewItem(status)}>
@@ -395,6 +375,7 @@ export const ProjectPlannerView: React.FC = () => {
         onChangePriority={(itemId, priority) => void updateItem(itemId, { priority })}
         onChangeStatus={(itemId, status) => void updateItem(itemId, { status })}
         onDelete={requestDeleteItem}
+        onStartWork={(item) => (selectedProject.repoPath ? requestPlannerWork(selectedProject.repoPath, item) : void handleSelectParent())}
       />
 
       <ProjectDialog
@@ -429,6 +410,7 @@ export const ProjectPlannerView: React.FC = () => {
 
       <ItemDialog
         open={itemDialogOpen}
+        suspended={workflowOpen}
         item={editingItem}
         defaultStatus={newItemStatus}
         busy={busy}
@@ -439,13 +421,23 @@ export const ProjectPlannerView: React.FC = () => {
         onSubmit={async (input) => {
           const projectId = itemDialogProjectIdRef.current;
           if (!projectId || projectId !== selectedProjectIdRef.current) return;
-          if (editingItem && (!liveEditingItem || liveEditingItem.projectId !== projectId || liveEditingItem.updatedAt !== editingItem.updatedAt)) {
-            itemDialogProjectIdRef.current = null;
-            setItemDialogOpen(false);
-            setEditingItem(null);
-            return;
+          let patch = input as Partial<typeof input>;
+          if (editingItem) {
+            if (!liveEditingItem || liveEditingItem.projectId !== projectId) return;
+            try {
+              patch = plannerDraftPatch(editingItem, liveEditingItem, input);
+            } catch {
+              notify(
+                tr(
+                  'Die Aufgabe wurde zwischenzeitlich geändert. Entwurf prüfen oder neu laden.',
+                  'The task changed in the meantime. Review the draft or reload it.',
+                ),
+                true,
+              );
+              return;
+            }
           }
-          const ok = editingItem ? await updateItem(editingItem.id, input) : await createItem(projectId, input);
+          const ok = editingItem ? await updateItem(editingItem.id, patch) : await createItem(projectId, input);
           if (ok) {
             itemDialogProjectIdRef.current = null;
             setItemDialogOpen(false);
@@ -454,6 +446,21 @@ export const ProjectPlannerView: React.FC = () => {
         onCopyAgentPrompt={(item) => void plannerAiActions.copyItemPrompt(item)}
         onGenerateCommitMessage={selectedProject.repoPath ? (item) => plannerAiActions.generateCommitMessageForItem(item) : undefined}
         isAiCommitGenerating={plannerAiActions.isAiCommitGenerating}
+        workPanel={
+          liveEditingItem && editingItem ? (
+            <PlannerItemWorkPanel
+              item={liveEditingItem}
+              original={editingItem}
+              repoPath={selectedProject.repoPath}
+              onReload={() => setEditingItem(liveEditingItem)}
+              onNavigate={() => setItemDialogOpen(false)}
+              onMaterialize={() => {
+                setItemDialogOpen(false);
+                void handleSelectParent();
+              }}
+            />
+          ) : undefined
+        }
       />
 
       <MaterializeDialog

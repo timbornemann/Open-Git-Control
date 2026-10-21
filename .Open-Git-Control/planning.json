@@ -78,17 +78,6 @@
       "updatedAt": 1792502640868
     },
     {
-      "id": "fc1e7cb2-92bc-4fd6-b21f-52afb06eaf64",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Aufgabe → Branch → Commit → PR verbinden",
-      "description": "Im Planner „Bearbeitung starten“ anbieten: Branchname vorschlagen, Branch erstellen und Aufgabe zuordnen. Commits und PR anschließend verknüpfen. Dafür die [Aufgabendaten (line 15)](D:/Projects/Software/Open-Git-Control/src/types/projectPlanner.ts:15) um strukturierte Referenzen erweitern. Das spart Namensgebung, Suchen und manuelle Statuspflege.",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1792501044485,
-      "updatedAt": 1792502644954
-    },
-    {
       "id": "24836c97-af92-44db-9ce6-2e1c1df11b7b",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Geführter Abschluss eines Arbeitsschritts",
@@ -120,28 +109,6 @@
       "tags": [],
       "createdAt": 1792501086451,
       "updatedAt": 1792502665319
-    },
-    {
-      "id": "5b1c2fb3-49c1-45bc-b4a8-1899de1d0443",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Änderungen beim Branchwechsel geführt mitnehmen oder parken",
-      "description": "Neben den vorhandenen Warnungen einen zusammenhängenden Ablauf anbieten: Änderungen prüfen → benannten Stash erstellen → wechseln → bei Bedarf wiederherstellen. Gestagte und ungestagte Änderungen sowie neue Dateien sichtbar unterscheiden. Das erspart mehrere manuelle Stash-Aktionen.",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1792501100579,
-      "updatedAt": 1792502675244
-    },
-    {
-      "id": "c765bece-a65b-4b38-93f7-d5a28f534ecc",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Konsolenfehler direkt als Aufgabe übernehmen",
-      "description": "Im Probleme-Tab „Als Bug aufnehmen“ ergänzen. Fehlermeldung, Dateiposition, ausgeführter Befehl und ein begrenzter Logauszug werden als bearbeitbarer Planner-Entwurf übernommen.",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1792501116276,
-      "updatedAt": 1792502679090
     },
     {
       "id": "fef11401-94ff-4855-a0f7-d014394c50eb",
@@ -274,6 +241,72 @@
       "tags": [],
       "createdAt": 1792502701083,
       "updatedAt": 1792502701083
+    },
+    {
+      "id": "5b1c2fb3-49c1-45bc-b4a8-1899de1d0443",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Änderungen beim Branchwechsel geführt mitnehmen oder parken",
+      "description": "Neben den vorhandenen Warnungen einen zusammenhängenden Ablauf anbieten: Änderungen prüfen → benannten Stash erstellen → wechseln → bei Bedarf wiederherstellen. Gestagte und ungestagte Änderungen sowie neue Dateien sichtbar unterscheiden. Das erspart mehrere manuelle Stash-Aktionen.",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [],
+      "references": {
+        "activeWorkflowId": "4ff99da2-f541-4717-a91a-b33ce1e0b4bc",
+        "branches": [
+          {
+            "id": "4ff99da2-f541-4717-a91a-b33ce1e0b4bc",
+            "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+            "name": "task/61c0d223-anderungen-beim-branchwechsel-gefuhrt-mitnehmen-oder-parken",
+            "baseRef": "refs/heads/master",
+            "baseSha": "51df5b17d777e22c08cbf629b7206af51dd7711d",
+            "startedAt": 1792583781025,
+            "automationPaused": true,
+            "repository": {
+              "provider": "github",
+              "server": "https://github.com",
+              "repositoryId": "1176739168",
+              "fullPath": "timbornemann/Open-Git-Control"
+            }
+          }
+        ],
+        "pullRequests": []
+      },
+      "createdAt": 1792501100579,
+      "updatedAt": 1792583900508
+    },
+    {
+      "id": "3f29063f-5810-47a2-b3f1-4a611fe1cd55",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Fix-Workflow-layout",
+      "description": "Die bedinung und auch die optik sind nicht os passend, es ist aktuell eher schwer zu verstehen was was macht wenn man bereits in dem branch ist kann man aktuell trozdem resume work machen, auch ist nicht klar in wlecher phase man ist udn so weiter wenn ich auf start work klicke kommt ein weiteres model, dieses sittz aber hinter dem edit item modal, das ist also nicht so schlau das edit item und das task and git workflow im gleichen edit modal leigen a sie sich in die qerere kommen es wäre also besser als eigenes modal mit klarer und einfacher minimaler aber gut vertsändlicher optik",
+      "priority": "medium",
+      "status": "in-progress",
+      "tags": [
+        "Bug"
+      ],
+      "references": {
+        "activeWorkflowId": "c82e7c44-5b40-4c73-bd8e-9910203dc355",
+        "branches": [
+          {
+            "id": "c82e7c44-5b40-4c73-bd8e-9910203dc355",
+            "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+            "name": "task/51ee535f-fix-workflow-layout",
+            "baseRef": "refs/heads/master",
+            "baseSha": "51df5b17d777e22c08cbf629b7206af51dd7711d",
+            "startedAt": 1792584012987,
+            "automationPaused": true,
+            "repository": {
+              "provider": "github",
+              "server": "https://github.com",
+              "repositoryId": "1176739168",
+              "fullPath": "timbornemann/Open-Git-Control"
+            }
+          }
+        ],
+        "pullRequests": []
+      },
+      "createdAt": 1792583992066,
+      "updatedAt": 1792584118123
     }
   ]
 }

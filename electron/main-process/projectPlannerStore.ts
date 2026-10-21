@@ -5,6 +5,9 @@ import * as path from 'path';
 import { writeTextFileAtomically } from './atomicFile';
 import { ensureOpenGitControlReadme, getOpenGitControlAssetPath } from './openGitControlDirectory';
 import { ApiError } from './planningApiTypes';
+import { plannerWorkDetached } from './plannerWorkEvents';
+import { updatePlannerItemInData, type PlannerItemUpdateOptions } from './plannerItemUpdates';
+export { updatePlannerItemInData, type PlannerItemUpdateOptions } from './plannerItemUpdates';
 import { readStoreData } from './repoStore';
 import {
   cleanPlannerText,
@@ -60,6 +63,7 @@ const notifyDataChanged = (): void => {
     }
   }
 };
+export const notifyProjectPlannerDataChanged = notifyDataChanged;
 
 export function onProjectPlannerDataChanged(listener: () => void): () => void {
   plannerDataListeners.add(listener);
@@ -342,6 +346,10 @@ export function deletePlannerProject(projectId: string): void {
     projects: storage.data.projects.filter((project) => project.id !== projectId),
     items: storage.data.items.filter((item) => item.projectId !== projectId),
   });
+  plannerWorkDetached(
+    storage.repoPath,
+    storage.data.items.filter((item) => item.projectId === projectId).map((item) => item.id),
+  );
 }
 
 export function deleteRepositoryPlannerProjectByPath(repoPath: string): { deletedProjectCount: number; deletedItemCount: number } {
@@ -363,6 +371,10 @@ export function deleteRepositoryPlannerProjectByPath(repoPath: string): { delete
     if (!legacyProjects.length) throw error;
   }
   if (legacyProjects.length || repositoryData.projects.length) notifyDataChanged();
+  plannerWorkDetached(
+    repoPath,
+    repositoryData.items.map((item) => item.id),
+  );
   return { deletedProjectCount: legacyProjects.length + repositoryData.projects.length, deletedItemCount: legacyItemCount + repositoryData.items.length };
 }
 
@@ -394,34 +406,6 @@ export function createPlannerItem(projectId: string, input: PlannerItemInput): P
   return item;
 }
 
-export type PlannerItemUpdateOptions = { projectId?: string };
-export function updatePlannerItemInData(
-  data: ProjectPlannerData,
-  itemId: string,
-  input: Partial<PlannerItemInput>,
-  options: PlannerItemUpdateOptions = {},
-): PlannerItem {
-  const index = data.items.findIndex((item) => item.id === itemId);
-  if (index < 0) throw new ApiError(404, 'TODO_NOT_FOUND', 'Todo not found.');
-  const current = data.items[index];
-  const title = input.title === undefined ? current.title : cleanPlannerText(input.title, 240);
-  if (!title) throw new ApiError(400, 'TITLE_REQUIRED', 'Item title is required.');
-  const projectId = options.projectId === undefined ? current.projectId : cleanPlannerText(options.projectId, 100);
-  if (!data.projects.some((project) => project.id === projectId)) throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
-  const updated: PlannerItem = {
-    ...current,
-    projectId,
-    title,
-    description: input.description === undefined ? current.description : cleanPlannerText(input.description, 20_000),
-    priority: input.priority !== undefined && isPlannerPriority(input.priority) ? input.priority : current.priority,
-    status: input.status !== undefined && isPlannerStatus(input.status) ? input.status : current.status,
-    tags: input.tags === undefined ? current.tags : normalizePlannerTags(input.tags),
-    updatedAt: Date.now(),
-  };
-  data.items = data.items.map((item, itemIndex) => (itemIndex === index ? updated : item));
-  return updated;
-}
-
 const findItemStorage = (itemId: string): Storage => {
   const data = readProjectPlannerData();
   const item = data.items.find((candidate) => candidate.id === itemId);
@@ -448,6 +432,7 @@ export function updatePlannerItem(itemId: string, input: Partial<PlannerItemInpu
   target.data.items = [...target.data.items, moved];
   writeStorage(target, target.data);
   writeStorage(source, source.data);
+  plannerWorkDetached(source.repoPath, [itemId]);
   return moved;
 }
 
@@ -458,6 +443,7 @@ export function movePlannerItem(itemId: string, input: { projectId?: string; sta
 export function deletePlannerItem(itemId: string): void {
   const storage = findItemStorage(itemId);
   writeStorage(storage, { ...storage.data, items: storage.data.items.filter((item) => item.id !== itemId) });
+  plannerWorkDetached(storage.repoPath, [itemId]);
 }
 
 export function convertProjectToRepository(projectId: string, repoPath: string): PlannerProject {

@@ -371,7 +371,10 @@
   font: 0.78rem/1.5 var(--font-mono);
   overflow-wrap: anywhere;
 }
-.repository-run-console__problem button {
+.repository-run-console__problem-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 9px;
 }
 .repository-run-console__problem.warning > svg {

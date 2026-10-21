@@ -19,6 +19,8 @@ export interface StorageAdapter {
 }
 /** Every persisted area must declare its ownership and retention here. */
 export const STORAGE_ADAPTERS: readonly StorageAdapter[] = [
+  { name: 'planner-work', category: 'auxiliary', disposable: true, matches: (p) => /^planner-work-v1\/[a-f0-9]{64}\.json$/.test(p) },
+  { name: 'planner-work-recovery', category: 'protected', disposable: false, matches: (p) => /^planner-work-v1\/recovery-[a-f0-9]{64}\.json$/.test(p) },
   { name: 'branch-cleanup-protection', category: 'protected', disposable: false, matches: (p) => p === 'branch-cleanup.json' },
   // Kept available offline; the notes synchronizer owns retention and pruning.
   { name: 'user-notes', category: 'auxiliary', disposable: false, matches: (p) => p === 'user-notes-v1.json' },

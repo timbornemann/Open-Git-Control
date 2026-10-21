@@ -5,6 +5,7 @@ import { createBranchCleanupApi } from './createBranchCleanupApi';
 import { createRepositoryLocationApi } from './createRepositoryLocationApi';
 import { createSystemToolsApi } from './createSystemToolsApi';
 import { createStorageApi } from './createStorageApi';
+import { createPlannerWorkApi } from './createPlannerWorkApi';
 import { createUpdaterApi } from './createUpdaterApi';
 import { createUserNotesApi } from './createUserNotesApi';
 import type { RepositoryMutation } from '../../src/shared/ipc/storageMaintenance';
@@ -314,6 +315,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       return () => ipcRenderer.removeListener(IpcChannel.ReposChanged, handler);
     },
     ...createStorageApi(ipcRenderer),
+    ...createPlannerWorkApi(ipcRenderer),
     setStoredRepos: (data: StoredRepoData) => ipcRenderer.invoke(IpcChannel.ReposSetStored, data),
     ...createRepositoryRunApi(ipcRenderer),
     plannerGetData: () => ipcRenderer.invoke(IpcChannel.PlannerGetData),
@@ -439,6 +441,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     },
     planner: {
       plannerGetData: flatApi.plannerGetData,
+      ...createPlannerWorkApi(ipcRenderer),
       onPlannerDataChanged: flatApi.onPlannerDataChanged,
       plannerEnsureRepositoryProject: flatApi.plannerEnsureRepositoryProject,
       plannerCreateProject: flatApi.plannerCreateProject,

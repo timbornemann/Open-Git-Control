@@ -1,4 +1,4 @@
-import { AlertCircle, AlertTriangle } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Bug } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import type { RepositoryRunProblem } from '@/utils/repositoryRunOutput';
 import { resolveRepositoryRunFile } from '@/utils/repositoryRunFileLinks';
@@ -35,9 +35,14 @@ export function RepositoryRunProblemHint({ problem }: { problem: RepositoryRunPr
 export function RepositoryRunProblems({
   problems,
   onShowOutput,
+  onCreateBug,
   repoPath,
   onOpenFile,
-}: { problems: RepositoryRunProblem[]; onShowOutput: (sequence: number) => void } & RepositoryRunFileLinkProps) {
+}: {
+  problems: RepositoryRunProblem[];
+  onShowOutput: (sequence: number) => void;
+  onCreateBug: (problem: RepositoryRunProblem) => void;
+} & RepositoryRunFileLinkProps) {
   const { tr } = useI18n();
   if (!problems.length) return <p className="repository-run-console__empty">{tr('Keine auswertbaren Probleme gefunden.', 'No parseable problems found.')}</p>;
   return (
@@ -79,9 +84,15 @@ export function RepositoryRunProblems({
                   </pre>
                 </details>
               )}
-              <button className="staging-tool-btn" onClick={() => onShowOutput(problem.sequence)}>
-                {tr('In Konsole anzeigen', 'Show in console')}
-              </button>
+              <div className="repository-run-console__problem-actions">
+                <button type="button" className="staging-tool-btn" onClick={() => onShowOutput(problem.sequence)}>
+                  {tr('In Konsole anzeigen', 'Show in console')}
+                </button>
+                <button type="button" className="staging-tool-btn" onClick={() => onCreateBug(problem)}>
+                  <Bug size={13} />
+                  {tr('Als Bug aufnehmen', 'Add as bug')}
+                </button>
+              </div>
             </div>
           </article>
         );

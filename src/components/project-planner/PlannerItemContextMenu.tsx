@@ -1,5 +1,7 @@
 import React from 'react';
-import { ChevronRight, Copy, Flag, ListTodo, Sparkles, Trash2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ChevronRight, Copy, Flag, GitBranch, ListTodo, Sparkles, Trash2 } from 'lucide-react';
+import { activePlannerBranch } from '@/shared/plannerWork';
 import { useI18n } from '@/i18n';
 import type { PlannerItem, PlannerPriority, PlannerStatus } from '@/types/projectPlanner';
 import { PRIORITY_OPTIONS, STATUS_OPTIONS, usePlannerLabels } from './PlannerDialogs';
@@ -21,6 +23,7 @@ type PlannerItemContextMenuProps = {
   onChangePriority: (itemId: string, priority: PlannerPriority) => void;
   onChangeStatus: (itemId: string, status: PlannerStatus) => void;
   onDelete: (itemId: string) => void;
+  onStartWork?: (item: PlannerItem) => void;
 };
 
 type Submenu = 'priority' | 'status' | null;
@@ -40,12 +43,16 @@ export const PlannerItemContextMenu: React.FC<PlannerItemContextMenuProps> = ({
   onChangePriority,
   onChangeStatus,
   onDelete,
+  onStartWork,
 }) => {
   const { tr } = useI18n();
   const labels = usePlannerLabels();
   const menuRef = React.useRef<HTMLDivElement>(null);
+  const submenuRef = React.useRef<HTMLDivElement>(null);
+  const submenuTriggersRef = React.useRef<Partial<Record<Exclude<Submenu, null>, HTMLDivElement | null>>>({});
   const [submenu, setSubmenu] = React.useState<Submenu>(null);
-  const [placement, setPlacement] = React.useState({ left: 0, top: 0, opensLeft: false });
+  const [placement, setPlacement] = React.useState({ left: 0, top: 0 });
+  const [submenuPlacement, setSubmenuPlacement] = React.useState({ left: 0, top: 0 });
 
   React.useLayoutEffect(() => {
     if (!contextMenu) return;
@@ -53,9 +60,31 @@ export const PlannerItemContextMenu: React.FC<PlannerItemContextMenuProps> = ({
     const height = menuRef.current?.offsetHeight || 300;
     const left = Math.max(MENU_MARGIN, Math.min(contextMenu.x, window.innerWidth - width - MENU_MARGIN));
     const top = Math.max(MENU_MARGIN, Math.min(contextMenu.y, window.innerHeight - height - MENU_MARGIN));
-    setPlacement({ left, top, opensLeft: left + width + SUBMENU_WIDTH > window.innerWidth - MENU_MARGIN });
+    setPlacement({ left, top });
     setSubmenu(null);
   }, [contextMenu]);
+
+  React.useLayoutEffect(() => {
+    if (!contextMenu || !submenu) return;
+    const trigger = submenuTriggersRef.current[submenu];
+    const element = submenuRef.current;
+    if (!trigger || !element) return;
+    const place = () => {
+      const anchor = trigger.getBoundingClientRect();
+      const width = Math.min(element.offsetWidth || SUBMENU_WIDTH, window.innerWidth - MENU_MARGIN * 2);
+      const height = Math.min(element.offsetHeight || (submenu === 'priority' ? 130 : 190), window.innerHeight - MENU_MARGIN * 2);
+      const right = anchor.right - 4;
+      const left = right + width <= window.innerWidth - MENU_MARGIN ? right : anchor.left - width + 4;
+      setSubmenuPlacement({
+        left: Math.max(MENU_MARGIN, Math.min(left, window.innerWidth - width - MENU_MARGIN)),
+        top: Math.max(MENU_MARGIN, Math.min(anchor.top - 4, window.innerHeight - height - MENU_MARGIN)),
+      });
+    };
+    place();
+    const menu = menuRef.current;
+    menu?.addEventListener('scroll', place);
+    return () => menu?.removeEventListener('scroll', place);
+  }, [contextMenu, placement, submenu]);
 
   React.useEffect(() => {
     if (!contextMenu) return;
@@ -83,9 +112,12 @@ export const PlannerItemContextMenu: React.FC<PlannerItemContextMenuProps> = ({
     const options = isPriority ? PRIORITY_OPTIONS : STATUS_OPTIONS;
     return (
       <div
-        className={`planner-item-context-submenu ${placement.opensLeft ? 'opens-left' : ''}`}
+        ref={submenuRef}
+        className="planner-item-context-submenu"
         role="menu"
+        style={{ left: submenuPlacement.left, top: submenuPlacement.top }}
         aria-label={isPriority ? tr('Prioritaet waehlen', 'Choose priority') : tr('Status waehlen', 'Choose status')}
+        onMouseDown={(event) => event.stopPropagation()}
       >
         {options.map((option) => {
           const active = isPriority ? item.priority === option : item.status === option;
@@ -116,7 +148,14 @@ export const PlannerItemContextMenu: React.FC<PlannerItemContextMenuProps> = ({
   const renderSubmenuTrigger = (kind: Exclude<Submenu, null>, label: string, icon: React.ReactNode) => {
     const open = submenu === kind;
     return (
-      <div className="planner-item-context-submenu-trigger" onMouseEnter={() => setSubmenu(kind)} onFocus={() => setSubmenu(kind)}>
+      <div
+        ref={(element) => {
+          submenuTriggersRef.current[kind] = element;
+        }}
+        className="planner-item-context-submenu-trigger"
+        onMouseEnter={() => setSubmenu(kind)}
+        onFocus={() => setSubmenu(kind)}
+      >
         <button
           type="button"
           role="menuitem"
@@ -135,7 +174,7 @@ export const PlannerItemContextMenu: React.FC<PlannerItemContextMenuProps> = ({
     );
   };
 
-  return (
+  return createPortal(
     <div
       className="planner-item-context-backdrop"
       onMouseDown={onClose}
@@ -156,6 +195,12 @@ export const PlannerItemContextMenu: React.FC<PlannerItemContextMenuProps> = ({
         <div className="planner-item-context-header" title={item.title}>
           {item.title}
         </div>
+        {onStartWork && (
+          <button type="button" role="menuitem" className="planner-item-context-action" disabled={busy} onClick={() => runAction(() => onStartWork(item))}>
+            <GitBranch size={14} />
+            {activePlannerBranch(item) ? tr('Aufgaben-Workflow öffnen …', 'Open task workflow …') : tr('Bearbeitung starten', 'Start work')}
+          </button>
+        )}
         <button type="button" role="menuitem" className="planner-item-context-action" onClick={() => runAction(() => onCopyAgentPrompt(item))}>
           <Copy size={14} />
           {tr('Agent-Prompt kopieren', 'Copy agent prompt')}
@@ -181,6 +226,7 @@ export const PlannerItemContextMenu: React.FC<PlannerItemContextMenuProps> = ({
           {tr('Todo loeschen', 'Delete todo')}
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };

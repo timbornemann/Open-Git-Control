@@ -6,7 +6,7 @@ import { useI18n } from '@/i18n';
 import { useHostingState } from './hostingState';
 import { useRemoteTransferDialogState } from './remoteTransferDialogState';
 import { useRemoteTransferState } from './remoteTransferState';
-import { RemoteTransferCoordinator, type RemoteTransferContext } from './remoteTransferCoordinator';
+import { RemoteTransferCoordinator, remoteTransferContextKey, type RemoteTransferContext } from './remoteTransferCoordinator';
 import { RemoteTransferPanel } from './RemoteTransferPanel';
 import { useRemoteTransferNotifications } from './useRemoteTransferNotifications';
 import './hosting.css';
@@ -23,6 +23,7 @@ export function RemoteTransferHost({ onOpenConfiguration }: { onOpenConfiguratio
   const connections = useHostingState((state) => state.connections);
   const accounts = JSON.stringify(connections.map(({ id, authenticated, username, userId, apiBaseUrl }) => [id, authenticated, username, userId, apiBaseUrl]));
   const context: RemoteTransferContext = { repoPath, branch, accounts, scanEnabled };
+  const contextRevision = remoteTransferContextKey(context);
   const complete = useRef<(message: string, error: boolean) => void>(() => {});
   const environment = useRef({ context, refresh, tr, onOpenConfiguration });
   useLayoutEffect(() => {
@@ -38,10 +39,10 @@ export function RemoteTransferHost({ onOpenConfiguration }: { onOpenConfiguratio
       openConfiguration: (path) => environment.current.onOpenConfiguration(path),
     });
   const coordinator = coordinatorRef.current;
-  complete.current = useRemoteTransferNotifications(coordinator, JSON.stringify([repoPath, branch, accounts]), tr);
+  complete.current = useRemoteTransferNotifications(coordinator, contextRevision, tr);
   useLayoutEffect(() => {
     coordinator.invalidate();
-  }, [coordinator, repoPath, branch, accounts]);
+  }, [coordinator, contextRevision]);
   useEffect(() => () => coordinator.invalidate(), [coordinator]);
   const intent = useRemoteTransferDialogState((state) => state.dialog);
   const closeRequest = useRemoteTransferDialogState((state) => state.close);

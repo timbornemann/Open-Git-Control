@@ -58,7 +58,9 @@ export function useRemoteTransferNotifications(coordinator: RemoteTransferCoordi
               gitContext: transferFailureContext(current, failedTargets.length === 1 ? failedTargets[0] : undefined),
               technicalDetails: failedTargets.length
                 ? failedTargets.map((target) => `${target.remoteName} (${target.url})\n${pushFailureDetails(target)}`).join('\n\n')
-                : current.error || undefined,
+                : current.error !== message
+                  ? current.error || undefined
+                  : undefined,
             }
           : {}),
         detail:

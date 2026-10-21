@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 
-import { act, createElement } from 'react';
+import { act, createElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfirmDialogState } from '@/app/state/contracts';
 import { DEFAULT_SETTINGS } from '@/app/state/defaultSettings';
+import { Confirm } from '@/components/Confirm';
 import { clearCommitFormDraftsForTests, getCommitFormDraft, updateCommitFormDraft } from '@/components/staging-area/commitFormDraft';
+import { I18nProvider, type AppLanguage } from '@/i18n';
 import { aiClient } from '@/services/aiClient';
 import { copyTextToClipboard } from '@/utils/clipboard';
 import { openStagingCommitArea } from '@/utils/layoutPreferences';
@@ -52,19 +54,33 @@ describe('usePlannerAiActions', () => {
   const markItemsDone = vi.fn();
   const setConfirmDialog = vi.fn();
 
-  const render = () => {
+  const render = (language: AppLanguage = 'de') => {
     const Harness = () => {
+      const [dialog, setDialog] = useState<ConfirmDialogState | null>(null);
       actions = usePlannerAiActions({
         project,
         settings: { ...DEFAULT_SETTINGS, aiCommitMessageLanguage: 'en' },
         activateRepositoryProject,
         markItemsDone,
         notify,
-        setConfirmDialog,
+        setConfirmDialog: (value) => {
+          setConfirmDialog(value);
+          setDialog(value);
+        },
       });
-      return null;
+      return dialog
+        ? createElement(Confirm, {
+            ...dialog,
+            open: true,
+            onConfirm: () => {
+              setDialog(null);
+              void dialog.onConfirm();
+            },
+            onCancel: () => setDialog(null),
+          })
+        : null;
     };
-    act(() => root.render(createElement(Harness)));
+    act(() => root.render(createElement(I18nProvider, { language, children: createElement(Harness) })));
   };
 
   const flush = async () => {
@@ -154,7 +170,7 @@ describe('usePlannerAiActions', () => {
     expect(markItemsDone).toHaveBeenCalledWith([item]);
   });
 
-  it('completes every visible todo supplied to a status action', async () => {
+  it('requires confirmation before completing every visible todo supplied to a status action', async () => {
     render();
     const visibleItems = [
       { ...item, id: 'item-urgent', title: 'Urgent priority', priority: 'urgent' as const },
@@ -162,9 +178,89 @@ describe('usePlannerAiActions', () => {
     ];
 
     act(() => actions!.generateCommitMessageForStatus(visibleItems));
+
+    expect(aiClient.generateCommitMessage).not.toHaveBeenCalled();
+    expect(markItemsDone).not.toHaveBeenCalled();
+    const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
+    expect(dialog.message).toContain('2 sichtbaren Einträge');
+    expect(dialog.message).toContain('2 unverknüpfte Einträge');
+    expect(dialog.contextItems).toContainEqual({ label: 'Betroffene Eintraege', value: 'Urgent priority, High priority' });
+    await act(async () => {
+      await dialog.onConfirm();
+    });
     await flush();
 
+    expect(aiClient.generateCommitMessage).toHaveBeenCalledOnce();
     expect(markItemsDone).toHaveBeenCalledWith(visibleItems);
+  });
+  it('separates linked and unlinked counts in the bulk confirmation', () => {
+    render();
+    const linked = {
+      ...item,
+      references: {
+        activeWorkflowId: 'workflow',
+        branches: [
+          {
+            id: 'workflow',
+            projectId: item.projectId,
+            name: 'task/work',
+            baseRef: 'refs/heads/main',
+            baseSha: 'a'.repeat(40),
+            startedAt: 1,
+            automationPaused: false,
+          },
+        ],
+        pullRequests: [],
+      },
+    };
+    act(() => actions!.generateCommitMessageForStatus([item, linked]));
+    const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
+    expect(dialog.message).toContain('1 unverknüpfte Einträge');
+    expect(dialog.message).toContain('1 verknüpfte Einträge warten auf den PR-Merge');
+    expect(aiClient.generateCommitMessage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['de', 'cancel'],
+    ['en', 'escape'],
+  ] as const)('leaves todos and the commit draft unchanged when a %s status confirmation is closed with %s', async (language, closeAction) => {
+    const original = updateCommitFormDraft(project.repoPath, { commitMsg: 'Keep this draft' });
+    render(language);
+
+    act(() => actions!.generateCommitMessageForStatus([item]));
+    expect(host.querySelector('[role="dialog"]')).toBeTruthy();
+    expect(host.textContent).toContain(language === 'de' ? '1 sichtbaren Einträge' : '1 visible items');
+    expect(host.textContent).toContain(language === 'de' ? 'erledigt' : 'done');
+    act(() => {
+      if (closeAction === 'escape') document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      else host.querySelector<HTMLButtonElement>('.dialog-btn-secondary')!.click();
+    });
+    await flush();
+
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    expect(aiClient.generateCommitMessage).not.toHaveBeenCalled();
+    expect(activateRepositoryProject).not.toHaveBeenCalled();
+    expect(markItemsDone).not.toHaveBeenCalled();
+    expect(getCommitFormDraft(project.repoPath, '')).toEqual(original);
+  });
+
+  it('confirms completing status items and replacing an existing draft in a single dialog', async () => {
+    updateCommitFormDraft(project.repoPath, { commitMsg: 'Existing draft' });
+    render();
+
+    act(() => actions!.generateCommitMessageForStatus([item]));
+    const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
+    expect(dialog.contextItems).toContainEqual({ label: 'Aktueller Titel', value: 'Existing draft' });
+    expect(dialog.consequences).toContain('ersetzt');
+    expect(aiClient.generateCommitMessage).not.toHaveBeenCalled();
+
+    act(() => host.querySelector<HTMLButtonElement>('.dialog-btn-primary')!.click());
+    await flush();
+
+    expect(setConfirmDialog).toHaveBeenCalledOnce();
+    expect(aiClient.generateCommitMessage).toHaveBeenCalledOnce();
+    expect(markItemsDone).toHaveBeenCalledWith([item]);
+    expect(getCommitFormDraft(project.repoPath, '').commitMsg).toBe('fix(git): support copied paths');
   });
 
   it('does not complete todos when generating the AI commit message fails', async () => {

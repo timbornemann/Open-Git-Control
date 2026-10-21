@@ -6,6 +6,7 @@ import { hasUnresolvedConflictMarkers, parseConflictMarkerSize } from '../../git
 import { mergeIntoBranch } from '../../git/MergeIntoBranch';
 import { parseMergeIntoBranchArgs } from '../gitMergeCommandPolicy';
 import { requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
+import { observesPlannerBranchRename, plannerBranchRename } from '../plannerWorkEvents';
 
 type GitCommandRouterEvent = {
   sender: any;
@@ -228,6 +229,14 @@ const COMMAND_EXECUTORS: Partial<Record<GitCommandName, GitCommandExecutor>> = {
 };
 
 const executeGitCommand = async (context: GitCommandExecutionContext): Promise<string> => {
+  if (context.commandName === 'branch' && ['-m', '-M', '--move'].includes(context.args[0]) && observesPlannerBranchRename()) {
+    const names = context.args.slice(1);
+    const before = names.length === 1 ? (await runInContext(context, ['symbolic-ref', '--short', 'HEAD'])).trim() : names[0];
+    const result = await runInContext(context, ['branch', ...context.args]);
+    const repo = context.repoPath || context.gitService.getRepoPath();
+    if (repo && before && names.at(-1)) await plannerBranchRename(repo, before, names.at(-1)!);
+    return result;
+  }
   const executor = COMMAND_EXECUTORS[context.commandName];
   if (executor) return executor(context);
   if (context.repoPath) return context.gitService.runCommandAtPath(context.repoPath, [context.commandName, ...context.args]);

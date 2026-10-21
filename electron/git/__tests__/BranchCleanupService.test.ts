@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GitIntegrationLifecycle } from './gitIntegrationLifecycle';
 import { git, cleanupTransferFixtures } from './remoteTransferFixture';
 import { cleanupFixture } from './branchCleanupFixture';
+import { BranchCleanupService } from '../BranchCleanupService';
 
 vi.mock('electron', () => ({ app: { getPath: () => os.tmpdir() } }));
 const lifecycles: GitIntegrationLifecycle[] = [];
@@ -31,6 +32,22 @@ afterEach(async () => {
 }, 60_000);
 
 describe('BranchCleanupService with real Git', () => {
+  test('protects ongoing planner work and rechecks new assignments before deletion', async (lifecycle) => {
+    const f = cleanupFixture(lifecycle);
+    git(f.repo, 'branch', 'task/planner');
+    let tasks: Array<{ branch: string; title: string }> = [];
+    const service = new BranchCleanupService({ git: lifecycle.runner, remotes: f.remotes, preferences: f.preferences, taskBranches: async () => tasks });
+    const request = { repoPath: f.repo, operationId: randomUUID() };
+    const plan = await service.inspect(request, f.context);
+    const branch = plan.candidates.find((entry) => entry.kind === 'local' && entry.name === 'task/planner')!;
+    expect(branch.selectedByDefault).toBe(true);
+    tasks = [{ branch: 'task/planner', title: 'Fix bug' }];
+    const result = await service.execute({ ...request, planId: plan.id, selectedIds: [branch.id], confirmedUnmergedIds: [] }, f.context);
+    expect(result.outcomes[0]).toMatchObject({ status: 'skipped', message: 'changed' });
+    expect(f.hasRef(f.repo, branch.ref)).toBe(true);
+    const updated = await service.inspect(request, f.context);
+    expect(updated.candidates.find((entry) => entry.id === branch.id)?.blocks).toContainEqual({ code: 'planner-work', detail: 'Fix bug' });
+  });
   test('proposes merged local branches and deletes an independently selected local/server pair after review', async (lifecycle) => {
     const f = cleanupFixture(lifecycle);
     git(f.repo, 'branch', 'feature/done');
@@ -82,6 +99,8 @@ describe('BranchCleanupService with real Git', () => {
     git(f.repo, 'worktree', 'add', active, 'feature/active');
     git(f.repo, 'worktree', 'add', missing, 'feature/missing');
     git(f.repo, 'worktree', 'lock', missing);
+    // Git records physical paths; TEMP may contain an OS alias that no longer resolves after removal.
+    const physicalMissing = fs.realpathSync.native(missing).replace(/\\/g, '/');
     const resolved = path.resolve(missing);
     if (path.dirname(resolved) !== path.resolve(f.root)) throw new Error('Unsafe worktree fixture');
     fs.rmSync(resolved, { recursive: true });
@@ -93,7 +112,7 @@ describe('BranchCleanupService with real Git', () => {
       expect(candidate.selectedByDefault).toBe(false);
       await expect(f.execute(plan, [candidate])).rejects.toThrow('protected');
     }
-    expect(plan.candidates.find((entry) => entry.name === 'feature/missing')?.worktrees).toEqual([missing.replace(/\\/g, '/')]);
+    expect(plan.candidates.find((entry) => entry.name === 'feature/missing')?.worktrees).toEqual([physicalMissing]);
     expect(f.preferences.read(active).protectedPatterns).toContain('release/*');
   });
 

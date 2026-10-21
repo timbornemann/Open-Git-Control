@@ -6,6 +6,21 @@ export const plannerClient = cachedClient('planner', {
   isAvailable(): boolean {
     return Boolean(getElectronApi());
   },
+  inspectWork(request: Parameters<ElectronAPI['plannerInspectWork']>[0]) {
+    return requireElectronPlannerApi().plannerInspectWork(request);
+  },
+  startWork(request: Parameters<ElectronAPI['plannerStartWork']>[0]) {
+    return requireElectronPlannerApi().plannerStartWork(request);
+  },
+  getWork(request: Parameters<ElectronAPI['plannerGetWork']>[0]) {
+    return requireElectronPlannerApi().plannerGetWork(request);
+  },
+  refreshWork(request: Parameters<ElectronAPI['plannerRefreshWork']>[0]) {
+    return requireElectronPlannerApi().plannerRefreshWork(request);
+  },
+  updateWork(request: Parameters<ElectronAPI['plannerUpdateWork']>[0]) {
+    return requireElectronPlannerApi().plannerUpdateWork(request);
+  },
 
   async getData(...args: Parameters<ElectronAPI['plannerGetData']>): ReturnType<ElectronAPI['plannerGetData']> {
     return requireElectronPlannerApi().plannerGetData(...args);
