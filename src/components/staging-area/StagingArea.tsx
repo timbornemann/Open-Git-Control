@@ -7,6 +7,8 @@ import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { ConflictResolverPanel } from './ConflictResolverPanel';
 import { StagingCommitPanel } from './StagingCommitPanel';
 import { StagingContextMenu } from './StagingContextMenu';
+import { UntrackFilesDialog } from './UntrackFilesDialog';
+import { useUntrackFiles } from './useUntrackFiles';
 import { StagingFileSections } from './StagingFileSections';
 import { StagingToolbar } from './StagingToolbar';
 import { StashPanel } from './StashPanel';
@@ -83,7 +85,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const sharedStatus = sharedWorkingTreeMatchesRepo ? (workingTreeStatus ?? null) : null;
   const sharedSnapshot = sharedWorkingTreeMatchesRepo ? (workingTreeSnapshot ?? null) : null;
 
-  const fileOps = useFileOperations({
+  const baseFileOps = useFileOperations({
     repoPath,
     setToast,
     setConfirmDialog,
@@ -97,6 +99,15 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     externalStats: hasSharedWorkingTree ? (sharedWorkingTreeMatchesRepo ? (workingTreeStats ?? null) : null) : undefined,
     externalRefresh: onRefreshWorkingTree,
   });
+  const untrack = useUntrackFiles({
+    repoPath,
+    canExecute: !baseFileOps.isMutating,
+    onChanged: async () => {
+      onRepoChanged?.();
+      await baseFileOps.refresh();
+    },
+  });
+  const fileOps = { ...baseFileOps, isMutating: baseFileOps.isMutating || untrack.busy === 'execute' };
 
   const commitForm = useCommitForm({
     repoPath,
@@ -155,7 +166,12 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
 
   if (!repoPath) return null;
   if (!fileOps.status) {
-    return <div style={{ color: 'var(--text-secondary)', padding: '16px' }}>{t('generated.components.staging_area.stagingarea.loading_status_bff97099')}</div>;
+    return (
+      <>
+        <div style={{ color: 'var(--text-secondary)', padding: '16px' }}>{t('generated.components.staging_area.stagingarea.loading_status_bff97099')}</div>
+        <UntrackFilesDialog model={untrack} />
+      </>
+    );
   }
 
   const status = fileOps.status;
@@ -271,7 +287,8 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
         />
       )}
 
-      <StagingContextMenu contextMenu={fileOps.contextMenu} fileOps={fileOps} />
+      <StagingContextMenu contextMenu={fileOps.contextMenu} fileOps={fileOps} onUntrackFiles={untrack.open} />
+      <UntrackFilesDialog model={untrack} />
     </div>
   );
 };

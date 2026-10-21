@@ -142,4 +142,36 @@ describe('StagingContextMenu', () => {
     expect(fileOps.openRepositoryPath).toHaveBeenCalledWith(entry.path, 'open');
     expect(fileOps.setContextMenu).toHaveBeenCalledWith(null);
   });
+  it.each(['staged', 'unstaged'] as const)('opens an untracking preview for a %s file without changing ignore rules', (section) => {
+    const fileOps = createFileOps();
+    const onUntrackFiles = vi.fn();
+    act(() =>
+      root.render(
+        createElement(I18nProvider, {
+          language: 'de',
+          children: createElement(StagingContextMenu, { contextMenu: { x: 10, y: 10, entry, section }, fileOps, onUntrackFiles }),
+        }),
+      ),
+    );
+    const action = Array.from(host.querySelectorAll('button')).find((button) => button.textContent?.includes('Aus Versionierung entfernen'))!;
+    act(() => action.click());
+    expect(onUntrackFiles).toHaveBeenCalledExactlyOnceWith(entry.path);
+    expect(fileOps.setContextMenu).toHaveBeenCalledWith(null);
+    expect(fileOps.addIgnoreRule).not.toHaveBeenCalled();
+  });
+  it('does not offer untracking for untracked files', () => {
+    act(() =>
+      root.render(
+        createElement(I18nProvider, {
+          language: 'de',
+          children: createElement(StagingContextMenu, {
+            contextMenu: { x: 10, y: 10, entry, section: 'untracked' },
+            fileOps: createFileOps(),
+            onUntrackFiles: vi.fn(),
+          }),
+        }),
+      ),
+    );
+    expect(host.textContent).not.toContain('Aus Versionierung entfernen');
+  });
 });

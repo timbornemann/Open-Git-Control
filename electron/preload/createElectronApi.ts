@@ -3,6 +3,7 @@ import { createWorkingTreeWatchApi } from './createWorkingTreeWatchApi';
 import { createRepositoryAnalyticsApi } from './createRepositoryAnalyticsApi';
 import { createBranchCleanupApi } from './createBranchCleanupApi';
 import { createBranchChangeApi } from './createBranchChangeApi';
+import { createUntrackFilesApi } from './createUntrackFilesApi';
 import type { ApplyDiffLineSelectionRequest } from '../../src/shared/ipc/diffLineSelection';
 import { createRepositoryLocationApi } from './createRepositoryLocationApi';
 import { createSystemToolsApi } from './createSystemToolsApi';
@@ -92,6 +93,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
   const flatApi = {
     ...createBranchCleanupApi(ipcRenderer),
     ...createBranchChangeApi(ipcRenderer),
+    ...createUntrackFilesApi(ipcRenderer),
     ...createSystemToolsApi(ipcRenderer),
     ...createRepositorySecretScanAllowlistApi(ipcRenderer),
     ...createRepositoryIconApi(ipcRenderer),
@@ -370,6 +372,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     git: {
       ...createBranchCleanupApi(ipcRenderer),
       ...createBranchChangeApi(ipcRenderer),
+      ...createUntrackFilesApi(ipcRenderer),
       ...createRepositoryAnalyticsApi(ipcRenderer),
       getGitIdentity: flatApi.getGitIdentity,
       saveGitIdentity: flatApi.saveGitIdentity,

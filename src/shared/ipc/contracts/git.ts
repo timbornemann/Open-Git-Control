@@ -5,6 +5,7 @@ import type { ReadRequest } from '../../cache/resource';
 import type { GitLfsApi } from '../gitLfs';
 import type { BranchCleanupApi } from '../branchCleanup';
 import type { BranchChangeApi } from '../branchChange';
+import type { UntrackFilesApi } from '../untrackFiles';
 import type { ApplyDiffLineSelectionRequest, ApplyDiffLineSelectionResult } from '../diffLineSelection';
 import type { GitIdentityApi } from '../gitIdentity';
 import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from '../../../types/git';
@@ -236,7 +237,15 @@ export type OpenRepositoryPathResultDto = {
 };
 
 export interface ElectronGitAPI
-  extends BranchChangeApi, BranchCleanupApi, GitLfsApi, GitIdentityApi, ElectronRepositorySecretScanAllowlistAPI, RepositoryAnalyticsApi, WorkingTreeWatchApi {
+  extends
+    UntrackFilesApi,
+    BranchChangeApi,
+    BranchCleanupApi,
+    GitLfsApi,
+    GitIdentityApi,
+    ElectronRepositorySecretScanAllowlistAPI,
+    RepositoryAnalyticsApi,
+    WorkingTreeWatchApi {
   inspectCommitMessageEdit: (request: CommitMessageEditRequest) => Promise<IpcResult<CommitMessageEditInspection>>;
   rewordCommitMessage: (request: RewordCommitMessageRequest) => Promise<IpcResult<CommitMessageEditResult> & { cancelled?: boolean }>;
   getCommitMessageEditBackups: (repoPath: string) => Promise<IpcResult<CommitMessageEditBackup[]>>;

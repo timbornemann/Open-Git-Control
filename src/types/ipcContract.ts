@@ -1,4 +1,7 @@
 export const enum IpcChannel {
+  GitInspectUntrackFiles = 'git:inspectUntrackFiles',
+  GitExecuteUntrackFiles = 'git:executeUntrackFiles',
+  GitCancelUntrackFiles = 'git:cancelUntrackFiles',
   GitInspectBranchChange = 'git:inspectBranchChange',
   GitExecuteBranchChange = 'git:executeBranchChange',
   GitListParkedBranchChanges = 'git:listParkedBranchChanges',

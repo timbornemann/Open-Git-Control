@@ -15,6 +15,7 @@ import { ensureCommitIdentity } from '@/app/state/gitIdentityStore';
 import { mergeCommands } from './mergeCommands';
 import { branchCleanupClient } from './branchCleanupClient';
 import { diffClient } from './diffClient';
+import { untrackFilesClient } from './untrackFilesClient';
 
 export type GitCommandArgs = [GitCommandName, ...string[]];
 
@@ -41,6 +42,7 @@ const command = <TCommand extends GitCommandName>(commandName: TCommand, ...args
 export const gitClient = cachedClient('git', {
   ...branchCleanupClient,
   ...diffClient,
+  ...untrackFilesClient,
   ...mergeCommands,
   ...commitMessageEdits,
   ...repositoryAnalyticsClient,

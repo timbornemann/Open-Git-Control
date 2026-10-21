@@ -1,0 +1,71 @@
+.untrack-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+.untrack-spinner {
+  flex-shrink: 0;
+  animation: untrack-spin 1s linear infinite;
+}
+@keyframes untrack-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .untrack-spinner {
+    animation: none;
+  }
+}
+.untrack-error {
+  color: var(--status-danger);
+  overflow-wrap: anywhere;
+}
+.untrack-warning {
+  color: var(--status-warning);
+}
+.untrack-files {
+  min-width: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+.untrack-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 70px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.untrack-file--blocked {
+  cursor: default;
+  color: var(--text-secondary);
+}
+.untrack-file input {
+  flex-shrink: 0;
+  accent-color: var(--accent-color);
+}
+.untrack-file input:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 3px;
+}
+.untrack-file-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+.untrack-file-text strong,
+.untrack-file-text > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+}
+.untrack-file-text > span {
+  color: var(--text-secondary);
+}

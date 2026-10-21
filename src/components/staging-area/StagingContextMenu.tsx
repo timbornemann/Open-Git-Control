@@ -9,13 +9,14 @@ import { escapeGitignoreLiteralPath } from './gitignorePattern';
 type StagingContextMenuProps = {
   contextMenu: StagingContextMenuState | null;
   fileOps: ReturnType<typeof useFileOperations>;
+  onUntrackFiles?: (path: string) => void;
 };
 
 const CTX_MENU_WIDTH = 220;
 const CTX_MENU_HEIGHT = 260;
 const CTX_MENU_MARGIN = 8;
 
-export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextMenu, fileOps }) => {
+export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextMenu, fileOps, onUntrackFiles }) => {
   const { t, tr } = useI18n();
   const menuRef = useRef<HTMLDivElement>(null);
   const [placement, setPlacement] = useState({ left: 0, top: 0 });
@@ -195,6 +196,19 @@ export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextM
           <span className="ctx-menu-icon">IG</span>
           {t('generated.components.staging_area.stagingcontextmenu.add_file_to_gitignore_45f071fe')}
         </button>
+        {contextSection !== 'untracked' && onUntrackFiles && (
+          <button
+            className="ctx-menu-item"
+            disabled={fileOps.isMutating}
+            onClick={() => {
+              closeContextMenu();
+              onUntrackFiles(contextEntry.path);
+            }}
+          >
+            <span className="ctx-menu-icon">−</span>
+            {tr('Aus Versionierung entfernen …', 'Stop tracking files …')}
+          </button>
+        )}
         {contextDir && (
           <button
             className="ctx-menu-item"

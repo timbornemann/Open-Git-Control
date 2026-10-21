@@ -10,6 +10,7 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { createJobId } from '../gitCommandPolicy';
 import { registerGitDiffPreviewHandler } from './git/registerGitDiffPreviewHandler';
 import { registerDiffLineSelectionHandler } from './git/registerDiffLineSelectionHandler';
+import { registerUntrackFilesHandlers } from './git/registerUntrackFilesHandlers';
 import { repoJobRegistry as defaultRepoJobRegistry } from '../repoJobRegistry';
 import type { RepoJobRegistry } from '../repoJobRegistry';
 import { handleGitCommand } from './gitCommandRouter';
@@ -71,6 +72,7 @@ export function registerGitHandlers({
   registerGitFileHandlers({ gitService, readStoredRepoPaths, ensureWriteAllowed: ensureCommitProtectionIsIdle });
   registerGitOperationStateHandler({ gitService });
   registerDiffLineSelectionHandler(gitService);
+  registerUntrackFilesHandlers(gitService, repoJobRegistry);
   registerRepositoryActivityHandler({ gitService, readStoredRepoPaths });
   const commitMessageEdits = registerCommitMessageEditHandlers({ gitService, repoJobRegistry, beginCommitProtection, ensureCommitProtectionIsIdle });
 
