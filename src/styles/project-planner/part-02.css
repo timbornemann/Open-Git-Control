@@ -130,20 +130,18 @@
   background: var(--border-color);
 }
 
-.planner-item-context-submenu-trigger {
-  position: relative;
+.planner-item-context-menu,
+.planner-item-context-submenu {
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .planner-item-context-submenu {
-  position: absolute;
-  top: -4px;
-  left: calc(100% - 4px);
   width: 184px;
-}
-
-.planner-item-context-submenu.opens-left {
-  right: calc(100% - 4px);
-  left: auto;
+  z-index: 2002;
 }
 
 .planner-card.planner-priority-low {
