@@ -281,9 +281,7 @@
       "description": "Die bedinung und auch die optik sind nicht os passend, es ist aktuell eher schwer zu verstehen was was macht wenn man bereits in dem branch ist kann man aktuell trozdem resume work machen, auch ist nicht klar in wlecher phase man ist udn so weiter wenn ich auf start work klicke kommt ein weiteres model, dieses sittz aber hinter dem edit item modal, das ist also nicht so schlau das edit item und das task and git workflow im gleichen edit modal leigen a sie sich in die qerere kommen es wäre also besser als eigenes modal mit klarer und einfacher minimaler aber gut vertsändlicher optik",
       "priority": "medium",
       "status": "in-progress",
-      "tags": [
-        "Bug"
-      ],
+      "tags": ["Bug"],
       "references": {
         "activeWorkflowId": "c82e7c44-5b40-4c73-bd8e-9910203dc355",
         "branches": [
@@ -303,10 +301,21 @@
             }
           }
         ],
-        "pullRequests": []
+        "pullRequests": [
+          {
+            "provider": "github",
+            "server": "https://github.com",
+            "repositoryId": "1176739168",
+            "fullPath": "timbornemann/Open-Git-Control",
+            "workflowId": "c82e7c44-5b40-4c73-bd8e-9910203dc355",
+            "id": "31",
+            "number": "31",
+            "url": "https://github.com/timbornemann/Open-Git-Control/pull/31"
+          }
+        ]
       },
       "createdAt": 1792583992066,
-      "updatedAt": 1792584118123
+      "updatedAt": 1792590793250
     }
   ]
 }
