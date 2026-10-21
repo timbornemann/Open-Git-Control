@@ -112,6 +112,7 @@ describe('local workflow discovery', () => {
     });
   });
 
+  // Two full reads of 100 guarded files can exceed the default 5 s on Windows CI under coverage.
   it('limits discovered files and reads new local changes on subsequent requests', async () => {
     for (let index = 0; index < 102; index++) file(`.github/workflows/${index}.yml`, 'on: workflow_dispatch\n');
     const result = await discoverLocalHostingWorkflows(repo, 'github');
@@ -120,7 +121,7 @@ describe('local workflow discovery', () => {
     expect(result.issues).toContainEqual({ filePath: '.github/workflows', reason: 'limit' });
     file('.github/workflows/0.yml', 'on: push\n');
     expect((await discoverLocalHostingWorkflows(repo, 'github')).workflows).toHaveLength(99);
-  });
+  }, 30_000);
 
   it('pins local reads to the active repository and hosting account, with no network or authentication request', async () => {
     file('.github/workflows/ci.yml', 'on: workflow_dispatch\n');

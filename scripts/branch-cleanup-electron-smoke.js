@@ -6,7 +6,8 @@ const path = require('node:path');
 async function verifyBranchCleanup(window, profile, applicationPath, captureReadyPage) {
   const { GitRunner } = require(path.join(applicationPath, 'dist-electron/electron/git/GitRunner.js'));
   const git = new GitRunner();
-  const repo = path.join(profile, 'repository');
+  // Bootstrap canonicalizes the active root; IPC requests must use that same path.
+  const repo = fs.realpathSync.native(path.join(profile, 'repository'));
   const branch = `cleanup-smoke-${process.pid}`;
   const manualBranch = `${branch}-manual`;
   await git.run(repo, ['branch', branch]);
@@ -38,7 +39,7 @@ async function verifyBranchCleanup(window, profile, applicationPath, captureRead
     throw new Error('Native branch cleanup did not reach its expected state: ' + details);
   };
   const preferences = await window.webContents.executeJavaScript(`window.electronAPI.git.getBranchCleanupPreferences(${JSON.stringify(repo)})`);
-  assert.ok(preferences.success && preferences.data.protectedPatterns.includes('main'));
+  assert.ok(preferences.success && preferences.data.protectedPatterns.includes('main'), `Cleanup preferences failed: ${JSON.stringify(preferences)}`);
   await waitFor(`Boolean(document.querySelector('button[aria-label="Branch actions"]'))`);
   await window.webContents.executeJavaScript(`(document.querySelector('button[aria-label="Branch actions"]').click(), true)`);
   await waitFor('Boolean(document.querySelector(".sidebar-actions-menu [role=menuitem]"))');

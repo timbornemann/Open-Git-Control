@@ -82,6 +82,8 @@ describe('BranchCleanupService with real Git', () => {
     git(f.repo, 'worktree', 'add', active, 'feature/active');
     git(f.repo, 'worktree', 'add', missing, 'feature/missing');
     git(f.repo, 'worktree', 'lock', missing);
+    // Git records physical paths; TEMP may contain an OS alias that no longer resolves after removal.
+    const physicalMissing = fs.realpathSync.native(missing).replace(/\\/g, '/');
     const resolved = path.resolve(missing);
     if (path.dirname(resolved) !== path.resolve(f.root)) throw new Error('Unsafe worktree fixture');
     fs.rmSync(resolved, { recursive: true });
@@ -93,7 +95,7 @@ describe('BranchCleanupService with real Git', () => {
       expect(candidate.selectedByDefault).toBe(false);
       await expect(f.execute(plan, [candidate])).rejects.toThrow('protected');
     }
-    expect(plan.candidates.find((entry) => entry.name === 'feature/missing')?.worktrees).toEqual([missing.replace(/\\/g, '/')]);
+    expect(plan.candidates.find((entry) => entry.name === 'feature/missing')?.worktrees).toEqual([physicalMissing]);
     expect(f.preferences.read(active).protectedPatterns).toContain('release/*');
   });
 

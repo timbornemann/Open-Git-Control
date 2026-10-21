@@ -4,8 +4,42 @@
     "run": {
       "steps": [
         {
+          "id": "prepare-electron",
+          "label": "Prepare Electron runtime",
+          "parser": "diagnostic",
+          "windows": {
+            "shell": "powershell",
+            "command": "npx --no-install install-electron"
+          },
+          "macos": {
+            "shell": "zsh",
+            "command": "npx --no-install install-electron"
+          },
+          "linux": {
+            "shell": "bash",
+            "command": "npx --no-install install-electron"
+          }
+        },
+        {
+          "id": "verify-git-lfs",
+          "label": "Verify Git LFS test dependency",
+          "parser": "diagnostic",
+          "windows": {
+            "shell": "powershell",
+            "command": "git lfs version"
+          },
+          "macos": {
+            "shell": "zsh",
+            "command": "git lfs version"
+          },
+          "linux": {
+            "shell": "bash",
+            "command": "git lfs version"
+          }
+        },
+        {
           "id": "quality",
-          "label": "Full CI check",
+          "label": "Full quality gate",
           "parser": "vitest-jest",
           "windows": {
             "shell": "powershell",
