@@ -59,7 +59,7 @@ describe('PlannerWorkService with real Git', () => {
     expect(f.current().item.references?.branches).toHaveLength(1);
     expect(original).not.toContain(f.repo);
   });
-  test('requires explicit dirty carry, never stashes, and rejects changed reviewed state', async (f) => {
+  test('requires explicit dirty carry, restores its stash, and rejects changed reviewed state', async (f) => {
     fs.writeFileSync(path.join(f.repo, 'untracked.txt'), 'draft');
     await expect(f.start()).rejects.toThrow('Confirm carrying');
     expect(git(f.repo, 'branch', '--show-current')).toBe('main');

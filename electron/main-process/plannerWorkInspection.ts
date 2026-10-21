@@ -82,8 +82,9 @@ export async function workState(git: WorkGit, repo: string) {
   }
   return { head, changes, worktrees, digest: workDigest([head, status, diff, staged, identities, tree]) };
 }
+export const WORK_OPERATION_MARKERS = ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply', 'sequencer', 'BISECT_LOG'];
 export async function assertWorkIdle(git: WorkGit, repo: string) {
-  for (const name of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply', 'sequencer', 'BISECT_LOG']) {
+  for (const name of WORK_OPERATION_MARKERS) {
     const file = (await git.run(repo, ['rev-parse', '--git-path', name])).trim();
     if (fs.existsSync(path.resolve(repo, file))) throw new Error('Finish the active Git operation before starting task work.');
   }

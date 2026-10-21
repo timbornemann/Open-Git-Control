@@ -30,6 +30,7 @@ import { registerHostingHandlers } from '../../hosting/registerHostingHandlers';
 import { hostingService } from '../../hosting/HostingService';
 import { registerRemoteTransferHandlers } from './registerRemoteTransferHandlers';
 import { registerBranchCleanupHandlers } from './git/registerBranchCleanupHandlers';
+import { registerBranchChangeHandlers } from './git/registerBranchChangeHandlers';
 import type { CredentialEnvironmentFactory } from '../../git/remoteTransferModels';
 import { registerRepositoryIconHandlers } from './registerRepositoryIconHandlers';
 import { registerRepositorySecretScanAllowlistHandlers } from './registerRepositorySecretScanAllowlistHandlers';
@@ -104,7 +105,8 @@ export function setupIPC({
   registerRepositoryLocationHandlers(gitService, locationService, (oldPath) => maintenance.service.repositoryRelocated(oldPath));
   registerRepositorySecretScanAllowlistHandlers({ gitService, repoJobRegistry, readSettingsWithMigration });
   registerProjectPlannerHandlers({ gitService });
-  const plannerWork = registerPlannerWorkHandlers(gitService);
+  const branchChanges = registerBranchChangeHandlers(gitService);
+  const plannerWork = registerPlannerWorkHandlers(gitService, undefined, branchChanges);
   registerUpdaterHandlers({ updaterManager });
   registerUserNotesHandlers(userNotesManager);
   registerAiHandlers({

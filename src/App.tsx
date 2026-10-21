@@ -20,6 +20,7 @@ import { requestRemoteTransfer } from './components/hosting/remoteTransferDialog
 import { NotificationProvider } from './contexts/NotificationContext';
 import { SystemToolsRuntime } from './components/system-tools/SystemToolsRuntime';
 import { PlannerWorkRuntime } from './components/project-planner/PlannerWorkRuntime';
+import { BranchChangeRuntime } from './components/branch-change/BranchChangeRuntime';
 
 const App: React.FC = () => {
   const state = useAppState();
@@ -141,6 +142,14 @@ const App: React.FC = () => {
             >
               <QuickRepositoryTodoDialog requestId={quickTodoRequestId} activeRepo={state.activeRepo} />
               <PlannerWorkRuntime activeRepo={state.activeRepo} refreshSignal={state.refreshTrigger} onChanged={state.triggerRefresh} />
+              <BranchChangeRuntime
+                activeRepo={state.activeRepo}
+                refreshSignal={state.refreshTrigger}
+                onChanged={state.triggerRefresh}
+                onWorktree={(repo) => {
+                  void state.handleSwitchRepo(repo);
+                }}
+              />
               <div
                 className={`app-container${isSidebarCollapsed ? ' sidebar-collapsed' : ''}`}
                 style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}

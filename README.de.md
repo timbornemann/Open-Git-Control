@@ -347,6 +347,7 @@ Dateikopplung benötigt standardmäßig drei gemeinsame Commits; Commits mit meh
 - Untracked Dateien loeschen.
 - Dateien, Ordner, Top-Level-Ordner oder Dateityp-Pattern zu `.gitignore` hinzufuegen.
 - Stash mit optionaler Nachricht.
+- Geführter Branchwechsel: gestagte, ungestagte und neue Dateien prüfen, den Stash benennen und **Mitnehmen und wechseln** oder **Parken und wechseln** wählen. Der Assistent öffnet sich bei lokalen Änderungen auch für Planner- und PR-Checkouts. Die Wiederherstellung erhält teilweises Staging; beim Zurückwechseln werden geparkte Änderungen angeboten. Erfolgreich wiederhergestellte Stashes werden entfernt. Bei Konflikten und unterbrochenen Vorgängen bleibt die Sicherung erhalten und ist auch nach einem Neustart prüfbar. Ignorierte Dateien bleiben ausgeschlossen und werden bei Checkout-Kollisionen geschützt. Dateiweise Checkouts öffnen den Assistenten nicht.
 - Stashes anwenden, poppen und droppen.
 - Branch aus Stash erstellen.
 - Commit mit Titel und optionaler Beschreibung.
@@ -540,7 +541,7 @@ Uncommittete Dateien werden angezeigt und nicht automatisch committed. Ohne Comm
 
 **Bearbeitung starten** im Kontextmenü oder Aufgabendialog öffnet die Prüfung des bearbeitbaren Vorschlags `task/<kurze-id>-<titel>` und der Ausgangsbasis. Erst nach erfolgreichem Erstellen, Auschecken und Zuordnen des Branches wechselt die Aufgabe auf **In Arbeit**. **Zum Aufgabenbranch wechseln** checkt einen bereits zugeordneten Branch aus. Ist dieser in einem anderen Worktree belegt, lässt sich stattdessen zu diesem Worktree wechseln.
 
-Der bekannte Standardbranch wird ohne Fetch vorbelegt. Bei gemeinsamer Historie wird der weiter fortgeschrittene lokale oder Remote-Stand verwendet; bei Divergenz oder unbekanntem Standardbranch ist eine ausdrückliche Auswahl nötig. Lokale Änderungen werden aufgelistet und nur nach Bestätigung mitgenommen. Es gibt kein automatisches Stash oder Verwerfen. Veränderte Vorschauen, Checkout-Konflikte und widersprüchliche Planungsdaten verlangen eine erneute Prüfung. Gelingt der Checkout, aber die Zuordnung scheitert, bietet der Dialog eine Wiederherstellung an, auch nach einem Neustart.
+Der bekannte Standardbranch wird ohne Fetch vorbelegt. Bei gemeinsamer Historie wird der weiter fortgeschrittene lokale oder Remote-Stand verwendet; bei Divergenz oder unbekanntem Standardbranch ist eine ausdrückliche Auswahl nötig. Lokale Änderungen durchlaufen den Branchwechsel-Assistenten: prüfen, Stash benennen und ausdrücklich Mitnehmen oder Parken wählen. Die Aufgaben-Zuordnung wird nach Checkout und gegebenenfalls Wiederherstellung gespeichert. Veränderte Vorschauen, Checkout-Konflikte und widersprüchliche Planungsdaten verlangen eine erneute Prüfung. Gelingt der Checkout, aber die Zuordnung scheitert, bietet der Dialog eine Wiederherstellung an, auch nach einem Neustart.
 
 **Aufgaben-Workflow öffnen** führt aus dem Kontextmenü oder Editor in einen eigenen Dialog. Die Phasen **Start → Bearbeiten → PR prüfen → Erledigt**, der PR-Zustand und die Markierung **Hier aktiv** zeigen den aktuellen Stand. **Zum Aufgabenbranch wechseln** erscheint nur, wenn ein anderer Branch ausgecheckt ist. Ein offener Aufgabenentwurf bleibt währenddessen erhalten und erscheint beim Schließen wieder. Branchanlage, PR-Erstellung und Archivbestätigung erfolgen ohne überlagerte Dialoge.
 

@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/contexts/ProjectPlannerContext', () => ({
   useProjectPlanner: () => ({ data: mocks.data, refresh: mocks.refresh, activateRepositoryProject: mocks.activate }),
 }));
-vi.mock('@/contexts/AppStateContext', () => ({ useGitStore: (select: (state: unknown) => unknown) => select(mocks.git) }));
+vi.mock('@/contexts/AppStateContext', () => ({ useGitStore: (select: (state: unknown) => unknown) => select(mocks.git), useWorkflowStore: () => vi.fn() }));
 vi.mock('@/services/plannerClient', () => ({
   plannerClient: {
     inspectWork: vi.fn(),

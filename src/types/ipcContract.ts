@@ -1,4 +1,9 @@
 export const enum IpcChannel {
+  GitInspectBranchChange = 'git:inspectBranchChange',
+  GitExecuteBranchChange = 'git:executeBranchChange',
+  GitListParkedBranchChanges = 'git:listParkedBranchChanges',
+  GitRestoreBranchChange = 'git:restoreBranchChange',
+  GitCancelBranchChange = 'git:cancelBranchChange',
   GitAnalyticsSnapshot = 'git:analytics:snapshot',
   GitAnalyticsRefresh = 'git:analytics:refresh',
   GitAnalyticsDetails = 'git:analytics:details',

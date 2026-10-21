@@ -347,6 +347,7 @@ File coupling normally requires three shared commits; commits touching more than
 - Delete untracked files.
 - Add files, folders, top-level folders, or file-type patterns to `.gitignore`.
 - Stash with optional message.
+- Guided branch switching: review staged, unstaged and new files, name the stash, then **Carry and switch** or **Park and switch**. The assistant opens whenever a checkout has local changes, including Planner and PR checkouts. It preserves partial staging with index-aware restoration and offers parked work when returning to its source branch. Successfully restored stashes are removed; conflicts and interrupted operations retain their backup and can be reviewed after restarting. Ignored files are excluded and protected against checkout collisions. Ordinary file checkouts do not open the assistant.
 - Apply, pop, and drop stashes.
 - Create a branch from a stash.
 - Commit with title and optional description.
@@ -540,7 +541,7 @@ Uncommitted files are shown but not committed automatically. Without a commit, *
 
 Choose **Start work** in an item's context menu or editor. Review the editable `task/<short-id>-<title>` suggestion and base, then confirm creating and checking out the branch. The task moves to **In progress** only after checkout and assignment succeed. **Switch to task branch** checks out the assigned branch; branches checked out in another worktree offer a switch to that worktree instead.
 
-The known default branch is selected without fetching. When local and remote copies share a history, the more advanced tip wins; divergent or unknown defaults require an explicit choice. Local changes are listed and require explicit permission to carry them. Nothing is automatically stashed or discarded. Changed previews, checkout conflicts and conflicting planning files require another review. If checkout succeeds but saving the assignment fails, the dialog offers recovery, including after restarting the app.
+The known default branch is selected without fetching. When local and remote copies share a history, the more advanced tip wins; divergent or unknown defaults require an explicit choice. Local changes go through the branch-switch assistant: review them, name a stash and explicitly choose Carry or Park. The task assignment is saved after checkout and any requested restoration. Changed previews, checkout conflicts and conflicting planning files require another review. If checkout succeeds but saving the assignment fails, the dialog offers recovery, including after restarting the app.
 
 **Open task workflow** opens a separate dialog from the context menu or item editor. The **Start → Work → Review PR → Done** phases, PR state and **Active here** indicator show the current state. **Switch to task branch** appears only when another branch is checked out. An open item draft is preserved and returns when the workflow closes. Branch setup, PR creation and archive confirmation appear without overlapping dialogs.
 

@@ -1,0 +1,123 @@
+.branch-change {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.branch-change p,
+.branch-change h4 {
+  margin: 0;
+}
+.branch-change label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.branch-change input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+  color: var(--text-primary);
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+.branch-change .branch-change-checkbox {
+  flex-direction: row;
+  align-items: center;
+}
+.branch-change input[type='checkbox'] {
+  width: auto;
+}
+.branch-change button {
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 6px 9px;
+  cursor: pointer;
+}
+.branch-change button:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+.branch-change-files {
+  max-height: min(40vh, 350px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.branch-change-files ul {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+}
+.branch-change-files li button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+}
+.branch-change-files code {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.branch-change-files [aria-pressed='true'] {
+  border-color: var(--accent-primary);
+}
+.branch-change-muted {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.branch-change-preview {
+  max-height: 35vh;
+  overflow: auto;
+  min-width: 0;
+}
+.branch-change [role='alert'] {
+  color: var(--status-error);
+}
+.branch-change-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-dark);
+}
+.branch-change-progress-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.branch-change-progress progress {
+  width: 100%;
+  accent-color: var(--accent-primary);
+}
+.branch-change-progress-path {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.branch-change-progress-spinner {
+  flex-shrink: 0;
+  animation: branch-change-spin 1s linear infinite;
+}
+.dialog-overlay:has(.branch-change[aria-busy='true']),
+.dialog-overlay:has(.branch-change[aria-busy='true']) * {
+  cursor: progress !important;
+}
+@keyframes branch-change-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .branch-change-progress-spinner {
+    animation: none;
+  }
+}

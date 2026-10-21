@@ -1,5 +1,6 @@
 import type { SecretScanProgressDto } from './secretScan';
 import type { RemoteTransferProgressDto } from './remoteTransferProgress';
+import type { BranchChangeProgress } from '../shared/ipc/branchChange';
 
 export type GitJobStatus = 'start' | 'progress' | 'done' | 'failed' | 'cancelled';
 export type GitJobPhaseDto = 'snapshot' | 'context' | 'grouping' | 'validating' | 'committing' | 'retry' | 'fallback' | 'done' | 'failed' | 'cancelled';
@@ -18,6 +19,8 @@ export interface GitJobEventDto {
   message?: string;
   progress?: number;
   details?: {
+    branchChangeId?: string;
+    branchChange?: BranchChangeProgress;
     secretScan?: SecretScanProgressDto;
     remoteTransfer?: RemoteTransferProgressDto;
     phase?: GitJobPhaseDto;

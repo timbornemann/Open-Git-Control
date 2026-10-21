@@ -7,6 +7,7 @@ import { CommandPalette, type PaletteCommand } from '@/components/CommandPalette
 import { Confirm } from '@/components/Confirm';
 import { DangerConfirm } from '@/components/DangerConfirm';
 import { Input } from '@/components/Input';
+import { useBranchChangeDialogState } from '@/components/branch-change/branchChangeDialogState';
 import { BranchContextMenu } from './BranchContextMenu';
 import { CloneProgressModal } from './CloneProgressModal';
 import { GitTransferProgressNotification } from './GitTransferProgressNotification';
@@ -113,83 +114,87 @@ const RepoSwitcherOverlay: React.FC<{ state: RepoSwitcherOverlayState }> = ({ st
   );
 };
 
-const DialogOverlays: React.FC<{ state: DialogOverlayState }> = ({ state }) => (
-  <>
-    {state.confirmDialog?.variant === 'confirm' && (
-      <Confirm
-        open={true}
-        title={state.confirmDialog.title}
-        message={state.confirmDialog.message}
-        contextItems={state.confirmDialog.contextItems}
-        contextAction={
-          state.confirmDialog.contextAction
-            ? {
-                label: state.confirmDialog.contextAction.label,
-                onClick: () => {
-                  const action = state.confirmDialog?.contextAction;
-                  state.onCancelConfirm();
-                  action?.onClick();
-                },
-              }
-            : undefined
-        }
-        irreversible={state.confirmDialog.irreversible}
-        consequences={state.confirmDialog.consequences}
-        confirmLabel={state.confirmDialog.confirmLabel}
-        focusConfirm={state.confirmDialog.focusConfirm}
-        onConfirm={state.onConfirm}
-        secondaryActionLabel={state.confirmDialog.secondaryActionLabel}
-        secondaryActionVariant={state.confirmDialog.secondaryActionVariant}
-        onSecondaryAction={state.confirmDialog.onSecondaryAction ? state.onSecondaryConfirm : undefined}
-        onCancel={state.onCancelConfirm}
-      />
-    )}
+const DialogOverlays: React.FC<{ state: DialogOverlayState }> = ({ state }) => {
+  const suspended = useBranchChangeDialogState((value) => Boolean(value.pending));
+  return (
+    <>
+      {state.confirmDialog?.variant === 'confirm' && (
+        <Confirm
+          open={!suspended}
+          title={state.confirmDialog.title}
+          message={state.confirmDialog.message}
+          contextItems={state.confirmDialog.contextItems}
+          contextAction={
+            state.confirmDialog.contextAction
+              ? {
+                  label: state.confirmDialog.contextAction.label,
+                  onClick: () => {
+                    const action = state.confirmDialog?.contextAction;
+                    state.onCancelConfirm();
+                    action?.onClick();
+                  },
+                }
+              : undefined
+          }
+          irreversible={state.confirmDialog.irreversible}
+          consequences={state.confirmDialog.consequences}
+          confirmLabel={state.confirmDialog.confirmLabel}
+          focusConfirm={state.confirmDialog.focusConfirm}
+          onConfirm={state.onConfirm}
+          secondaryActionLabel={state.confirmDialog.secondaryActionLabel}
+          secondaryActionVariant={state.confirmDialog.secondaryActionVariant}
+          onSecondaryAction={state.confirmDialog.onSecondaryAction ? state.onSecondaryConfirm : undefined}
+          onCancel={state.onCancelConfirm}
+        />
+      )}
 
-    {state.confirmDialog?.variant === 'danger' && (
-      <DangerConfirm
-        open={true}
-        title={state.confirmDialog.title}
-        message={state.confirmDialog.message}
-        contextItems={state.confirmDialog.contextItems}
-        contextAction={
-          state.confirmDialog.contextAction
-            ? {
-                label: state.confirmDialog.contextAction.label,
-                onClick: () => {
-                  const action = state.confirmDialog?.contextAction;
-                  state.onCancelConfirm();
-                  action?.onClick();
-                },
-              }
-            : undefined
-        }
-        irreversible={state.confirmDialog.irreversible}
-        consequences={state.confirmDialog.consequences}
-        confirmLabel={state.confirmDialog.confirmLabel}
-        onConfirm={state.onConfirm}
-        secondaryActionLabel={state.confirmDialog.secondaryActionLabel}
-        secondaryActionVariant={state.confirmDialog.secondaryActionVariant}
-        onSecondaryAction={state.confirmDialog.onSecondaryAction ? state.onSecondaryConfirm : undefined}
-        onCancel={state.onCancelConfirm}
-      />
-    )}
+      {state.confirmDialog?.variant === 'danger' && (
+        <DangerConfirm
+          open={!suspended}
+          title={state.confirmDialog.title}
+          message={state.confirmDialog.message}
+          contextItems={state.confirmDialog.contextItems}
+          contextAction={
+            state.confirmDialog.contextAction
+              ? {
+                  label: state.confirmDialog.contextAction.label,
+                  onClick: () => {
+                    const action = state.confirmDialog?.contextAction;
+                    state.onCancelConfirm();
+                    action?.onClick();
+                  },
+                }
+              : undefined
+          }
+          irreversible={state.confirmDialog.irreversible}
+          consequences={state.confirmDialog.consequences}
+          confirmLabel={state.confirmDialog.confirmLabel}
+          onConfirm={state.onConfirm}
+          secondaryActionLabel={state.confirmDialog.secondaryActionLabel}
+          secondaryActionVariant={state.confirmDialog.secondaryActionVariant}
+          onSecondaryAction={state.confirmDialog.onSecondaryAction ? state.onSecondaryConfirm : undefined}
+          onCancel={state.onCancelConfirm}
+        />
+      )}
 
-    {state.inputDialog && (
-      <Input
-        open={true}
-        title={state.inputDialog.title}
-        message={state.inputDialog.message}
-        fields={state.inputDialog.fields}
-        contextItems={state.inputDialog.contextItems}
-        irreversible={state.inputDialog.irreversible}
-        consequences={state.inputDialog.consequences}
-        confirmLabel={state.inputDialog.confirmLabel}
-        onSubmit={state.onSubmitInput}
-        onCancel={state.onCancelInput}
-      />
-    )}
-  </>
-);
+      {state.inputDialog && (
+        <Input
+          open
+          suspended={suspended}
+          title={state.inputDialog.title}
+          message={state.inputDialog.message}
+          fields={state.inputDialog.fields}
+          contextItems={state.inputDialog.contextItems}
+          irreversible={state.inputDialog.irreversible}
+          consequences={state.inputDialog.consequences}
+          confirmLabel={state.inputDialog.confirmLabel}
+          onSubmit={state.onSubmitInput}
+          onCancel={state.onCancelInput}
+        />
+      )}
+    </>
+  );
+};
 
 export const OverlayManager: React.FC<OverlayManagerProps> = ({ repoSwitcher, toasts, branchMenu, dialogs, gitTransfer, cloneProgress, commandPalette }) => (
   <>

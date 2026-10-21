@@ -5,6 +5,7 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import type { PlannerStartWorkRequest, PlannerUpdateWorkRequest, PlannerWorkRequest } from '../../../src/types/plannerWork';
 import { PlannerWorkService, type PlannerWorkContext } from '../PlannerWorkService';
 import { PlannerWorkCache } from '../PlannerWorkCache';
+import type { BranchChangeService } from '../BranchChangeService';
 import { PlannerWorkHosting } from '../PlannerWorkHosting';
 import { requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
 import { repoJobRegistry } from '../repoJobRegistry';
@@ -14,10 +15,15 @@ import { emitJobEvent } from './jobEvents';
 import { randomUUID } from 'node:crypto';
 import { registerPlannerBranchRename, registerPlannerWorkDetach } from '../plannerWorkEvents';
 
-export function registerPlannerWorkHandlers(gitService: GitService, injected?: PlannerWorkService) {
+export function registerPlannerWorkHandlers(gitService: GitService, injected?: PlannerWorkService, branchChanges?: BranchChangeService) {
   const service =
     injected ??
-    new PlannerWorkService(gitService.runner, new PlannerWorkCache(app.getPath('userData')), new PlannerWorkHosting(gitService.runner, hostingService));
+    new PlannerWorkService(
+      gitService.runner,
+      new PlannerWorkCache(app.getPath('userData')),
+      new PlannerWorkHosting(gitService.runner, hostingService),
+      branchChanges,
+    );
   registerPlannerBranchRename((repo, before, after) => service.renamed(repo, before, after));
   registerPlannerWorkDetach((repo, ids) => service.detached(repo, ids));
   for (const channel of [

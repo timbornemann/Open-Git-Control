@@ -8,10 +8,21 @@ import type { PlannerItem } from '@/types/projectPlanner';
 import type { PlannerWorkDialogTarget } from './plannerWorkDialogState';
 import { PlannerWorkProgress } from './PlannerWorkProgress';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
+import { prepareBranchChange, useBranchChangeDialogState } from '@/components/branch-change/branchChangeDialogState';
+import { getElectronApi } from '@/services/electronApi';
+import { PlannerWorkRecoveryReview } from './PlannerWorkRecoveryReview';
 import '@/styles/project-planner.css';
 
+const hasBranchChangeApi = () => Boolean(getElectronApi()?.git?.inspectBranchChange);
+function setupDisabled(busy: boolean, partial: PlannerStartWorkResult | undefined, reviewed: boolean, cannotStart: boolean) {
+  if (busy) return true;
+  return partial ? Boolean(partial.requiresChangesReview && !reviewed) : cannotStart;
+}
+
 function startDisabled(inspection: PlannerWorkInspection | undefined, name: string, base: string, occupied: boolean, acceptChanges: boolean) {
-  return !inspection || !name.trim() || (!inspection.existing && !base) || occupied || (inspection.changes.length > 0 && !acceptChanges);
+  return (
+    !inspection || !name.trim() || (!inspection.existing && !base) || occupied || (inspection.changes.length > 0 && !acceptChanges && !hasBranchChangeApi())
+  );
 }
 
 export function PlannerWorkSetupDialog({
@@ -36,13 +47,16 @@ export function PlannerWorkSetupDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [partial, setPartial] = useState<PlannerStartWorkResult>();
+  const [recoveredChanges, setRecoveredChanges] = useState(false);
   const [revision, setRevision] = useState(0);
+  const suspended = useBranchChangeDialogState((value) => Boolean(value.pending));
 
   useEffect(() => {
     let current = true;
     setInspection(undefined);
     setError('');
     setPartial(undefined);
+    setRecoveredChanges(false);
     setAcceptChanges(false);
     setBusy(true);
     void plannerClient
@@ -54,7 +68,8 @@ export function PlannerWorkSetupDialog({
           return;
         }
         setInspection(result.data);
-        if (result.data.recoveryId) setPartial({ branch: result.data.suggestedName, recoveryId: result.data.recoveryId });
+        if (result.data.recoveryId)
+          setPartial({ branch: result.data.suggestedName, recoveryId: result.data.recoveryId, requiresChangesReview: result.data.requiresChangesReview });
         setName(result.data.suggestedName);
         setBase(result.data.defaultBase);
       })
@@ -82,13 +97,22 @@ export function PlannerWorkSetupDialog({
     setBusy(true);
     setError('');
     try {
+      const branchChange =
+        inspection.changes.length && hasBranchChangeApi()
+          ? await prepareBranchChange(
+              target.repoPath,
+              inspection.existing ? { kind: 'existing', branch: name } : { kind: 'create', branch: name, startPoint: base },
+            )
+          : undefined;
+      if (branchChange === null) return;
       const result = await plannerClient.startWork({
         repoPath: target.repoPath,
         itemId: target.item.id,
         planId: inspection.planId,
         branchName: name,
         baseRef: base,
-        acceptChanges,
+        acceptChanges: Boolean(branchChange) || acceptChanges,
+        ...(branchChange ? { branchChange } : {}),
       });
       if (!result.success) {
         setError(result.error);
@@ -119,6 +143,7 @@ export function PlannerWorkSetupDialog({
         expectedRevision: details.success ? details.data.revision || '' : '',
         action: 'recover',
         recoveryId: partial.recoveryId,
+        acceptRecoveredChanges: recoveredChanges,
       });
       if (!result.success) {
         setError(result.error);
@@ -133,7 +158,7 @@ export function PlannerWorkSetupDialog({
   };
   return (
     <DialogFrame
-      open
+      open={!suspended}
       title={existing ? tr('Zum Aufgabenbranch wechseln', 'Switch to task branch') : tr('Bearbeitung starten', 'Start work')}
       onClose={() => {
         if (!busy) onClose();
@@ -147,7 +172,7 @@ export function PlannerWorkSetupDialog({
             ? tr('Branch wechseln', 'Switch branch')
             : tr('Branch erstellen und starten', 'Create branch and start')
       }
-      confirmDisabled={busy || (!partial && startDisabled(inspection, name, base, Boolean(occupied), acceptChanges))}
+      confirmDisabled={setupDisabled(busy, partial, recoveredChanges, startDisabled(inspection, name, base, Boolean(occupied), acceptChanges))}
     >
       <div className="planner-dialog-form planner-work">
         <h3>{target.item.title}</h3>
@@ -163,12 +188,14 @@ export function PlannerWorkSetupDialog({
             {tr('Dieser Aufgabenbranch ist hier bereits aktiv.', 'This task branch is already active here.')}
           </p>
         ) : partial ? (
-          <p>
-            {tr(
-              'Der Branch wurde ausgecheckt. Die Zuordnung kann erneut gespeichert werden. Vorhandene Arbeit bleibt erhalten.',
-              'The branch was checked out. Retry saving the assignment; existing work is preserved.',
-            )}
-          </p>
+          <PlannerWorkRecoveryReview
+            partial={partial}
+            repo={target.repoPath}
+            accepted={recoveredChanges}
+            busy={busy}
+            onAccept={setRecoveredChanges}
+            onClose={onClose}
+          />
         ) : (
           <>
             <label>
@@ -223,10 +250,20 @@ export function PlannerWorkSetupDialog({
                     </li>
                   ))}
                 </ul>
-                <label className="planner-work-checkbox">
-                  <input type="checkbox" checked={acceptChanges} onChange={(e) => setAcceptChanges(e.target.checked)} disabled={busy} />
-                  {tr('Diese Änderungen ausdrücklich mitnehmen', 'Explicitly carry these changes')}
-                </label>
+                {!hasBranchChangeApi() && (
+                  <label className="planner-work-checkbox">
+                    <input type="checkbox" checked={acceptChanges} onChange={(e) => setAcceptChanges(e.target.checked)} disabled={busy} />
+                    {tr('Diese Änderungen ausdrücklich mitnehmen', 'Explicitly carry these changes')}
+                  </label>
+                )}
+                {hasBranchChangeApi() && (
+                  <p>
+                    {tr(
+                      'Vor dem Wechsel prüfst du diese Änderungen im Assistenten und wählst Mitnehmen oder Parken.',
+                      'Before switching, review these changes in the assistant and choose Carry or Park.',
+                    )}
+                  </p>
+                )}
               </>
             )}
             <p>

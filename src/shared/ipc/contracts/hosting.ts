@@ -27,6 +27,7 @@ import type {
 } from '../../../types/hostingDtos';
 import type { IpcResult } from '../../../types/ipc';
 import type { ReleaseContext } from '../../../types/releaseNotes';
+import type { BranchChangeTarget } from '../branchChange';
 import type {
   HostingCreationTargets,
   HostingCreationTarget,
@@ -65,6 +66,10 @@ export interface HostingOperations {
   cancelPublication: { input: { repoPath: string }; output: true };
   clone: { input: { repository: HostedRepositoryRef; targetDir: string; targetName?: string; useSsh?: boolean }; output: { path: string } };
   checkoutChangeRequest: { input: { repoPath: string; repository: HostedRepositoryRef; id: string; expectedHeadSha: string }; output: true };
+  prepareChangeRequestCheckout: {
+    input: { repoPath: string; repository: HostedRepositoryRef; id: string; expectedHeadSha: string };
+    output: BranchChangeTarget;
+  };
   fork: { input: HostingForkRequest; output: HostedRepository };
   branches: { input: { repository: HostedRepositoryRef; cursor?: string }; output: HostingPage<string> };
   tags: { input: { repository: HostedRepositoryRef; cursor?: string }; output: HostingPage<string> };

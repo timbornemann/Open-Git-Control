@@ -4,6 +4,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGitCommandWorkflow } from '../useGitCommandWorkflow';
 import { gitClient } from '@/services/gitClient';
+import * as electronApi from '@/services/electronApi';
+import * as branchChanges from '@/components/branch-change/branchChangeDialogState';
 
 const args = (mode = 'default') => ['mergeIntoBranch', 'feature', 'main', mode, 'a'.repeat(40), 'b'.repeat(40)];
 let root: Root, current: ReturnType<typeof useGitCommandWorkflow>;
@@ -44,6 +46,22 @@ async function run(mode = 'default') {
 }
 
 describe('cross-branch merge workflow', () => {
+  it('uses guided branch switching even when general dangerous-operation warnings are disabled', async () => {
+    input.settings.confirmDangerousOps = false;
+    vi.spyOn(electronApi, 'getElectronApi').mockReturnValue({ git: { inspectBranchChange: vi.fn() } } as never);
+    const guided = vi.spyOn(branchChanges, 'requestBranchChange').mockResolvedValue({ switched: true, restored: false, conflicts: [] });
+    await render();
+    let switched = false;
+    await act(async () => {
+      switched = await current.runGitCommand(['checkout', 'feature'], 'Switched');
+    });
+    expect(switched).toBe(true);
+    expect(guided).toHaveBeenCalledWith('/repo', { kind: 'existing', branch: 'feature' }, expect.any(AbortSignal));
+    expect(gitClient.runGitCommandForRepo).not.toHaveBeenCalled();
+    expect(input.triggerRefresh).toHaveBeenCalled();
+    expect(current.isGitActionRunningRef.current).toBe(false);
+  });
+
   it.each(['default', 'noFf'])('checks commit identity for %s before dispatching and refreshes the resulting branch', async (mode) => {
     await render();
     expect(await run(mode)).toBe(true);

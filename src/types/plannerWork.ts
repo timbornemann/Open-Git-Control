@@ -1,5 +1,6 @@
 import type { PlannerBranchReference, PlannerChangeRequestReference, PlannerItem } from './projectPlanner';
 import type { HostedRepository } from './hostingDtos';
+import type { BranchChangeResult, ExecuteBranchChangeRequest } from '../shared/ipc/branchChange';
 
 export type PlannerWorkRequest = { repoPath: string; itemId: string; workflowId?: string };
 export type PlannerWorkGetRequest = PlannerWorkRequest & { listRecoveries?: boolean };
@@ -15,9 +16,23 @@ export type PlannerWorkInspection = {
   worktrees: PlannerWorktree[];
   existing?: PlannerBranchReference;
   recoveryId?: string;
+  requiresChangesReview?: boolean;
 };
-export type PlannerStartWorkRequest = PlannerWorkRequest & { planId: string; branchName: string; baseRef: string; acceptChanges: boolean };
-export type PlannerStartWorkResult = { branch: string; item?: PlannerItem; recoveryId?: string; error?: string };
+export type PlannerStartWorkRequest = PlannerWorkRequest & {
+  planId: string;
+  branchName: string;
+  baseRef: string;
+  acceptChanges: boolean;
+  branchChange?: Omit<ExecuteBranchChangeRequest, 'repoPath'>;
+};
+export type PlannerStartWorkResult = {
+  branch: string;
+  item?: PlannerItem;
+  recoveryId?: string;
+  error?: string;
+  branchChange?: BranchChangeResult;
+  requiresChangesReview?: boolean;
+};
 export type PlannerCommitReference = { sha: string; subject: string; timestamp: number; state: 'current' | 'replaced' | 'unavailable' };
 export type PlannerWorkChangeRequest = PlannerChangeRequestReference & {
   state: 'open' | 'closed' | 'merged';
@@ -50,5 +65,5 @@ export type PlannerUpdateWorkRequest = PlannerWorkRequest & { expectedRevision: 
     | { action: 'detach-pr'; id: string }
     | { action: 'archive' }
     | { action: 'assign-branch'; branchName: string }
-    | { action: 'recover'; recoveryId: string }
+    | { action: 'recover'; recoveryId: string; acceptRecoveredChanges?: boolean }
   );

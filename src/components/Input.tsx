@@ -8,6 +8,7 @@ export type { InputDialogField } from '@/app/state/contracts';
 
 interface InputProps {
   open: boolean;
+  suspended?: boolean;
   title: string;
   message?: string;
   fields: InputDialogField[];
@@ -22,6 +23,7 @@ interface InputProps {
 
 export const Input: React.FC<InputProps> = ({
   open,
+  suspended = false,
   title,
   message,
   fields,
@@ -72,7 +74,7 @@ export const Input: React.FC<InputProps> = ({
 
   return (
     <DialogFrame
-      open={open}
+      open={open && !suspended}
       title={title}
       onClose={onCancel}
       onConfirm={handleSubmit}

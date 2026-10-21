@@ -471,6 +471,7 @@ export class HostingService {
         'syncReleaseTag',
         'clone',
         'checkoutChangeRequest',
+        'prepareChangeRequestCheckout',
         'releaseNotesCommits',
         'releaseContext',
         'localWorkflows',

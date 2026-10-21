@@ -7,6 +7,7 @@ import { gitClient } from '@/services/gitClient';
 import { EmptyState } from '@/components/EmptyState';
 import type { InputDialogState } from './types';
 import { basename } from './utils';
+import { isGuidedStash, restoreGuidedStash } from './restoreGuidedStash';
 
 type Props = {
   repoPath: string | null;
@@ -175,14 +176,16 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
     if (operationId === null) return;
     setRunningStashOp({ name: stashName, op });
     try {
-      let args: string[];
-      if (op === 'apply') {
-        args = ['stash', 'apply', stashName];
-      } else if (op === 'pop') {
-        args = ['stash', 'pop', stashName];
-      } else {
-        args = ['stash', 'drop', stashName];
+      const stash = stashes.find((entry) => entry.name === stashName);
+      if (isGuidedStash(stash, op)) {
+        await restoreGuidedStash(capturedRepoPath, stash, op, () => isCurrentGeneration(generation, capturedRepoPath), tr);
+        if (isCurrentGeneration(generation, capturedRepoPath)) {
+          await load();
+          onRepoChanged?.();
+        }
+        return;
       }
+      const args = ['stash', op, stashName];
       const result = await gitClient.runGitCommandForRepo(capturedRepoPath, 'stash', ...args.slice(1));
       if (!isCurrentGeneration(generation, capturedRepoPath)) return;
       if (result.success) {
@@ -431,7 +434,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
                         </button>
                         <button
                           className="staging-btn-sm"
-                          disabled={isStashMutationRunning}
+                          disabled={isStashMutationRunning || /\[OGC:[a-f0-9-]+\]/.test(stash.subject)}
                           onClick={() => branchFromStash(stash)}
                           title={t('generated.components.staging_area.stashpanel.create_a_branch_from_this_stash_caa1dff5')}
                         >
@@ -462,7 +465,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
                                 </span>
                                 <button
                                   className="staging-btn-sm"
-                                  disabled={isStashMutationRunning}
+                                  disabled={isStashMutationRunning || /\[OGC:[a-f0-9-]+\]/.test(stash.subject)}
                                   onClick={() => {
                                     void restoreStashFile(stash.name, filePath);
                                   }}

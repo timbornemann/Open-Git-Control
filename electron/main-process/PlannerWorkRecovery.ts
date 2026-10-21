@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { PlannerItem, PlannerProject } from '../../src/types/projectPlanner';
 import type { PlannerWorkCache } from './PlannerWorkCache';
 
-export type WorkRecovery = { item: PlannerItem; project: PlannerProject; branch: string };
+export type WorkRecovery = { item: PlannerItem; project: PlannerProject; branch: string; requiresChangesReview?: boolean };
 /** An indexed journal keeps unfinished checkouts discoverable after a restart. */
 export class PlannerWorkRecovery {
   constructor(private readonly cache: PlannerWorkCache) {}

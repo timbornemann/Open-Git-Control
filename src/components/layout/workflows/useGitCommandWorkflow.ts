@@ -15,10 +15,12 @@ import { useGitSyncRecoveryWorkflow, type GitCommandRunner } from './useGitSyncR
 import { useRemoteRecoveryWorkflow } from './useRemoteRecoveryWorkflow';
 import { requestRemoteTransfer } from '@/components/hosting/remoteTransferDialogState';
 import { awaitPullTransfer, pullIntentFromArguments } from '@/components/hosting/awaitPullTransfer';
+import { executeGuidedBranchChange, guidedBranchTarget } from './executeGuidedBranchChange';
 
 type Toast = { msg: string; isError: boolean };
 
 const needsCommitIdentity = (args: string[]) => args[0] === 'commit' || (args[0] === 'mergeIntoBranch' && ['default', 'noFf'].includes(args[3]));
+const matchesExpectedRepository = (repo: string, options?: RunGitCommandOptions) => !options?.expectedRepoPath || repo === options.expectedRepoPath;
 
 type WorkspaceBridge = {
   activeRepo: string | null;
@@ -99,7 +101,7 @@ export const useGitCommandWorkflow = ({
   const runGitCommand = useCallback(
     async (args: string[], successMsg: string, actionLabel?: string, options?: RunGitCommandOptions, internalContinuation = false): Promise<boolean> => {
       if (!gitClient.isAvailable() || !workspace.activeRepo || args.length === 0) return false;
-      if (options?.expectedRepoPath && workspace.activeRepo !== options.expectedRepoPath) return false;
+      if (!matchesExpectedRepository(workspace.activeRepo, options)) return false;
       if (!internalContinuation && (activeGitWorkflowRunRef.current !== null || isGitActionRunningRef.current)) return false;
       const repoAtStart = options?.expectedRepoPath || workspace.activeRepo;
       options = { ...options, expectedRepoPath: repoAtStart };
@@ -334,6 +336,26 @@ export const useGitCommandWorkflow = ({
           return false;
         }
 
+        const branchTarget = guidedBranchTarget(args);
+        if (branchTarget) {
+          try {
+            return await executeGuidedBranchChange({
+              repo: repoAtStart,
+              target: branchTarget,
+              signal: pullAbort.current.signal,
+              current: isStillActiveRepo,
+              refresh: triggerRefresh,
+              conflict: (file) => {
+                workspace.setActiveTab('repo');
+                setConflictResolverPath(file);
+              },
+              toast: setGitActionToast,
+              success: successMsg,
+            });
+          } finally {
+            releaseWorkflowRun();
+          }
+        }
         if (await runGitCommandGuards({ args, command, repoPath: repoAtStart, successMsg, actionLabel, options })) {
           releaseWorkflowRun();
           return false;

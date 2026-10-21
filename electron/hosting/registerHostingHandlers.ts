@@ -7,6 +7,7 @@ import type { HostingOperation, HostingOperations } from '../../src/shared/ipc/c
 import { getLocalHostingWorkflows } from './HostingLocalWorkflows';
 import { IpcChannel } from '../../src/types/ipcContract';
 import type { HostedRepositoryRef, HostingChangeRequest } from '../../src/types/hostingDtos';
+import type { BranchChangeTarget } from '../../src/shared/ipc/branchChange';
 import type { SecretScanPushGuard } from '../main-process/ipc/git/secretScanPushGuard';
 import { getAuthorizedSelectedFile, getAuthorizedProjectParentDirectory } from '../main-process/fileAccessGrant';
 import { requireActiveRepositoryPath, repositoryPathKey } from '../main-process/activeRepositoryAuthorization';
@@ -42,12 +43,13 @@ async function findChangeRequest(service: HostingService, repository: HostedRepo
   throw new Error('The change request is no longer available. Refresh it before checking out.');
 }
 
-async function checkoutChangeRequest(
+async function checkoutChangeRequest<T extends boolean = false>(
   event: IpcMainInvokeEvent,
   input: HostingOperations['checkoutChangeRequest']['input'],
   gitService: GitService,
   service: HostingService,
-): Promise<true> {
+  prepareOnly: T = false as T,
+): Promise<T extends true ? BranchChangeTarget : true> {
   const repoPath = requireActiveRepositoryPath(input.repoPath, gitService.getRepoPath(), 'hosting:checkoutChangeRequest');
   service.validateRepository(input.repository);
   if (!/^(?:[a-f\d]{40}|[a-f\d]{64})$/i.test(input.expectedHeadSha)) throw new Error('A verified change request head SHA is required.');
@@ -74,7 +76,7 @@ async function checkoutChangeRequest(
     if (source.cloneUrl.startsWith('https://'))
       credential = await service.createGitCredentialEnvironment({ connectionId: source.ref.connectionId, urls: [source.cloneUrl], signal: lifecycle });
     const signal = credential?.signal || lifecycle;
-    await gitService.runner.withExclusiveWrite(
+    const target = await gitService.runner.withExclusiveWrite(
       repoPath,
       'hosting-checkout-change-request',
       async (git) => {
@@ -82,7 +84,8 @@ async function checkoutChangeRequest(
           current();
           return git.run(repoPath, args, { signal, envOverrides: credential?.envOverrides || { GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never' } });
         };
-        if ((await run(['status', '--porcelain'])).trim()) throw new Error('Commit or stash local changes before checking out a change request.');
+        if (!prepareOnly && (await run(['status', '--porcelain'])).trim())
+          throw new Error('Commit or stash local changes before checking out a change request.');
         const adapter = await service.authenticatedAdapter(input.repository.connectionId);
         const names = (await run(['remote'])).trim().split(/\r?\n/).filter(Boolean);
         let matchingRemote = false;
@@ -112,16 +115,17 @@ async function checkoutChangeRequest(
           fresh.targetBranch !== change.targetBranch
         )
           throw new Error('The change request changed during fetch. Refresh it before checking out.');
-        if ((await run(['status', '--porcelain'])).trim()) throw new Error('Local changes appeared during fetch. Commit or stash them first.');
+        if (!prepareOnly && (await run(['status', '--porcelain'])).trim()) throw new Error('Local changes appeared during fetch. Commit or stash them first.');
         const branch = `ogc/change-${change.number.replace(/[^a-z\d_-]/gi, '').slice(0, 40) || 'request'}-${input.expectedHeadSha.slice(0, 8)}`;
         const existing = (await run(['show-ref', '--verify', '--hash', `refs/heads/${branch}`]).catch(() => '')).trim();
         if (existing && existing !== input.expectedHeadSha) throw new Error('The local change request branch already points to another commit.');
+        if (prepareOnly) return existing ? { kind: 'existing' as const, branch } : { kind: 'create' as const, branch, startPoint: input.expectedHeadSha };
         await run(existing ? ['checkout', '--no-guess', branch] : ['checkout', '--no-guess', '-b', branch, input.expectedHeadSha]);
         current();
       },
       signal,
     );
-    return true;
+    return (prepareOnly ? target : true) as T extends true ? BranchChangeTarget : true;
   } finally {
     credential?.dispose();
     job.complete();
@@ -260,6 +264,8 @@ export function registerHostingHandlers({ gitService, pushGuard, hostingService:
       else if (operation === 'clone') data = await clone(event, input as HostingOperations['clone']['input'], gitService, service);
       else if (operation === 'checkoutChangeRequest')
         data = await checkoutChangeRequest(event, input as HostingOperations['checkoutChangeRequest']['input'], gitService, service);
+      else if (operation === 'prepareChangeRequestCheckout')
+        data = await checkoutChangeRequest(event, input as HostingOperations['prepareChangeRequestCheckout']['input'], gitService, service, true);
       else if (operation === 'releaseNotesCommits') data = await releaseNotesCommits(input as HostingOperations['releaseNotesCommits']['input'], gitService);
       else if (operation === 'localWorkflows')
         data = await getLocalHostingWorkflows(input as HostingOperations['localWorkflows']['input'], gitService, service);

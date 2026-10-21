@@ -235,7 +235,7 @@
       "id": "5b1c2fb3-49c1-45bc-b4a8-1899de1d0443",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Änderungen beim Branchwechsel geführt mitnehmen oder parken",
-      "description": "Neben den vorhandenen Warnungen einen zusammenhängenden Ablauf anbieten: Änderungen prüfen → benannten Stash erstellen → wechseln → bei Bedarf wiederherstellen. Gestagte und ungestagte Änderungen sowie neue Dateien sichtbar unterscheiden. Das erspart mehrere manuelle Stash-Aktionen.",
+      "description": "Änderungen beim Branchwechsel geführt mitnehmen oder parken: Neben den vorhandenen Warnungen einen zusammenhängenden Ablauf anbieten: Änderungen prüfen → benannten Stash erstellen → wechseln → bei Bedarf wiederherstellen. Gestagte und ungestagte Änderungen sowie neue Dateien sichtbar unterscheiden. Das erspart mehrere manuelle Stash-Aktionen.",
       "priority": "medium",
       "status": "planned",
       "tags": [],
@@ -261,7 +261,7 @@
         "pullRequests": []
       },
       "createdAt": 1792501100579,
-      "updatedAt": 1792583900508
+      "updatedAt": 1792600659353
     }
   ]
 }

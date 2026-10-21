@@ -20,6 +20,9 @@ import { loadWorkItem, carryWorkItem, saveWorkItem, workContent, workDigest } fr
 import { assertWorkIdle, suggestWorkBranch, workBases, workSha, workState, type WorkGit } from './plannerWorkInspection';
 import { readWorkHistory } from './plannerWorkHistory';
 import { checkWorkCompletion } from './plannerWorkCompletion';
+import { BranchChangeService } from './BranchChangeService';
+import type { BranchChangeResult } from '../../src/shared/ipc/branchChange';
+import { checkoutPlannerWork, branchChangeNeedsReview } from './plannerWorkCheckout';
 import type { PlannerWorkRegistry } from './PlannerWorkRegistry';
 import { PlannerWorkAssignments } from './PlannerWorkAssignments';
 import type { PlannerWorkRecovery, WorkRecovery } from './PlannerWorkRecovery';
@@ -45,14 +48,17 @@ export class PlannerWorkService {
   private readonly assignments: PlannerWorkAssignments;
   private readonly registry: PlannerWorkRegistry;
   private readonly recovery: PlannerWorkRecovery;
+  readonly branchChanges: BranchChangeService;
   constructor(
     private readonly git: GitRunner,
     private readonly cache: PlannerWorkCache,
     private readonly hosting: PlannerHostingReader,
+    branchChanges?: BranchChangeService,
   ) {
     this.assignments = new PlannerWorkAssignments(git, cache);
     this.registry = this.assignments.registry;
     this.recovery = this.assignments.recovery;
+    this.branchChanges = branchChanges || new BranchChangeService(git, cache);
   }
   async protectedBranches(repo: string) {
     return this.assignments.protectedBranches(repo);
@@ -88,6 +94,7 @@ export class PlannerWorkService {
         worktrees: [],
         existing: activePlannerBranch(recovery.item),
         recoveryId: pending.id,
+        requiresChangesReview: recovery.requiresChangesReview,
       };
     }
     const source = await this.assignments.load(request.repoPath, request.itemId, () => context.ensureActive(), context.signal);
@@ -193,13 +200,23 @@ export class PlannerWorkService {
         references.branches = [...references.branches.filter((entry) => entry.id !== branch.id), branch];
         references.activeWorkflowId = branch.id;
         const item = { ...plan.source.item, status: 'in-progress' as const, references: normalizePlannerReferences(references) };
-        const recoveryId = await this.recovery.prepare(request.repoPath, { item, project: plan.source.project, branch: name }, () => !context.signal.aborted);
+        const requiresChangesReview = plan.inspection.changes.length > 0;
+        const recoveryId = await this.recovery.prepare(
+          request.repoPath,
+          { item, project: plan.source.project, branch: name, requiresChangesReview },
+          () => !context.signal.aborted,
+        );
         let changedBranch = false;
+        let branchChange: BranchChangeResult | undefined;
         try {
           context.progress?.('Creating and checking out the task branch');
           context.ensureActive();
           await this.revalidateStart(request, plan, git);
-          await exclusive.run(request.repoPath, existing ? ['switch', name] : ['switch', '-c', name, base!.sha], { ignoreAbort: true });
+          branchChange = await checkoutPlannerWork(this.branchChanges, request, plan.inspection, plan.branchSha, exclusive, context);
+          if (branchChangeNeedsReview(branchChange)) {
+            changedBranch = branchChange!.switched;
+            throw new Error(branchChange!.error || 'The branch change did not finish.');
+          }
           changedBranch = true;
           context.ensureActive();
           if ((await git.run(request.repoPath, ['symbolic-ref', '--short', 'HEAD'])).trim() !== name)
@@ -207,7 +224,7 @@ export class PlannerWorkService {
           const saved = carryWorkItem(request.repoPath, item, plan.source.project, [plan.source.revision, ...(baseItem ? [workDigest(baseItem)] : [])]);
           await this.registry.record(request.repoPath, [saved]);
           await this.recovery.complete(request.repoPath, request.itemId, recoveryId);
-          return { branch: name, item: saved };
+          return { branch: name, item: saved, branchChange };
         } catch (error) {
           if (!changedBranch) {
             const head = await exclusive.run(request.repoPath, ['symbolic-ref', '--short', 'HEAD'], { ignoreAbort: true }).catch(() => '');
@@ -220,6 +237,8 @@ export class PlannerWorkService {
           return {
             branch: name,
             recoveryId,
+            requiresChangesReview,
+            branchChange,
             error: `Branch checkout finished, but task assignment could not be completed: ${error instanceof Error ? error.message : String(error)}`,
           };
         }
@@ -399,6 +418,10 @@ export class PlannerWorkService {
             (await exclusive.run(request.repoPath, ['symbolic-ref', '--short', 'HEAD'])).trim() !== recovery.branch
           )
             throw new Error('The recovery no longer matches this task and branch.');
+          if (recovery.requiresChangesReview && request.acceptRecoveredChanges !== true)
+            throw new Error('Review the saved changes and confirm their restoration or intentional parking before recovering the task assignment.');
+          if ((await exclusive.run(request.repoPath, ['diff', '--name-only', '--diff-filter=U', '-z'])).length)
+            throw new Error('Resolve the remaining conflicts before recovering the task assignment.');
           const saved = carryWorkItem(request.repoPath, recovery.item, recovery.project, [request.expectedRevision]);
           await this.registry.record(request.repoPath, [saved]);
           await this.recovery.complete(request.repoPath, request.itemId, request.recoveryId);

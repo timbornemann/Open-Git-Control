@@ -9,6 +9,7 @@ import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { usePlannerWorkDialogState, type PlannerWorkDialogTarget } from './plannerWorkDialogState';
 import { PlannerWorkSetupDialog } from './PlannerWorkSetupDialog';
 import { PlannerWorkPanel } from './PlannerWorkPanel';
+import { useBranchChangeDialogState } from '@/components/branch-change/branchChangeDialogState';
 import '@/styles/project-planner.css';
 import '@/styles/planner-work.css';
 
@@ -25,6 +26,7 @@ function WorkflowDialog({ target, onChanged }: { target: PlannerWorkDialogTarget
   const overviewFocus = useRef<HTMLHeadingElement>(null);
   const prFocus = useRef<HTMLHeadingElement>(null);
   const initialFocusRef = creatingPr ? prFocus : overviewFocus;
+  const suspended = useBranchChangeDialogState((value) => Boolean(value.pending));
   const liveItem = data.items.find((entry) => entry.id === target.item.id && entry.projectId === target.item.projectId);
   const item = liveItem && liveItem.updatedAt >= updatedItem.updatedAt ? liveItem : updatedItem;
   useEffect(() => setCheckedOutBranch(undefined), [reportedBranch]);
@@ -48,7 +50,7 @@ function WorkflowDialog({ target, onChanged }: { target: PlannerWorkDialogTarget
     );
   return (
     <DialogFrame
-      open
+      open={!suspended}
       initialFocusRef={initialFocusRef}
       title={creatingPr ? tr('PR erstellen', 'Create PR') : tr('Aufgaben-Workflow', 'Task workflow')}
       onClose={creatingPr ? () => setCreatingPr(false) : close}

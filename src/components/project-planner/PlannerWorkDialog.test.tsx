@@ -15,7 +15,7 @@ const { refresh, activate, changed, git } = vi.hoisted(() => ({
   git: { currentBranch: 'main', onNavigateToCommit: vi.fn() },
 }));
 vi.mock('@/contexts/ProjectPlannerContext', () => ({ useProjectPlanner: () => ({ data: { items: [] }, refresh, activateRepositoryProject: activate }) }));
-vi.mock('@/contexts/AppStateContext', () => ({ useGitStore: (select: (state: unknown) => unknown) => select(git) }));
+vi.mock('@/contexts/AppStateContext', () => ({ useGitStore: (select: (state: unknown) => unknown) => select(git), useWorkflowStore: () => vi.fn() }));
 vi.mock('@/services/plannerClient', () => ({
   plannerClient: { inspectWork: vi.fn(), startWork: vi.fn(), getWork: vi.fn(), updateWork: vi.fn(), onDataChanged: vi.fn(() => () => {}) },
 }));
@@ -131,5 +131,16 @@ describe('PlannerWorkDialog', () => {
     await render('/elsewhere');
     expect(host.querySelector('[role="dialog"]')).toBeNull();
     expect(plannerClient.startWork).not.toHaveBeenCalled();
+  });
+  it('requires reviewing a failed carry before recovering a task assignment', async () => {
+    vi.mocked(plannerClient.inspectWork).mockResolvedValue({ success: true, data: { ...plan(), recoveryId: 'recovery', requiresChangesReview: true } });
+    vi.mocked(plannerClient.updateWork).mockResolvedValue({ success: true, data: item });
+    await render();
+    expect(primary().disabled).toBe(true);
+    expect(host.textContent).toContain('bewusst geparkt');
+    act(() => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+    expect(primary().disabled).toBe(false);
+    await act(async () => primary().click());
+    expect(plannerClient.updateWork).toHaveBeenCalledWith(expect.objectContaining({ action: 'recover', acceptRecoveredChanges: true }));
   });
 });

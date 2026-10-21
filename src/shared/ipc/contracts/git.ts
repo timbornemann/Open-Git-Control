@@ -4,6 +4,7 @@ import type { WorkingTreeWatchApi } from '../workingTreeWatch';
 import type { ReadRequest } from '../../cache/resource';
 import type { GitLfsApi } from '../gitLfs';
 import type { BranchCleanupApi } from '../branchCleanup';
+import type { BranchChangeApi } from '../branchChange';
 import type { GitIdentityApi } from '../gitIdentity';
 import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from '../../../types/git';
 import type {
@@ -234,7 +235,7 @@ export type OpenRepositoryPathResultDto = {
 };
 
 export interface ElectronGitAPI
-  extends BranchCleanupApi, GitLfsApi, GitIdentityApi, ElectronRepositorySecretScanAllowlistAPI, RepositoryAnalyticsApi, WorkingTreeWatchApi {
+  extends BranchChangeApi, BranchCleanupApi, GitLfsApi, GitIdentityApi, ElectronRepositorySecretScanAllowlistAPI, RepositoryAnalyticsApi, WorkingTreeWatchApi {
   inspectCommitMessageEdit: (request: CommitMessageEditRequest) => Promise<IpcResult<CommitMessageEditInspection>>;
   rewordCommitMessage: (request: RewordCommitMessageRequest) => Promise<IpcResult<CommitMessageEditResult> & { cancelled?: boolean }>;
   getCommitMessageEditBackups: (repoPath: string) => Promise<IpcResult<CommitMessageEditBackup[]>>;

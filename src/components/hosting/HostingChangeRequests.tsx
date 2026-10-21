@@ -4,6 +4,7 @@ import { GitPullRequest, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { hostingClient } from '@/services/hostingClient';
 import { appClient } from '@/services/appClient';
+import { checkoutHostedChange } from './checkoutHostedChange';
 import { useGitStore } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
 import type { HostedRepository, HostingCapabilities, HostingChangeRequest, HostingPage } from '@/types/hostingDtos';
@@ -91,9 +92,10 @@ export function HostingChangeRequests({
                 disabled={task.busy}
                 onClick={() =>
                   void task.run(
-                    () =>
-                      hostingClient.request('checkoutChangeRequest', { repoPath, repository: repository.ref, id: change.id, expectedHeadSha: change.headSha }),
-                    refresh,
+                    () => checkoutHostedChange({ repoPath, repository: repository.ref, id: change.id, expectedHeadSha: change.headSha }),
+                    (done) => {
+                      if (done) refresh();
+                    },
                   )
                 }
               >
