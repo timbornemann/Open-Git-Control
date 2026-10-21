@@ -262,20 +262,27 @@ describe('guided branch changes with real Git', () => {
     await expect(f.service.execute({ repoPath: f.repo, planId: again.planId, mode: 'carry', name: 'No' }, f.context)).rejects.toThrow('expired');
     expect(git(f.repo, 'stash', 'list')).toBe('');
   });
-  test('protects occupied worktrees and rejects restoring into another worktree', async (f) => {
-    const tree = path.join(f.root, 'linked');
-    git(f.repo, 'worktree', 'add', tree, 'target');
-    f.dirty();
-    const plan = await f.inspect();
-    expect(plan.occupiedWorktree).toBe(tree.replace(/\\/g, '/'));
-    expect(plan.blocks.join(' ')).toContain('another worktree');
-    await expect(f.service.execute({ repoPath: f.repo, planId: plan.planId, mode: 'park', name: 'No' }, f.context)).rejects.toThrow('another worktree');
-    git(f.repo, 'worktree', 'remove', tree);
-    const parked = await f.execute('park');
-    git(f.repo, 'worktree', 'add', tree, 'main');
-    const restore = await f.service.inspect({ repoPath: tree, sessionId: parked.session!.id }, f.context);
-    expect(restore.blocks.join(' ')).toContain('original worktree');
-  });
+  for (const aliased of [false, true]) {
+    test(`protects occupied worktrees and rejects restoring into another worktree${aliased ? ' through a directory alias' : ''}`, async (f) => {
+      const worktrees = path.join(f.root, 'worktrees');
+      fs.mkdirSync(worktrees);
+      const parent = aliased ? path.join(f.root, 'worktree-alias') : worktrees;
+      if (aliased) fs.symlinkSync(worktrees, parent, process.platform === 'win32' ? 'junction' : 'dir');
+      const tree = path.join(parent, 'linked');
+      git(f.repo, 'worktree', 'add', tree, 'target');
+      f.dirty();
+      const plan = await f.inspect();
+      // Git reports physical paths: /private/var on macOS and long names on Windows.
+      expect(plan.occupiedWorktree).toBe(fs.realpathSync.native(tree).replace(/\\/g, '/'));
+      expect(plan.blocks.join(' ')).toContain('another worktree');
+      await expect(f.service.execute({ repoPath: f.repo, planId: plan.planId, mode: 'park', name: 'No' }, f.context)).rejects.toThrow('another worktree');
+      git(f.repo, 'worktree', 'remove', tree);
+      const parked = await f.execute('park');
+      git(f.repo, 'worktree', 'add', tree, 'main');
+      const restore = await f.service.inspect({ repoPath: tree, sessionId: parked.session!.id }, f.context);
+      expect(restore.blocks.join(' ')).toContain('original worktree');
+    });
+  }
   test('blocks active Git operations without changing files', async (f) => {
     f.dirty();
     fs.writeFileSync(path.join(f.repo, '.git', 'MERGE_HEAD'), `${f.initial}\n`);
