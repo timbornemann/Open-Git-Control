@@ -129,7 +129,8 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({
   const [description, setDescription] = React.useState('');
   const [priority, setPriority] = React.useState<PlannerPriority>('medium');
   const [status, setStatus] = React.useState<PlannerStatus>('idea');
-  const [tags, setTags] = React.useState('');
+  const [tags, setTags] = React.useState<string | null>(null);
+  const tagText = tags ?? labels.status[status];
 
   React.useEffect(() => {
     if (!open) return;
@@ -137,8 +138,21 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({
     setDescription(item?.description || '');
     setPriority(item?.priority || 'medium');
     setStatus(item?.status || defaultStatus);
-    setTags(item?.tags.join(', ') || '');
+    setTags(item ? item.tags.join(', ') : null);
   }, [defaultStatus, item, open]);
+
+  const changeStatus = (nextStatus: PlannerStatus) => {
+    if (!item && tags !== null) {
+      const previousTag = labels.status[status].toLowerCase();
+      const nextTag = labels.status[nextStatus];
+      const customTags = tags
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter((tag) => tag && tag.toLowerCase() !== previousTag && tag.toLowerCase() !== nextTag.toLowerCase());
+      setTags([nextTag, ...customTags].join(', '));
+    }
+    setStatus(nextStatus);
+  };
 
   const submit = () => {
     if (!title.trim() || busy) return;
@@ -147,7 +161,7 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({
       description: description.trim(),
       priority,
       status,
-      tags: tags
+      tags: tagText
         .split(',')
         .map((tag) => tag.trim())
         .filter(Boolean),
@@ -159,7 +173,7 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({
     description: description.trim(),
     priority,
     status,
-    tags: tags
+    tags: tagText
       .split(',')
       .map((tag) => tag.trim())
       .filter(Boolean),
@@ -214,7 +228,7 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({
           </label>
           <label>
             {t('generated.components.layout.apimcpsettingspanel.status_b853ab43')}
-            <select value={status} onChange={(event) => setStatus(event.target.value as PlannerStatus)}>
+            <select value={status} onChange={(event) => changeStatus(event.target.value as PlannerStatus)}>
               {STATUS_OPTIONS.map((option) => (
                 <option key={option} value={option}>
                   {labels.status[option]}
@@ -225,7 +239,7 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({
         </div>
         <label>
           {t('generated.components.project_planner.plannerdialogs.tags_d3c9e52d')}
-          <input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="Bug, Feature, UI" />
+          <input value={tagText} onChange={(event) => setTags(event.target.value)} placeholder="Bug, Feature, UI" />
           <small>{t('generated.components.project_planner.plannerdialogs.separate_multiple_tags_with_commas_94bb76c8')}</small>
         </label>
         {onCopyAgentPrompt && (

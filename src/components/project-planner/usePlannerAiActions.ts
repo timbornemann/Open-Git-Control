@@ -42,7 +42,7 @@ export const usePlannerAiActions = ({ project, settings, activateRepositoryProje
   );
 
   const generateCommitMessage = useCallback(
-    (items: PlannerCommitMessageItem[]) => {
+    (items: PlannerCommitMessageItem[], confirmStatusAction = false) => {
       const repoPath = project?.repoPath;
       if (!project || !repoPath || items.length === 0 || isGeneratingRef.current) return;
 
@@ -86,31 +86,56 @@ export const usePlannerAiActions = ({ project, settings, activateRepositoryProje
       };
 
       const draft = getCommitFormDraft(repoPath, settings.commitTemplate);
-      if (!draft.commitMsg.trim() && !draft.commitDescription.trim() && !draft.subject.type && !draft.subject.scope.trim()) {
+      const hasDraft = Boolean(draft.commitMsg.trim() || draft.commitDescription.trim() || draft.subject.type || draft.subject.scope.trim());
+      if (!confirmStatusAction && !hasDraft) {
         void run();
         return;
       }
 
       setConfirmDialog({
         variant: 'confirm',
-        title: tr('Commit-Entwurf ersetzen?', 'Replace commit draft?'),
-        message: tr(
-          'In der Staging-Ansicht gibt es bereits einen Commit-Entwurf. Die KI-Nachricht ersetzt Titel und Beschreibung erst nach deiner Bestaetigung.',
-          'The staging view already contains a commit draft. The AI message will replace its title and description after confirmation.',
-        ),
+        title: confirmStatusAction
+          ? tr('Commit-Nachricht erstellen und Eintraege abschliessen?', 'Create commit message and complete items?')
+          : tr('Commit-Entwurf ersetzen?', 'Replace commit draft?'),
+        message: confirmStatusAction
+          ? tr(
+              `Fuer alle ${items.length} sichtbaren Eintraege dieser Kategorie wird eine gemeinsame KI-Commit-Nachricht erstellt. Nach erfolgreicher Erstellung werden diese Eintraege nach "Erledigt" verschoben. Fortfahren?`,
+              `A shared AI commit message will be generated for all ${items.length} visible items in this category. After successful generation, these items will be moved to "Done". Continue?`,
+            )
+          : tr(
+              'In der Staging-Ansicht gibt es bereits einen Commit-Entwurf. Die KI-Nachricht ersetzt Titel und Beschreibung erst nach deiner Bestaetigung.',
+              'The staging view already contains a commit draft. The AI message will replace its title and description after confirmation.',
+            ),
         contextItems: [
-          {
-            label: tr('Aktueller Titel', 'Current title'),
-            value:
-              draft.commitMsg ||
-              (draft.subject.type
-                ? `${draft.subject.type}${draft.subject.scope ? `(${draft.subject.scope})` : ''}: …`
-                : tr('(nur Beschreibung)', '(description only)')),
-          },
+          ...(confirmStatusAction
+            ? [
+                { label: tr('Projekt', 'Project'), value: project.name },
+                { label: tr('Betroffene Eintraege', 'Affected items'), value: items.map((item) => item.title).join(', ') },
+              ]
+            : []),
+          ...(hasDraft
+            ? [
+                {
+                  label: tr('Aktueller Titel', 'Current title'),
+                  value:
+                    draft.commitMsg ||
+                    (draft.subject.type
+                      ? `${draft.subject.type}${draft.subject.scope ? `(${draft.subject.scope})` : ''}: …`
+                      : tr('(nur Beschreibung)', '(description only)')),
+                },
+              ]
+            : []),
         ],
         irreversible: false,
-        consequences: tr('Der bisherige Entwurf wird nur in dieser App-Sitzung ersetzt.', 'The existing draft is replaced only in this app session.'),
-        confirmLabel: tr('KI-Nachricht erstellen', 'Create AI message'),
+        consequences: hasDraft
+          ? tr('Der vorhandene Commit-Entwurf wird durch die KI-Nachricht ersetzt.', 'The existing commit draft will be replaced by the AI message.')
+          : tr(
+              'Die KI-Nachricht wird als Commit-Entwurf in die Staging-Ansicht uebernommen.',
+              'The AI message will be added to the staging view as a commit draft.',
+            ),
+        confirmLabel: confirmStatusAction
+          ? tr('Erstellen und als erledigt markieren', 'Generate and mark as done')
+          : tr('KI-Nachricht erstellen', 'Create AI message'),
         onConfirm: run,
       });
     },
@@ -121,7 +146,7 @@ export const usePlannerAiActions = ({ project, settings, activateRepositoryProje
     copyItemPrompt: (item: PlannerPromptItem) => copyPrompt([item]),
     copyStatusPrompt: (items: PlannerPromptItem[]) => copyPrompt(sortPlannerPromptItemsByPriority(items)),
     generateCommitMessageForItem: (item: PlannerCommitMessageItem) => generateCommitMessage([item]),
-    generateCommitMessageForStatus: generateCommitMessage,
+    generateCommitMessageForStatus: (items: PlannerCommitMessageItem[]) => generateCommitMessage(items, true),
     isAiCommitGenerating,
   };
 };

@@ -11,7 +11,13 @@ vi.mock('electron', () => ({
   app: { getPath: getPathMock },
 }));
 
-import { createPlannerItem, ensureRepositoryProject, readProjectPlannerData, writeProjectPlannerData } from '../main-process/projectPlannerStore';
+import {
+  createPlannerItem,
+  ensureRepositoryProject,
+  movePlannerItem,
+  readProjectPlannerData,
+  writeProjectPlannerData,
+} from '../main-process/projectPlannerStore';
 
 describe('projectPlannerStore persistence', () => {
   let temporaryDirectory = '';
@@ -100,6 +106,20 @@ describe('projectPlannerStore persistence', () => {
       items: [expect.objectContaining({ title: 'Repository-only todo' })],
     });
     expect(fs.readFileSync(path.join(directoryPath, 'README.md'), 'utf8')).toContain('repository-local data');
+  });
+
+  it('persists the original category tag when an item moves through other categories', () => {
+    const repoPath = path.join(temporaryDirectory, 'repo');
+    fs.mkdirSync(repoPath);
+    const project = ensureRepositoryProject(repoPath);
+    const item = createPlannerItem(project.id, { title: 'Fix a bug', status: 'bug', tags: ['Bug', 'UI'] });
+
+    movePlannerItem(item.id, { status: 'in-progress' });
+    movePlannerItem(item.id, { status: 'done' });
+
+    expect(readProjectPlannerData().items).toContainEqual(expect.objectContaining({ id: item.id, status: 'done', tags: ['Bug', 'UI'] }));
+    const planningFile = JSON.parse(fs.readFileSync(path.join(repoPath, '.Open-Git-Control', 'planning.json'), 'utf8'));
+    expect(planningFile.items).toContainEqual(expect.objectContaining({ id: item.id, status: 'done', tags: ['Bug', 'UI'] }));
   });
 
   const createRepositoryWithPlanningFile = (name: string, projectId: string, itemId: string, storedRepoPath?: string): string => {
