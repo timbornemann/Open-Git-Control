@@ -8,9 +8,17 @@ import { PlannerWorkDialog } from './PlannerWorkDialog';
 import { usePlannerWorkDialogState } from './plannerWorkDialogState';
 import type { PlannerWorkInspection } from '@/types/plannerWork';
 
-const { refresh, activate, changed } = vi.hoisted(() => ({ refresh: vi.fn(async () => {}), activate: vi.fn(), changed: vi.fn() }));
-vi.mock('@/contexts/ProjectPlannerContext', () => ({ useProjectPlanner: () => ({ refresh, activateRepositoryProject: activate }) }));
-vi.mock('@/services/plannerClient', () => ({ plannerClient: { inspectWork: vi.fn(), startWork: vi.fn(), getWork: vi.fn(), updateWork: vi.fn() } }));
+const { refresh, activate, changed, git } = vi.hoisted(() => ({
+  refresh: vi.fn(async () => {}),
+  activate: vi.fn(),
+  changed: vi.fn(),
+  git: { currentBranch: 'main', onNavigateToCommit: vi.fn() },
+}));
+vi.mock('@/contexts/ProjectPlannerContext', () => ({ useProjectPlanner: () => ({ data: { items: [] }, refresh, activateRepositoryProject: activate }) }));
+vi.mock('@/contexts/AppStateContext', () => ({ useGitStore: (select: (state: unknown) => unknown) => select(git) }));
+vi.mock('@/services/plannerClient', () => ({
+  plannerClient: { inspectWork: vi.fn(), startWork: vi.fn(), getWork: vi.fn(), updateWork: vi.fn(), onDataChanged: vi.fn(() => () => {}) },
+}));
 const item = {
   id: 'task',
   projectId: 'project',
@@ -42,11 +50,13 @@ describe('PlannerWorkDialog', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     vi.clearAllMocks();
+    git.currentBranch = 'main';
     host = document.createElement('div');
     document.body.appendChild(host);
     root = createRoot(host);
     usePlannerWorkDialogState.setState({ target: { repoPath: '/repo', item } });
     vi.mocked(plannerClient.inspectWork).mockResolvedValue({ success: true, data: plan() });
+    vi.mocked(plannerClient.getWork).mockResolvedValue({ success: true, data: { itemId: item.id, commits: [], requests: [] } });
     vi.mocked(plannerClient.startWork).mockResolvedValue({ success: true, data: { branch: plan().suggestedName, item: { ...item, status: 'in-progress' } } });
   });
   afterEach(() => {

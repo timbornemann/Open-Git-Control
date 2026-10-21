@@ -77,7 +77,7 @@ describe('planner work detection triggers', () => {
       data: { itemId: 'inventory', commits: [], requests: [], recoveries: [{ recoveryId: 'journal', item: item as any }] },
     });
     await render();
-    expect(usePlannerWorkDialogState.getState().target).toEqual({ repoPath: '/repo', item });
+    expect(usePlannerWorkDialogState.getState().target).toMatchObject({ repoPath: '/repo', item, setup: true });
     expect(plannerClient.getWork).toHaveBeenCalledWith(expect.objectContaining({ listRecoveries: true }));
     expect(plannerClient.refreshWork).not.toHaveBeenCalled();
   });

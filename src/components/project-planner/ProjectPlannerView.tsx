@@ -1,6 +1,6 @@
 import { DataPlaceholder } from '@/components/common/DataPlaceholder';
 import React from 'react';
-import { AlertTriangle, Bug, CheckCircle2, CircleDot, Copy, FolderGit2, Lightbulb, Pencil, Plus, Rocket, Search, Sparkles, Tag } from 'lucide-react';
+import { AlertTriangle, Bug, CheckCircle2, CircleDot, Copy, FolderGit2, Lightbulb, Pencil, Plus, Rocket, Search, Sparkles } from 'lucide-react';
 import { EmptyState } from '@/components/EmptyState';
 import { useSettingsContext, useUIContext } from '@/contexts/AppStateContext';
 import { useProjectPlanner } from '@/contexts/ProjectPlannerContext';
@@ -12,8 +12,9 @@ import { usePlannerAiActions } from './usePlannerAiActions';
 import { PlannerItemContextMenu, type PlannerItemContextMenuState } from './PlannerItemContextMenu';
 import '@/styles/project-planner.css';
 import { usePlannerCompletion } from './usePlannerCompletion';
-import { requestPlannerWork } from './plannerWorkDialogState';
+import { requestPlannerWork, usePlannerWorkDialogState } from './plannerWorkDialogState';
 import { PlannerItemWorkPanel } from './PlannerItemWorkPanel';
+import { PlannerItemCard } from './PlannerItemCard';
 import { plannerDraftPatch } from './plannerDraftPatch';
 
 const statusIcons: Record<PlannerStatus, React.ReactNode> = {
@@ -56,6 +57,7 @@ export const ProjectPlannerView: React.FC = () => {
   const [projectDialogOpen, setProjectDialogOpen] = React.useState(false);
   const [editingProject, setEditingProject] = React.useState(false);
   const [itemDialogOpen, setItemDialogOpen] = React.useState(false);
+  const workflowOpen = usePlannerWorkDialogState((state) => Boolean(state.target));
   const [editingItem, setEditingItem] = React.useState<PlannerItem | null>(null);
   const [newItemStatus, setNewItemStatus] = React.useState<PlannerStatus>('idea');
   const [itemContextMenu, setItemContextMenu] = React.useState<PlannerItemContextMenuState | null>(null);
@@ -337,34 +339,19 @@ export const ProjectPlannerView: React.FC = () => {
               </div>
               <div className="planner-column-list">
                 {statusItems.map((item) => (
-                  <article
+                  <PlannerItemCard
                     key={item.id}
-                    className={`planner-card planner-priority-${item.priority}`}
+                    item={item}
                     onContextMenu={(event) => {
                       event.preventDefault();
                       setItemContextMenu({ x: event.clientX, y: event.clientY, item });
                     }}
-                    onClick={() => {
+                    onEdit={() => {
                       itemDialogProjectIdRef.current = selectedProject.id;
                       setEditingItem(item);
                       setItemDialogOpen(true);
                     }}
-                  >
-                    <div className="planner-card-header">
-                      <span className={`planner-priority-badge ${item.priority}`}>{labels.priority[item.priority]}</span>
-                    </div>
-                    <h3>{item.title}</h3>
-                    {item.description && <p>{item.description}</p>}
-                    {item.tags.length > 0 && (
-                      <div className="planner-card-tags">
-                        {item.tags.map((tag) => (
-                          <span key={tag}>
-                            <Tag size={10} /> {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </article>
+                  />
                 ))}
                 {statusItems.length === 0 && (
                   <button className="planner-column-empty" onClick={() => openNewItem(status)}>
@@ -423,6 +410,7 @@ export const ProjectPlannerView: React.FC = () => {
 
       <ItemDialog
         open={itemDialogOpen}
+        suspended={workflowOpen}
         item={editingItem}
         defaultStatus={newItemStatus}
         busy={busy}

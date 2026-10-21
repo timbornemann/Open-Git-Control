@@ -198,9 +198,7 @@ export const PlannerItemContextMenu: React.FC<PlannerItemContextMenuProps> = ({
         {onStartWork && (
           <button type="button" role="menuitem" className="planner-item-context-action" disabled={busy} onClick={() => runAction(() => onStartWork(item))}>
             <GitBranch size={14} />
-            {activePlannerBranch(item) && !activePlannerBranch(item)?.completedBy
-              ? tr('Bearbeitung fortsetzen', 'Resume work')
-              : tr('Bearbeitung starten', 'Start work')}
+            {activePlannerBranch(item) ? tr('Aufgaben-Workflow öffnen …', 'Open task workflow …') : tr('Bearbeitung starten', 'Start work')}
           </button>
         )}
         <button type="button" role="menuitem" className="planner-item-context-action" onClick={() => runAction(() => onCopyAgentPrompt(item))}>

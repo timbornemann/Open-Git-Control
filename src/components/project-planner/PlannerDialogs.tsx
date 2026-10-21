@@ -102,6 +102,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ open, project, bus
 
 type ItemDialogProps = {
   open: boolean;
+  suspended?: boolean;
   item?: PlannerItem | null;
   initialInput?: PlannerItemInput;
   defaultStatus?: PlannerStatus;
@@ -116,6 +117,7 @@ type ItemDialogProps = {
 
 export const ItemDialog: React.FC<ItemDialogProps> = ({
   open,
+  suspended = false,
   item,
   initialInput,
   defaultStatus = 'idea',
@@ -190,7 +192,7 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({
 
   return (
     <DialogFrame
-      open={open}
+      open={open && !suspended}
       title={
         item
           ? t('generated.components.project_planner.plannerdialogs.edit_item_5d102720')

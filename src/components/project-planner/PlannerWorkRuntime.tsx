@@ -29,7 +29,7 @@ export function PlannerWorkRuntime({ activeRepo, refreshSignal, onChanged }: { a
       .then((result) => {
         const recovery = result.success && result.data.recoveries?.[0];
         const state = usePlannerWorkDialogState.getState();
-        if (current && recovery && !state.target) state.open(activeRepo, recovery.item);
+        if (current && recovery && !state.target) state.open(activeRepo, recovery.item, undefined, true);
       })
       .catch(() => undefined);
     return () => {

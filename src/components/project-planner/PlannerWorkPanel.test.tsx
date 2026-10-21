@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, createElement } from 'react';
+import { act, createElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '@/i18n';
@@ -10,10 +10,9 @@ import { usePlannerCompletion } from './usePlannerCompletion';
 import type { PlannerItem } from '@/types/projectPlanner';
 import type { PlannerWorkDetails } from '@/types/plannerWork';
 
-const mocks = vi.hoisted(() => ({ navigate: vi.fn(), close: vi.fn(), confirm: vi.fn(), transfer: vi.fn(), create: vi.fn() }));
+const mocks = vi.hoisted(() => ({ navigate: vi.fn(), close: vi.fn(), setup: vi.fn(), updated: vi.fn(), transfer: vi.fn(), create: vi.fn() }));
 vi.mock('@/contexts/AppStateContext', () => ({
   useGitStore: (select: (state: unknown) => unknown) => select({ onNavigateToCommit: mocks.navigate }),
-  useUIContext: () => ({ setConfirmDialog: mocks.confirm }),
 }));
 vi.mock('@/components/hosting/remoteTransferDialogState', () => ({ requestRemoteTransfer: mocks.transfer }));
 vi.mock('@/components/hosting/HostingCreateChangeRequest', () => ({
@@ -65,15 +64,29 @@ const details = (): PlannerWorkDetails => ({
   requests: [{ ...pr, title: 'The PR', state: 'open', headSha: 'b'.repeat(40), sourceBranch: branch.name, targetBranch: 'main' }],
 });
 
+function PanelHarness({ workItem, currentBranch }: { workItem: PlannerItem; currentBranch: string }) {
+  const [creatingPr, onCreatePrChange] = useState(false);
+  return createElement(PlannerWorkPanel, {
+    repoPath: '/repo',
+    item: workItem,
+    currentBranch,
+    creatingPr,
+    onCreatePrChange,
+    onNavigate: mocks.close,
+    onSetup: mocks.setup,
+    onItemChanged: mocks.updated,
+  });
+}
+
 describe('planner work details and completion', () => {
   let host: HTMLDivElement;
   let root: Root;
-  const render = async (workItem = item) =>
+  const render = async (workItem = item, currentBranch = branch.name) =>
     act(async () =>
       root.render(
         createElement(I18nProvider, {
           language: 'en',
-          children: createElement(PlannerWorkPanel, { repoPath: '/repo', item: workItem, onNavigate: mocks.close }),
+          children: createElement(PanelHarness, { workItem, currentBranch }),
         }),
       ),
     );
@@ -132,12 +145,35 @@ describe('planner work details and completion', () => {
       success: true,
       data: { ...details(), hostingRepository: { ref: { connectionId: 'local', repositoryId: '42', fullPath: 'team/repo' }, defaultBranch: 'main' } as any },
     });
-    await render();
+    await render({ ...item, references: { ...item.references!, pullRequests: [] } });
     expect(mocks.create).not.toHaveBeenCalled();
     act(() => button('Create PR').click());
     expect(mocks.create.mock.calls[0][0]).toMatchObject({
       initialDraft: { title: item.title, body: item.description, sourceBranch: 'task/fix', targetBranch: 'main' },
     });
+  });
+  it('keeps a closed, unmerged PR in the review phase and distinguishes it from completed work', async () => {
+    const cached = details();
+    cached.requests[0].state = 'closed';
+    vi.mocked(plannerClient.getWork).mockResolvedValue({ success: true, data: cached });
+    await render();
+    expect(host.textContent).toContain('PR closed · not merged');
+    expect(host.querySelector('[aria-current="step"]')?.textContent).toContain('Review PR');
+    expect(host.textContent).not.toContain('Completed by a PR merge');
+    const completed = { ...item, references: { ...item.references!, branches: [{ ...branch, completedBy: 'merged-pr' }] } };
+    await render(completed);
+    expect(host.textContent).toContain('Completed by a PR merge');
+    expect(host.querySelector('[aria-current="step"]')?.textContent).toContain('Done');
+  });
+  it('blocks checkout and publishing for a missing branch and exposes the replacement option', async () => {
+    vi.mocked(plannerClient.getWork).mockResolvedValue({ success: true, data: { ...details(), branchMissing: true } });
+    await render();
+    expect(button('Switch to task branch')).toBeUndefined();
+    expect(button('Publish branch')).toBeUndefined();
+    expect(host.textContent).not.toContain('Active here');
+    expect(host.querySelector<HTMLInputElement>('input')).not.toBeNull();
+    const options = [...host.querySelectorAll('details')].find((entry) => entry.querySelector('summary')?.textContent?.includes('Workflow options'));
+    expect(options?.open).toBe(true);
   });
   it('the mixed AI completion action only closes live unlinked tasks, including when references changed during generation', async () => {
     const unlinked = { ...item, id: 'unlinked', references: undefined };
