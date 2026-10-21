@@ -5,6 +5,7 @@ import { GitProcessExecutor } from './GitProcessExecutor';
 import { assertRepoPathAvailable } from './GitRepositoryPath';
 import { GitRepositoryProbe } from './GitRepositoryProbe';
 import { GitSpawnOperations } from './GitSpawnOperations';
+import { readGitDiffPreview } from './GitDiffPreview';
 import type { CommitEditGit } from './CommitEditGit';
 import { runCommitEditProcess } from './CommitEditProcess';
 import { runGitChunkStream } from './GitChunkStream';
@@ -14,9 +15,6 @@ const commandToken = (value: string | undefined): string =>
   String(value || '')
     .trim()
     .toLowerCase();
-import * as fs from 'fs';
-import * as path from 'path';
-import { normalizeRepositoryRelativePath, resolveExistingRepositoryPathWithoutSymlinks, toLiteralPathspec } from './RepositoryPathSafety';
 import {
   defaultExecFileAsyncRunner,
   type DiffPreviewResult,
@@ -312,45 +310,19 @@ export class GitRunner {
     signal?: AbortSignal,
   ): Promise<DiffPreviewResult> {
     this.assertRepoPathAvailable(repoPath);
-    const maxBytes = Math.max(64 * 1024, Math.min(limits.maxBytes || 2 * 1024 * 1024, 8 * 1024 * 1024));
-    const maxLines = Math.max(100, Math.min(limits.maxLines || 5000, 20_000));
+    return this.schedule(repoPath, 'interactive', args[0] || 'diff', (activeSignal) => this.readDiffPreviewInsideWrite(repoPath, args, limits, activeSignal), {
+      signal,
+    });
+  }
 
-    return this.schedule(
-      repoPath,
-      'interactive',
-      args[0] || 'diff',
-      async (activeSignal) => {
-        const preview = await this.spawnOperations.getDiffPreview(repoPath, args, maxBytes, maxLines, activeSignal);
-        if (preview.text || args.length !== 3 || args[0] !== 'diff' || args[1] !== '--') return preview;
-
-        // An ordinary working-tree diff omits untracked files. Preview those
-        // against the empty file without creating or changing the Git index.
-        const requestedPath = args[2].startsWith(':(literal)') ? args[2].slice(10) : args[2];
-        const filePath = path.posix.normalize(normalizeRepositoryRelativePath(requestedPath, 'Diff path'));
-        const untrackedPaths = await this.processExecutor.run(
-          repoPath,
-          ['ls-files', '--others', '--exclude-standard', '-z', '--', toLiteralPathspec(filePath)],
-          {
-            cwd: repoPath,
-            maxBuffer: 64 * 1024,
-            env: process.env,
-            signal: activeSignal,
-          },
-        );
-        if (!untrackedPaths.split('\0').includes(filePath)) return preview;
-        const resolvedPath = resolveExistingRepositoryPathWithoutSymlinks(repoPath, filePath, 'Diff path');
-        if (!fs.statSync(resolvedPath).isFile()) return preview;
-        activeSignal.throwIfAborted();
-        return this.spawnOperations.getDiffPreview(
-          repoPath,
-          ['diff', '--no-index', '--no-ext-diff', '--no-textconv', '--', '/dev/null', filePath],
-          maxBytes,
-          maxLines,
-          activeSignal,
-        );
-      },
-      { signal },
-    );
+  /** Unscheduled read: only call inside an existing exclusive write job. */
+  async readDiffPreviewInsideWrite(
+    repoPath: string,
+    args: string[],
+    limits: { maxBytes?: number; maxLines?: number },
+    activeSignal: AbortSignal,
+  ): Promise<DiffPreviewResult> {
+    return readGitDiffPreview(this.spawnOperations, this.processExecutor, repoPath, args, limits, activeSignal);
   }
 
   async streamLines(repoPath: string, args: string[], onLine: GitLineHandler, signal?: AbortSignal, options: GitLineStreamOptions = {}): Promise<void> {

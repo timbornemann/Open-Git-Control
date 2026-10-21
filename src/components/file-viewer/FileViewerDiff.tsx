@@ -13,6 +13,9 @@ import { MAX_RENDER_CHARS, MAX_RENDER_LINES } from '@/components/diff-viewer/dif
 import { gitClient } from '@/services/gitClient';
 import type { RepositoryFileContextDto } from '@/shared/ipc/repositoryFiles';
 import { fileViewerIdentity } from './fileViewerRequest';
+import { diffSelectionBlockReason } from '@/shared/diff/lineSelection';
+import { useDiffLineSelection } from '@/components/diff-viewer/useDiffLineSelection';
+import { DiffSelectionBar } from '@/components/diff-viewer/DiffSelectionBar';
 
 type Props = {
   context: RepositoryFileContextDto;
@@ -50,6 +53,53 @@ export function FileViewerDiff({ context, refreshTrigger, onRepoChanged, onNavig
   );
   const { isHunkOperationRunning, applyHunk } = useHunkPatchActions({ repoPath, request, onRepoChanged, onApplied: applied, onError: reportError, t });
   const pendingStage = mutation.stagedScope === currentScope;
+  const refreshDiff = useCallback(() => setMutation((previous) => ({ refresh: previous.refresh + 1, stagedScope: null })), []);
+  const selectionBlocked = diffSelectionBlockReason(data.parsed, data.diffText);
+  const selectionEnabled = !!onRepoChanged && source !== 'commit' && !data.isTooLarge && data.canRenderText && !selectionBlocked;
+  const lineSelection = useDiffLineSelection({
+    context,
+    diffText: data.diffText,
+    parsed: data.parsed,
+    enabled: selectionEnabled,
+    blocked: isHunkOperationRunning || pendingStage || data.isLoading,
+    onApplied: applied,
+    onRefresh: refreshDiff,
+    onRepoChanged,
+    onError: reportError,
+  });
+  const diffRoot = useRef<HTMLDivElement>(null);
+  const { clear: clearLineSelection, selected: selectedLines } = lineSelection;
+  useEffect(() => {
+    if (!selectedLines.size) return;
+    const clearBeforeDialog = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || !diffRoot.current?.isConnected) return;
+      const topDialog = [...document.querySelectorAll('.dialog-overlay')].at(-1);
+      if (topDialog && !topDialog.contains(diffRoot.current)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      clearLineSelection();
+    };
+    document.addEventListener('keydown', clearBeforeDialog, true);
+    return () => document.removeEventListener('keydown', clearBeforeDialog, true);
+  }, [selectedLines.size, clearLineSelection]);
+  const selectionReason =
+    source === 'commit' || !onRepoChanged || !data.diffText
+      ? null
+      : data.isTooLarge
+        ? tr(
+            'Zeilenauswahl ist bei gekürzten Diffs nicht verfügbar. Bitte die Dateiaktionen verwenden.',
+            'Line selection is unavailable for truncated diffs. Use the file actions.',
+          )
+        : !data.canRenderText || selectionBlocked === 'binary'
+          ? tr('Binärdateien lassen sich nur als ganze Datei stagen.', 'Binary files can only be staged as a whole file.')
+          : selectionBlocked === 'conflict'
+            ? tr('Konfliktdateien müssen vor dem zeilenweisen Stagen aufgelöst werden.', 'Resolve file conflicts before staging individual lines.')
+            : selectionBlocked
+              ? tr(
+                  'Für diesen Diff ist keine sichere Zeilenauswahl verfügbar. Bitte die Dateiaktionen verwenden.',
+                  'Safe line selection is unavailable for this diff. Use the file actions.',
+                )
+              : null;
   useEffect(() => {
     if (!pendingStage || scopeRef.current !== currentScope) return;
     const finish = () =>
@@ -99,6 +149,7 @@ export function FileViewerDiff({ context, refreshTrigger, onRepoChanged, onNavig
   }, []);
   const requestHunk = useCallback(
     (hunk: ParsedHunk, fileHeader: string[], operation: 'stage' | 'unstage' | 'discard') => {
+      if (lineSelection.isRunning) return;
       if (source === 'commit') return;
       if (operation !== 'discard') {
         void applyHunk(hunk, fileHeader, operation);
@@ -123,10 +174,10 @@ export function FileViewerDiff({ context, refreshTrigger, onRepoChanged, onNavig
         },
       });
     },
-    [source, setConfirmDialog, tr, path, t, applyHunk, currentScope],
+    [source, setConfirmDialog, tr, path, t, applyHunk, currentScope, lineSelection.isRunning],
   );
   return (
-    <div className="diff-viewer-root file-viewer-diff">
+    <div className="diff-viewer-root file-viewer-diff" ref={diffRoot}>
       <DiffToolbar
         request={request}
         viewMode={viewMode}
@@ -143,6 +194,17 @@ export function FileViewerDiff({ context, refreshTrigger, onRepoChanged, onNavig
         onClose={() => {}}
         embedded
       />
+      {selectionEnabled && (
+        <DiffSelectionBar
+          source={source}
+          count={lineSelection.selected.size}
+          disabled={isHunkOperationRunning || pendingStage || lineSelection.isRunning || data.isLoading}
+          onApply={() => {
+            void lineSelection.apply();
+          }}
+          onClear={lineSelection.clear}
+        />
+      )}
       <DiffContentPane
         request={request}
         viewMode={viewMode}
@@ -158,13 +220,24 @@ export function FileViewerDiff({ context, refreshTrigger, onRepoChanged, onNavig
         activeHunkIndex={activeHunkIndex}
         setHunkRef={setHunkRef}
         scrollToHunk={scrollToHunk}
-        isHunkOperationRunning={isHunkOperationRunning || pendingStage}
+        isHunkOperationRunning={isHunkOperationRunning || pendingStage || lineSelection.isRunning}
         applyHunk={requestHunk}
         onRepoChanged={onRepoChanged}
         showBlame={blame.showBlame}
         isBlameLoading={blame.isBlameLoading}
         blameMap={blame.blameMap}
         onNavigateToCommit={onNavigateToCommit}
+        lineSelection={
+          selectionEnabled
+            ? {
+                operation: source === 'staged' ? 'unstage' : 'stage',
+                selected: lineSelection.selected,
+                toggle: lineSelection.toggle,
+                disabled: isHunkOperationRunning || pendingStage || lineSelection.isRunning || data.isLoading,
+              }
+            : undefined
+        }
+        lineSelectionReason={selectionReason}
       />
     </div>
   );

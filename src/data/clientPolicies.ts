@@ -85,7 +85,7 @@ export function isMutation(domain: ResourceDomain, name: string) {
   if (domain === 'github') return /^(create|fork|merge|rerun|cancelWorkflow|uploadReleaseAsset)/.test(name);
   if (domain === 'runs') return ['saveConfig', 'start', 'stop'].includes(name);
   if (domain === 'app') return ['setSettings', 'setStoredRepos', 'setGeminiApiKey', 'clearGeminiApiKey', 'setOpenAiApiKey', 'clearOpenAiApiKey'].includes(name);
-  return /^(trackWithGitLfs|createCommit|stagePaths|startInteractiveRebase|applyPatch|gitStashBranch|addIgnoreRule|gitFetch|gitPull|gitPush|writeRepoFile|saveRepositoryFile|deleteRepoFile|createWorking|replaceWorking|applyWorking|moveWorking|copyWorking|deleteWorking|deleteEmpty)/.test(
+  return /^(trackWithGitLfs|createCommit|stagePaths|startInteractiveRebase|applyPatch|applyDiffLineSelection|gitStashBranch|addIgnoreRule|gitFetch|gitPull|gitPush|writeRepoFile|saveRepositoryFile|deleteRepoFile|createWorking|replaceWorking|applyWorking|moveWorking|copyWorking|deleteWorking|deleteEmpty)/.test(
     name,
   );
 }

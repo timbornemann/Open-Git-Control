@@ -388,6 +388,9 @@ File coupling normally requires three shared commits; commits touching more than
   - stage hunk
   - unstage hunk
   - discard hunk
+- Select individual changes using the **+** buttons beside unstaged lines or **−** buttons beside staged lines. Old and new lines of a replacement are selected together; extra additions or deletions remain individually selectable. Shift-click selects a range, including across hunks in the same file. Selection is preserved between unified and side-by-side views.
+- **Stage selection** and **Unstage selection** change only the index; working files remain untouched. The counter counts a replacement once. **Clear selection** or Escape clears the selection. Discard remains a whole-block action with confirmation.
+- Line selection supports partial additions and deletions of text files. Changed previews require selecting the lines again. Binary, truncated, conflicted or unsupported diffs use the existing file actions instead. If a selected addition needs an adjacent final-newline change, select that replacement too.
 - Blame overlay inside the diff viewer.
 - Click blame entries to navigate to the responsible commit.
 - File inspector tabs:

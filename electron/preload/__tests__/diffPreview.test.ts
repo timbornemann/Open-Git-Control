@@ -3,6 +3,17 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { createElectronApi } from '../createElectronApi';
 
 describe('cancellable diff preview API', () => {
+  it('forwards repository-bound line selections in both API namespaces', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true, data: { status: 'applied' } });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() });
+    const request = { repoPath: 'C:/repo', path: 'file.txt', source: 'unstaged' as const, expectedDiff: 'diff', selectedUnitIds: ['hunk-1:0'] };
+    await api.git.applyDiffLineSelection(request);
+    await api.applyDiffLineSelection(request);
+    expect(invoke.mock.calls).toEqual([
+      [IpcChannel.GitApplyDiffLineSelection, request],
+      [IpcChannel.GitApplyDiffLineSelection, request],
+    ]);
+  });
   it('forwards read tokens with explicit and implicit repositories in both namespaces', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() });

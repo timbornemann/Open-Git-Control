@@ -158,12 +158,12 @@
       "id": "ebb43dbd-48f5-430e-b08e-7ee9a3c6d0e3",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Einzelne Zeilen stagen",
-      "description": "Die vorhandenen Aktionen für ganze Änderungsblöcke um eine Zeilenauswahl ergänzen. Das erleichtert saubere Commits, wenn mehrere Themen denselben Block betreffen.",
+      "description": "Einzelne Zeilen stagen: Die vorhandenen Aktionen für ganze Änderungsblöcke um eine Zeilenauswahl ergänzen. Das erleichtert saubere Commits, wenn mehrere Themen denselben Block betreffen.",
       "priority": "medium",
       "status": "planned",
       "tags": [],
       "createdAt": 1792502128090,
-      "updatedAt": 1792502128090
+      "updatedAt": 1792608908843
     },
     {
       "id": "68868582-9d66-423c-903b-3bd7ce03e6a2",
@@ -186,17 +186,6 @@
       "tags": [],
       "createdAt": 1792502230492,
       "updatedAt": 1792502230492
-    },
-    {
-      "id": "c9aa6552-e9af-42f9-a782-487c29d0cdb2",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Hosting-Issues und Planner verknüpfen",
-      "description": "Issues zunächst als lokale Aufgaben importieren oder verlinken. Später ausgewählte Felder synchronisieren und Änderungen bei Konflikten gegenüberstellen. Checklisten und Aufgabenabhängigkeiten würden längere Vorhaben zusätzlich erleichtern.",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1792502277069,
-      "updatedAt": 1792502277069
     },
     {
       "id": "b77fd51f-9d8b-42ed-ba7b-42208bf500a3",
@@ -230,38 +219,6 @@
       "tags": [],
       "createdAt": 1792502701083,
       "updatedAt": 1792502701083
-    },
-    {
-      "id": "5b1c2fb3-49c1-45bc-b4a8-1899de1d0443",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Änderungen beim Branchwechsel geführt mitnehmen oder parken",
-      "description": "Änderungen beim Branchwechsel geführt mitnehmen oder parken: Neben den vorhandenen Warnungen einen zusammenhängenden Ablauf anbieten: Änderungen prüfen → benannten Stash erstellen → wechseln → bei Bedarf wiederherstellen. Gestagte und ungestagte Änderungen sowie neue Dateien sichtbar unterscheiden. Das erspart mehrere manuelle Stash-Aktionen.",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "references": {
-        "activeWorkflowId": "4ff99da2-f541-4717-a91a-b33ce1e0b4bc",
-        "branches": [
-          {
-            "id": "4ff99da2-f541-4717-a91a-b33ce1e0b4bc",
-            "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-            "name": "task/61c0d223-anderungen-beim-branchwechsel-gefuhrt-mitnehmen-oder-parken",
-            "baseRef": "refs/heads/master",
-            "baseSha": "51df5b17d777e22c08cbf629b7206af51dd7711d",
-            "startedAt": 1792583781025,
-            "automationPaused": true,
-            "repository": {
-              "provider": "github",
-              "server": "https://github.com",
-              "repositoryId": "1176739168",
-              "fullPath": "timbornemann/Open-Git-Control"
-            }
-          }
-        ],
-        "pullRequests": []
-      },
-      "createdAt": 1792501100579,
-      "updatedAt": 1792600659353
     }
   ]
 }

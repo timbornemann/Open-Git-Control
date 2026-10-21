@@ -5,6 +5,7 @@ import type { ReadRequest } from '../../cache/resource';
 import type { GitLfsApi } from '../gitLfs';
 import type { BranchCleanupApi } from '../branchCleanup';
 import type { BranchChangeApi } from '../branchChange';
+import type { ApplyDiffLineSelectionRequest, ApplyDiffLineSelectionResult } from '../diffLineSelection';
 import type { GitIdentityApi } from '../gitIdentity';
 import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from '../../../types/git';
 import type {
@@ -265,6 +266,7 @@ export interface ElectronGitAPI
   onRepoUnavailable: (callback: (payload: RepoUnavailablePayloadDto) => void) => () => void;
   startInteractiveRebase: (baseHash: string, todoLines: string[], repoPath?: string) => Promise<IpcResult<string>>;
   applyPatch: (patch: string, options?: PatchApplyOptionsDto, repoPath?: string) => Promise<IpcResult<string>>;
+  applyDiffLineSelection: (request: ApplyDiffLineSelectionRequest) => Promise<IpcResult<ApplyDiffLineSelectionResult>>;
   getStashes: (repoPath?: string) => Promise<IpcResult<GitStashEntryDto[]>>;
   gitStashBranch: (stashName: string, branchName: string, repoPath?: string) => Promise<IpcResult<string>>;
   getRepoOriginUrl: (repoPath: string) => Promise<IpcResult<string | null>>;

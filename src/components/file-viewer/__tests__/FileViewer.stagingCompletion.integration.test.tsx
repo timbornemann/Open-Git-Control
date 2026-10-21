@@ -7,6 +7,7 @@ import { act, createElement, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GitRunner } from '../../../../electron/git/GitRunner';
+import { DiffLineStagingService } from '../../../../electron/git/DiffLineStagingService';
 import { RepositoryFiles } from '../../../../electron/git/RepositoryFiles';
 import { RepositoryFileViewerService } from '../../../../electron/git/RepositoryFileViewerService';
 import { normalizeDiffPreviewArgs } from '../../../../electron/main-process/diffPreviewPolicy';
@@ -84,62 +85,72 @@ afterEach(() => {
 });
 
 describe('staging completion through the live resource cache and Git', () => {
-  it.each(['standalone viewer', 'repository selection'])('shows the complete index diff after staging both hunks through %s', async (entry) => {
-    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-hunk-viewer-'));
-    repositories.push(repo);
-    git(repo, 'init', '-b', 'main');
-    git(repo, 'config', 'user.name', 'Viewer integration');
-    git(repo, 'config', 'user.email', 'viewer@example.test');
-    git(repo, 'config', 'core.autocrlf', 'false');
-    const lines = Array.from({ length: 60 }, (_, index) => `original line ${index + 1}`);
-    fs.writeFileSync(path.join(repo, 'file.txt'), lines.join('\n') + '\n');
-    git(repo, 'add', 'file.txt');
-    git(repo, 'commit', '-m', 'Initial file');
-    lines[1] = 'first staged change';
-    lines[49] = 'last staged change';
-    const working = lines.join('\n') + '\n';
-    fs.writeFileSync(path.join(repo, 'file.txt'), working);
+  it.each(['standalone viewer', 'repository selection', 'line selection'])(
+    'shows the complete index diff after staging both hunks through %s',
+    async (entry) => {
+      const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-hunk-viewer-'));
+      repositories.push(repo);
+      git(repo, 'init', '-b', 'main');
+      git(repo, 'config', 'user.name', 'Viewer integration');
+      git(repo, 'config', 'user.email', 'viewer@example.test');
+      git(repo, 'config', 'core.autocrlf', 'false');
+      const lines = Array.from({ length: 60 }, (_, index) => `original line ${index + 1}`);
+      fs.writeFileSync(path.join(repo, 'file.txt'), lines.join('\n') + '\n');
+      git(repo, 'add', 'file.txt');
+      git(repo, 'commit', '-m', 'Initial file');
+      lines[1] = 'first staged change';
+      lines[49] = 'last staged change';
+      const working = lines.join('\n') + '\n';
+      fs.writeFileSync(path.join(repo, 'file.txt'), working);
 
-    const runner = new GitRunner();
-    const files = new RepositoryFiles(
-      () => repo,
-      (cwd, revision, maxBytes) => runner.runBuffer(cwd, ['show', revision], { maxBytes, tooLargeMessage: 'Too large' }),
-    );
-    const service = new RepositoryFileViewerService(runner, files);
-    // Keep the production cached client intact; stub only the IPC boundary.
-    vi.mocked(gitClient.applyPatch).mockRestore();
-    vi.mocked(gitClient.getRepositoryFilePreview).mockRestore();
-    const api: Pick<ElectronGitAPI, 'getDiffPreview' | 'applyPatch' | 'getRepositoryFilePreview'> = {
-      getDiffPreview: async (args, limits) => ({ success: true, data: await runner.getDiffPreview(repo, normalizeDiffPreviewArgs(args), limits) }),
-      getRepositoryFilePreview: async (request) => ({ success: true, data: await service.getPreview(request) }),
-      applyPatch: async (patch, options) => ({
-        success: true,
-        data: await runner.runWithInput(repo, ['apply', ...(options?.cached ? ['--cached'] : []), ...(options?.reverse ? ['--reverse'] : []), '-'], patch),
-      }),
-    };
-    vi.spyOn(electronApi, 'requireElectronGitApi').mockReturnValue(api as ElectronGitAPI);
-    const view =
-      entry === 'repository selection' ? await renderRepositoryViewer(repo) : await renderViewer({ ...viewerRequest(), repoPath: repo, startView: 'diff' });
-    try {
-      await waitForView(() => expect(document.querySelectorAll('.diff-hunk')).toHaveLength(2));
-      await click('Stage');
-      await waitForView(() => expect(document.querySelectorAll('.diff-hunk')).toHaveLength(1));
-      await waitForView(() => expect(button('Stage').disabled).toBe(false));
-      expect(document.querySelector('.file-viewer')?.getAttribute('data-source')).toBe('unstaged');
-      await click('Stage');
-      await waitForView(() => expect(git(repo, 'diff', '--', 'file.txt')).toBe(''));
-      await waitForView(() => expect(document.querySelector('.file-viewer')?.getAttribute('data-source')).toBe('staged'));
-      if (entry === 'repository selection') expect(document.querySelector('[data-selected-source]')?.getAttribute('data-selected-source')).toBe('staged');
-      expect(document.querySelectorAll('.diff-hunk')).toHaveLength(2);
-      expect(document.querySelector('.diff-viewer-root')?.textContent).toContain('first staged change');
-      expect(document.querySelector('.diff-viewer-root')?.textContent).toContain('last staged change');
-      expect(button('Unstage')).toBeTruthy();
-      await click('Text');
-      await waitForView(() => expect(editor.value).toBe(working));
-      expect(fs.readFileSync(path.join(repo, 'file.txt'), 'utf8')).toBe(working);
-      expect(view.props.onRepoChanged).toHaveBeenCalledTimes(2);
-    } finally {
-      view.unmount();
-    }
-  });
+      const runner = new GitRunner();
+      const files = new RepositoryFiles(
+        () => repo,
+        (cwd, revision, maxBytes) => runner.runBuffer(cwd, ['show', revision], { maxBytes, tooLargeMessage: 'Too large' }),
+      );
+      const service = new RepositoryFileViewerService(runner, files);
+      const lineStaging = new DiffLineStagingService(runner);
+      // Keep the production cached client intact; stub only the IPC boundary.
+      vi.mocked(gitClient.applyPatch).mockRestore();
+      vi.mocked(gitClient.getRepositoryFilePreview).mockRestore();
+      const api: Pick<ElectronGitAPI, 'getDiffPreview' | 'applyPatch' | 'applyDiffLineSelection' | 'getRepositoryFilePreview'> = {
+        getDiffPreview: async (args, limits) => ({ success: true, data: await runner.getDiffPreview(repo, normalizeDiffPreviewArgs(args), limits) }),
+        getRepositoryFilePreview: async (request) => ({ success: true, data: await service.getPreview(request) }),
+        applyDiffLineSelection: async (request) => ({ success: true, data: await lineStaging.apply(request, () => {}) }),
+        applyPatch: async (patch, options) => ({
+          success: true,
+          data: await runner.runWithInput(repo, ['apply', ...(options?.cached ? ['--cached'] : []), ...(options?.reverse ? ['--reverse'] : []), '-'], patch),
+        }),
+      };
+      vi.spyOn(electronApi, 'requireElectronGitApi').mockReturnValue(api as ElectronGitAPI);
+      const view =
+        entry === 'repository selection' ? await renderRepositoryViewer(repo) : await renderViewer({ ...viewerRequest(), repoPath: repo, startView: 'diff' });
+      try {
+        const stageNext = async () => {
+          if (entry !== 'line selection') return click('Stage block');
+          await act(async () => document.querySelector<HTMLButtonElement>('.diff-line-action')!.click());
+          await click('Stage selection');
+        };
+        await waitForView(() => expect(document.querySelectorAll('.diff-hunk')).toHaveLength(2));
+        await stageNext();
+        await waitForView(() => expect(document.querySelectorAll('.diff-hunk')).toHaveLength(1));
+        await waitForView(() => expect(button('Stage block').disabled).toBe(false));
+        expect(document.querySelector('.file-viewer')?.getAttribute('data-source')).toBe('unstaged');
+        await stageNext();
+        await waitForView(() => expect(git(repo, 'diff', '--', 'file.txt')).toBe(''));
+        await waitForView(() => expect(document.querySelector('.file-viewer')?.getAttribute('data-source')).toBe('staged'));
+        if (entry === 'repository selection') expect(document.querySelector('[data-selected-source]')?.getAttribute('data-selected-source')).toBe('staged');
+        expect(document.querySelectorAll('.diff-hunk')).toHaveLength(2);
+        expect(document.querySelector('.diff-viewer-root')?.textContent).toContain('first staged change');
+        expect(document.querySelector('.diff-viewer-root')?.textContent).toContain('last staged change');
+        expect(button('Unstage block')).toBeTruthy();
+        await click('Text');
+        await waitForView(() => expect(editor.value).toBe(working));
+        expect(fs.readFileSync(path.join(repo, 'file.txt'), 'utf8')).toBe(working);
+        expect(view.props.onRepoChanged).toHaveBeenCalledTimes(2);
+      } finally {
+        view.unmount();
+      }
+    },
+  );
 });

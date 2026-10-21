@@ -52,7 +52,7 @@ export function gitMutationAffects(method: string, args: unknown[], key: readonl
   const command = method === 'runGitCommandForRepo' ? String(args[1]) : method === 'runGitCommand' ? String(args[0]) : method;
   const operation = String(key[3]);
   const cachedCommand = operation === 'command' ? String(key[4]) : '';
-  if (['add', 'stagePaths', 'applyPatch'].includes(command)) return workingTree.has(operation) || treeCommands.has(cachedCommand);
+  if (['add', 'stagePaths', 'applyPatch', 'applyDiffLineSelection'].includes(command)) return workingTree.has(operation) || treeCommands.has(cachedCommand);
   if (/WorkingDirectory|RepoFile|RepositoryFile|IgnoreRule/.test(command) || ['clean', 'rm', 'restore'].includes(command)) {
     return workingTree.has(operation) || treeCommands.has(cachedCommand);
   }

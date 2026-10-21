@@ -47,18 +47,18 @@ describe('file viewer after staging the final hunk', () => {
       expect(toggle).toBeTruthy();
       await act(async () => toggle!.click());
     }
-    await click('Stage');
+    await click('Stage block');
     expect(selectedSource()).toBe('unstaged');
     await vi.waitFor(() => expect(document.querySelectorAll('.diff-hunk')).toHaveLength(1));
     expect(document.querySelector('.diff-viewer-root')?.textContent).toContain('last after');
-    await click('Stage');
+    await click('Stage block');
     await vi.waitFor(() => expect(selectedSource()).toBe('staged'));
     expect(document.querySelector('[role=tab][aria-selected=true]')?.textContent).toBe('Diff');
     expect(document.querySelector('.file-viewer-source')?.textContent).toBe('Git index · Staging');
     expect(document.querySelector('.diff-viewer-root')?.textContent).toContain('first after');
     expect(document.querySelector('.diff-viewer-root')?.textContent).toContain('last after');
     expect(document.querySelectorAll('.diff-hunk')).toHaveLength(2);
-    expect(button('Unstage')).toBeTruthy();
+    expect(button('Unstage block')).toBeTruthy();
     expect(Boolean(document.querySelector('.diff-sbs-wrap'))).toBe(mode === 'side-by-side');
     expect(view.props.onRepoChanged).toHaveBeenCalledTimes(2);
     await click('Text');
@@ -76,13 +76,13 @@ describe('file viewer after staging the final hunk', () => {
     getDiffPreview.mockImplementation(async (args) => preview(args.includes('--cached') || !applied ? diff(lastHunk) : ''));
     const onRequestChange = vi.fn();
     const view = await renderViewer(request, { onRequestChange });
-    await click('Stage');
+    await click('Stage block');
     await vi.waitFor(() =>
       expect(onRequestChange).toHaveBeenCalledWith({ repoPath: request.repoPath, path: request.path, source: 'staged', startView: 'diff' }),
     );
     await view.rerender(onRequestChange.mock.calls[0][0]);
     expect(selectedSource()).toBe('staged');
-    expect(button('Unstage')).toBeTruthy();
+    expect(button('Unstage block')).toBeTruthy();
     view.unmount();
   });
 
@@ -100,7 +100,7 @@ describe('file viewer after staging the final hunk', () => {
     });
     const onRequestChange = vi.fn();
     const view = await renderViewer({ ...request, source }, { onRequestChange });
-    await click(caseName === 'unstage' ? 'Unstage' : caseName === 'discard' ? 'Discard' : 'Stage');
+    await click(caseName === 'unstage' ? 'Unstage block' : caseName === 'discard' ? 'Discard block' : 'Stage block');
     if (caseName === 'discard') await act(async () => dialogs.confirm.mock.calls.at(-1)?.[0].onConfirm());
     expect(onRequestChange).not.toHaveBeenCalled();
     expect(selectedSource()).toBe(source);
@@ -117,7 +117,7 @@ describe('file viewer after staging the final hunk', () => {
     getDiffPreview.mockImplementation(async (args) => (args.includes('--cached') ? staged.promise : preview(applied ? '' : diff(lastHunk))));
     const onRequestChange = vi.fn();
     const view = await renderViewer(request, { onRequestChange });
-    await click('Stage');
+    await click('Stage block');
     await vi.waitFor(() => expect(getDiffPreview).toHaveBeenCalledWith(['diff', '--cached', '--', request.path], expect.any(Object), request.repoPath));
     if (change === 'tab') await click('Text');
     else if (change.startsWith('source')) {

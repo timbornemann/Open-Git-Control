@@ -149,7 +149,7 @@ describe('file viewer draft protection', () => {
     const request = { ...viewerRequest(), startView: 'diff' as const };
     const view = await renderViewer(request);
     await vi.waitFor(() => expect(document.querySelector('.diff-hunk')).toBeTruthy());
-    await click('Discard');
+    await click('Discard block');
     const dialog = dialogs.confirm.mock.calls.at(-1)?.[0];
     await view.rerender(viewerRequest('staged'));
     await view.rerender(request);

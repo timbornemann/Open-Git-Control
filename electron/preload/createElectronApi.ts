@@ -3,6 +3,7 @@ import { createWorkingTreeWatchApi } from './createWorkingTreeWatchApi';
 import { createRepositoryAnalyticsApi } from './createRepositoryAnalyticsApi';
 import { createBranchCleanupApi } from './createBranchCleanupApi';
 import { createBranchChangeApi } from './createBranchChangeApi';
+import type { ApplyDiffLineSelectionRequest } from '../../src/shared/ipc/diffLineSelection';
 import { createRepositoryLocationApi } from './createRepositoryLocationApi';
 import { createSystemToolsApi } from './createSystemToolsApi';
 import { createStorageApi } from './createStorageApi';
@@ -202,6 +203,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       repoPath
         ? invokeGitOperationForRepo(repoPath, 'apply', IpcChannel.GitApplyPatch, patch, options || {}, repoPath)
         : invokeGitOperation('apply', IpcChannel.GitApplyPatch, patch, options || {}),
+    applyDiffLineSelection: (request: ApplyDiffLineSelectionRequest) =>
+      invokeGitOperationForRepo(request.repoPath, 'apply', IpcChannel.GitApplyDiffLineSelection, request),
     getStashes: (repoPath?: string) =>
       repoPath ? invokeGitOperationForRepo(repoPath, 'stash list', IpcChannel.GitStashes, repoPath) : invokeGitOperation('stash list', IpcChannel.GitStashes),
     gitStashBranch: (stashName: string, branchName: string, repoPath?: string) =>
@@ -394,6 +397,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       getCommitMessageEditBackups: flatApi.getCommitMessageEditBackups,
       cancelCommitMessageEdit: flatApi.cancelCommitMessageEdit,
       applyPatch: flatApi.applyPatch,
+      applyDiffLineSelection: flatApi.applyDiffLineSelection,
       getStashes: flatApi.getStashes,
       gitStashBranch: flatApi.gitStashBranch,
       getRepoOriginUrl: flatApi.getRepoOriginUrl,

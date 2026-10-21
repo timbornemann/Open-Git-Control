@@ -388,6 +388,9 @@ Dateikopplung benötigt standardmäßig drei gemeinsame Commits; Commits mit meh
   - Hunk stagen
   - Hunk unstagen
   - Hunk verwerfen
+- Einzelne Änderungen über die **+**-Buttons neben ungestagten Zeilen beziehungsweise **−**-Buttons neben gestagten Zeilen auswählen. Alt und Neu einer Ersetzung werden gemeinsam ausgewählt; zusätzliche Ergänzungen oder Löschungen bleiben einzeln auswählbar. Umschalt-Klick wählt einen Bereich, auch über mehrere Blöcke derselben Datei. Beim Wechsel zwischen Unified und Side-by-side bleibt die Auswahl erhalten.
+- **Auswahl stagen** und **Auswahl unstagen** ändern ausschließlich den Index; Arbeitsdateien bleiben unverändert. Der Zähler zählt eine Ersetzung einmal. **Auswahl aufheben** oder Escape leert die Auswahl. Verwerfen bleibt eine bestätigungspflichtige Aktion für ganze Blöcke.
+- Die Zeilenauswahl unterstützt teilweise neue und gelöschte Textdateien. Bei veränderter Vorschau müssen die Zeilen erneut ausgewählt werden. Binäre, gekürzte, konfliktbehaftete oder nicht unterstützte Diffs verwenden die vorhandenen Dateiaktionen. Benötigt eine Ergänzung die angrenzende Änderung des letzten Zeilenumbruchs, muss diese Ersetzung ebenfalls ausgewählt werden.
 - Blame-Overlay im Diff Viewer.
 - Blame-Eintraege anklicken und zum verantwortlichen Commit springen.
 - Datei-Inspector-Tabs:

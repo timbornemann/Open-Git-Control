@@ -179,11 +179,11 @@
           "copy_full_diff_5abd77b2": "Copy full diff",
           "no_hunk_data_available_3c3c1467": "No hunk data available.",
           "stage_this_hunk_c97d4d48": "Stage this hunk",
-          "stage_a304b800": "Stage",
+          "stage_a304b800": "Stage block",
           "discard_changes_in_this_hunk_b3969326": "Discard changes in this hunk",
-          "discard_23504c1c": "Discard",
+          "discard_23504c1c": "Discard block",
           "unstage_this_hunk_0ac01911": "Unstage this hunk",
-          "unstage_80442576": "Unstage"
+          "unstage_80442576": "Unstage block"
         },
         "difftoolbar": {
           "unified_diff_a93333ef": "Unified diff",

@@ -14,6 +14,7 @@ import { isSystemToolAvailable } from './systemToolsAvailability';
 import { ensureCommitIdentity } from '@/app/state/gitIdentityStore';
 import { mergeCommands } from './mergeCommands';
 import { branchCleanupClient } from './branchCleanupClient';
+import { diffClient } from './diffClient';
 
 export type GitCommandArgs = [GitCommandName, ...string[]];
 
@@ -39,6 +40,7 @@ const sanitizeBranchSuffix = (value: string): string => value.replace(/[^a-zA-Z0
 const command = <TCommand extends GitCommandName>(commandName: TCommand, ...args: string[]): [TCommand, ...string[]] => [commandName, ...args];
 export const gitClient = cachedClient('git', {
   ...branchCleanupClient,
+  ...diffClient,
   ...mergeCommands,
   ...commitMessageEdits,
   ...repositoryAnalyticsClient,
@@ -391,21 +393,12 @@ export const gitClient = cachedClient('git', {
     return result;
   },
 
-  async getDiffPreview(...args: Parameters<ElectronAPI['getDiffPreview']>): ReturnType<ElectronAPI['getDiffPreview']> {
-    return requireElectronGitApi().getDiffPreview(...args);
-  },
-
   async getFileBlameRange(...args: Parameters<ElectronAPI['getFileBlameRange']>): ReturnType<ElectronAPI['getFileBlameRange']> {
     return requireElectronGitApi().getFileBlameRange(...args);
   },
 
   async startInteractiveRebase(...args: Parameters<ElectronAPI['startInteractiveRebase']>): ReturnType<ElectronAPI['startInteractiveRebase']> {
     return requireElectronGitApi().startInteractiveRebase(...args);
-  },
-
-  async applyPatch(...args: Parameters<ElectronAPI['applyPatch']>): ReturnType<ElectronAPI['applyPatch']> {
-    const result = await requireElectronGitApi().applyPatch(...args);
-    return result;
   },
 
   async getStashes(...args: Parameters<ElectronAPI['getStashes']>): ReturnType<ElectronAPI['getStashes']> {

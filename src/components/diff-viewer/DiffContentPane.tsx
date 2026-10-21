@@ -1,11 +1,10 @@
 import { FileWarning } from 'lucide-react';
 import type { DiffRequest } from '@/types/diff';
 import type { GitFileBlameLineDto } from '@/types/git';
-import { sideBySideRows, type DiffViewMode, type ParsedDiff, type ParsedHunk, type ParsedLine } from '@/utils/diffParser';
-import { useDiffSyntaxHighlighting } from '@/hooks/useDiffSyntaxHighlighting';
+import { type DiffViewMode, type ParsedDiff, type ParsedHunk } from '@/utils/diffParser';
 import { useI18n } from '@/i18n';
-import { MAX_RENDER_LINES, MAX_SINGLE_LINE_LENGTH } from './diffViewerConstants';
-import { DiffBlameCell } from './DiffBlameCell';
+import { MAX_RENDER_LINES } from './diffViewerConstants';
+import { DiffHunkLines, type DiffLineSelectionControls } from './DiffHunkLines';
 import type { HunkPatchOperation } from './useHunkPatchActions';
 
 type DiffContentPaneProps = {
@@ -30,6 +29,8 @@ type DiffContentPaneProps = {
   isBlameLoading: boolean;
   blameMap: Map<number, GitFileBlameLineDto>;
   onNavigateToCommit?: (hash: string) => void;
+  lineSelection?: DiffLineSelectionControls;
+  lineSelectionReason?: string | null;
 };
 
 export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
@@ -54,112 +55,10 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
   isBlameLoading,
   blameMap,
   onNavigateToCommit,
+  lineSelection,
+  lineSelectionReason,
 }) => {
   const { t, tr } = useI18n();
-  const { highlightLine } = useDiffSyntaxHighlighting();
-
-  const renderBlameCell = (line: ParsedLine, prevLine?: ParsedLine, side: 'left' | 'right' = 'right') => (
-    <DiffBlameCell
-      line={line}
-      prevLine={prevLine}
-      side={side}
-      showBlame={showBlame}
-      isBlameLoading={isBlameLoading}
-      blameMap={blameMap}
-      onNavigateToCommit={onNavigateToCommit}
-    />
-  );
-
-  const renderUnifiedLine = (line: ParsedLine, key: string, prevLine?: ParsedLine) => {
-    const lineClass = line.type === 'add' ? 'diff-line add' : line.type === 'del' ? 'diff-line del' : 'diff-line ctx';
-
-    const gridStyle = showBlame ? { gridTemplateColumns: '220px 52px 52px minmax(0, 1fr)' } : undefined;
-
-    return (
-      <div key={key} className={lineClass} style={gridStyle}>
-        {renderBlameCell(line, prevLine)}
-        <span className="diff-lineno">{line.leftNo ?? ''}</span>
-        <span className="diff-lineno">{line.rightNo ?? ''}</span>
-        <span className="diff-code" title={line.text}>
-          {highlightLine(line.text)}
-        </span>
-      </div>
-    );
-  };
-
-  const renderSideBySideLine = (line: ParsedLine, key: string, prevLine?: ParsedLine) => {
-    const textStr = line.text || '';
-    const sbsGridStyle = showBlame ? { gridTemplateColumns: '180px 52px minmax(0, 1fr)' } : undefined;
-
-    if (line.type === 'context') {
-      // A modified line (a deletion paired with an addition) reaches this branch
-      // as a single row whose left and right text are joined by the \x1f
-      // delimiter from sideBySideRows. Genuine unchanged context has no
-      // delimiter. Highlight the two differing sides as deletion/addition so a
-      // modified line is not mistaken for an unchanged one.
-      const isModifiedLine = textStr.includes('\x1f');
-      const [leftText = '', rightText = leftText] = textStr.split('\x1f');
-      const leftCellClass = isModifiedLine ? 'diff-sbs-cell del' : 'diff-sbs-cell ctx';
-      const rightCellClass = isModifiedLine ? 'diff-sbs-cell add' : 'diff-sbs-cell ctx';
-      return (
-        <div key={key} className="diff-sbs-row">
-          <div className={leftCellClass} style={sbsGridStyle}>
-            {renderBlameCell(line, prevLine, 'left')}
-            <span className="diff-lineno">{line.leftNo ?? ''}</span>
-            <span className="diff-code" title={leftText}>
-              {highlightLine(leftText)}
-            </span>
-          </div>
-          <div className={rightCellClass} style={sbsGridStyle}>
-            {renderBlameCell(line, prevLine, 'right')}
-            <span className="diff-lineno">{line.rightNo ?? ''}</span>
-            <span className="diff-code" title={rightText}>
-              {highlightLine(rightText)}
-            </span>
-          </div>
-        </div>
-      );
-    }
-
-    if (line.type === 'del') {
-      const [leftText = ''] = textStr.split('\x1f');
-      return (
-        <div key={key} className="diff-sbs-row">
-          <div className="diff-sbs-cell del" style={sbsGridStyle}>
-            {renderBlameCell(line, prevLine, 'left')}
-            <span className="diff-lineno">{line.leftNo ?? ''}</span>
-            <span className="diff-code" title={leftText}>
-              {highlightLine(leftText)}
-            </span>
-          </div>
-          <div className="diff-sbs-cell empty" style={sbsGridStyle}>
-            {renderBlameCell(line, prevLine, 'right')}
-            <span className="diff-lineno"> </span>
-            <span className="diff-code"> </span>
-          </div>
-        </div>
-      );
-    }
-
-    const [, rightText = ''] = textStr.split('\x1f');
-    return (
-      <div key={key} className="diff-sbs-row">
-        <div className="diff-sbs-cell empty" style={sbsGridStyle}>
-          {renderBlameCell(line, prevLine, 'left')}
-          <span className="diff-lineno"> </span>
-          <span className="diff-code"> </span>
-        </div>
-        <div className="diff-sbs-cell add" style={sbsGridStyle}>
-          {renderBlameCell(line, prevLine, 'right')}
-          <span className="diff-lineno">{line.rightNo ?? ''}</span>
-          <span className="diff-code" title={rightText}>
-            {highlightLine(rightText)}
-          </span>
-        </div>
-      </div>
-    );
-  };
-
   if (isLoading) {
     return (
       <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -198,9 +97,10 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
       <div className="diff-empty-state warning">
         <FileWarning size={18} />
         <span>
-          {isBinaryDiff || looksBinaryByExt
-            ? t('generated.components.diff_viewer.diffcontentpane.binary_file_detected_text_diff_is_not_shown_bcfe2843')
-            : t('generated.components.diff_viewer.diffcontentpane.this_file_cannot_be_shown_as_text_diff_e0948ac7')}
+          {lineSelectionReason ||
+            (isBinaryDiff || looksBinaryByExt
+              ? t('generated.components.diff_viewer.diffcontentpane.binary_file_detected_text_diff_is_not_shown_bcfe2843')
+              : t('generated.components.diff_viewer.diffcontentpane.this_file_cannot_be_shown_as_text_diff_e0948ac7'))}
         </span>
       </div>
     );
@@ -208,6 +108,11 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
 
   return (
     <div className="diff-content-scroll">
+      {lineSelectionReason && (
+        <div className="diff-line-selection-note" role="note">
+          {lineSelectionReason}
+        </div>
+      )}
       {isTooLarge && (
         <div className="diff-large-warning">
           <span>
@@ -243,7 +148,6 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
       )}
 
       {parsed.hunks.map((hunk, hunkIndex) => {
-        const rows = viewMode === 'side-by-side' ? sideBySideRows(hunk.rows) : hunk.rows;
         const canStageHunks = !!onRepoChanged && !isTooLarge && (request.source === 'staged' || request.source === 'unstaged');
         return (
           <div key={hunk.id} className={`diff-hunk ${activeHunkIndex === hunkIndex ? 'active' : ''}`} ref={(element) => setHunkRef(hunkIndex, element)}>
@@ -288,13 +192,15 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
             </div>
 
             <div className={viewMode === 'side-by-side' ? 'diff-sbs-wrap' : 'diff-unified-wrap'}>
-              {rows.map((line, lineIndex) => {
-                const clippedText = line.text.length > MAX_SINGLE_LINE_LENGTH ? `${line.text.slice(0, MAX_SINGLE_LINE_LENGTH)} ...` : line.text;
-                const normalizedLine = { ...line, text: clippedText };
-                const key = `${hunk.id}-${lineIndex}`;
-                const prevLine = lineIndex > 0 ? rows[lineIndex - 1] : undefined;
-                return viewMode === 'side-by-side' ? renderSideBySideLine(normalizedLine, key, prevLine) : renderUnifiedLine(normalizedLine, key, prevLine);
-              })}
+              <DiffHunkLines
+                hunk={hunk}
+                sideBySide={viewMode === 'side-by-side'}
+                selection={lineSelection}
+                showBlame={showBlame}
+                isBlameLoading={isBlameLoading}
+                blameMap={blameMap}
+                onNavigateToCommit={onNavigateToCommit}
+              />
             </div>
           </div>
         );

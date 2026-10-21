@@ -52,6 +52,7 @@ export const enum IpcChannel {
   GitAddIgnoreRule = 'git:addIgnoreRule',
   GitAiAutoCommit = 'git:aiAutoCommit',
   GitApplyPatch = 'git:applyPatch',
+  GitApplyDiffLineSelection = 'git:applyDiffLineSelection',
   GitCancelAiAutoCommit = 'git:cancelAiAutoCommit',
   GitCancelSecretScan = 'git:cancelSecretScan',
   GitApproveSecretScanCommit = 'git:approveSecretScanCommit',

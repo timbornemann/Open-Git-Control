@@ -9,6 +9,7 @@ import { redactGitSensitiveText } from '../../git/GitErrorFormatter';
 import { IpcChannel } from '../../../src/types/ipcContract';
 import { createJobId } from '../gitCommandPolicy';
 import { registerGitDiffPreviewHandler } from './git/registerGitDiffPreviewHandler';
+import { registerDiffLineSelectionHandler } from './git/registerDiffLineSelectionHandler';
 import { repoJobRegistry as defaultRepoJobRegistry } from '../repoJobRegistry';
 import type { RepoJobRegistry } from '../repoJobRegistry';
 import { handleGitCommand } from './gitCommandRouter';
@@ -69,6 +70,7 @@ export function registerGitHandlers({
   const resetWorkingTreeWatches = registerGitHistoryHandlers({ gitService, commitStatsService, workingTreeService });
   registerGitFileHandlers({ gitService, readStoredRepoPaths, ensureWriteAllowed: ensureCommitProtectionIsIdle });
   registerGitOperationStateHandler({ gitService });
+  registerDiffLineSelectionHandler(gitService);
   registerRepositoryActivityHandler({ gitService, readStoredRepoPaths });
   const commitMessageEdits = registerCommitMessageEditHandlers({ gitService, repoJobRegistry, beginCommitProtection, ensureCommitProtectionIsIdle });
 

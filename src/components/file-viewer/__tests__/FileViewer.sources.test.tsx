@@ -191,9 +191,7 @@ describe('shared file viewer sources', () => {
   it('keeps hunk operations in unified and side-by-side diff views', async () => {
     const view = await renderViewer({ ...viewerRequest(), startView: 'diff' });
     await vi.waitFor(() => expect(document.querySelector('.diff-hunk')).toBeTruthy());
-    const stage = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
-      (b) => b.textContent?.includes('Stage') && !b.textContent?.includes('Unstage'),
-    );
+    const stage = [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Stage block');
     expect(stage).toBeTruthy();
     await act(async () => stage?.click());
     expect(gitClient.applyPatch).toHaveBeenCalledWith(expect.stringContaining('+after'), { cached: true }, 'C:/viewer-repo');
