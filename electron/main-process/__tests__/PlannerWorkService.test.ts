@@ -234,9 +234,16 @@ describe('PlannerWorkService with real Git', () => {
     git(f.repo, 'branch', '-D', started.branch);
     const main = f.current();
     saveWorkItem(f.repo, { ...main.item, references }, main.revision);
-    const missing = await f.service.refresh(f.request, f.context);
-    expect(missing.branchMissing).toBe(true);
-    expect(missing.commits).toEqual(details.commits);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    for (let pass = 0; pass < 3; pass++) {
+      const missing = await f.service.refresh(f.request, f.context);
+      expect(missing.branchMissing).toBe(true);
+      expect(missing.commits).toEqual(details.commits);
+    }
+    expect(consoleError).not.toHaveBeenCalled();
+    git(f.repo, 'branch', started.branch, details.headSha!);
+    expect((await f.service.refresh(f.request, f.context)).branchMissing).toBe(false);
+    expect(consoleError).not.toHaveBeenCalled();
   });
   test('only completes a linked server-confirmed merge at the exact current tip and respects manual status changes', async (f) => {
     await f.start();

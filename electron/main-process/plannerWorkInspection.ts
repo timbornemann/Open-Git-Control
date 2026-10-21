@@ -9,7 +9,7 @@ export const WORK_OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i;
 export async function workSha(git: WorkGit, repo: string, ref: string) {
   if (!ref || ref.startsWith('-') || /[\0\r\n]/.test(ref)) throw new Error('Invalid Git reference.');
   try {
-    const sha = (await git.run(repo, ['rev-parse', '--verify', `${ref}^{commit}`])).trim();
+    const sha = (await git.run(repo, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`])).trim();
     return WORK_OID.test(sha) ? sha : '';
   } catch {
     return '';

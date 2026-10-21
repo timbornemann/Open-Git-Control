@@ -303,10 +303,21 @@
             }
           }
         ],
-        "pullRequests": []
+        "pullRequests": [
+          {
+            "provider": "github",
+            "server": "https://github.com",
+            "repositoryId": "1176739168",
+            "fullPath": "timbornemann/Open-Git-Control",
+            "workflowId": "c82e7c44-5b40-4c73-bd8e-9910203dc355",
+            "id": "31",
+            "number": "31",
+            "url": "https://github.com/timbornemann/Open-Git-Control/pull/31"
+          }
+        ]
       },
       "createdAt": 1792583992066,
-      "updatedAt": 1792584118123
+      "updatedAt": 1792591068093
     }
   ]
 }

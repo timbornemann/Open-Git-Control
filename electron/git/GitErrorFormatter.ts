@@ -19,7 +19,7 @@ export class GitErrorFormatter {
     const fallbackMessage = readGitProcessErrorText(error, 'message') || 'Unknown git error';
     const detailedMessage = gitOut ? `${fallbackMessage}\nGit Output: ${gitOut}` : fallbackMessage;
     const isRepoUnavailable = isRepoUnavailableError(detailedMessage);
-    const isExpectedNonFatal = this.isExpectedNonFatalGitError(args, detailedMessage, gitOut);
+    const isExpectedNonFatal = this.isExpectedNonFatalGitError(args, detailedMessage, gitOut, readGitProcessErrorText(error, 'code'));
     const finalMessage = isRepoUnavailable ? createRepoUnavailableErrorMessage(gitOut || fallbackMessage) : detailedMessage;
     const safeFinalMessage = redactGitSensitiveText(finalMessage);
 
@@ -34,7 +34,7 @@ export class GitErrorFormatter {
     return normalizedError;
   }
 
-  private isExpectedNonFatalGitError(args: string[], errorText: string, gitOutput: string): boolean {
+  private isExpectedNonFatalGitError(args: string[], errorText: string, gitOutput: string, exitCode: string): boolean {
     const primary = String(args?.[0] || '')
       .trim()
       .toLowerCase();
@@ -50,8 +50,9 @@ export class GitErrorFormatter {
       );
     }
     if (primary === 'rev-parse' && args.includes('--verify') && args.includes('--quiet')) {
+      // Missing optional refs exit 1 without diagnostics, including with an absolute Git executable path.
       return (
-        (!gitOutput && /^command failed:\s*git\s+rev-parse\s+--verify\s+--quiet\b/i.test(errorText)) ||
+        (!gitOutput && (exitCode === '1' || (!exitCode && /^command failed:\s*git\s+rev-parse\s+--verify\s+--quiet\b/i.test(errorText)))) ||
         /needed a single revision|unknown revision or path not in the working tree|ambiguous argument .*unknown revision/i.test(errorText)
       );
     }
