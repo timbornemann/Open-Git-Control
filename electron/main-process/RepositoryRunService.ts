@@ -106,7 +106,11 @@ export class RepositoryRunService {
       startedAt: Date.now(),
       activeStepIndex: 0,
       stepCount: configState.config.actions[action].steps.length,
-      steps: configState.config.actions[action].steps.map((step) => ({ label: step.label, parser: step.parser })),
+      steps: configState.config.actions[action].steps.map((step) => ({
+        label: step.label,
+        parser: step.parser,
+        ...getRunPlatformCommand(step, getRepositoryRunPlatform(process.platform)),
+      })),
       output: [],
       config: configState.config,
       child: null,

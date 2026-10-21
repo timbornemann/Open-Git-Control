@@ -65,7 +65,7 @@ export type RepositoryRunStateDto = {
   finishedAt?: number;
   activeStepIndex: number;
   stepCount: number;
-  steps: Array<{ label: string; parser: RepositoryRunParser }>;
+  steps: Array<{ label: string; parser: RepositoryRunParser; command?: string; shell?: RepositoryRunShell }>;
   exitCode?: number | null;
   message?: string;
   output: RepositoryRunOutputLineDto[];

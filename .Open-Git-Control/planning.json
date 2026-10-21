@@ -138,10 +138,10 @@
       "title": "Konsolenfehler direkt als Aufgabe übernehmen",
       "description": "Im Probleme-Tab „Als Bug aufnehmen“ ergänzen. Fehlermeldung, Dateiposition, ausgeführter Befehl und ein begrenzter Logauszug werden als bearbeitbarer Planner-Entwurf übernommen.",
       "priority": "medium",
-      "status": "planned",
+      "status": "done",
       "tags": [],
       "createdAt": 1792501116276,
-      "updatedAt": 1792502679090
+      "updatedAt": 1792575940069
     },
     {
       "id": "fef11401-94ff-4855-a0f7-d014394c50eb",

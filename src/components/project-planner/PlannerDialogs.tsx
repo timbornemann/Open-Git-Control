@@ -103,6 +103,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ open, project, bus
 type ItemDialogProps = {
   open: boolean;
   item?: PlannerItem | null;
+  initialInput?: PlannerItemInput;
   defaultStatus?: PlannerStatus;
   busy: boolean;
   onClose: () => void;
@@ -115,6 +116,7 @@ type ItemDialogProps = {
 export const ItemDialog: React.FC<ItemDialogProps> = ({
   open,
   item,
+  initialInput,
   defaultStatus = 'idea',
   busy,
   onClose,
@@ -134,12 +136,13 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({
 
   React.useEffect(() => {
     if (!open) return;
-    setTitle(item?.title || '');
-    setDescription(item?.description || '');
-    setPriority(item?.priority || 'medium');
-    setStatus(item?.status || defaultStatus);
-    setTags(item ? item.tags.join(', ') : null);
-  }, [defaultStatus, item, open]);
+    const source = item ?? initialInput;
+    setTitle(source?.title || '');
+    setDescription(source?.description || '');
+    setPriority(source?.priority || 'medium');
+    setStatus(source?.status || defaultStatus);
+    setTags(source ? source.tags.join(', ') : null);
+  }, [defaultStatus, initialInput, item, open]);
 
   const changeStatus = (nextStatus: PlannerStatus) => {
     if (!item && tags !== null) {

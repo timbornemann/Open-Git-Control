@@ -3,7 +3,9 @@ import { DialogFrame } from '@/components/DialogFrame';
 import { useProjectPlanner } from '@/contexts/ProjectPlannerContext';
 import { useI18n } from '@/i18n';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
+import type { PlannerItemInput } from '@/types/projectPlanner';
 import { ItemDialog } from './PlannerDialogs';
+import { useRepositoryTodoDraftState } from './repositoryTodoDraftState';
 
 type QuickRepositoryTodoDialogProps = {
   requestId: number;
@@ -15,14 +17,20 @@ const repoKey = normalizeRepoPathKey;
 export const QuickRepositoryTodoDialog: React.FC<QuickRepositoryTodoDialogProps> = ({ requestId, activeRepo }) => {
   const { data, loading, busy, createItem, createRepositoryProject, notify } = useProjectPlanner();
   const { tr } = useI18n();
+  const draftRequest = useRepositoryTodoDraftState((state) => state.request);
+  const consumeDraftRequest = useRepositoryTodoDraftState((state) => state.consume);
+  const [initialInput, setInitialInput] = React.useState<PlannerItemInput>();
   const [targetRepoPath, setTargetRepoPath] = React.useState<string | null>(null);
   const [projectId, setProjectId] = React.useState<string | null>(null);
   const [repositoryProjectConfirmationOpen, setRepositoryProjectConfirmationOpen] = React.useState(false);
   const handledRequestIdRef = React.useRef(requestId);
+  const generationRef = React.useRef(0);
 
   const close = React.useCallback(() => {
+    generationRef.current += 1;
     setTargetRepoPath(null);
     setProjectId(null);
+    setInitialInput(undefined);
     setRepositoryProjectConfirmationOpen(false);
   }, []);
 
@@ -34,9 +42,25 @@ export const QuickRepositoryTodoDialog: React.FC<QuickRepositoryTodoDialogProps>
       return;
     }
     setTargetRepoPath(activeRepo);
+    generationRef.current += 1;
+    setInitialInput(undefined);
     setProjectId(null);
     setRepositoryProjectConfirmationOpen(false);
   }, [activeRepo, notify, requestId, tr]);
+
+  React.useEffect(() => {
+    if (!draftRequest) return;
+    consumeDraftRequest(draftRequest);
+    if (!activeRepo || repoKey(activeRepo) !== repoKey(draftRequest.repoPath)) {
+      notify(tr('Bitte zuerst das zugehörige Repository öffnen.', 'Please open the associated repository first.'), true);
+      return;
+    }
+    generationRef.current += 1;
+    setTargetRepoPath(draftRequest.repoPath);
+    setInitialInput(draftRequest.input);
+    setProjectId(null);
+    setRepositoryProjectConfirmationOpen(false);
+  }, [activeRepo, consumeDraftRequest, draftRequest, notify, tr]);
 
   React.useEffect(() => {
     if (!targetRepoPath || loading || projectId || repositoryProjectConfirmationOpen) return;
@@ -49,14 +73,15 @@ export const QuickRepositoryTodoDialog: React.FC<QuickRepositoryTodoDialogProps>
   }, [data.projects, loading, projectId, repositoryProjectConfirmationOpen, targetRepoPath]);
 
   React.useEffect(() => {
-    if (!targetRepoPath || !activeRepo || repoKey(targetRepoPath) === repoKey(activeRepo)) return;
+    if (!targetRepoPath || (activeRepo && repoKey(targetRepoPath) === repoKey(activeRepo))) return;
     close();
   }, [activeRepo, close, targetRepoPath]);
 
   const createProjectAndOpenTodo = async () => {
     if (!targetRepoPath) return;
+    const generation = generationRef.current;
     const project = await createRepositoryProject(targetRepoPath);
-    if (!project) return;
+    if (!project || generation !== generationRef.current) return;
     setRepositoryProjectConfirmationOpen(false);
     setProjectId(project.id);
   };
@@ -86,12 +111,14 @@ export const QuickRepositoryTodoDialog: React.FC<QuickRepositoryTodoDialogProps>
 
       <ItemDialog
         open={Boolean(projectId)}
+        initialInput={initialInput}
         busy={busy}
         onClose={close}
         onSubmit={async (input) => {
           if (!projectId) return;
+          const generation = generationRef.current;
           const created = await createItem(projectId, input);
-          if (created) close();
+          if (created && generation === generationRef.current) close();
         }}
       />
     </>
