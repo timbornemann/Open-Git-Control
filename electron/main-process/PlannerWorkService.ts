@@ -19,6 +19,7 @@ import type { PlannerHostingReader } from './PlannerWorkHosting';
 import { loadWorkItem, carryWorkItem, saveWorkItem, workContent, workDigest } from './PlannerWorkStore';
 import { assertWorkIdle, suggestWorkBranch, workBases, workSha, workState, type WorkGit } from './plannerWorkInspection';
 import { readWorkHistory } from './plannerWorkHistory';
+import { checkWorkCompletion } from './plannerWorkCompletion';
 import type { PlannerWorkRegistry } from './PlannerWorkRegistry';
 import { PlannerWorkAssignments } from './PlannerWorkAssignments';
 import type { PlannerWorkRecovery, WorkRecovery } from './PlannerWorkRecovery';
@@ -286,6 +287,7 @@ export class PlannerWorkService {
     if (!branch) return emptyDetails(source.item.id);
     const previous = await this.get({ repoPath: request.repoPath, itemId: request.itemId });
     let details = await readWorkHistory(this.reader(context), request.repoPath, branch, previous);
+    delete details.completion;
     const version = this.hosting.version();
     try {
       const remote = await this.hosting.read(request.repoPath, branch, context.signal);
@@ -314,20 +316,10 @@ export class PlannerWorkService {
       );
       if (!references.pullRequests.some((entry) => entry.workflowId === branch.id) && candidates.length === 1)
         references.pullRequests.push(this.reference(candidates[0]));
-      const linked = remote.requests.filter((entry) =>
-        references.pullRequests.some(
-          (reference) => reference.workflowId === branch.id && plannerWorkReferenceKey(reference) === plannerWorkReferenceKey(entry),
-        ),
-      );
-      const merged = linked.filter(
-        (entry) =>
-          entry.state === 'merged' &&
-          entry.headSha === details.headSha &&
-          !details.branchMissing &&
-          !references.branches.some((other) => other.completedBy === plannerWorkReferenceKey(entry)),
-      );
-      const complete = !branch.automationPaused && !branch.completedBy && !details.historyIncomplete && merged.length === 1;
-      if (complete) currentBranch.completedBy = plannerWorkReferenceKey(merged[0]);
+      const completion = await checkWorkCompletion(this.reader(context), request.repoPath, references, details);
+      details.completion = completion.completion;
+      const complete = !branch.automationPaused && !branch.completedBy && Boolean(completion.request);
+      if (complete) currentBranch.completedBy = plannerWorkReferenceKey(completion.request!);
       if (workDigest(references) !== workDigest(source.item.references) || complete) {
         context.ensureActive();
         await this.git.withExclusiveWrite(
@@ -335,6 +327,7 @@ export class PlannerWorkService {
           'planner:recordWork',
           async (git) => {
             context.ensureActive();
+            if (version !== this.hosting.version()) throw new Error('The hosting session changed during refresh.');
             const reader: WorkGit = { run: (repo, args) => git.run(repo, args, { envOverrides: { GIT_NO_LAZY_FETCH: '1', GIT_NO_REPLACE_OBJECTS: '1' } }) };
             if (complete && (await workSha(reader, request.repoPath, `refs/heads/${branch.name}`)) !== (details.branchMissing ? '' : details.headSha))
               throw new Error('The work branch changed during refresh. Refresh it again before completion.');
@@ -345,12 +338,20 @@ export class PlannerWorkService {
       }
     } catch (error) {
       context.ensureActive();
-      details = { ...details, hostingRepository: undefined, error: error instanceof Error ? error.message : String(error) };
+      details = { ...details, hostingRepository: undefined, completion: undefined, error: error instanceof Error ? error.message : String(error) };
     }
     context.ensureActive();
     await this.cache.write(request.repoPath, `${source.item.id}:${branch.id}`, { ...details, hostingVersion: version }, () => !context.signal.aborted);
     await this.registry.record(request.repoPath, [loadWorkItem(request.repoPath, request.itemId).item]);
-    const visible = (entry: PlannerWorkDetails) => [entry.headSha, entry.commits, entry.requests, entry.error, entry.branchMissing, entry.historyIncomplete];
+    const visible = (entry: PlannerWorkDetails) => [
+      entry.headSha,
+      entry.commits,
+      entry.requests,
+      entry.error,
+      entry.branchMissing,
+      entry.historyIncomplete,
+      entry.completion,
+    ];
     if (workDigest(visible(previous)) !== workDigest(visible(details))) notifyProjectPlannerDataChanged();
     return { ...details, revision: loadWorkItem(request.repoPath, request.itemId).revision };
   }
@@ -378,7 +379,7 @@ export class PlannerWorkService {
       chosen = remote.requests.find((entry) => plannerWorkReferenceKey(entry) === plannerWorkReferenceKey(request.reference));
       if (!chosen || chosen.workflowId !== branch.id) throw new Error('Refresh change requests and choose a verified matching source.');
     }
-    return this.git.withExclusiveWrite(
+    const saved = await this.git.withExclusiveWrite(
       request.repoPath,
       'planner:updateWork',
       async (exclusive) => {
@@ -447,5 +448,13 @@ export class PlannerWorkService {
       },
       context.signal,
     );
+    if (request.action === 'automation' && !request.paused) {
+      // Re-evaluate immediately, outside the write lock. A concurrent manual edit
+      // still wins through refreshWork's task revision guard.
+      await this.refreshWork(request, context);
+      context.ensureActive();
+      return loadWorkItem(request.repoPath, request.itemId).item;
+    }
+    return saved;
   }
 }

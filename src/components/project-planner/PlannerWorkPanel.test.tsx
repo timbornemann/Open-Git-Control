@@ -152,6 +152,69 @@ describe('planner work details and completion', () => {
       initialDraft: { title: item.title, body: item.description, sourceBranch: 'task/fix', targetBranch: 'main' },
     });
   });
+  it.each([true, false])('applies automatic completion (%s) only after successful PR creation', async (enabled) => {
+    vi.mocked(plannerClient.getWork).mockResolvedValue({
+      success: true,
+      data: { ...details(), hostingRepository: { ref: { connectionId: 'local', repositoryId: '42', fullPath: 'team/repo' } } as any },
+    });
+    await render({ ...item, references: { ...item.references!, pullRequests: [] } });
+    act(() => button('Create PR').click());
+    const choice = host.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    expect(choice.checked).toBe(true);
+    expect(host.textContent).toContain('Complete task automatically after PR merge');
+    if (!enabled) act(() => choice.click());
+    expect(plannerClient.updateWork).not.toHaveBeenCalled();
+    expect(plannerClient.refreshWork).not.toHaveBeenCalled();
+    await act(async () => (mocks.create.mock.lastCall![0] as { onCreated(): void }).onCreated());
+    expect(plannerClient.updateWork).toHaveBeenCalledExactlyOnceWith({
+      repoPath: '/repo',
+      itemId: item.id,
+      expectedRevision: 'current-revision',
+      action: 'automation',
+      paused: !enabled,
+    });
+  });
+  it('offers a direct reviewed resume action for a merged PR and avoids publishing it again', async () => {
+    const cached = details();
+    cached.requests[0].state = 'merged';
+    cached.completion = 'ready';
+    vi.mocked(plannerClient.getWork).mockResolvedValue({ success: true, data: cached });
+    const done = {
+      ...item,
+      status: 'done' as const,
+      references: { ...item.references!, branches: [{ ...branch, automationPaused: false, completedBy: 'merged-pr' }] },
+    };
+    vi.mocked(plannerClient.updateWork).mockResolvedValue({ success: true, data: done });
+    await render(item, 'main');
+    expect(host.textContent).toContain('PR merged · automation paused');
+    expect(host.textContent).toContain('PR merge confirmed');
+    expect(button('Publish branch')).toBeUndefined();
+    expect(button('Create PR')).toBeUndefined();
+    expect(button('Switch to task branch')).toBeUndefined();
+    expect(plannerClient.updateWork).not.toHaveBeenCalled();
+    act(() => button('Open merged PR').click());
+    expect(appClient.openExternalUrl).toHaveBeenCalledExactlyOnceWith(pr.url);
+    await act(async () => button('Resume automation and check completion').click());
+    expect(plannerClient.updateWork).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'automation', paused: false, expectedRevision: 'current-revision' }),
+    );
+    expect(mocks.updated).toHaveBeenCalledWith(done);
+    await render(done, 'main');
+    expect(host.querySelector('[aria-current="step"]')?.textContent).toContain('Done');
+    expect(host.textContent).not.toContain('Resume automation and check completion');
+  });
+  it('explains why actual work after a PR merge still prevents completion', async () => {
+    const cached = details();
+    cached.requests[0].state = 'merged';
+    cached.completion = 'new-work';
+    vi.mocked(plannerClient.getWork).mockResolvedValue({ success: true, data: cached });
+    await render({ ...item, references: { ...item.references!, branches: [{ ...branch, automationPaused: false }] } });
+    expect(host.textContent).toContain('additional changes that have not been reviewed');
+    expect(button('Resume automation')).toBeUndefined();
+    expect(plannerClient.updateWork).not.toHaveBeenCalled();
+    expect(button('Open merged PR')).toBeDefined();
+    expect(button('Create PR')).toBeDefined();
+  });
   it('keeps a closed, unmerged PR in the review phase and distinguishes it from completed work', async () => {
     const cached = details();
     cached.requests[0].state = 'closed';

@@ -35,6 +35,7 @@ export type PlannerWorkDetails = {
   headSha?: string;
   branchMissing?: boolean;
   historyIncomplete?: boolean;
+  completion?: 'ready' | 'new-work' | 'branch-missing' | 'incomplete-history' | 'ambiguous' | 'already-processed';
   commits: PlannerCommitReference[];
   requests: PlannerWorkChangeRequest[];
   checkedAt?: number;

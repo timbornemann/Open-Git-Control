@@ -24,10 +24,19 @@ function WorkActions({ item, details, currentBranch, busy, loading, onSetup, onP
   const openPr = refs.find((ref) =>
     details?.requests.some((entry) => plannerWorkReferenceKey(entry) === plannerWorkReferenceKey(ref) && entry.state === 'open'),
   );
+  const mergedPr = refs.find((ref) =>
+    details?.requests.some((entry) => plannerWorkReferenceKey(entry) === plannerWorkReferenceKey(ref) && entry.state === 'merged'),
+  );
   if (!branch || branch.completedBy)
     return (
       <button type="button" className="planner-btn planner-btn-primary" disabled={busy} onClick={onSetup}>
         {branch ? tr('Neue Bearbeitung starten …', 'Start new work …') : tr('Bearbeitung starten …', 'Start work …')}
+      </button>
+    );
+  if (!openPr && mergedPr && details?.completion !== 'new-work')
+    return (
+      <button type="button" className="planner-btn planner-btn-secondary" onClick={() => void appClient.openExternalUrl(mergedPr.url)}>
+        {tr('Zusammengeführten PR öffnen', 'Open merged PR')}
       </button>
     );
   if (details?.branchMissing) return null;
@@ -47,6 +56,11 @@ function WorkActions({ item, details, currentBranch, busy, loading, onSetup, onP
         <Upload size={14} />
         {tr('Branch veröffentlichen …', 'Publish branch …')}
       </button>
+      {mergedPr && !openPr && (
+        <button type="button" className="planner-btn planner-btn-secondary" onClick={() => void appClient.openExternalUrl(mergedPr.url)}>
+          {tr('Zusammengeführten PR öffnen', 'Open merged PR')}
+        </button>
+      )}
       {openPr ? (
         <button type="button" className="planner-btn planner-btn-primary" onClick={() => void appClient.openExternalUrl(openPr.url)}>
           {tr('PR öffnen', 'Open PR')}

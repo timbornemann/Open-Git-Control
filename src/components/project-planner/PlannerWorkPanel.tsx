@@ -1,6 +1,5 @@
 import { RefreshCw } from 'lucide-react';
 import type { RefObject } from 'react';
-import { HostingCreateChangeRequest } from '@/components/hosting/HostingCreateChangeRequest';
 import { requestRemoteTransfer } from '@/components/hosting/remoteTransferDialogState';
 import { useGitStore } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
@@ -12,6 +11,8 @@ import { PlannerWorkHistory } from './PlannerWorkHistory';
 import { PlannerWorkArchive } from './PlannerWorkArchive';
 import { PlannerWorkProgress } from './PlannerWorkProgress';
 import { PlannerWorkOptions } from './PlannerWorkOptions';
+import { PlannerWorkCompletion } from './PlannerWorkCompletion';
+import { PlannerWorkCreatePr } from './PlannerWorkCreatePr';
 import { usePlannerWorkDetails } from './usePlannerWorkDetails';
 
 export function PlannerWorkPanel({
@@ -58,25 +59,16 @@ export function PlannerWorkPanel({
   };
   if (creatingPr && branch && details?.hostingRepository)
     return (
-      <section className="planner-work planner-dialog-form">
-        <h3 ref={headingRef} tabIndex={-1}>
-          {item.title}
-        </h3>
-        <HostingCreateChangeRequest
-          repository={details.hostingRepository}
-          initialDraft={{
-            title: item.title,
-            body: item.description,
-            sourceBranch: branch.name,
-            targetBranch: branch.baseRef.replace(/^refs\/(?:heads\/|remotes\/[^/]+\/)/, ''),
-            target: details.hostingRepository.parent || details.hostingRepository.ref,
-          }}
-          onCreated={() => {
-            onCreatePrChange(false);
-            void refresh();
-          }}
-        />
-      </section>
+      <PlannerWorkCreatePr
+        item={item}
+        branch={branch}
+        repository={details.hostingRepository}
+        headingRef={headingRef}
+        onCreated={(completeOnMerge) => {
+          onCreatePrChange(false);
+          void update({ action: 'automation', paused: !completeOnMerge });
+        }}
+      />
     );
   return (
     <section className="planner-work planner-work-overview planner-dialog-form" aria-label={tr('Aufgabe und Git', 'Task and Git')} aria-busy={busy || loading}>
@@ -94,14 +86,7 @@ export function PlannerWorkPanel({
         onPublish={publish}
         onCreatePr={() => onCreatePrChange(true)}
       />
-      {branch?.automationPaused && !branch.completedBy && (
-        <p className="planner-work-notice" role="status">
-          {tr(
-            'Statusautomatik pausiert. Die Aufgabe wird nicht automatisch abgeschlossen.',
-            'Status automation is paused. The task will not complete automatically.',
-          )}
-        </p>
-      )}
+      <PlannerWorkCompletion item={item} details={details} busy={busy} onResume={() => void update({ action: 'automation', paused: false })} />
       {details?.branchMissing && (
         <p className="planner-work-notice" role="status">
           {tr(

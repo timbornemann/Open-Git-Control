@@ -245,7 +245,7 @@ describe('PlannerWorkService with real Git', () => {
     expect((await f.service.refresh(f.request, f.context)).branchMissing).toBe(false);
     expect(consoleError).not.toHaveBeenCalled();
   });
-  test('only completes a linked server-confirmed merge at the exact current tip and respects manual status changes', async (f) => {
+  test('respects manual status changes and checks a confirmed merge immediately when automation resumes', async (f) => {
     await f.start();
     f.commitPlanning();
     const head = f.commit('task work');
@@ -260,10 +260,11 @@ describe('PlannerWorkService with real Git', () => {
     const source = f.current();
     const updated = updatePlannerItemInData(source.data, source.item.id, { status: 'blocked' });
     saveWorkItem(f.repo, updated, source.revision);
-    await f.service.refresh(f.request, f.context);
+    f.commitPlanning();
+    expect((await f.service.refresh(f.request, f.context)).completion).toBe('ready');
     expect(f.current().item.status).toBe('blocked');
-    await f.service.update({ ...f.request, action: 'automation', paused: false, expectedRevision: f.current().revision }, f.context);
-    await f.service.refresh(f.request, f.context);
+    const resumed = await f.service.update({ ...f.request, action: 'automation', paused: false, expectedRevision: f.current().revision }, f.context);
+    expect(resumed.status).toBe('done');
     expect(f.current().item.status).toBe('done');
     const completed = f.current();
     saveWorkItem(f.repo, { ...completed.item, status: 'planned' }, completed.revision);
@@ -278,6 +279,112 @@ describe('PlannerWorkService with real Git', () => {
     f.remote.requests = [f.pr(head, { state: 'merged' })];
     await f.service.refresh(f.request, f.context);
     expect(f.current().item.status).toBe('in-progress');
+  });
+  test('completes after planning-only commits and an empty integration merge even when the remote branch was deleted', async (f) => {
+    const started = await f.start();
+    f.commitPlanning();
+    const head = f.commit('task implementation');
+    const server = f.bare('hosting');
+    git(f.repo, 'remote', 'add', 'origin', server);
+    git(f.repo, 'push', '--set-upstream', 'origin', started.branch);
+    f.remote.requests = [f.pr(head)];
+    await f.service.refresh(f.request, f.context);
+    f.commitPlanning(); // Recording the PR reference happens after the published PR head.
+    git(f.repo, 'switch', 'main');
+    git(f.repo, 'merge', '--no-ff', '--no-edit', head);
+    git(f.repo, 'push', 'origin', 'main');
+    git(f.repo, 'push', 'origin', '--delete', started.branch);
+    git(f.repo, 'switch', started.branch);
+    git(f.repo, 'merge', '--no-ff', '--no-edit', 'main');
+    const branchTip = git(f.repo, 'rev-parse', 'HEAD');
+    expect(branchTip).not.toBe(head);
+    git(f.repo, 'switch', 'main');
+    git(f.repo, 'merge', '--no-ff', '--no-edit', started.branch);
+    f.remote.requests[0].state = 'merged';
+    const details = await f.service.refresh(f.request, f.context);
+    expect(details.completion).toBe('ready');
+    expect(details.headSha).toBe(branchTip);
+    expect(f.current().item.status).toBe('done');
+    expect(f.current().item.references?.branches[0].completedBy).toBeTruthy();
+    const restarted = new PlannerWorkService(f.lifecycle.runner, f.cache, f.hosting);
+    expect((await restarted.get(f.request)).requests[0].state).toBe('merged');
+    await restarted.refresh(f.request, f.context);
+    expect(f.current().item.status).toBe('done');
+  });
+  test('does not treat code changes followed by a revert as planning-only changes', async (f) => {
+    await f.start();
+    f.commitPlanning();
+    const head = f.commit('published task work');
+    f.remote.requests = [f.pr(head)];
+    await f.service.refresh(f.request, f.context);
+    f.commitPlanning();
+    f.commit('unreviewed code');
+    git(f.repo, 'revert', '--no-edit', 'HEAD');
+    expect(git(f.repo, 'diff', '--name-only', head, 'HEAD')).toBe('.Open-Git-Control/planning.json');
+    f.remote.requests[0].state = 'merged';
+    expect((await f.service.refresh(f.request, f.context)).completion).toBe('new-work');
+    expect(f.current().item.status).toBe('in-progress');
+  });
+  test('can finish additional work through a newer linked merged PR', async (f) => {
+    await f.start();
+    f.commitPlanning();
+    const first = f.commit('first reviewed work');
+    f.remote.requests = [f.pr(first)];
+    await f.service.refresh(f.request, f.context);
+    f.commitPlanning();
+    const latest = f.commit('additional reviewed work');
+    const second = f.pr(latest, { id: '2', number: '2', url: 'https://code.invalid/team/repo/pull/2' });
+    f.remote.requests = [{ ...f.remote.requests[0], state: 'merged' }, second];
+    await f.service.update({ ...f.request, action: 'attach-pr', reference: second, expectedRevision: f.current().revision }, f.context);
+    f.remote.requests[1].state = 'merged';
+    expect((await f.service.refresh(f.request, f.context)).completion).toBe('ready');
+    expect(f.current().item.status).toBe('done');
+    expect(f.current().item.references?.branches[0].completedBy).toContain('"2"');
+  });
+  test('keeps rewritten work open without repeatedly logging a normal non-ancestor result', async (f) => {
+    await f.start();
+    f.commitPlanning();
+    const oldHead = f.commit('published task work');
+    f.remote.requests = [f.pr(oldHead)];
+    await f.service.refresh(f.request, f.context);
+    f.commitPlanning();
+    git(f.repo, 'reset', '--soft', `${oldHead}^`);
+    git(f.repo, 'commit', '-m', 'rewritten task work');
+    f.remote.requests[0].state = 'merged';
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    for (let pass = 0; pass < 3; pass++) {
+      const refreshed = await f.service.refresh(f.request, f.context);
+      expect(refreshed.completion).toBe('new-work');
+      expect(refreshed.error).toBeUndefined();
+      expect(f.current().item.status).toBe('in-progress');
+    }
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+  test('rechecks branch and task revisions after the server reports a merge', async (f) => {
+    await f.start();
+    f.commitPlanning();
+    const head = f.commit('published task work');
+    f.remote.requests = [f.pr(head)];
+    await f.service.refresh(f.request, f.context);
+    f.commitPlanning();
+    f.remote.requests[0].state = 'merged';
+    f.hosting.read.mockImplementationOnce(async () => {
+      f.commit('concurrent branch work');
+      return f.remote;
+    });
+    const changed = await f.service.refresh(f.request, f.context);
+    expect(changed.error).toContain('work branch changed');
+    expect(changed.completion).toBeUndefined();
+    expect(f.current().item.status).toBe('in-progress');
+    f.remote.requests[0].headSha = git(f.repo, 'rev-parse', 'HEAD');
+    f.hosting.read.mockImplementationOnce(async () => {
+      const current = f.current();
+      saveWorkItem(f.repo, updatePlannerItemInData(current.data, current.item.id, { status: 'blocked' }), current.revision);
+      return f.remote;
+    });
+    expect((await f.service.refresh(f.request, f.context)).error).toContain('task changed');
+    expect(f.current().item.status).toBe('blocked');
+    expect(f.current().item.references?.branches[0].completedBy).toBeUndefined();
   });
   test('does not close newer work, ambiguous requests, partial histories or failed hosting queries', async (f) => {
     await f.start();
