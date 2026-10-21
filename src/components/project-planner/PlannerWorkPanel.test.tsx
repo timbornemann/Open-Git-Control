@@ -152,27 +152,42 @@ describe('planner work details and completion', () => {
       initialDraft: { title: item.title, body: item.description, sourceBranch: 'task/fix', targetBranch: 'main' },
     });
   });
-  it.each([true, false])('applies automatic completion (%s) only after successful PR creation', async (enabled) => {
+  it('always activates automation after successful PR creation using the current task revision', async () => {
+    vi.mocked(plannerClient.getWork).mockResolvedValue({
+      success: true,
+      data: { ...details(), hostingRepository: { ref: { connectionId: 'local', repositoryId: '42', fullPath: 'team/repo' } } as any },
+    });
+    const resumed = { ...item, references: { ...item.references!, branches: [{ ...branch, automationPaused: false }] } };
+    vi.mocked(plannerClient.updateWork).mockResolvedValue({ success: true, data: resumed });
+    await render({ ...item, references: { ...item.references!, pullRequests: [] } });
+    act(() => button('Create PR').click());
+    expect(host.querySelector('input[type="checkbox"]')).toBeNull();
+    expect(host.textContent).toContain('Creating the PR enables status automation');
+    expect(plannerClient.updateWork).not.toHaveBeenCalled();
+    expect(plannerClient.refreshWork).not.toHaveBeenCalled();
+    // Background PR detection may have updated the task while creation was pending.
+    vi.mocked(plannerClient.getWork).mockResolvedValue({ success: true, data: { ...details(), revision: 'revision-after-pr-detection' } });
+    await act(async () => (mocks.create.mock.lastCall![0] as { onCreated(): void }).onCreated());
+    expect(plannerClient.updateWork).toHaveBeenCalledExactlyOnceWith({
+      repoPath: '/repo',
+      itemId: item.id,
+      expectedRevision: 'revision-after-pr-detection',
+      action: 'automation',
+      paused: false,
+    });
+    expect(mocks.updated).toHaveBeenCalledWith(resumed);
+  });
+  it('does not activate a different workflow if the assignment changed while creating the PR', async () => {
     vi.mocked(plannerClient.getWork).mockResolvedValue({
       success: true,
       data: { ...details(), hostingRepository: { ref: { connectionId: 'local', repositoryId: '42', fullPath: 'team/repo' } } as any },
     });
     await render({ ...item, references: { ...item.references!, pullRequests: [] } });
     act(() => button('Create PR').click());
-    const choice = host.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
-    expect(choice.checked).toBe(true);
-    expect(host.textContent).toContain('Complete task automatically after PR merge');
-    if (!enabled) act(() => choice.click());
-    expect(plannerClient.updateWork).not.toHaveBeenCalled();
-    expect(plannerClient.refreshWork).not.toHaveBeenCalled();
+    vi.mocked(plannerClient.getWork).mockResolvedValue({ success: true, data: { ...details(), workflowId: 'replacement-workflow' } });
     await act(async () => (mocks.create.mock.lastCall![0] as { onCreated(): void }).onCreated());
-    expect(plannerClient.updateWork).toHaveBeenCalledExactlyOnceWith({
-      repoPath: '/repo',
-      itemId: item.id,
-      expectedRevision: 'current-revision',
-      action: 'automation',
-      paused: !enabled,
-    });
+    expect(plannerClient.updateWork).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('branch assignment changed during PR creation');
   });
   it('offers a direct reviewed resume action for a merged PR and avoids publishing it again', async () => {
     const cached = details();

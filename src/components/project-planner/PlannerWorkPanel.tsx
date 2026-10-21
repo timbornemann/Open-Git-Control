@@ -39,7 +39,7 @@ export function PlannerWorkPanel({
   const { tr } = useI18n();
   const navigate = useGitStore((state) => state.onNavigateToCommit);
   const branch = activePlannerBranch(item);
-  const { details, busy, loading, error, refresh, update } = usePlannerWorkDetails(repoPath, item, onItemChanged);
+  const { details, busy, loading, error, refresh, update, activateAfterPr } = usePlannerWorkDetails(repoPath, item, onItemChanged);
   const refs = item.references?.pullRequests.filter((entry) => entry.workflowId === branch?.id) || [];
   const openCommit = (sha: string) => {
     onNavigate();
@@ -64,9 +64,9 @@ export function PlannerWorkPanel({
         branch={branch}
         repository={details.hostingRepository}
         headingRef={headingRef}
-        onCreated={(completeOnMerge) => {
+        onCreated={() => {
           onCreatePrChange(false);
-          void update({ action: 'automation', paused: !completeOnMerge });
+          void activateAfterPr();
         }}
       />
     );

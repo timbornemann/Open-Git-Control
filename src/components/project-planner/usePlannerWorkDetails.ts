@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { plannerClient } from '@/services/plannerClient';
+import { useI18n } from '@/i18n';
 import type { PlannerItem } from '@/types/projectPlanner';
 import type { PlannerUpdateWorkRequest, PlannerWorkDetails } from '@/types/plannerWork';
 
 export type PlannerWorkAction<T = PlannerUpdateWorkRequest> = T extends unknown ? Omit<T, 'repoPath' | 'itemId' | 'expectedRevision'> : never;
 
 export function usePlannerWorkDetails(repoPath: string, item: PlannerItem, onItemChanged: (item: PlannerItem) => void) {
+  const { tr } = useI18n();
   const [details, setDetails] = useState<PlannerWorkDetails>();
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -57,19 +59,29 @@ export function usePlannerWorkDetails(repoPath: string, item: PlannerItem, onIte
       if (result.success) setDetails(result.data);
       else setError(result.error);
     });
-  const update = (action: PlannerWorkAction) =>
+  const applyUpdate = async (action: PlannerWorkAction, expectedRevision: string) => {
+    const result = await plannerClient.updateWork({ ...action, repoPath, itemId: item.id, expectedRevision } as PlannerUpdateWorkRequest);
+    if (!result.success) setError(result.error);
+    else {
+      onItemChanged(result.data);
+      await read();
+    }
+  };
+  const update = (action: PlannerWorkAction) => run(() => applyUpdate(action, details?.revision || ''));
+  const activateAfterPr = () =>
     run(async () => {
-      const result = await plannerClient.updateWork({
-        ...action,
-        repoPath,
-        itemId: item.id,
-        expectedRevision: details?.revision || '',
-      } as PlannerUpdateWorkRequest);
-      if (!result.success) setError(result.error);
-      else {
-        onItemChanged(result.data);
-        await read();
-      }
+      // PR creation can outlive a background task/PR-link refresh. Read the
+      // current revision while keeping activation bound to the original workflow.
+      const latest = await plannerClient.getWork({ repoPath, itemId: item.id });
+      if (!latest.success) throw new Error(latest.error);
+      if (!latest.data.revision || !latest.data.workflowId || latest.data.workflowId !== item.references?.activeWorkflowId)
+        throw new Error(
+          tr(
+            'Die Branch-Zuordnung hat sich während der PR-Erstellung geändert. Prüfe den Aufgaben-Workflow.',
+            'The branch assignment changed during PR creation. Review the task workflow.',
+          ),
+        );
+      await applyUpdate({ action: 'automation', paused: false }, latest.data.revision);
     });
-  return { details, busy, loading, error, refresh, update };
+  return { details, busy, loading, error, refresh, update, activateAfterPr };
 }

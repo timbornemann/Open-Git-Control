@@ -67,17 +67,6 @@
       "updatedAt": 1792355261758
     },
     {
-      "id": "447fc595-f9dc-46f0-a397-016bb24924f7",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Aufgaben erst beim tatsächlichen Abschluss erledigen",
-      "description": "Aktuell setzt die [Planner-Aktion (line 78)](D:/Projects/Software/Open-Git-Control/src/components/project-planner/usePlannerAiActions.ts:78) Aufgaben bereits beim Erzeugen eines Commit-Entwurfs auf „Done“. Den Abschluss stattdessen an einen erfolgreichen Commit, Merge oder eine ausdrückliche Freigabe knüpfen. So verschwinden unerledigte Aufgaben nicht vorzeitig aus dem Arbeitsvorrat.",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1792501026457,
-      "updatedAt": 1792502640868
-    },
-    {
       "id": "24836c97-af92-44db-9ce6-2e1c1df11b7b",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Geführter Abschluss eines Arbeitsschritts",
@@ -136,12 +125,12 @@
       "id": "49f8d95b-ab3c-497f-811a-1f8525589818",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "PRs vollständig in der App reviewen",
-      "description": "Die vorhandenen PR-Aktionen um Dateidiffs, Zeilenkommentare, Review-Entwürfe und Freigaben erweitern. Dafür den gemeinsamen [Hosting-Adapter (line 13)](D:/Projects/Software/Open-Git-Control/electron/hosting/HostingAdapter.ts:13) um entsprechende Fähigkeiten ergänzen und Anbieterunterschiede sichtbar machen.",
+      "description": "PRs vollständig in der App reviewen: Die vorhandenen PR-Aktionen um Dateidiffs, Zeilenkommentare, Review-Entwürfe und Freigaben erweitern. Dafür den gemeinsamen [Hosting-Adapter (line 13)](D:/Projects/Software/Open-Git-Control/electron/hosting/HostingAdapter.ts:13) um entsprechende Fähigkeiten ergänzen und Anbieterunterschiede sichtbar machen.",
       "priority": "medium",
       "status": "planned",
       "tags": [],
       "createdAt": 1792501912964,
-      "updatedAt": 1792501912964
+      "updatedAt": 1792597037449
     },
     {
       "id": "db7b013f-7a16-4a93-b769-1525c7ea4905",
@@ -273,52 +262,6 @@
       },
       "createdAt": 1792501100579,
       "updatedAt": 1792583900508
-    },
-    {
-      "id": "3f29063f-5810-47a2-b3f1-4a611fe1cd55",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Fix-Workflow-layout",
-      "description": "Die bedinung und auch die optik sind nicht os passend, es ist aktuell eher schwer zu verstehen was was macht wenn man bereits in dem branch ist kann man aktuell trozdem resume work machen, auch ist nicht klar in wlecher phase man ist udn so weiter wenn ich auf start work klicke kommt ein weiteres model, dieses sittz aber hinter dem edit item modal, das ist also nicht so schlau das edit item und das task and git workflow im gleichen edit modal leigen a sie sich in die qerere kommen es wäre also besser als eigenes modal mit klarer und einfacher minimaler aber gut vertsändlicher optik",
-      "priority": "medium",
-      "status": "done",
-      "tags": [
-        "Bug"
-      ],
-      "references": {
-        "activeWorkflowId": "c82e7c44-5b40-4c73-bd8e-9910203dc355",
-        "branches": [
-          {
-            "id": "c82e7c44-5b40-4c73-bd8e-9910203dc355",
-            "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-            "name": "task/51ee535f-fix-workflow-layout",
-            "baseRef": "refs/heads/master",
-            "baseSha": "51df5b17d777e22c08cbf629b7206af51dd7711d",
-            "startedAt": 1792584012987,
-            "automationPaused": false,
-            "repository": {
-              "provider": "github",
-              "server": "https://github.com",
-              "repositoryId": "1176739168",
-              "fullPath": "timbornemann/Open-Git-Control"
-            },
-            "completedBy": "[\"github\",\"https://github.com\",\"1176739168\",\"31\"]"
-          }
-        ],
-        "pullRequests": [
-          {
-            "provider": "github",
-            "server": "https://github.com",
-            "repositoryId": "1176739168",
-            "fullPath": "timbornemann/Open-Git-Control",
-            "workflowId": "c82e7c44-5b40-4c73-bd8e-9910203dc355",
-            "id": "31",
-            "number": "31",
-            "url": "https://github.com/timbornemann/Open-Git-Control/pull/31"
-          }
-        ]
-      },
-      "createdAt": 1792583992066,
-      "updatedAt": 1792594215440
     }
   ]
 }

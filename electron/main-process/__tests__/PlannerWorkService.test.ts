@@ -245,6 +245,25 @@ describe('PlannerWorkService with real Git', () => {
     expect((await f.service.refresh(f.request, f.context)).branchMissing).toBe(false);
     expect(consoleError).not.toHaveBeenCalled();
   });
+  test('activates a previously paused workflow when creating the PR and completes on merge without another resume', async (f) => {
+    await f.start();
+    f.commitPlanning();
+    f.commit('task implementation');
+    const source = f.current();
+    saveWorkItem(f.repo, updatePlannerItemInData(source.data, source.item.id, { status: 'blocked' }), source.revision);
+    f.commitPlanning();
+    expect(f.current().item.references?.branches[0].automationPaused).toBe(true);
+    f.remote.requests = [f.pr(git(f.repo, 'rev-parse', 'HEAD'))];
+    const activated = await f.service.update({ ...f.request, action: 'automation', paused: false, expectedRevision: f.current().revision }, f.context);
+    expect(activated.references?.branches[0].automationPaused).toBe(false);
+    expect(activated.references?.pullRequests).toHaveLength(1);
+    expect(activated.status).toBe('blocked'); // An open PR does not complete the task.
+    f.commitPlanning();
+    f.remote.requests[0].state = 'merged';
+    await f.service.refresh(f.request, f.context);
+    expect(f.current().item.status).toBe('done');
+    expect(f.current().item.references?.branches[0].completedBy).toBeTruthy();
+  });
   test('respects manual status changes and checks a confirmed merge immediately when automation resumes', async (f) => {
     await f.start();
     f.commitPlanning();
