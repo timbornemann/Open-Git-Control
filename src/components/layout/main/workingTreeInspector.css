@@ -1,0 +1,45 @@
+.working-tree-inspector {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.working-tree-inspector.has-selection {
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1.2fr);
+}
+
+.working-tree-inspector > .commit-file-details {
+  padding: 12px;
+}
+
+.working-tree-inspector__directory {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Keep the categorized file lists usable above the commit form even in a
+   short inspector. The lower region scrolls independently of file details. */
+.working-tree-inspector.has-selection .working-tree-inspector__staging {
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.working-tree-inspector.has-selection .staging-container {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+}
+
+.working-tree-inspector.has-selection .staging-files {
+  flex: 1 0 190px;
+  min-height: 190px;
+}
+
+.staging-file-row.is-selected {
+  background: var(--accent-primary-soft);
+  box-shadow: inset 2px 0 var(--accent-primary);
+}

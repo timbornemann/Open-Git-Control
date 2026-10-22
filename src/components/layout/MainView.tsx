@@ -58,6 +58,7 @@ const MainViewComponent: React.FC = () => {
     handleSelectCommitFromWorkingTree,
     handleCommitBack,
     closeInspector,
+    closeWorkingTreeFileDetails,
     handleStageCommitOpen,
   } = useMainViewInspector({
     autoOpenConflictResolverPath,
@@ -206,6 +207,7 @@ const MainViewComponent: React.FC = () => {
             handleSelectCommitFromWorkingTree={handleSelectCommitFromWorkingTree}
             handleCommitBack={handleCommitBack}
             closeInspector={closeInspector}
+            closeWorkingTreeFileDetails={closeWorkingTreeFileDetails}
             directoryMode={directoryMode}
             onDirectoryModeChange={setDirectoryMode}
             expandedDirectoryPaths={expandedDirectoryPaths}

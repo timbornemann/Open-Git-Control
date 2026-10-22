@@ -61,6 +61,53 @@ afterEach(() => {
 });
 
 describe('useMainViewInspector working-directory viewer binding', () => {
+  it.each(['staged', 'unstaged'] as const)('opens one %s diff and restores it after visiting file history', (source) => {
+    const hook = renderInspector('C:/repositories/a');
+    const hash = 'a'.repeat(40);
+    const guard = vi.fn((_target, proceed: () => void) => proceed());
+    act(() => hook.current.setWorkingDirectoryNavigationGuard(guard));
+    act(() => hook.current.handleSelectWorkingTreeFile('renamed.ts', source));
+    expect(guard).toHaveBeenCalledOnce();
+    expect(hook.current.activeDiffRequest).toEqual({ source, path: 'renamed.ts' });
+    act(() => hook.current.handleSelectCommitFromWorkingTree(hash, 'original.ts'));
+    expect(hook.current.activeDiffRequest).toEqual({ source: 'commit', path: 'original.ts', commitHash: hash });
+    expect(hook.current.workingTreeSelection).toBeNull();
+    expect(hook.current.isCommitInspectorOpen).toBe(true);
+    act(() => hook.current.handleCommitBack());
+    expect(hook.current.activeDiffRequest).toEqual({ source, path: 'renamed.ts' });
+    expect(hook.current.workingTreeSelection).toEqual({ source, path: 'renamed.ts' });
+    expect(hook.current.isCommitInspectorOpen).toBe(false);
+    expect(hook.setSelectedCommit).toHaveBeenLastCalledWith(null);
+    hook.unmount();
+  });
+
+  it('closes working-file details while keeping the diff open', () => {
+    const hook = renderInspector('C:/repositories/a');
+    act(() => hook.current.handleSelectWorkingTreeFile('file.ts', 'unstaged'));
+    act(() => hook.current.closeWorkingTreeFileDetails());
+    expect(hook.current.workingTreeSelection).toBeNull();
+    expect(hook.current.activeDiffRequest).toEqual({ source: 'unstaged', path: 'file.ts' });
+    hook.unmount();
+  });
+
+  it('guards file history and drops a delayed working-file navigation after a repository switch', () => {
+    const hook = renderInspector('C:/repositories/a');
+    act(() => hook.current.handleSelectWorkingTreeFile('file.ts', 'unstaged'));
+    let proceed: (() => void) | undefined;
+    act(() =>
+      hook.current.setWorkingDirectoryNavigationGuard((_target, next) => {
+        proceed = next;
+      }),
+    );
+    act(() => hook.current.handleSelectCommitFromWorkingTree('a'.repeat(40)));
+    expect(hook.current.activeDiffRequest?.source).toBe('unstaged');
+    hook.rerender('C:/repositories/b');
+    act(() => proceed?.());
+    expect(hook.current.activeDiffRequest).toBeNull();
+    expect(hook.current.commitHistoryStack).toHaveLength(0);
+    hook.unmount();
+  });
+
   it('restores the captured commit diff only after the navigation guard proceeds', () => {
     const hook = renderInspector('C:/repositories/a');
     const first = 'a'.repeat(40),

@@ -58,6 +58,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   onCommitsCreated,
   onOpenDiff,
   onSelectFileInspect,
+  selectedFile,
   onOpenConflictResolver,
   onCloseConflictResolver,
   viewMode = 'default',
@@ -240,6 +241,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
           visibleUntracked={visibleUntracked}
           fileOps={fileOps}
           onSelectFileInspect={onSelectFileInspect}
+          selectedFile={selectedFile}
         />
       )}
     </>

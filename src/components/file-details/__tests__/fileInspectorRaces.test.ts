@@ -39,12 +39,12 @@ describe('file inspector request generations', () => {
     await act(async () => {
       root.render(createElement(WorkingTreeFileDetails, { repoPath, path: 'a.ts', source: 'unstaged' }));
     });
-    await vi.waitFor(() => expect(gitClient.getFileHistory).toHaveBeenCalledWith('a.ts', undefined, 80, repoPath));
+    await vi.waitFor(() => expect(gitClient.getFileHistory).toHaveBeenCalledWith('a.ts', undefined, 81, repoPath));
 
     await act(async () => {
       root.render(createElement(WorkingTreeFileDetails, { repoPath, path: 'b.ts', source: 'unstaged' }));
     });
-    await vi.waitFor(() => expect(gitClient.getFileHistory).toHaveBeenCalledWith('b.ts', undefined, 80, repoPath));
+    await vi.waitFor(() => expect(gitClient.getFileHistory).toHaveBeenCalledWith('b.ts', undefined, 81, repoPath));
 
     await act(async () => {
       b.resolve({ success: true, data: [{ hash: 'b'.repeat(40), abbrevHash: 'bbbbbbb', author: 'B', date: '', subject: 'history-b' }] });

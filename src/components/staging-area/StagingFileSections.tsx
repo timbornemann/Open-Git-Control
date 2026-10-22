@@ -12,6 +12,7 @@ type StagingFileSectionsProps = {
   visibleUntracked: FileEntry[];
   fileOps: ReturnType<typeof useFileOperations>;
   onSelectFileInspect?: (filePath: string, source: 'staged' | 'unstaged') => void;
+  selectedFile?: { path: string; source: 'staged' | 'unstaged' } | null;
 };
 
 const SectionHeader = ({
@@ -36,7 +37,14 @@ const SectionHeader = ({
   </div>
 );
 
-export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({ visibleStaged, visibleUnstaged, visibleUntracked, fileOps, onSelectFileInspect }) => {
+export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
+  visibleStaged,
+  visibleUnstaged,
+  visibleUntracked,
+  fileOps,
+  onSelectFileInspect,
+  selectedFile,
+}) => {
   const { t } = useI18n();
 
   // Render markup directly: defining a component type here would remount every
@@ -45,25 +53,27 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({ visibl
     const statusCode = section === 'staged' ? entry.x : entry.y;
     const info = getStatusInfo(statusCode);
     const inspectSource = section === 'staged' ? 'staged' : 'unstaged';
+    const isSelected = selectedFile?.path === entry.path && selectedFile.source === inspectSource;
     const lfsState = fileOps.lfs?.stateFor(entry.path, section);
     return (
       <div
-        className="staging-file-row"
+        className={`staging-file-row${isSelected ? ' is-selected' : ''}`}
         tabIndex={0}
         role="group"
         aria-label={entry.path}
+        aria-current={isSelected ? 'true' : undefined}
         onKeyDown={(event) => {
           if (event.target !== event.currentTarget) return;
           if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) fileOps.openFileContextMenu(event, entry, section);
           else if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
-            onSelectFileInspect?.(entry.path, inspectSource);
-            fileOps.showDiff(entry.path, section === 'staged');
+            if (onSelectFileInspect) onSelectFileInspect(entry.path, inspectSource);
+            else fileOps.showDiff(entry.path, section === 'staged');
           }
         }}
         onClick={() => {
-          onSelectFileInspect?.(entry.path, inspectSource);
-          fileOps.showDiff(entry.path, section === 'staged');
+          if (onSelectFileInspect) onSelectFileInspect(entry.path, inspectSource);
+          else fileOps.showDiff(entry.path, section === 'staged');
         }}
         onContextMenu={(event) => fileOps.openFileContextMenu(event, entry, section)}
       >

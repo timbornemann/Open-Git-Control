@@ -23,7 +23,7 @@ describe('StagingFileSections file previews', () => {
     host.remove();
   });
 
-  const render = (lfs?: ReturnType<typeof useFileOperations>['lfs']) => {
+  const render = (lfs?: ReturnType<typeof useFileOperations>['lfs'], withInspector = true, selectedFile?: { path: string; source: 'staged' | 'unstaged' }) => {
     const actions = {
       isMutating: false,
       showDiff: vi.fn(),
@@ -45,7 +45,8 @@ describe('StagingFileSections file previews', () => {
             visibleUnstaged: [{ path: 'modified.txt', x: ' ', y: 'M' }],
             visibleUntracked: [{ path: 'new/file.txt', x: '?', y: '?' }],
             fileOps: actions as unknown as ReturnType<typeof useFileOperations>,
-            onSelectFileInspect: inspect,
+            onSelectFileInspect: withInspector ? inspect : undefined,
+            selectedFile,
           }),
         }),
       );
@@ -54,16 +55,16 @@ describe('StagingFileSections file previews', () => {
   };
 
   it.each([
-    ['staged.txt', 'staged', true],
-    ['modified.txt', 'unstaged', false],
-    ['new/file.txt', 'unstaged', false],
-  ] as const)('opens %s directly in the inspector and diff without staging', (filePath, source, staged) => {
+    ['staged.txt', 'staged'],
+    ['modified.txt', 'unstaged'],
+    ['new/file.txt', 'unstaged'],
+  ] as const)('opens %s through one inspector navigation without staging', (filePath, source) => {
     const { actions, inspect } = render();
     const row = host.querySelector(`[title="${filePath}"]`)!.closest('.staging-file-row')!;
     act(() => row.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 
-    expect(inspect).toHaveBeenCalledWith(filePath, source);
-    expect(actions.showDiff).toHaveBeenCalledWith(filePath, staged);
+    expect(inspect).toHaveBeenCalledExactlyOnceWith(filePath, source);
+    expect(actions.showDiff).not.toHaveBeenCalled();
     expect(actions.stageFile).not.toHaveBeenCalled();
     expect(actions.unstageFile).not.toHaveBeenCalled();
     expect(actions.deleteUntracked).not.toHaveBeenCalled();
@@ -84,16 +85,29 @@ describe('StagingFileSections file previews', () => {
       stateFor: (filePath: string) => (filePath === 'new/file.txt' ? { recommendation: 'asset' } : { configured: true }),
       recommendationTitle: () => 'Git LFS recommended: large asset file (18 MiB). Convert through the context menu.',
     } as unknown as ReturnType<typeof useFileOperations>['lfs'];
-    const { actions } = render(lfs);
+    const { actions, inspect } = render(lfs);
     const marker = host.querySelector<HTMLElement>('.staging-lfs-recommendation')!;
     expect(host.querySelectorAll('.staging-lfs-recommendation')).toHaveLength(1);
     expect(marker.tabIndex).toBe(0);
     expect(marker.title).toContain('18 MiB');
     expect(marker.getAttribute('aria-label')).toContain('context menu');
     act(() => marker.click());
-    expect(actions.showDiff).toHaveBeenCalledWith('new/file.txt', false);
+    expect(inspect).toHaveBeenCalledExactlyOnceWith('new/file.txt', 'unstaged');
+    expect(actions.showDiff).not.toHaveBeenCalled();
     render({ ...lfs, stateFor: () => ({ configured: true, pointer: true }) } as any);
     expect(host.querySelector('.staging-lfs-recommendation')).toBeNull();
+  });
+
+  it('opens a diff directly when embedded without an inspector callback', () => {
+    const { actions } = render(undefined, false);
+    act(() => host.querySelector<HTMLElement>('[aria-label="staged.txt"]')!.click());
+    expect(actions.showDiff).toHaveBeenCalledExactlyOnceWith('staged.txt', true);
+  });
+
+  it('marks the selected file in its original category', () => {
+    render(undefined, true, { path: 'modified.txt', source: 'unstaged' });
+    expect(host.querySelector('[aria-current="true"]')?.getAttribute('aria-label')).toBe('modified.txt');
+    expect(host.querySelectorAll('.is-selected')).toHaveLength(1);
   });
 
   it.each(['stage', 'delete'] as const)('keeps the explicit %s button independent of preview selection', (action) => {

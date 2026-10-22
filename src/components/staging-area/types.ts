@@ -12,6 +12,7 @@ export interface StagingAreaProps {
   onCommitsCreated?: () => void;
   onOpenDiff?: (request: DiffRequest) => void;
   onSelectFileInspect?: (filePath: string, source: 'staged' | 'unstaged') => void;
+  selectedFile?: { path: string; source: 'staged' | 'unstaged' } | null;
   onOpenConflictResolver?: (filePath: string) => void;
   onCloseConflictResolver?: () => void;
   viewMode?: 'default' | 'conflictOnly';
