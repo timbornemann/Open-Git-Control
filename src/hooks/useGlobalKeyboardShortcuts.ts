@@ -11,9 +11,27 @@ type ShortcutHandlers = {
   onOpenCommandPalette: () => void;
   onOpenQuickTodo: () => void;
   onCreateCommit?: () => void;
+  onRefresh?: () => void;
+  onOpenRepository?: () => void;
+  onCloneRepository?: () => void;
+  onCreateBranch?: () => void;
+  onPull?: () => void;
+  onPush?: () => void;
 };
 
-export const useGlobalKeyboardShortcuts = ({ setActiveTab, onFetch, onOpenCommandPalette, onOpenQuickTodo, onCreateCommit }: ShortcutHandlers) => {
+export const useGlobalKeyboardShortcuts = ({
+  setActiveTab,
+  onFetch,
+  onOpenCommandPalette,
+  onOpenQuickTodo,
+  onCreateCommit,
+  onRefresh,
+  onOpenRepository,
+  onCloneRepository,
+  onCreateBranch,
+  onPull,
+  onPush,
+}: ShortcutHandlers) => {
   const shortcuts = useKeyboardShortcuts();
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -24,10 +42,16 @@ export const useGlobalKeyboardShortcuts = ({ setActiveTab, onFetch, onOpenComman
         commandPalette: onOpenCommandPalette,
         quickTodo: onOpenQuickTodo,
         commit: onCreateCommit,
+        refresh: onRefresh,
+        openRepository: onOpenRepository,
+        cloneRepository: onCloneRepository,
+        createBranch: onCreateBranch,
+        pull: onPull,
+        push: onPush,
       };
-      const tabs: AppTabId[] = ['localRepos', 'repo', 'hosting', 'settings', 'planner', 'analytics'];
       for (const entry of SHORTCUT_ACTIONS) {
-        const handler = handlers[entry.id] ?? (!editing && tabs.includes(entry.id as AppTabId) ? () => setActiveTab(entry.id as AppTabId) : undefined);
+        const handler =
+          handlers[entry.id] ?? (!editing && entry.group === 'navigation' && entry.id !== 'commandPalette' ? () => setActiveTab(entry.id) : undefined);
         if (!handler || !matchesShortcut(e, getShortcutBinding(entry.id, shortcuts), true)) continue;
         e.preventDefault();
         e.stopPropagation();
@@ -40,5 +64,18 @@ export const useGlobalKeyboardShortcuts = ({ setActiveTab, onFetch, onOpenComman
     // App actions must reach their handlers before an editor consumes the key.
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [shortcuts, setActiveTab, onFetch, onOpenCommandPalette, onOpenQuickTodo, onCreateCommit]);
+  }, [
+    shortcuts,
+    setActiveTab,
+    onFetch,
+    onOpenCommandPalette,
+    onOpenQuickTodo,
+    onCreateCommit,
+    onRefresh,
+    onOpenRepository,
+    onCloneRepository,
+    onCreateBranch,
+    onPull,
+    onPush,
+  ]);
 };

@@ -153,8 +153,8 @@ export function SettingsKeyboardShortcutsSection({ settings, onUpdateSettings, v
       id: 'repository',
       title: tr('Repository-Aktionen', 'Repository actions'),
       scope: tr(
-        'Appweit für das aktive Repository; Todos im ausgewählten Planner-Projekt',
-        'Throughout the app for the active repository; todos in the selected planner project',
+        'Appweit: Öffnen und Klonen ohne aktives Repository, übrige Aktionen für das aktive Repository; Todos auch im ausgewählten Planner-Projekt',
+        'Throughout the app: open and clone without an active repository, other actions for the active repository; todos also in the selected planner project',
       ),
     },
     { id: 'files', title: tr('Dateibearbeitung', 'File editing'), scope: tr('Im Dateibetrachter und Codeeditor', 'In the file viewer and code editor') },

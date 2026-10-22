@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { registerRepoSettingsHandlers } from '../registerRepoSettingsHandlers';
 import { IpcChannel } from '../../../../src/types/ipcContract';
 import type { AppSettings } from '../../../settings';
+import { getShortcutBinding } from '../../../../src/shared/keyboardShortcuts';
 
 const state = vi.hoisted(() => ({ userData: '', handlers: new Map<string, (...args: any[]) => Promise<AppSettings>>() }));
 vi.mock('electron', () => ({
@@ -37,6 +38,28 @@ afterEach(() => {
   state.handlers.clear();
 });
 describe('keyboard shortcut settings persistence', () => {
+  it('preserves legacy custom bindings that collide with the new defaults across reads and writes', async () => {
+    const previous = { fetch: getShortcutBinding('pull'), commit: getShortcutBinding('analytics'), saveFile: null };
+    fs.writeFileSync(path.join(state.userData, 'settings.json'), JSON.stringify({ keyboardShortcuts: previous }));
+    const normalized = { ...previous, pull: null, analytics: null };
+    expect((await get()).keyboardShortcuts).toEqual(normalized);
+    await set({ language: 'en' });
+    expect(JSON.parse(stored()).keyboardShortcuts).toEqual(normalized);
+    expect((await get()).keyboardShortcuts).toEqual(normalized);
+  });
+  it('persists all new actions, custom bindings and disabling through the settings IPC', async () => {
+    const keyboardShortcuts = {
+      refresh: { key: 'F9', primary: false, alt: false, shift: false },
+      openRepository: null,
+      cloneRepository: null,
+      createBranch: { key: 'b', primary: true, alt: true, shift: false },
+      pull: null,
+      push: null,
+    };
+    await set({ keyboardShortcuts });
+    expect((await get()).keyboardShortcuts).toEqual(keyboardShortcuts);
+    expect(JSON.parse(stored()).keyboardShortcuts).toEqual(keyboardShortcuts);
+  });
   it('loads old settings with defaults, persists changes and reloads them without an in-memory cache', async () => {
     expect((await get()).keyboardShortcuts).toEqual({});
     const keyboardShortcuts = { fetch: { key: 'K', primary: true, shift: true, alt: false }, saveFile: null };

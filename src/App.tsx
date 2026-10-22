@@ -16,12 +16,12 @@ import { createAppStateSlicesValue } from './app/createAppStateSlicesValue';
 import { useAppPaletteCommands } from './app/useAppPaletteCommands';
 import { FeedbackReportProvider } from './contexts/FeedbackReportContext';
 import { QuickRepositoryTodoDialog } from './components/project-planner/QuickRepositoryTodoDialog';
-import { requestRemoteTransfer } from './components/hosting/remoteTransferDialogState';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { SystemToolsRuntime } from './components/system-tools/SystemToolsRuntime';
 import { PlannerWorkRuntime } from './components/project-planner/PlannerWorkRuntime';
 import { BranchChangeRuntime } from './components/branch-change/BranchChangeRuntime';
 import { openStagingCommitArea } from './utils/layoutPreferences';
+import { createAppRepositoryActions } from './app/createAppRepositoryActions';
 
 const App: React.FC = () => {
   const state = useAppState();
@@ -42,14 +42,24 @@ const App: React.FC = () => {
     onRepositoryCommitted: () => state.setActiveTab('repo'),
   });
 
-  const paletteCommands = useAppPaletteCommands({ state, t });
+  const repositoryActions = createAppRepositoryActions({
+    state,
+    tr,
+    revealSidebar: () => {
+      if (isSidebarCollapsed) handleToggleSidebar();
+    },
+  });
+  const paletteCommands = useAppPaletteCommands({ state, t, repositoryActions });
 
   useGlobalKeyboardShortcuts({
     setActiveTab: state.setActiveTab,
-    onFetch: () => {
-      if (state.activeRepo) requestRemoteTransfer({ repoPath: state.activeRepo, mode: 'fetch' });
-      else state.setGitActionToast({ msg: tr('Bitte zuerst ein Repository öffnen.', 'Please open a repository first.'), isError: true });
-    },
+    onFetch: repositoryActions.fetch,
+    onRefresh: repositoryActions.refresh,
+    onOpenRepository: repositoryActions.open,
+    onCloneRepository: repositoryActions.clone,
+    onCreateBranch: repositoryActions.createBranch,
+    onPull: repositoryActions.pull,
+    onPush: repositoryActions.push,
     onOpenCommandPalette: () => setIsPaletteOpen(true),
     onOpenQuickTodo: () => {
       setQuickTodoRequestId((current) => current + 1);

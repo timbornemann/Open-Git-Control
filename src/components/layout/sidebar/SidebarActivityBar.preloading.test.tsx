@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { preloadViewModule } from '@/data/viewModules';
 import { SidebarActivityBar } from './SidebarActivityBar';
+import { SHORTCUT_ACTIONS } from '@/shared/keyboardShortcuts';
 
 vi.mock('@/data/viewModules', () => ({ preloadViewModule: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/i18n', () => ({ useI18n: () => ({ t: (key: string) => key, tr: (_de: string, en: string) => en }) }));
@@ -32,6 +33,21 @@ describe('navigation intent view preloading', () => {
 
   it('does not start loading inactive views merely by rendering the menu', () => {
     expect(preloadViewModule).not.toHaveBeenCalled();
+  });
+
+  it('keeps numbered shortcut defaults in the rendered sidebar order', () => {
+    const tabsByTitle: Record<string, string> = {
+      'sidebar.currentRepository': 'repo',
+      'Statistics & analytics': 'analytics',
+      'sidebar.planner': 'planner',
+      'sidebar.localRepos': 'localRepos',
+      Hosting: 'hosting',
+      'sidebar.settings': 'settings',
+    };
+    const sidebarTabs = [...host.querySelectorAll<HTMLButtonElement>('button')].map((node) => tabsByTitle[node.title]).filter(Boolean);
+    const shortcuts = SHORTCUT_ACTIONS.filter((entry) => entry.group === 'navigation' && entry.id !== 'commandPalette');
+    expect(shortcuts.map((entry) => entry.id)).toEqual(sidebarTabs);
+    expect(shortcuts.map((entry) => entry.defaultBinding.key)).toEqual(sidebarTabs.map((_tab, index) => String(index + 1)));
   });
 
   it.each([

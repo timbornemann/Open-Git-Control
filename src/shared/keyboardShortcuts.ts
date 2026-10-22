@@ -3,29 +3,77 @@ export type ShortcutBinding = { key: string; primary: boolean; alt: boolean; shi
 type Text = readonly [de: string, en: string];
 type Group = 'navigation' | 'repository' | 'files';
 const binding = (key: string, shift = false): ShortcutBinding => ({ key, primary: true, alt: false, shift });
-const action = <Id extends string>(id: Id, group: Group, label: Text, description: Text, defaultBinding: ShortcutBinding) =>
+const action = <Id extends string, ActionGroup extends Group>(id: Id, group: ActionGroup, label: Text, description: Text, defaultBinding: ShortcutBinding) =>
   ({ id, group, label, description, defaultBinding }) as const;
 
 export const SHORTCUT_ACTIONS = [
+  action('repo', 'navigation', ['Repository', 'Repository'], ['Zur Repository-Ansicht wechseln.', 'Switch to the repository view.'], binding('1')),
+  action(
+    'analytics',
+    'navigation',
+    ['Statistik & Analyse', 'Statistics & analytics'],
+    ['Repository-Statistiken anzeigen.', 'Show repository statistics.'],
+    binding('2'),
+  ),
+  action('planner', 'navigation', ['Aufgaben / Planner', 'Tasks / Planner'], ['Projektplanung öffnen.', 'Open project planning.'], binding('3')),
   action(
     'localRepos',
     'navigation',
     ['Lokale Repositories', 'Local repositories'],
     ['Lokale Repositories anzeigen.', 'Show local repositories.'],
-    binding('1'),
+    binding('4'),
   ),
-  action('repo', 'navigation', ['Repository', 'Repository'], ['Zur Repository-Ansicht wechseln.', 'Switch to the repository view.'], binding('2')),
-  action('hosting', 'navigation', ['Hosting', 'Hosting'], ['Hosting-Verbindungen anzeigen.', 'Show hosting connections.'], binding('3')),
-  action('settings', 'navigation', ['Einstellungen', 'Settings'], ['Einstellungen öffnen.', 'Open settings.'], binding('4')),
-  action('planner', 'navigation', ['Planner', 'Planner'], ['Projektplanung öffnen.', 'Open project planning.'], binding('5')),
-  action('analytics', 'navigation', ['Analytics', 'Analytics'], ['Repository-Statistiken anzeigen.', 'Show repository statistics.'], binding('6')),
+  action('hosting', 'navigation', ['Hosting', 'Hosting'], ['Hosting-Verbindungen anzeigen.', 'Show hosting connections.'], binding('5')),
+  action('settings', 'navigation', ['Einstellungen', 'Settings'], ['Einstellungen öffnen.', 'Open settings.'], binding('6')),
   action('commandPalette', 'navigation', ['Befehlspalette', 'Command palette'], ['Nach App-Befehlen suchen.', 'Search app commands.'], binding('p', true)),
+  action(
+    'refresh',
+    'repository',
+    ['Repository aktualisieren', 'Refresh repository'],
+    ['Status, Verlauf und lokale Repository-Daten neu laden.', 'Reload status, history and local repository data.'],
+    { key: 'F5', primary: false, alt: false, shift: false },
+  ),
+  action(
+    'openRepository',
+    'repository',
+    ['Repository öffnen', 'Open repository'],
+    ['Ein lokales Repository über die Ordnerauswahl öffnen.', 'Open a local repository using the folder picker.'],
+    binding('o'),
+  ),
+  action(
+    'cloneRepository',
+    'repository',
+    ['Repository klonen', 'Clone repository'],
+    ['Ein Repository über seine URL klonen.', 'Clone a repository from its URL.'],
+    binding('o', true),
+  ),
+  action(
+    'createBranch',
+    'repository',
+    ['Branch erstellen', 'Create branch'],
+    ['Die Eingabe für einen neuen Branch im aktiven Repository öffnen.', 'Open the new branch input for the active repository.'],
+    binding('b', true),
+  ),
   action(
     'fetch',
     'repository',
     ['Fetch', 'Fetch'],
     ['Remote-Änderungen für das aktive Repository abrufen.', 'Fetch remote changes for the active repository.'],
     binding('f', true),
+  ),
+  action(
+    'pull',
+    'repository',
+    ['Pull', 'Pull'],
+    ['Den Pull-Dialog für das aktive Repository öffnen.', 'Open the pull dialog for the active repository.'],
+    binding('l', true),
+  ),
+  action(
+    'push',
+    'repository',
+    ['Push', 'Push'],
+    ['Den Push-Dialog für das aktive Repository öffnen.', 'Open the push dialog for the active repository.'],
+    binding('u', true),
   ),
   action(
     'quickTodo',
@@ -172,13 +220,30 @@ export function validateShortcutOverrides(value: unknown): ShortcutIssue | null 
 }
 
 export function normalizeShortcutOverrides(value: unknown): ShortcutOverrides {
-  if (validateShortcutOverrides(value)) return {};
-  return Object.fromEntries(
+  const issue = validateShortcutOverrides(value);
+  if (issue && issue.reason !== 'conflict') return {};
+  const normalized: ShortcutOverrides = Object.fromEntries(
     Object.entries(value as ShortcutOverrides).map(([id, b]) => [
       id,
       b ? { key: normalizeShortcutKey(b.key), primary: b.primary, alt: b.alt, shift: b.shift } : null,
     ]),
   );
+  // New or reordered defaults must not discard previously saved custom bindings.
+  // Explicit choices take priority; conflicting inherited defaults stay unassigned.
+  const used = new Set<string>();
+  for (const b of Object.values(normalized)) {
+    if (!b) continue;
+    const key = fingerprint(b);
+    if (used.has(key)) return {};
+    used.add(key);
+  }
+  for (const entry of SHORTCUT_ACTIONS) {
+    if (normalized[entry.id] !== undefined) continue;
+    const key = fingerprint(entry.defaultBinding);
+    if (used.has(key)) normalized[entry.id] = null;
+    else used.add(key);
+  }
+  return normalized;
 }
 
 type ShortcutEvent = {

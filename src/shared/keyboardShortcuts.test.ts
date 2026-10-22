@@ -15,14 +15,49 @@ const custom = { key: 'k', primary: true, alt: false, shift: true };
 const event = (partial = {}) => ({ key: 'k', ctrlKey: true, metaKey: false, altKey: false, shiftKey: true, ...partial });
 
 describe('shared keyboard shortcuts', () => {
-  it('has thirteen distinct defaults and supports legacy settings, overrides and disabling', () => {
-    expect(SHORTCUT_ACTIONS).toHaveLength(13);
+  it('has nineteen distinct defaults and supports legacy settings, overrides and disabling', () => {
+    expect(SHORTCUT_ACTIONS).toHaveLength(19);
     expect(validateShortcutOverrides({})).toBeNull();
+    for (const entry of SHORTCUT_ACTIONS) expect(validateShortcutBinding(entry.id, entry.defaultBinding)).toBeNull();
     expect(normalizeShortcutOverrides(undefined)).toEqual({});
-    expect(getShortcutBinding('settings')?.key).toBe('4');
+    expect(getShortcutBinding('settings')?.key).toBe('6');
     expect(getShortcutBinding('fetch', { fetch: custom })).toEqual(custom);
     expect(getShortcutBinding('fetch', { fetch: null })).toBeNull();
     expect(normalizeShortcutOverrides({ fetch: { ...custom, key: 'K' }, saveFile: null })).toEqual({ fetch: custom, saveFile: null });
+  });
+  it('assigns tab numbers in sidebar order and provides the new repository defaults', () => {
+    expect(
+      SHORTCUT_ACTIONS.filter((entry) => entry.group === 'navigation' && entry.id !== 'commandPalette').map(({ id, defaultBinding }) => [
+        id,
+        defaultBinding.key,
+      ]),
+    ).toEqual([
+      ['repo', '1'],
+      ['analytics', '2'],
+      ['planner', '3'],
+      ['localRepos', '4'],
+      ['hosting', '5'],
+      ['settings', '6'],
+    ]);
+    expect(getShortcutBinding('refresh')).toEqual({ key: 'F5', primary: false, alt: false, shift: false });
+    for (const [id, key, shift] of [
+      ['openRepository', 'o', false],
+      ['cloneRepository', 'o', true],
+      ['createBranch', 'b', true],
+      ['pull', 'l', true],
+      ['push', 'u', true],
+    ] as const) {
+      expect(getShortcutBinding(id)).toEqual({ key, shift, primary: true, alt: false });
+    }
+  });
+  it('keeps saved custom keys when new or reordered defaults would conflict', () => {
+    const previous = { fetch: getShortcutBinding('pull'), quickTodo: getShortcutBinding('analytics'), saveFile: null };
+    expect(validateShortcutOverrides(previous)?.reason).toBe('conflict');
+    const migrated = normalizeShortcutOverrides(previous);
+    expect(migrated).toEqual({ ...previous, analytics: null, pull: null });
+    expect(validateShortcutOverrides(migrated)).toBeNull();
+    expect(normalizeShortcutOverrides(migrated)).toEqual(migrated);
+    expect(getShortcutBinding('repo', migrated)?.key).toBe('1');
   });
   it('rejects collisions with defaults and overrides, and allows freeing a binding first', () => {
     const palette = getShortcutBinding('commandPalette')!;

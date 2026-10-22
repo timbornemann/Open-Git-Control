@@ -55,9 +55,15 @@ afterEach(() => {
 });
 
 describe('keyboard shortcuts settings', () => {
-  it('documents all thirteen actions with grouped descriptions and localized labels', async () => {
+  it('documents all nineteen actions with grouped descriptions and localized labels', async () => {
     await render();
-    expect(host.querySelectorAll('[data-shortcut]')).toHaveLength(13);
+    expect(host.querySelectorAll('[data-shortcut]')).toHaveLength(19);
+    expect(row('refresh').textContent).toContain('F5');
+    expect(row('openRepository').textContent).toContain('Repository öffnen');
+    expect(row('cloneRepository').textContent).toContain('Repository klonen');
+    expect(row('createBranch').textContent).toContain('Branch erstellen');
+    expect(row('pull').textContent).toContain('StrgUmschaltL');
+    expect(row('push').textContent).toContain('StrgUmschaltU');
     expect(host.textContent).toContain('Repository-Aktionen');
     expect(row('commit').textContent).toContain('StrgEnter');
     expect(button('fetch', 0).getAttribute('aria-label')).toContain('Fetch ändern');
@@ -66,6 +72,7 @@ describe('keyboard shortcuts settings', () => {
     saved.language = 'en';
     await render();
     expect(host.textContent).toContain('File editing');
+    expect(row('createBranch').textContent).toContain('Create branch');
     expect(button('saveFile', 0).getAttribute('aria-label')).toBe('Change shortcut for Save file');
   });
   it('records on key release, saves immediately and restores the new binding after remounting', async () => {
@@ -97,6 +104,18 @@ describe('keyboard shortcuts settings', () => {
     expect(isShortcutCaptureActive()).toBe(true);
     await press('Escape');
     expect(isShortcutCaptureActive()).toBe(false);
+  });
+  it.each(['refresh', 'openRepository', 'cloneRepository', 'createBranch', 'pull', 'push'] as const)('records, disables and resets %s', async (id) => {
+    await render();
+    const standard = row(id).querySelector('.shortcut-binding')!.textContent;
+    await click(button(id, 0));
+    await press('F9');
+    expect(saved.keyboardShortcuts?.[id]).toEqual({ key: 'F9', primary: false, alt: false, shift: false });
+    await click(button(id, 1));
+    expect(saved.keyboardShortcuts?.[id]).toBeNull();
+    await click(button(id, 2));
+    expect(saved.keyboardShortcuts?.[id]).toBeUndefined();
+    expect(row(id).querySelector('.shortcut-binding')!.textContent).toBe(standard);
   });
   it('rejects reserved and bare keys while continuing to listen', async () => {
     await render();

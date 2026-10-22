@@ -31,7 +31,7 @@ export const getSettingsGroups = (tr: Translate) =>
       title: tr('Tastenkürzel', 'Keyboard shortcuts'),
       description: tr('App-Aktionen per Tastatur ausführen und Belegungen anpassen.', 'Run app actions from the keyboard and customize bindings.'),
       keywords:
-        'keyboard shortcuts keybindings keys hotkeys tastatur tastenkürzel tastenkuerzel tastenbelegung strg ctrl cmd navigation fetch commit speichern save todo befehlspalette command palette repository wechseln',
+        'keyboard shortcuts keybindings keys hotkeys tastatur tastenkürzel tastenkuerzel tastenbelegung strg ctrl cmd navigation fetch pull push commit speichern save todo befehlspalette command palette repository wechseln refresh reload aktualisieren öffnen oeffnen open klonen clone branch erstellen F5',
     },
     {
       id: 'appearance',

@@ -6,6 +6,7 @@ import type { TranslationVariables } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { requestRemoteTransfer } from '@/components/hosting/remoteTransferDialogState';
 import { useHostingState } from '@/components/hosting/hostingState';
+import type { AppRepositoryActions } from './createAppRepositoryActions';
 
 type AppState = ReturnType<typeof useAppState>;
 type Translate = (key: string, variables?: TranslationVariables) => string;
@@ -13,9 +14,10 @@ type Translate = (key: string, variables?: TranslationVariables) => string;
 type Params = {
   state: AppState;
   t: Translate;
+  repositoryActions: AppRepositoryActions;
 };
 
-export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
+export const useAppPaletteCommands = ({ state, t, repositoryActions }: Params): PaletteCommand[] =>
   useMemo(
     () => [
       {
@@ -91,20 +93,22 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         },
       },
       {
+        id: 'repository-refresh',
+        label: state.settings.language === 'de' ? 'Repository aktualisieren' : 'Refresh repository',
+        keywords: ['refresh', 'reload', 'status', 'aktualisieren', 'neu laden'],
+        action: repositoryActions.refresh,
+      },
+      {
         id: 'fetch',
         label: t('generated.app.fetch_refresh_remote_88270faa'),
         keywords: ['fetch', 'remote', 'sync'],
-        action: () => {
-          if (state.activeRepo) requestRemoteTransfer({ repoPath: state.activeRepo, mode: 'fetch' });
-        },
+        action: repositoryActions.fetch,
       },
       {
         id: 'pull',
         label: t('generated.app.pull_8c55fb85'),
         keywords: ['pull', 'download'],
-        action: () => {
-          if (state.activeRepo) requestRemoteTransfer({ repoPath: state.activeRepo, mode: 'pull' });
-        },
+        action: repositoryActions.pull,
       },
       {
         id: 'pull-rebase',
@@ -118,9 +122,7 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         id: 'push',
         label: t('generated.app.push_61ad6264'),
         keywords: ['push', 'upload'],
-        action: () => {
-          if (state.activeRepo) requestRemoteTransfer({ repoPath: state.activeRepo, mode: 'push' });
-        },
+        action: repositoryActions.push,
       },
       {
         id: 'push-force',
@@ -134,10 +136,7 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         id: 'branch-create',
         label: t('generated.app.create_branch_d8083e45'),
         keywords: ['branch', 'new', 'erstellen'],
-        action: () => {
-          state.setActiveTab('repo');
-          state.setIsCreatingBranch(true);
-        },
+        action: repositoryActions.createBranch,
       },
       {
         id: 'stash-push',
@@ -209,13 +208,13 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         id: 'open-folder',
         label: t('generated.app.open_repository_09ccbb87'),
         keywords: ['open', 'folder', 'oeffnen'],
-        action: () => state.handleOpenFolder(),
+        action: repositoryActions.open,
       },
       {
         id: 'clone-url',
         label: t('generated.app.clone_repository_from_url_94b504ff'),
         keywords: ['clone', 'url', 'ssh', 'http'],
-        action: () => state.handleCloneByUrl(),
+        action: repositoryActions.clone,
       },
       {
         id: 'fork-url',
@@ -237,5 +236,5 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         },
       },
     ],
-    [state, t],
+    [state, t, repositoryActions],
   );

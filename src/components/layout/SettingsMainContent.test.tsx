@@ -85,7 +85,7 @@ describe('SettingsMainContent AI and MCP organization', () => {
   ] as const)('provides the searchable shortcuts category in %s', async (language, title, query) => {
     await render('shortcuts', language);
     expect(host.querySelector('h2')?.textContent).toBe(title);
-    expect(host.querySelectorAll('[data-shortcut]')).toHaveLength(13);
+    expect(host.querySelectorAll('[data-shortcut]')).toHaveLength(19);
     const options = [...host.querySelectorAll('.settings-mobile-category option')];
     expect(options[1].textContent).toBe(title);
     await render('general', language);
@@ -103,6 +103,16 @@ describe('SettingsMainContent AI and MCP organization', () => {
     expect(document.activeElement).toBe(host.querySelector('#settings-ai-automation-title'));
     expect(useSettingsNavigation.getState().destination).toBeNull();
     expect(onUpdateSettings).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['en', 'Keyboard shortcuts', ['F5', 'refresh', 'clone', 'pull', 'push']],
+    ['de', 'Tastenkürzel', ['aktualisieren', 'öffnen', 'klonen', 'branch']],
+  ] as const)('finds shortcut settings through the new action names in %s', async (language, title, queries) => {
+    await render('general', language);
+    for (const query of queries) {
+      changeInput(host.querySelector<HTMLInputElement>('input[type="search"]')!, query);
+      expect([...host.querySelectorAll('.settings-search-result strong')].some((result) => result.textContent === title)).toBe(true);
+    }
   });
   it('clears a search when an action links to another settings group', async () => {
     await render('api');
