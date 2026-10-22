@@ -1,12 +1,11 @@
-import React from 'react';
-import { FileCode, FileEdit, FileMinus, FilePlus } from 'lucide-react';
+import React, { useLayoutEffect, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
 import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { useAppToast } from '@/hooks/useAppToast';
 import type { RepositoryPathOpenActionDto } from '@/shared/ipc/contracts/git';
 import { fileNameFromPath, useCommitDetailsData } from '@/components/commit-details/useCommitDetailsData';
-import { VirtualList } from '@/components/VirtualList';
+import { CommitFileTree } from './CommitFileTree';
 import { BlamePanel } from '@/components/file-details/BlamePanel';
 import { FileHistoryPanel } from '@/components/file-details/FileHistoryPanel';
 
@@ -48,6 +47,8 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ repoPath, hash, on
     setSelectedFileCommitHash,
     setSelectedFilePath,
   } = useCommitDetailsData({ repoPath, hash, onOpenDiff });
+  const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(() => new Set());
+  useLayoutEffect(() => setCollapsedPaths(new Set()), [repoPath, normalizedHash]);
 
   const handleRepositoryPathAction = async (action: RepositoryPathOpenActionDto) => {
     if (!repoPath || !selectedFile || !gitClient.isAvailable()) return;
@@ -66,19 +67,6 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ repoPath, hash, on
           : tr('Der Dateipfad konnte nicht im Dateisystem geoeffnet werden.', 'The file path could not be opened in the file system.'),
         true,
       );
-    }
-  };
-
-  const getIconForStatus = (status: string) => {
-    switch (status[0]) {
-      case 'A':
-        return <FilePlus size={14} color="var(--status-success)" />;
-      case 'D':
-        return <FileMinus size={14} color="var(--status-danger)" />;
-      case 'M':
-        return <FileEdit size={14} color="var(--status-warning)" />;
-      default:
-        return <FileCode size={14} color="var(--status-untracked)" />;
     }
   };
 
@@ -161,42 +149,22 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ repoPath, hash, on
             </div>
           )}
           {files.length > 0 && (
-            <VirtualList
-              className="commit-details-file-list"
-              items={files}
-              rowHeight={42}
-              fillAvailableHeight
-              overscan={10}
-              getKey={(file, index) => `${file.path}-${index}`}
-              renderItem={(file) => (
-                <button
-                  onClick={() => {
-                    setSelectedFilePath(file.path);
-                    setSelectedFileCommitHash(normalizedHash);
-                  }}
-                  title={file.path}
-                  style={{
-                    width: '100%',
-                    height: 38,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '0.85rem',
-                    color: 'var(--text-primary)',
-                    backgroundColor: 'var(--bg-panel)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '6px',
-                    padding: '7px 8px',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                >
-                  {getIconForStatus(file.status)}
-                  <span style={{ fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {fileNameFromPath(file.path)}
-                  </span>
-                </button>
-              )}
+            <CommitFileTree
+              repoPath={repoPath}
+              files={files}
+              collapsedPaths={collapsedPaths}
+              onToggleDirectory={(path) =>
+                setCollapsedPaths((current) => {
+                  const next = new Set(current);
+                  if (next.has(path)) next.delete(path);
+                  else next.add(path);
+                  return next;
+                })
+              }
+              onSelectFile={(file) => {
+                setSelectedFilePath(file.path);
+                setSelectedFileCommitHash(normalizedHash);
+              }}
             />
           )}
           {files.length === 0 && (

@@ -1,0 +1,20 @@
+.commit-file-tree .working-tree-root {
+  cursor: default;
+}
+
+.commit-file-tree__count {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 400;
+}
+
+.commit-file-tree .working-tree-row {
+  height: 25px;
+  overflow: hidden;
+}
+
+.commit-file-tree .working-tree-row__guide {
+  max-width: 55%;
+  overflow: hidden;
+}
