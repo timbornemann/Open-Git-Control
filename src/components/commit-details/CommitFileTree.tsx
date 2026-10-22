@@ -13,9 +13,10 @@ type Props = {
   collapsedPaths: ReadonlySet<string>;
   onToggleDirectory: (path: string) => void;
   onSelectFile: (file: CommitFileDetail) => void;
+  selectedFilePath?: string | null;
 };
 
-export function CommitFileTree({ repoPath, files, collapsedPaths, onToggleDirectory, onSelectFile }: Props) {
+export function CommitFileTree({ repoPath, files, collapsedPaths, onToggleDirectory, onSelectFile, selectedFilePath }: Props) {
   const { tr } = useI18n();
   const nodes = useMemo(() => buildCommitFileTree(files), [files]);
   const rows = useMemo(() => commitFileTreeRows(nodes, collapsedPaths), [nodes, collapsedPaths]);
@@ -48,6 +49,7 @@ export function CommitFileTree({ repoPath, files, collapsedPaths, onToggleDirect
         getKey={({ node }) => node.key}
         renderItem={({ node, isLast, ancestorIsLast }, index) => {
           const open = node.kind === 'directory' && !collapsedPaths.has(node.path);
+          const selected = node.kind === 'file' && node.path === selectedFilePath;
           const status = node.kind === 'file' ? node.file.status[0] : '';
           const StatusIcon = status === 'A' ? FilePlus : status === 'D' ? FileMinus : status === 'M' ? FileEdit : FileCode;
           const statusColor = status === 'A' ? 'success' : status === 'D' ? 'danger' : status === 'M' ? 'warning' : 'untracked';
@@ -55,11 +57,12 @@ export function CommitFileTree({ repoPath, files, collapsedPaths, onToggleDirect
           return (
             <button
               type="button"
-              className="working-tree-row"
+              className={`working-tree-row${selected ? ' working-tree-row--selected' : ''}`}
               data-node-key={node.key}
               title={title}
               aria-label={node.kind === 'directory' ? node.path : `${title}, ${statusNames[status] || tr('Geändert', 'Changed')}`}
               aria-expanded={node.kind === 'directory' ? open : undefined}
+              aria-current={selected ? 'true' : undefined}
               onClick={() => (node.kind === 'directory' ? onToggleDirectory(node.path) : onSelectFile(node.file))}
               onKeyDown={(event) => {
                 if (event.key !== 'Tab' || event.ctrlKey || event.altKey || event.metaKey) return;

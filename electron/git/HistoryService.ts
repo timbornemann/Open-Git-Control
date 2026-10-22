@@ -60,11 +60,11 @@ export class HistoryService {
     return '%H%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%P%x1f%(decorate:prefix=,suffix=,separator=%x1d)%x00';
   }
 
-  private async existsAtRevision(filePath: string, revision: string, repoPath?: string): Promise<boolean> {
+  private async existsAtRevision(filePath: string, revision: string, repoPath?: string, kind: HistoryReadKind = 'background'): Promise<boolean> {
     // `git blame <revision> -- <path>` reports a fatal error for a file deleted
     // in that revision (or newly added only in the index). ls-tree instead
     // returns an empty result, so callers can render an empty blame view.
-    const output = await this.execute(['ls-tree', '-r', '--name-only', revision, '--', toLiteralPathspec(filePath)], repoPath);
+    const output = await this.execute(['ls-tree', '-r', '--name-only', revision, '--', toLiteralPathspec(filePath)], repoPath, undefined, kind);
     return output.trim().length > 0;
   }
 
@@ -190,7 +190,8 @@ export class HistoryService {
     }
 
     args.push('--', toLiteralPathspec(filePath));
-    return this.execute(args, repoPath);
+    // Visible file details must survive concurrent foreground diff reads.
+    return this.execute(args, repoPath, undefined, 'interactive');
   }
 
   async getFileBlame(filePath: string, commitHash?: string, repoPath?: string): Promise<string> {
@@ -212,7 +213,7 @@ export class HistoryService {
     const safeCount = Number.isFinite(lineCount) ? Math.max(1, Math.min(Math.floor(lineCount), 501)) : 500;
     const normalizedHash = normalizeOptionalCommitHash(commitHash);
     const revision = normalizedHash || 'HEAD';
-    if (!(await this.existsAtRevision(filePath, revision, repoPath))) return '';
+    if (!(await this.existsAtRevision(filePath, revision, repoPath, 'interactive'))) return '';
     // blame accepts a pathname after `--`, but does not interpret pathspec
     // magic such as `:(literal)`. Keep the same strict validation without
     // passing the magic prefix through to blame.
@@ -221,7 +222,7 @@ export class HistoryService {
       const args = ['blame', '--line-porcelain', `-L${safeStart},${endLine}`];
       if (normalizedHash) args.push(normalizedHash);
       args.push('--', normalizedPath);
-      return this.execute(args, repoPath);
+      return this.execute(args, repoPath, undefined, 'interactive');
     });
   }
 

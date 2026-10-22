@@ -8,16 +8,15 @@ import { useI18n } from '@/i18n';
 import { extractGitObjectId } from '@/utils/gitObjectId';
 import { gitClient } from '@/services/gitClient';
 import { BLAME_LOOKAHEAD_COUNT, splitBlamePage } from '../file-details/blamePagination';
+import type { CommitFileDetail } from '@/utils/gitParsing';
 
-export type DetailsTab = 'history' | 'blame' | 'patch';
+export type DetailsTab = 'history' | 'blame';
 
 type Params = {
   repoPath: string | null;
   hash: string;
   onOpenDiff?: (request: DiffRequest) => void;
 };
-
-export const fileNameFromPath = (filePath: string): string => filePath.split(/[\\/]/).pop() || filePath;
 
 export const extractCommitDescription = (message: string): string => {
   const lines = String(message || '')
@@ -206,25 +205,20 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
     }
   };
 
-  useEffect(() => {
-    if (!selectedFile || activeTab !== 'patch' || !normalizedHash) return;
-
+  const openFileDiff = (path: string) => {
+    if (!normalizedHash) return;
     onOpenDiff?.({
       source: 'commit',
-      path: selectedFile.path,
+      path,
       commitHash: normalizedHash,
       title: tr(`Commit Diff ${normalizedHash.slice(0, 8)}`, `Commit diff ${normalizedHash.slice(0, 8)}`),
     });
-  }, [activeTab, normalizedHash, onOpenDiff, selectedFile, tr]);
+  };
 
-  const openSelectedFileDiff = () => {
-    if (!selectedFile || !normalizedHash) return;
-    onOpenDiff?.({
-      source: 'commit',
-      path: selectedFile.path,
-      commitHash: normalizedHash,
-      title: tr(`Commit Diff ${normalizedHash.slice(0, 8)}`, `Commit diff ${normalizedHash.slice(0, 8)}`),
-    });
+  const selectFile = (file: CommitFileDetail) => {
+    setSelectedFilePath(file.path);
+    setSelectedFileCommitHash(normalizedHash);
+    openFileDiff(file.path);
   };
 
   const formatDate = (dateString: string) => {
@@ -291,8 +285,8 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
     loadMoreBlame,
     loadingFiles: loadingFiles || Boolean(normalizedHash && repoPath && !hasOverview && !filesError),
     normalizedHash,
-    openSelectedFileDiff,
     selectedFile,
+    selectFile,
     setActiveTab,
     setSelectedFileCommitHash,
     setSelectedFilePath,

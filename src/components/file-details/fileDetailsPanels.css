@@ -1,0 +1,213 @@
+.file-history-panel,
+.file-blame-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.file-detail-panel__intro,
+.file-detail-panel__state {
+  margin: 0;
+  padding: 4px 0 10px;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.file-detail-panel__state {
+  padding: 12px 0;
+  font-size: 0.8rem;
+}
+
+.file-detail-panel__state--error {
+  color: var(--status-danger);
+}
+
+.file-history-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-bottom: 1px solid var(--border-color);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.file-history-entry.is-current {
+  border-left-color: var(--accent-primary);
+  background: var(--accent-primary-softer);
+}
+
+.file-history-entry:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.file-history-entry:disabled {
+  cursor: default;
+}
+
+.file-history-entry:focus-visible,
+.file-blame-line__commit:focus-visible {
+  outline: 1px solid var(--accent-primary);
+  outline-offset: -1px;
+}
+
+.file-history-entry__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+}
+
+.file-history-entry__hash {
+  font-size: 0.72rem;
+}
+
+.file-history-entry__current {
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--accent-primary-soft);
+  color: var(--text-accent);
+  font-size: 0.65rem;
+}
+
+.file-history-entry__date {
+  margin-left: auto;
+}
+
+.file-history-entry__subject {
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.file-history-entry__author {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.file-blame-panel__frame {
+  min-width: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.file-blame-panel__lines {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.file-blame-line {
+  display: grid;
+  grid-template-columns: 50px 72px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line-subtle);
+  color: var(--text-primary);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+}
+
+.file-blame-line__number {
+  color: var(--text-secondary);
+}
+
+.file-blame-line__metadata {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  min-width: 0;
+  color: var(--text-secondary);
+}
+
+.file-blame-line__commit {
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--text-accent);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.file-blame-line__commit:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.file-blame-line__commit:disabled {
+  cursor: default;
+}
+
+.file-blame-line__author {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.file-blame-line__date {
+  margin-left: auto;
+}
+
+.file-blame-line__content {
+  min-width: 0;
+  font: inherit;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 4;
+}
+
+.file-blame-panel--detailed .file-blame-panel__lines {
+  max-height: none;
+  overflow: visible;
+}
+
+.file-blame-panel--detailed .file-blame-line {
+  grid-template-columns: minmax(3ch, auto) minmax(0, 1fr);
+  gap: 5px 10px;
+  padding: 8px;
+}
+
+.file-blame-panel--detailed .file-blame-line:nth-child(even) {
+  background: var(--accent-primary-softer);
+}
+
+.file-blame-panel--detailed .file-blame-line__number {
+  grid-row: span 2;
+  padding-top: 1px;
+  text-align: right;
+}
+
+.file-blame-panel--detailed .file-blame-line__metadata {
+  font-family: var(--font-sans, sans-serif);
+  font-size: 0.69rem;
+}
+
+.file-blame-panel--detailed .file-blame-line__commit {
+  font-family: var(--font-mono, monospace);
+}
+
+.file-blame-panel--detailed .file-blame-line__content {
+  grid-column: 2;
+}
+
+.file-blame-panel__more {
+  margin: 8px;
+}

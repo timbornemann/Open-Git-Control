@@ -1,5 +1,12 @@
 .commit-file-tree .working-tree-root {
+  color: var(--text-secondary);
   cursor: default;
+  font-weight: 400;
+}
+
+.commit-file-tree .working-tree-root__icon,
+.commit-file-tree .working-tree-row__icon--directory {
+  color: var(--text-secondary);
 }
 
 .commit-file-tree__count {
@@ -14,7 +21,13 @@
   overflow: hidden;
 }
 
+.commit-file-tree .working-tree-row:not([aria-expanded]) {
+  color: var(--text-primary);
+}
+
 .commit-file-tree .working-tree-row__guide {
   max-width: 55%;
   overflow: hidden;
+  color: var(--text-secondary);
+  opacity: 0.6;
 }
