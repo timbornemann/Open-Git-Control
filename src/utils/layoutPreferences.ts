@@ -23,6 +23,7 @@ export const resetStoredLayoutPreferences = (): void => {
   window.dispatchEvent(new window.Event(APPLICATION_LAYOUT_RESET_EVENT));
 };
 
-export const openStagingCommitArea = (): void => {
-  window.dispatchEvent(new window.Event(APPLICATION_OPEN_STAGING_COMMIT_EVENT));
+export type OpenStagingCommitOptions = { repoPath: string; submit: boolean };
+export const openStagingCommitArea = (options?: OpenStagingCommitOptions): void => {
+  window.dispatchEvent(new window.CustomEvent(APPLICATION_OPEN_STAGING_COMMIT_EVENT, { detail: options }));
 };

@@ -10,12 +10,13 @@ import { useRepositoryTodoDraftState } from './repositoryTodoDraftState';
 type QuickRepositoryTodoDialogProps = {
   requestId: number;
   activeRepo: string | null;
+  preferSelectedProject?: boolean;
 };
 
 const repoKey = normalizeRepoPathKey;
 
-export const QuickRepositoryTodoDialog: React.FC<QuickRepositoryTodoDialogProps> = ({ requestId, activeRepo }) => {
-  const { data, loading, busy, createItem, createRepositoryProject, notify } = useProjectPlanner();
+export const QuickRepositoryTodoDialog: React.FC<QuickRepositoryTodoDialogProps> = ({ requestId, activeRepo, preferSelectedProject = false }) => {
+  const { data, loading, busy, createItem, createRepositoryProject, notify, selectedProjectId } = useProjectPlanner();
   const { tr } = useI18n();
   const draftRequest = useRepositoryTodoDraftState((state) => state.request);
   const consumeDraftRequest = useRepositoryTodoDraftState((state) => state.consume);
@@ -35,10 +36,21 @@ export const QuickRepositoryTodoDialog: React.FC<QuickRepositoryTodoDialogProps>
   }, []);
 
   React.useEffect(() => {
-    if (requestId === 0 || requestId === handledRequestIdRef.current) return;
+    if (requestId === 0 || requestId === handledRequestIdRef.current || (preferSelectedProject && loading)) return;
     handledRequestIdRef.current = requestId;
+    if (preferSelectedProject && selectedProjectId) {
+      generationRef.current += 1;
+      setTargetRepoPath(null);
+      setInitialInput(undefined);
+      setProjectId(selectedProjectId);
+      setRepositoryProjectConfirmationOpen(false);
+      return;
+    }
     if (!activeRepo) {
-      notify(tr('Bitte zuerst ein Repository oeffnen.', 'Please open a repository first.'), true);
+      notify(
+        tr('Bitte zuerst ein Repository öffnen oder im Planner ein Projekt auswählen.', 'Please open a repository or select a project in the planner first.'),
+        true,
+      );
       return;
     }
     setTargetRepoPath(activeRepo);
@@ -46,7 +58,7 @@ export const QuickRepositoryTodoDialog: React.FC<QuickRepositoryTodoDialogProps>
     setInitialInput(undefined);
     setProjectId(null);
     setRepositoryProjectConfirmationOpen(false);
-  }, [activeRepo, notify, requestId, tr]);
+  }, [activeRepo, notify, requestId, tr, loading, preferSelectedProject, selectedProjectId]);
 
   React.useEffect(() => {
     if (!draftRequest) return;

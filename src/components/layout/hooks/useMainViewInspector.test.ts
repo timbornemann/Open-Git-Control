@@ -160,4 +160,26 @@ describe('useMainViewInspector working-directory viewer binding', () => {
     expect(hook.current.workingDirectoryFilePath).toBeNull();
     hook.unmount();
   });
+  it('runs a commit shortcut only after accepting the working-file navigation guard', () => {
+    const hook = renderInspector('C:/repositories/a');
+    let proceed: (() => void) | undefined;
+    act(() => hook.current.handleOpenWorkingDirectoryFile('src/index.ts'));
+    act(() =>
+      hook.current.setWorkingDirectoryNavigationGuard((_target, next) => {
+        proceed = next;
+      }),
+    );
+    const opened = vi.fn();
+    const beforeOpen = vi.fn();
+    act(() => hook.current.handleStageCommitOpen(opened, beforeOpen));
+    expect(opened).not.toHaveBeenCalled();
+    expect(beforeOpen).not.toHaveBeenCalled();
+    expect(hook.current.workingDirectoryFilePath).toBe('src/index.ts');
+    act(() => proceed?.());
+    expect(opened).toHaveBeenCalledOnce();
+    expect(beforeOpen).toHaveBeenCalledOnce();
+    expect(beforeOpen.mock.invocationCallOrder[0]).toBeLessThan(opened.mock.invocationCallOrder[0]);
+    expect(hook.current.workingDirectoryFilePath).toBeNull();
+    hook.unmount();
+  });
 });

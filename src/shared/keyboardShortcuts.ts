@@ -31,7 +31,10 @@ export const SHORTCUT_ACTIONS = [
     'quickTodo',
     'repository',
     ['Neues Todo', 'New todo'],
-    ['In der Repository-Ansicht ein Todo erstellen.', 'Create a todo in the repository view.'],
+    [
+      'Ein Todo für das aktive Repository oder das ausgewählte Planner-Projekt erstellen.',
+      'Create a todo for the active repository or selected planner project.',
+    ],
     binding('t', true),
   ),
   action(
@@ -52,7 +55,10 @@ export const SHORTCUT_ACTIONS = [
     'commit',
     'repository',
     ['Commit erstellen', 'Create commit'],
-    ['Den Commit aus der Commit-Eingabe erstellen.', 'Create the commit from the commit fields.'],
+    [
+      'Commit-Bereich öffnen und vorbereitete Änderungen committen; ohne Titel die Eingabe fokussieren.',
+      'Open the commit area and commit prepared changes; focus the message field if the title is empty.',
+    ],
     binding('Enter'),
   ),
   action(

@@ -275,6 +275,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
 
       {!isBareRepository && !isConflictOnly && (
         <StagingCommitPanel
+          repoPath={repoPath}
           status={status}
           fileOps={fileOps}
           commitForm={commitForm}

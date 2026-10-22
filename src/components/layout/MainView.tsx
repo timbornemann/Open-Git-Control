@@ -7,7 +7,8 @@ import { MainInspectorPane } from './main/MainInspectorPane';
 import { MainPrimaryPane } from './main/MainPrimaryPane';
 import { MainTopbar } from './main/MainTopbar';
 import { useInspectorPaneVisibility } from './main/useInspectorPaneVisibility';
-import { APPLICATION_OPEN_STAGING_COMMIT_EVENT } from '@/utils/layoutPreferences';
+import { APPLICATION_OPEN_STAGING_COMMIT_EVENT, type OpenStagingCommitOptions } from '@/utils/layoutPreferences';
+import { clearCommitShortcutRequest, requestCommitShortcut } from '@/components/staging-area/commitShortcutState';
 
 const MainViewComponent: React.FC = () => {
   const activeTab = useUIStore((state) => state.activeTab);
@@ -22,6 +23,8 @@ const MainViewComponent: React.FC = () => {
   const onCloseRepositoryPublication = useUIStore((state) => state.onCloseRepositoryPublication);
   const onCloseReleaseCreator = useUIStore((state) => state.onCloseReleaseCreator);
   const activeRepo = useGitStore((state) => state.activeRepo);
+  const activeRepoRef = React.useRef(activeRepo);
+  activeRepoRef.current = activeRepo;
   const refreshTrigger = useGitStore((state) => state.refreshTrigger);
   const setSelectedCommit = useGitStore((state) => state.setSelectedCommit);
   const onOpenRepoWorkspace = useGitStore((state) => state.onOpenRepoWorkspace);
@@ -77,35 +80,52 @@ const MainViewComponent: React.FC = () => {
   // Folder expansion is per-repository, so drop the previous repo's paths on switch.
   React.useEffect(() => {
     setExpandedDirectoryPaths(new Set(['']));
+    clearCommitShortcutRequest();
   }, [activeRepo]);
 
-  const handleRepositoryStagingOpen = React.useCallback(() => {
-    onCloseRunConfig();
-    onCloseRemoteConfig();
-    onCloseSecretScanAllowlist();
-    if (isReleaseCreatorOpen) onCloseReleaseCreator();
-    if (isRepositoryPublicationOpen) onCloseRepositoryPublication?.();
-    handleStageCommitOpen();
-  }, [
-    handleStageCommitOpen,
-    onCloseRunConfig,
-    onCloseRemoteConfig,
-    onCloseSecretScanAllowlist,
-    onCloseReleaseCreator,
-    isReleaseCreatorOpen,
-    isRepositoryPublicationOpen,
-    onCloseRepositoryPublication,
-  ]);
+  const handleRepositoryStagingOpen = React.useCallback(
+    (onOpened?: () => void) => {
+      handleStageCommitOpen(
+        () => {
+          setDirectoryMode('staging');
+          revealInspectorPane();
+          onOpened?.();
+        },
+        () => {
+          onCloseRunConfig();
+          onCloseRemoteConfig();
+          onCloseSecretScanAllowlist();
+          if (isReleaseCreatorOpen) onCloseReleaseCreator();
+          if (isRepositoryPublicationOpen) onCloseRepositoryPublication?.();
+        },
+      );
+    },
+    [
+      handleStageCommitOpen,
+      onCloseRunConfig,
+      onCloseRemoteConfig,
+      onCloseSecretScanAllowlist,
+      onCloseReleaseCreator,
+      isReleaseCreatorOpen,
+      isRepositoryPublicationOpen,
+      onCloseRepositoryPublication,
+      revealInspectorPane,
+    ],
+  );
 
   React.useEffect(() => {
-    const handleOpenStagingCommit = () => {
-      handleRepositoryStagingOpen();
-      revealInspectorPane();
+    const handleOpenStagingCommit = (event: Event) => {
+      const options = (event as CustomEvent<OpenStagingCommitOptions | undefined>).detail;
+      if (options && options.repoPath !== activeRepo) return;
+      const repoAtStart = activeRepo;
+      handleRepositoryStagingOpen(() => {
+        if (options?.submit && repoAtStart && repoAtStart === activeRepoRef.current) requestCommitShortcut(repoAtStart);
+      });
     };
 
     window.addEventListener(APPLICATION_OPEN_STAGING_COMMIT_EVENT, handleOpenStagingCommit);
     return () => window.removeEventListener(APPLICATION_OPEN_STAGING_COMMIT_EVENT, handleOpenStagingCommit);
-  }, [handleRepositoryStagingOpen, revealInspectorPane]);
+  }, [activeRepo, handleRepositoryStagingOpen]);
 
   const isSettingsView = activeTab === 'settings';
   const isPlannerView = activeTab === 'planner';
@@ -124,6 +144,19 @@ const MainViewComponent: React.FC = () => {
     );
   const showInspectorPane = canShowInspectorPane && isInspectorPaneVisible;
   const workingTree = useWorkingTreeSnapshot(activeRepo, refreshTrigger, canShowInspectorPane);
+  const previousCommitContextRef = React.useRef({ visible: showInspectorPane, directoryMode, tab: activeTab });
+  React.useEffect(() => {
+    const previous = previousCommitContextRef.current;
+    previousCommitContextRef.current = { visible: showInspectorPane, directoryMode, tab: activeTab };
+    // The app context can update after the local pane state. Cancel only when
+    // leaving staging, not during the intermediate render that is opening it.
+    if (
+      (previous.visible && !showInspectorPane) ||
+      (previous.directoryMode === 'staging' && directoryMode === 'tree') ||
+      (previous.tab !== activeTab && activeTab !== 'repo')
+    )
+      clearCommitShortcutRequest();
+  }, [showInspectorPane, directoryMode, activeTab]);
 
   return (
     <div className="main-view">
@@ -131,7 +164,7 @@ const MainViewComponent: React.FC = () => {
         canShowInspectorPane={canShowInspectorPane}
         showInspectorPane={showInspectorPane}
         onToggleInspectorPane={toggleInspectorPane}
-        onStageCommit={handleRepositoryStagingOpen}
+        onStageCommit={() => handleRepositoryStagingOpen()}
       />
 
       <div ref={contentAreaRef} className="content-area">

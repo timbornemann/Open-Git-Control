@@ -291,16 +291,21 @@ export const useMainViewInspector = ({
     });
   }, [setActiveDiffRequest]);
 
-  const handleStageCommitOpen = useCallback(() => {
-    requestWorkingDirectoryNavigation({ kind: 'view', label: 'staging and commit' }, () => {
-      onOpenRepoWorkspace();
-      setActiveDiffRequest(null);
-      setActiveConflictPath(null);
-      setShowRecoveryCenter(false);
-      setWorkingDirectoryFile(null);
-      handleSelectCommitDirect(null);
-    });
-  }, [handleSelectCommitDirect, onOpenRepoWorkspace, setActiveDiffRequest]);
+  const handleStageCommitOpen = useCallback(
+    (onOpened?: () => void, beforeOpen?: () => void) => {
+      requestWorkingDirectoryNavigation({ kind: 'view', label: 'staging and commit' }, () => {
+        beforeOpen?.();
+        onOpenRepoWorkspace();
+        setActiveDiffRequest(null);
+        setActiveConflictPath(null);
+        setShowRecoveryCenter(false);
+        setWorkingDirectoryFile(null);
+        handleSelectCommitDirect(null);
+        onOpened?.();
+      });
+    },
+    [handleSelectCommitDirect, onOpenRepoWorkspace, setActiveDiffRequest],
+  );
 
   return {
     activeDiffRequest,

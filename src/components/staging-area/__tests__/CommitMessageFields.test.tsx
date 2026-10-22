@@ -11,6 +11,8 @@ import { useCommitForm } from '../useCommitForm';
 import { updateResource } from '@/data/queryClient';
 import { resourceKey } from '@/data/clientCache';
 import { beginShortcutCapture } from '@/hooks/keyboardShortcutRuntime';
+import { useGlobalKeyboardShortcuts } from '@/hooks/useGlobalKeyboardShortcuts';
+import { clearCommitShortcutRequest, requestCommitShortcut } from '../commitShortcutState';
 
 describe('structured staging commit form', () => {
   let host: HTMLDivElement, root: Root;
@@ -19,6 +21,13 @@ describe('structured staging commit form', () => {
   const toast = vi.fn();
   const status = { staged: [{ path: 'file.ts', x: 'M', y: ' ' }], unstaged: [], untracked: [], conflicts: [] };
   const Harness = () => {
+    useGlobalKeyboardShortcuts({
+      setActiveTab: vi.fn(),
+      onFetch: vi.fn(),
+      onOpenCommandPalette: vi.fn(),
+      onOpenQuickTodo: vi.fn(),
+      onCreateCommit: () => requestCommitShortcut(repoPath),
+    });
     current = useCommitForm({
       repoPath,
       status,
@@ -29,6 +38,7 @@ describe('structured staging commit form', () => {
       onUpdateSettings: vi.fn(),
     });
     return createElement(StagingCommitPanel, {
+      repoPath,
       status,
       commitForm: current,
       fileOps: { isMutating: false } as never,
@@ -62,6 +72,7 @@ describe('structured staging commit form', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     clearCommitFormDraftsForTests();
+    clearCommitShortcutRequest();
     toast.mockClear();
     repoPath = 'C:/repos/one';
     template = '';
@@ -76,6 +87,7 @@ describe('structured staging commit form', () => {
   afterEach(() => {
     act(() => root.unmount());
     host.remove();
+    clearCommitShortcutRequest();
     vi.restoreAllMocks();
   });
 

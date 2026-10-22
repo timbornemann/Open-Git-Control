@@ -1,7 +1,7 @@
 import { useI18n } from '@/i18n';
 import { ActionRequirement } from '@/components/ui/ActionRequirement';
 import { useOpenSettingsGroup } from '@/hooks/useOpenSettingsGroup';
-import { useId } from 'react';
+import { useId, useRef } from 'react';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { formatShortcut, getShortcutBinding } from '@/shared/keyboardShortcuts';
 import { AiCommitPlan } from './AiCommitPlan';
@@ -10,8 +10,10 @@ import type { GitStatusWithConflicts } from './types';
 import type { useAiCommit } from './useAiCommit';
 import type { useCommitForm } from './useCommitForm';
 import type { useFileOperations } from './useFileOperations';
+import { useCommitShortcut } from './useCommitShortcut';
 
 type StagingCommitPanelProps = {
+  repoPath?: string | null;
   status: GitStatusWithConflicts;
   fileOps: ReturnType<typeof useFileOperations>;
   commitForm: ReturnType<typeof useCommitForm>;
@@ -40,6 +42,7 @@ export const isAiAutoCommitDisabled = ({
 }): boolean => !aiConfigEnabled || isMutating || isCommitting || isAiCommitting || isAiJobRunning || !hasStatus;
 
 export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
+  repoPath = null,
   status,
   fileOps,
   commitForm,
@@ -55,7 +58,15 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
   const commitShortcut = formatShortcut(getShortcutBinding('commit', shortcuts), language, /Mac/i.test(navigator.platform)).join('+');
   const openSettings = useOpenSettingsGroup();
   const titleHintId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
   const busy = fileOps.isMutating || commitForm.isCommitting || aiCommit.isAiCommitting || aiCommit.isAiJobRunning;
+  useCommitShortcut({
+    panelRef,
+    repoPath,
+    disabled: isCommitInputDisabled || busy || hasOpenConflicts,
+    hasMessage: Boolean(commitForm.commitMsg.trim()),
+    commit: commitForm.handleCommit,
+  });
   const titleRequirement =
     !busy && !hasOpenConflicts && status && (status.staged.length || commitForm.amendCommit) && !commitForm.commitMsg.trim()
       ? tr('Commit-Titel eingeben', 'Enter commit title')
@@ -81,7 +92,7 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
   };
 
   return (
-    <div className="staging-commit-area">
+    <div className="staging-commit-area" ref={panelRef}>
       <AiCommitPlan groups={aiCommit.aiGroups} />
       <CommitMessageFields
         commitForm={commitForm}

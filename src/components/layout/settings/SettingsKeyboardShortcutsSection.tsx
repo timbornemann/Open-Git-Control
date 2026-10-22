@@ -141,11 +141,21 @@ export function SettingsKeyboardShortcutsSection({ settings, onUpdateSettings, v
     void persist(id, next);
   };
   const groups = [
-    { id: 'navigation', title: tr('Navigation', 'Navigation'), scope: tr('Appweit, außerhalb von Eingabefeldern', 'Throughout the app, outside input fields') },
+    {
+      id: 'navigation',
+      title: tr('Navigation', 'Navigation'),
+      scope: tr(
+        'Ansichtswechsel außerhalb von Eingabefeldern; Befehlspalette appweit',
+        'View switching outside input fields; command palette throughout the app',
+      ),
+    },
     {
       id: 'repository',
       title: tr('Repository-Aktionen', 'Repository actions'),
-      scope: tr('Im aktiven Repository; Commit nur in der Commit-Eingabe', 'In the active repository; commit only in commit fields'),
+      scope: tr(
+        'Appweit für das aktive Repository; Todos im ausgewählten Planner-Projekt',
+        'Throughout the app for the active repository; todos in the selected planner project',
+      ),
     },
     { id: 'files', title: tr('Dateibearbeitung', 'File editing'), scope: tr('Im Dateibetrachter und Codeeditor', 'In the file viewer and code editor') },
   ];

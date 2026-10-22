@@ -15,6 +15,47 @@ afterEach(() => {
 });
 
 describe('useGlobalKeyboardShortcuts editor focus', () => {
+  it.each(['input', 'textarea', 'select', 'contenteditable', 'code-editor'])(
+    'runs app actions from %s before editor handlers, while protecting view navigation',
+    (type) => {
+      (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+      document.body.innerHTML = '<div id="root"></div>';
+      const setActiveTab = vi.fn(),
+        onFetch = vi.fn(),
+        onOpenCommandPalette = vi.fn(),
+        onOpenQuickTodo = vi.fn(),
+        onCreateCommit = vi.fn();
+      const Harness = () => {
+        useGlobalKeyboardShortcuts({ setActiveTab, onFetch, onOpenCommandPalette, onOpenQuickTodo, onCreateCommit });
+        return null;
+      };
+      const root = createRoot(document.getElementById('root')!);
+      act(() => root.render(createElement(Harness)));
+      const editor = document.createElement(['contenteditable', 'code-editor'].includes(type) ? 'div' : type);
+      editor.tabIndex = 0;
+      if (type === 'contenteditable') editor.setAttribute('contenteditable', 'true');
+      if (type === 'code-editor') editor.className = 'cm-editor';
+      document.body.append(editor);
+      editor.focus();
+      const editCommand = vi.fn((event: Event) => event.preventDefault());
+      editor.addEventListener('keydown', editCommand);
+      const press = (key: string, shiftKey = true) =>
+        act(() => editor.dispatchEvent(new KeyboardEvent('keydown', { key, ctrlKey: true, shiftKey, bubbles: true, cancelable: true })));
+      press('t');
+      press('f');
+      press('p');
+      press('Enter', false);
+      expect(onOpenQuickTodo).toHaveBeenCalledOnce();
+      expect(onFetch).toHaveBeenCalledOnce();
+      expect(onOpenCommandPalette).toHaveBeenCalledOnce();
+      expect(onCreateCommit).toHaveBeenCalledOnce();
+      expect(editCommand).not.toHaveBeenCalled();
+      press('4', false);
+      expect(setActiveTab).not.toHaveBeenCalled();
+      expect(editCommand).toHaveBeenCalledOnce();
+      act(() => root.unmount());
+    },
+  );
   it('updates live, disables old keys and ignores repeats, dialogs, IME and recording', async () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     document.body.innerHTML = '<div id="root"></div>';
@@ -83,7 +124,7 @@ describe('useGlobalKeyboardShortcuts editor focus', () => {
     act(() => root.unmount());
   });
 
-  it('opens the quick todo modal with Ctrl+Shift+T outside editable fields', () => {
+  it('opens the quick todo modal with Ctrl+Shift+T including editable fields', () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     document.body.innerHTML = '<div id="root"></div><input id="editor" />';
     const onOpenQuickTodo = vi.fn();
@@ -100,7 +141,7 @@ describe('useGlobalKeyboardShortcuts editor focus', () => {
     const editor = document.getElementById('editor') as HTMLInputElement;
     editor.focus();
     act(() => window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 't', ctrlKey: true, shiftKey: true, bubbles: true })));
-    expect(onOpenQuickTodo).toHaveBeenCalledOnce();
+    expect(onOpenQuickTodo).toHaveBeenCalledTimes(2);
     act(() => root.unmount());
   });
 });

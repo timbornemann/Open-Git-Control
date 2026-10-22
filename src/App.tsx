@@ -21,6 +21,7 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { SystemToolsRuntime } from './components/system-tools/SystemToolsRuntime';
 import { PlannerWorkRuntime } from './components/project-planner/PlannerWorkRuntime';
 import { BranchChangeRuntime } from './components/branch-change/BranchChangeRuntime';
+import { openStagingCommitArea } from './utils/layoutPreferences';
 
 const App: React.FC = () => {
   const state = useAppState();
@@ -47,12 +48,18 @@ const App: React.FC = () => {
     setActiveTab: state.setActiveTab,
     onFetch: () => {
       if (state.activeRepo) requestRemoteTransfer({ repoPath: state.activeRepo, mode: 'fetch' });
+      else state.setGitActionToast({ msg: tr('Bitte zuerst ein Repository öffnen.', 'Please open a repository first.'), isError: true });
     },
     onOpenCommandPalette: () => setIsPaletteOpen(true),
     onOpenQuickTodo: () => {
-      if (state.activeTab === 'repo' && state.activeRepo) {
-        setQuickTodoRequestId((current) => current + 1);
+      setQuickTodoRequestId((current) => current + 1);
+    },
+    onCreateCommit: () => {
+      if (!state.activeRepo) {
+        state.setGitActionToast({ msg: tr('Bitte zuerst ein Repository öffnen.', 'Please open a repository first.'), isError: true });
+        return;
       }
+      openStagingCommitArea({ repoPath: state.activeRepo, submit: true });
     },
   });
 
@@ -140,7 +147,7 @@ const App: React.FC = () => {
               onToast={(message, isError) => state.setGitActionToast({ msg: message, isError })}
               setConfirmDialog={state.setConfirmDialog}
             >
-              <QuickRepositoryTodoDialog requestId={quickTodoRequestId} activeRepo={state.activeRepo} />
+              <QuickRepositoryTodoDialog requestId={quickTodoRequestId} activeRepo={state.activeRepo} preferSelectedProject={state.activeTab === 'planner'} />
               <PlannerWorkRuntime activeRepo={state.activeRepo} refreshSignal={state.refreshTrigger} onChanged={state.triggerRefresh} />
               <BranchChangeRuntime
                 activeRepo={state.activeRepo}
