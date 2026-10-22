@@ -1,6 +1,9 @@
 import { useEffect } from 'react';
 
 import type { AppTabId } from '@/app/state/contracts';
+import { getShortcutBinding, matchesShortcut, SHORTCUT_ACTIONS } from '@/shared/keyboardShortcuts';
+import { useKeyboardShortcuts } from './useKeyboardShortcuts';
+import { isShortcutEditableTarget, isShortcutSuppressed } from './keyboardShortcutRuntime';
 
 type ShortcutHandlers = {
   setActiveTab: (tab: AppTabId) => void;
@@ -9,57 +12,28 @@ type ShortcutHandlers = {
   onOpenQuickTodo: () => void;
 };
 
-const FOCUSABLE_TEXT_SELECTOR = 'input, textarea, [contenteditable="true"], select';
-
-const isEditableFocused = (): boolean => {
-  const el = document.activeElement;
-  if (!el) return false;
-  return el.matches(FOCUSABLE_TEXT_SELECTOR);
-};
-
 export const useGlobalKeyboardShortcuts = ({ setActiveTab, onFetch, onOpenCommandPalette, onOpenQuickTodo }: ShortcutHandlers) => {
+  const shortcuts = useKeyboardShortcuts();
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const ctrl = e.ctrlKey || e.metaKey;
-      if (!ctrl) return;
-
-      // Never steal tab shortcuts from text/code editors. Navigation initiated
-      // outside an editor is still protected by the working-file dirty guard.
-      if (isEditableFocused()) return;
-
-      // Keep existing mappings; statistics is available on Ctrl+6.
-      if (!e.shiftKey && !e.altKey) {
-        const tabs: AppTabId[] = ['localRepos', 'repo', 'hosting', 'settings', 'planner', 'analytics'];
-        const idx = parseInt(e.key, 10) - 1;
-        if (idx >= 0 && idx < tabs.length) {
-          e.preventDefault();
-          setActiveTab(tabs[idx]);
-          return;
-        }
-      }
-
-      // Ctrl+Shift+F → Fetch
-      if (e.shiftKey && e.key === 'F') {
+      if (isShortcutSuppressed() || isShortcutEditableTarget(e.target) || isShortcutEditableTarget(document.activeElement)) return;
+      const handlers: Partial<Record<(typeof SHORTCUT_ACTIONS)[number]['id'], () => void>> = {
+        fetch: onFetch,
+        commandPalette: onOpenCommandPalette,
+        quickTodo: onOpenQuickTodo,
+      };
+      const tabs: AppTabId[] = ['localRepos', 'repo', 'hosting', 'settings', 'planner', 'analytics'];
+      for (const entry of SHORTCUT_ACTIONS) {
+        const handler = handlers[entry.id] ?? (tabs.includes(entry.id as AppTabId) ? () => setActiveTab(entry.id as AppTabId) : undefined);
+        if (!handler || !matchesShortcut(e, getShortcutBinding(entry.id, shortcuts), true)) continue;
         e.preventDefault();
-        onFetch();
+        if (e.repeat) return;
+        handler();
         return;
-      }
-
-      // Ctrl+Shift+P → Command palette
-      if (e.shiftKey && (e.key === 'P' || e.key === 'p')) {
-        e.preventDefault();
-        onOpenCommandPalette();
-        return;
-      }
-
-      // Ctrl+Shift+T → Create a todo for the active repository
-      if (e.shiftKey && (e.key === 'T' || e.key === 't')) {
-        e.preventDefault();
-        onOpenQuickTodo();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setActiveTab, onFetch, onOpenCommandPalette, onOpenQuickTodo]);
+  }, [shortcuts, setActiveTab, onFetch, onOpenCommandPalette, onOpenQuickTodo]);
 };

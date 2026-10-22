@@ -8,6 +8,9 @@ import { gitClient } from '@/services/gitClient';
 import { StagingCommitPanel } from '../StagingCommitPanel';
 import { clearCommitFormDraftsForTests } from '../commitFormDraft';
 import { useCommitForm } from '../useCommitForm';
+import { updateResource } from '@/data/queryClient';
+import { resourceKey } from '@/data/clientCache';
+import { beginShortcutCapture } from '@/hooks/keyboardShortcutRuntime';
 
 describe('structured staging commit form', () => {
   let host: HTMLDivElement, root: Root;
@@ -123,6 +126,36 @@ describe('structured staging commit form', () => {
       expect.objectContaining({ title: 'fix(backend): repair login', description: 'Keep the session alive.' }),
     );
     expect([typeField().value, scopeField().value, messageField().value, descriptionField().value]).toEqual(['', '', '', '']);
+  });
+  it('uses the configured commit binding and hint and ignores the old binding, repetition and recording', async () => {
+    render();
+    fill(messageField(), 'custom shortcut');
+    await act(async () =>
+      updateResource(resourceKey('app', 'getSettings'), {
+        ...DEFAULT_SETTINGS,
+        keyboardShortcuts: { commit: { key: 'k', primary: true, alt: false, shift: true } },
+      }),
+    );
+    expect(host.querySelector('.staging-commit-options')?.textContent).toContain('Ctrl+Shift+K');
+    const press = (key: string, extra = {}) =>
+      act(async () => messageField().dispatchEvent(new KeyboardEvent('keydown', { key, ctrlKey: true, bubbles: true, cancelable: true, ...extra })));
+    await press('Enter');
+    await press('K', { shiftKey: true, repeat: true });
+    const release = beginShortcutCapture();
+    try {
+      await press('K', { shiftKey: true });
+    } finally {
+      release();
+    }
+    expect(gitClient.createCommit).not.toHaveBeenCalled();
+    await press('K', { shiftKey: true });
+    expect(gitClient.createCommit).toHaveBeenCalledOnce();
+    await act(async () => updateResource(resourceKey('app', 'getSettings'), { ...DEFAULT_SETTINGS, keyboardShortcuts: { commit: null } }));
+    fill(messageField(), 'second commit');
+    await press('Enter');
+    await press('K', { shiftKey: true });
+    expect(gitClient.createCommit).toHaveBeenCalledOnce();
+    expect(host.querySelector('.staging-commit-options')?.textContent).toContain('No shortcut');
   });
 
   it('keeps the full draft after a failed commit', async () => {

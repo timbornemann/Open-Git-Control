@@ -1,4 +1,5 @@
 import type { AiCommitMessageLanguageDto, AiCommitMessageStyleDto, AiProviderDto } from './aiDtos';
+import type { ShortcutOverrides } from '../shared/keyboardShortcuts';
 
 export interface StoredRepoEntryDto {
   path: string;
@@ -59,6 +60,7 @@ export type PlanningApiTokenLifetimeDto = 'day' | 'month' | 'year' | 'forever';
 export type PlanningApiTokenSourceDto = 'environment' | 'saved' | 'session';
 
 export interface AppSettingsDto {
+  keyboardShortcuts?: ShortcutOverrides;
   theme: AppThemeDto;
   language: 'de' | 'en';
   autoFetchIntervalMs: number;

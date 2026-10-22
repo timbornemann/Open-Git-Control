@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-
-const REPO_SWITCH_EDITABLE_SELECTOR = 'input, textarea, [contenteditable="true"], select';
+import { getShortcutBinding, matchesShortcut, type ShortcutBinding } from '@/shared/keyboardShortcuts';
+import { useKeyboardShortcuts } from './useKeyboardShortcuts';
+import { isShortcutEditableTarget, isShortcutSuppressed } from './keyboardShortcutRuntime';
 
 type UseRepoSwitcherKeyboardParams = {
   openRepos: string[];
@@ -9,12 +10,9 @@ type UseRepoSwitcherKeyboardParams = {
   onRepositoryCommitted: () => void;
 };
 
-const isRepoSwitchEditableTarget = (target: EventTarget | null): boolean => {
-  const element = target instanceof HTMLElement ? target : document.activeElement;
-  return Boolean(element?.closest(REPO_SWITCH_EDITABLE_SELECTOR));
-};
-
 export const useRepoSwitcherKeyboard = ({ openRepos, activeRepo, onSwitchRepo, onRepositoryCommitted }: UseRepoSwitcherKeyboardParams) => {
+  const shortcuts = useKeyboardShortcuts();
+  const gestureBindingRef = useRef<ShortcutBinding | null>(null);
   const [repoSwitcherIndex, setRepoSwitcherIndex] = useState<number | null>(null);
   const repoSwitcherIndexRef = useRef<number | null>(null);
   const repoSwitcherListRef = useRef<HTMLDivElement>(null);
@@ -45,6 +43,7 @@ export const useRepoSwitcherKeyboard = ({ openRepos, activeRepo, onSwitchRepo, o
   }, [openRepos.length, repoSwitcherIndex]);
 
   const closeRepoSwitcher = useCallback(() => {
+    gestureBindingRef.current = null;
     repoSwitcherIndexRef.current = null;
     setRepoSwitcherIndex(null);
   }, []);
@@ -80,29 +79,41 @@ export const useRepoSwitcherKeyboard = ({ openRepos, activeRepo, onSwitchRepo, o
   }, [closeRepoSwitcher, onRepositoryCommitted, onSwitchRepo, openRepos]);
 
   useEffect(() => {
+    closeRepoSwitcher();
+  }, [shortcuts, closeRepoSwitcher]);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (isShortcutSuppressed(true)) {
+        closeRepoSwitcher();
+        return;
+      }
       if (event.key === 'Escape' && repoSwitcherIndexRef.current !== null) {
         event.preventDefault();
         closeRepoSwitcher();
         return;
       }
 
-      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-      if (!event.ctrlKey && !event.metaKey) return;
-      if (event.altKey || event.shiftKey) return;
-      if (isRepoSwitchEditableTarget(event.target)) return;
+      if (isShortcutEditableTarget(event.target) || isShortcutEditableTarget(document.activeElement)) return;
+      const previous = getShortcutBinding('previousRepository', shortcuts);
+      const next = getShortcutBinding('nextRepository', shortcuts);
+      const delta = matchesShortcut(event, previous, true) ? -1 : matchesShortcut(event, next, true) ? 1 : 0;
+      if (!delta || openRepos.length === 0) return;
 
       event.preventDefault();
       event.stopPropagation();
-      moveRepoSwitcherSelection(event.key === 'ArrowDown' ? 1 : -1);
+      gestureBindingRef.current = delta < 0 ? previous : next;
+      moveRepoSwitcherSelection(delta);
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
       if (repoSwitcherIndexRef.current === null) return;
-
-      const isModifierRelease = event.key === 'Control' || event.key === 'Meta';
-      const isArrowReleaseWithoutModifier = (event.key === 'ArrowUp' || event.key === 'ArrowDown') && !event.ctrlKey && !event.metaKey;
-      if (!isModifierRelease && !isArrowReleaseWithoutModifier) return;
+      if (isShortcutSuppressed(true)) {
+        closeRepoSwitcher();
+        return;
+      }
+      const b = gestureBindingRef.current;
+      if (!b || ((!b.primary || event.ctrlKey || event.metaKey) && (!b.alt || event.altKey) && (!b.shift || event.shiftKey))) return;
 
       event.preventDefault();
       event.stopPropagation();
@@ -117,7 +128,7 @@ export const useRepoSwitcherKeyboard = ({ openRepos, activeRepo, onSwitchRepo, o
       window.removeEventListener('keyup', handleKeyUp, true);
       window.removeEventListener('blur', closeRepoSwitcher);
     };
-  }, [closeRepoSwitcher, commitRepoSwitcherSelection, moveRepoSwitcherSelection]);
+  }, [shortcuts, openRepos.length, closeRepoSwitcher, commitRepoSwitcherSelection, moveRepoSwitcherSelection]);
 
   return {
     repoSwitcherIndex,

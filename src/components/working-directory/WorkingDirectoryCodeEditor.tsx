@@ -1,11 +1,14 @@
 import React, { useEffect, useRef } from 'react';
 import { indentWithTab } from '@codemirror/commands';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
-import { Compartment, EditorState, type Extension } from '@codemirror/state';
+import { Compartment, EditorState, Prec, type Extension } from '@codemirror/state';
 import { EditorView, highlightTrailingWhitespace, highlightWhitespace, keymap } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 import { basicSetup } from 'codemirror';
 import type { EditorPosition } from '@/types/editor';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { isShortcutSuppressed } from '@/hooks/keyboardShortcutRuntime';
+import { getShortcutBinding, matchesShortcut } from '@/shared/keyboardShortcuts';
 
 type Props = {
   path: string;
@@ -133,6 +136,9 @@ export const WorkingDirectoryCodeEditor: React.FC<Props> = ({
   onSelectionChange,
   position,
 }) => {
+  const shortcuts = useKeyboardShortcuts();
+  const saveBindingRef = useRef(getShortcutBinding('saveFile', shortcuts));
+  saveBindingRef.current = getShortcutBinding('saveFile', shortcuts);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const languageCompartmentRef = useRef(new Compartment());
@@ -161,16 +167,18 @@ export const WorkingDirectoryCodeEditor: React.FC<Props> = ({
           languageCompartmentRef.current.of([]),
           readOnlyCompartmentRef.current.of([EditorState.readOnly.of(readOnlyRef.current), EditorView.editable.of(!readOnlyRef.current)]),
           whitespaceCompartmentRef.current.of(initialShowWhitespaceRef.current ? [highlightWhitespace(), highlightTrailingWhitespace()] : []),
-          keymap.of([
-            indentWithTab,
-            {
-              key: 'Mod-s',
-              run: () => {
-                if (!readOnlyRef.current) void onSaveRef.current();
+          keymap.of([indentWithTab]),
+          Prec.highest(
+            EditorView.domEventHandlers({
+              keydown(event) {
+                if (isShortcutSuppressed() || !matchesShortcut(event, saveBindingRef.current, true)) return false;
+                event.preventDefault();
+                event.stopPropagation();
+                if (!readOnlyRef.current && !event.repeat) void onSaveRef.current();
                 return true;
               },
-            },
-          ]),
+            }),
+          ),
           EditorView.updateListener.of((update) => {
             if (update.docChanged && !readOnlyRef.current) onChangeRef.current(update.state.doc.toString());
             if (update.selectionSet) {

@@ -5,6 +5,9 @@ import { EditorView } from '@codemirror/view';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EditorPosition } from '@/types/editor';
 import { WorkingDirectoryCodeEditor } from './WorkingDirectoryCodeEditor';
+import { updateResource } from '@/data/queryClient';
+import { resourceKey } from '@/data/clientCache';
+import { DEFAULT_SETTINGS } from '@/app/state/defaultSettings';
 
 let host: HTMLDivElement, root: Root;
 const change = vi.fn();
@@ -32,6 +35,45 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 describe('working-file editor run navigation', () => {
+  it('changes and disables save shortcuts without recreating the editor or losing its text and selection', async () => {
+    const save = vi.fn();
+    await act(async () => root.render(<WorkingDirectoryCodeEditor path="notes.txt" value="unsaved text" onChange={change} onSave={save} />));
+    const original = view();
+    act(() => original.dispatch({ selection: { anchor: 4 } }));
+    const press = (key: string, extras = {}) =>
+      act(() => original.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key, ctrlKey: true, bubbles: true, cancelable: true, ...extras })));
+    const windowSave = vi.fn();
+    const listener = (event: KeyboardEvent) => {
+      if (!event.defaultPrevented && event.key === 's') windowSave();
+    };
+    window.addEventListener('keydown', listener);
+    try {
+      press('s');
+      expect(save).toHaveBeenCalledOnce();
+      expect(windowSave).not.toHaveBeenCalled();
+      await act(async () =>
+        updateResource(resourceKey('app', 'getSettings'), {
+          ...DEFAULT_SETTINGS,
+          keyboardShortcuts: { saveFile: { key: 'F8', primary: false, alt: false, shift: false } },
+        }),
+      );
+      press('s');
+      expect(save).toHaveBeenCalledOnce();
+      press('F8', { ctrlKey: false });
+      expect(save).toHaveBeenCalledTimes(2);
+      press('F8', { ctrlKey: false, repeat: true });
+      expect(save).toHaveBeenCalledTimes(2);
+      expect(view()).toBe(original);
+      expect(original.state.doc.toString()).toBe('unsaved text');
+      expect(original.state.selection.main.head).toBe(4);
+      await act(async () => updateResource(resourceKey('app', 'getSettings'), { ...DEFAULT_SETTINGS, keyboardShortcuts: { saveFile: null } }));
+      press('F8', { ctrlKey: false });
+      press('s');
+      expect(save).toHaveBeenCalledTimes(2);
+    } finally {
+      window.removeEventListener('keydown', listener);
+    }
+  });
   it('focuses the requested one-based line and column without changing the file', async () => {
     await render({ line: 2, column: 3 });
     expect(view().state.selection.main.head).toBe(8);

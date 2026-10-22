@@ -4,7 +4,7 @@ import type { BranchInfo, GitSubmoduleInfo, RemoteSyncState } from '@/types/git'
 import type { RepositoryRunActionId, RepositoryRunConfigStateDto, RepositoryRunStateDto } from '@/types/repositoryRun';
 
 export type AppTabId = 'localRepos' | 'repo' | 'planner' | 'analytics' | 'hosting' | 'github' | 'settings';
-export type SettingsTabId = 'general' | 'integrations' | 'api' | 'security' | 'system';
+export type SettingsTabId = 'general' | 'shortcuts' | 'integrations' | 'api' | 'security' | 'system';
 export type SettingsUpdateResult = { success: true; settings: AppSettingsDto } | { success: false; error: string };
 export type GithubAuthHelpMethod = 'pat' | 'device' | 'web' | null;
 

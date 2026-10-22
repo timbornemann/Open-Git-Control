@@ -2,6 +2,8 @@ import { useI18n } from '@/i18n';
 import { ActionRequirement } from '@/components/ui/ActionRequirement';
 import { useOpenSettingsGroup } from '@/hooks/useOpenSettingsGroup';
 import { useId } from 'react';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { formatShortcut, getShortcutBinding } from '@/shared/keyboardShortcuts';
 import { AiCommitPlan } from './AiCommitPlan';
 import { CommitMessageFields } from './CommitMessageFields';
 import type { GitStatusWithConflicts } from './types';
@@ -48,7 +50,9 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
   aiCommitMessageStyleLabel,
   openAiCommitMessageDialog,
 }) => {
-  const { t, tr } = useI18n();
+  const { t, tr, language } = useI18n();
+  const shortcuts = useKeyboardShortcuts();
+  const commitShortcut = formatShortcut(getShortcutBinding('commit', shortcuts), language, /Mac/i.test(navigator.platform)).join('+');
   const openSettings = useOpenSettingsGroup();
   const titleHintId = useId();
   const busy = fileOps.isMutating || commitForm.isCommitting || aiCommit.isAiCommitting || aiCommit.isAiJobRunning;
@@ -89,7 +93,9 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
       <div className="staging-commit-bar">
         <div className="staging-commit-options">
           <span style={{ fontSize: '0.72rem', color: hasOpenConflicts ? 'var(--status-danger)' : 'var(--text-secondary)' }}>
-            {hasOpenConflicts ? t('generated.components.staging_area.stagingcommitpanel.open_conflicts_block_commit_3da4f319') : 'Ctrl+Enter'}
+            {hasOpenConflicts
+              ? t('generated.components.staging_area.stagingcommitpanel.open_conflicts_block_commit_3da4f319')
+              : commitShortcut || tr('Kein Tastenkürzel', 'No shortcut')}
           </span>
           <label
             style={{

@@ -1,0 +1,118 @@
+.shortcuts-intro {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.shortcuts-intro > svg {
+  flex: none;
+  color: var(--text-accent);
+}
+.shortcuts-group-heading {
+  padding: 14px 0 6px;
+}
+.shortcuts-group-heading h4 {
+  color: var(--text-primary);
+  font-size: 0.77rem;
+}
+.shortcuts-group-heading p {
+  margin-top: 3px;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+.shortcut-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) minmax(0, auto);
+  align-items: center;
+  gap: 6px 20px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-subtle);
+}
+.shortcut-row--recording {
+  border-bottom-color: var(--accent-primary-border);
+}
+.shortcut-description {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 4px;
+}
+.shortcut-description strong {
+  color: var(--text-primary);
+  font-size: 0.76rem;
+  font-weight: 500;
+}
+.shortcut-description small {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+.shortcut-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  min-width: 0;
+}
+.shortcut-binding {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+}
+.shortcut-binding kbd {
+  padding: 3px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-dark);
+  box-shadow: 0 1px 0 var(--border-color);
+  color: var(--text-primary);
+  font: 0.7rem var(--font-mono);
+  white-space: nowrap;
+}
+.shortcut-unassigned {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.shortcut-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.shortcut-recorder {
+  max-width: 240px;
+  color: var(--text-accent);
+  border-color: var(--accent-primary-border);
+}
+.shortcut-recorder:focus-visible {
+  outline: 2px solid var(--accent-primary-border);
+  outline-offset: 2px;
+}
+.shortcut-row .shortcuts-error,
+.shortcut-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+.shortcuts-error {
+  color: var(--status-danger) !important;
+  overflow-wrap: anywhere;
+}
+.shortcut-status {
+  color: var(--text-secondary);
+}
+@container settings-page (max-width: 780px) {
+  .shortcut-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .shortcut-controls,
+  .shortcut-binding {
+    justify-content: flex-start;
+  }
+}

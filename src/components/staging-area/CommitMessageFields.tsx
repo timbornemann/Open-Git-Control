@@ -2,6 +2,9 @@ import { useId, useRef, type KeyboardEvent } from 'react';
 import { ActionRequirementHelp } from '@/components/ui/ActionRequirement';
 import { useI18n } from '@/i18n';
 import { COMMIT_TYPES, type CommitType } from './commitSubject';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { isShortcutSuppressed } from '@/hooks/keyboardShortcutRuntime';
+import { getShortcutBinding, matchesShortcut } from '@/shared/keyboardShortcuts';
 import type { useCommitForm } from './useCommitForm';
 
 type Props = {
@@ -14,6 +17,7 @@ type Props = {
 
 export const CommitMessageFields = ({ commitForm, disabled, hasOpenConflicts, titleRequirement, titleHintId }: Props) => {
   const { t, tr } = useI18n();
+  const shortcuts = useKeyboardShortcuts();
   const fieldId = useId();
   const messageField = useRef<HTMLTextAreaElement>(null);
   const subject = commitForm.commitSubject;
@@ -33,9 +37,10 @@ export const CommitMessageFields = ({ commitForm, disabled, hasOpenConflicts, ti
     remove: tr('Entfernung', 'Removal'),
   };
   const handleKeyDown = (event: KeyboardEvent) => {
-    if (!disabled && event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+    if (!disabled && !isShortcutSuppressed() && matchesShortcut(event.nativeEvent, getShortcutBinding('commit', shortcuts), true)) {
       event.preventDefault();
-      void commitForm.handleCommit();
+      event.stopPropagation();
+      if (!event.repeat) void commitForm.handleCommit();
     }
   };
 

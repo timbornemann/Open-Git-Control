@@ -1,6 +1,7 @@
 import { app, ipcMain } from 'electron';
 import type { AppSettings } from '../../settings';
 import { normalizeSettings } from '../../settings';
+import { validateShortcutOverrides } from '../../../src/shared/keyboardShortcuts';
 import type { StoredData } from '../repoStore';
 import { readStoreData, writeStoreData, mutateRepositoryStore } from '../repoStore';
 import type { RepositoryMutation } from '../../../src/shared/ipc/storageMaintenance';
@@ -70,6 +71,9 @@ export function registerRepoSettingsHandlers({ updaterManager, userNotesManager,
   });
 
   ipcMain.handle(IpcChannel.SettingsSet, async (_event: any, partial: Partial<AppSettings>) => {
+    if (Object.prototype.hasOwnProperty.call(partial, 'keyboardShortcuts') && validateShortcutOverrides(partial.keyboardShortcuts)) {
+      throw new Error('Invalid or conflicting keyboard shortcuts.');
+    }
     const current = readSettingsWithMigration();
     const partialWithoutSecrets = { ...partial } as Partial<AppSettings> & {
       geminiApiKey?: unknown;

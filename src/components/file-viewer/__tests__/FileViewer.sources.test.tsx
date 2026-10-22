@@ -2,6 +2,9 @@
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gitClient } from '@/services/gitClient';
+import { updateResource } from '@/data/queryClient';
+import { resourceKey } from '@/data/clientCache';
+import { DEFAULT_SETTINGS } from '@/app/state/defaultSettings';
 import {
   getDiffPreview,
   button,
@@ -19,6 +22,37 @@ import {
 beforeEach(initializeViewerMocks);
 afterEach(resetViewerMocks);
 describe('shared file viewer sources', () => {
+  it('uses live save bindings outside the code editor and ignores dialogs and disabled shortcuts', async () => {
+    const view = await renderViewer();
+    try {
+      await edit('unsaved draft');
+      await act(async () =>
+        updateResource(resourceKey('app', 'getSettings'), {
+          ...DEFAULT_SETTINGS,
+          keyboardShortcuts: { saveFile: { key: 'F8', primary: false, alt: false, shift: false } },
+        }),
+      );
+      const press = (key: string, extra = {}) =>
+        act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key, ctrlKey: true, bubbles: true, cancelable: true, ...extra })));
+      await press('s');
+      expect(gitClient.saveRepositoryFile).not.toHaveBeenCalled();
+      const dialog = document.createElement('div');
+      dialog.setAttribute('role', 'dialog');
+      document.body.append(dialog);
+      await press('F8', { ctrlKey: false });
+      dialog.remove();
+      expect(gitClient.saveRepositoryFile).not.toHaveBeenCalled();
+      await press('F8', { ctrlKey: false });
+      expect(gitClient.saveRepositoryFile).toHaveBeenCalledOnce();
+      await edit('another draft');
+      await act(async () => updateResource(resourceKey('app', 'getSettings'), { ...DEFAULT_SETTINGS, keyboardShortcuts: { saveFile: null } }));
+      await press('s');
+      await press('F8', { ctrlKey: false });
+      expect(gitClient.saveRepositoryFile).toHaveBeenCalledOnce();
+    } finally {
+      view.unmount();
+    }
+  });
   it('forwards run locations after loading and moves within a working-file draft without reloading it', async () => {
     const request = { ...viewerRequest(), position: { line: 17, column: 4 } };
     const view = await renderViewer(request);

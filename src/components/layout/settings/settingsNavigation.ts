@@ -5,6 +5,11 @@ type Translate = (de: string, en: string) => string;
 export const getSettingsCategories = (tr: Translate) => [
   { id: 'general' as const, label: tr('Allgemein', 'General'), description: tr('Darstellung und Git-Verhalten', 'Appearance and Git workflow') },
   {
+    id: 'shortcuts' as const,
+    label: tr('Tastenkürzel', 'Keyboard shortcuts'),
+    description: tr('Tastenbelegungen ansehen und ändern', 'View and change key bindings'),
+  },
+  {
     id: 'integrations' as const,
     label: tr('Konten & Server', 'Accounts & servers'),
     description: tr('Hosting-Verbindungen und Anmeldung', 'Hosting connections and sign-in'),
@@ -20,6 +25,14 @@ export const getSettingsCategories = (tr: Translate) => [
 
 export const getSettingsGroups = (tr: Translate) =>
   [
+    {
+      id: 'keyboard-shortcuts',
+      tab: 'shortcuts',
+      title: tr('Tastenkürzel', 'Keyboard shortcuts'),
+      description: tr('App-Aktionen per Tastatur ausführen und Belegungen anpassen.', 'Run app actions from the keyboard and customize bindings.'),
+      keywords:
+        'keyboard shortcuts keybindings keys hotkeys tastatur tastenkürzel tastenkuerzel tastenbelegung strg ctrl cmd navigation fetch commit speichern save todo befehlspalette command palette repository wechseln',
+    },
     {
       id: 'appearance',
       tab: 'general',

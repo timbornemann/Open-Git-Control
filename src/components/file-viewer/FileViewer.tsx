@@ -13,6 +13,9 @@ import { fileViewerIdentity, repositoryFileContext, type FileViewerRequest, type
 import { useFileDocument } from './useFileDocument';
 import { useFileNavigation } from './useFileNavigation';
 import { FileViewerContent } from './FileViewerContent';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { isShortcutSuppressed } from '@/hooks/keyboardShortcutRuntime';
+import { getShortcutBinding, matchesShortcut } from '@/shared/keyboardShortcuts';
 import '@/styles/working-directory-file-viewer.css';
 import '@/styles/diff-viewer.css';
 import '@/styles/file-viewer.css';
@@ -38,6 +41,7 @@ export function FileViewer({
   onRequestChange,
 }: FileViewerProps) {
   const { tr } = useI18n();
+  const shortcuts = useKeyboardShortcuts();
   const showToast = useAppToast();
   const [localRequest, setLocalRequest] = useState<{ original: FileViewerRequest; next: FileViewerRequest } | null>(null);
   const activeRequest = !onRequestChange && localRequest?.original === request ? localRequest.next : request;
@@ -85,14 +89,14 @@ export function FileViewer({
   useEffect(() => {
     const { dirty, save } = document;
     const listener = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+      if (!isShortcutSuppressed() && matchesShortcut(event, getShortcutBinding('saveFile', shortcuts), true)) {
         event.preventDefault();
-        if (dirty) void save();
+        if (dirty && !event.repeat) void save();
       }
     };
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
-  }, [document]);
+  }, [document, shortcuts]);
   const changeTab = (next: FileViewerTab) => {
     if (next === tab) return;
     if (next === 'diff')

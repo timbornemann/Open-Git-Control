@@ -23,6 +23,7 @@ import { useSettingsPanelModel } from './settings/useSettingsPanelModel';
 import { SettingsDiagnosticsSection } from './settings/SettingsDiagnosticsSection';
 import { SettingsStorageSection } from './settings/SettingsStorageSection';
 import { SettingsUserNotesSection } from './settings/SettingsUserNotesSection';
+import { SettingsKeyboardShortcutsSection } from './settings/SettingsKeyboardShortcutsSection';
 import { getSettingsCategories, searchSettingsGroups } from './settings/settingsNavigation';
 import { clearSettingsDestination, useSettingsNavigation } from '@/app/state/settingsNavigationStore';
 
@@ -158,6 +159,9 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
         <div hidden={searching} className="settings-category-content">
           {activeTab === 'general' && (
             <SettingsGeneralSection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" onResetLayout={onResetLayout} />
+          )}
+          {activeTab === 'shortcuts' && (
+            <SettingsKeyboardShortcutsSection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" visible={!searching} />
           )}
 
           {activeTab === 'integrations' && (

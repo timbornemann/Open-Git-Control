@@ -1,3 +1,5 @@
+import { normalizeShortcutOverrides, type ShortcutOverrides } from '../src/shared/keyboardShortcuts';
+
 export type AiProvider = 'ollama' | 'gemini' | 'openai';
 export type AiCommitMessageStyle = 'conventional' | 'plain' | 'detailed';
 export type AiCommitMessageLanguage = 'auto' | 'de' | 'en';
@@ -16,6 +18,7 @@ export type AppTheme =
 export type SecretScanStrictness = 'low' | 'medium' | 'high';
 
 export interface AppSettings {
+  keyboardShortcuts?: ShortcutOverrides;
   theme: AppTheme;
   language: 'de' | 'en';
   autoFetchIntervalMs: number;
@@ -47,6 +50,7 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  keyboardShortcuts: {},
   theme: 'copper-night',
   language: 'en',
   autoFetchIntervalMs: 60_000,
@@ -258,6 +262,7 @@ function normalizeGithubHost(value: unknown): string {
 export function normalizeSettings(input: Partial<AppSettings> | null | undefined): AppSettings {
   const value = input || {};
   return {
+    keyboardShortcuts: normalizeShortcutOverrides(value.keyboardShortcuts),
     theme: normalizeTheme(value.theme),
     language: normalizeLanguage(value.language),
     autoFetchIntervalMs: normalizeAutoFetchInterval(value.autoFetchIntervalMs),

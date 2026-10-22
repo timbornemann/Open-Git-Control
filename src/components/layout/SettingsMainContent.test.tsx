@@ -79,6 +79,22 @@ describe('SettingsMainContent AI and MCP organization', () => {
     expect(host.textContent).toContain('Enable AI auto-commit');
     expect(host.textContent).toContain('Local API');
   });
+  it.each([
+    ['en', 'Keyboard shortcuts', 'keyboard'],
+    ['de', 'Tastenkürzel', 'Tastenbelegung'],
+  ] as const)('provides the searchable shortcuts category in %s', async (language, title, query) => {
+    await render('shortcuts', language);
+    expect(host.querySelector('h2')?.textContent).toBe(title);
+    expect(host.querySelectorAll('[data-shortcut]')).toHaveLength(13);
+    const options = [...host.querySelectorAll('.settings-mobile-category option')];
+    expect(options[1].textContent).toBe(title);
+    await render('general', language);
+    changeInput(host.querySelector<HTMLInputElement>('input[type="search"]')!, query);
+    const result = host.querySelector<HTMLButtonElement>('.settings-search-result')!;
+    expect(result.textContent).toContain(title);
+    act(() => result.click());
+    expect(onSelectTab).toHaveBeenCalledWith('shortcuts');
+  });
   it('resolves an action link after the settings page mounts and focuses the exact group', async () => {
     requestSettingsDestination({ tab: 'api', id: 'ai-automation' });
     await render('general');

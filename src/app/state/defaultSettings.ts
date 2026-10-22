@@ -1,6 +1,7 @@
 import type { AppSettingsDto } from '@/types/appDtos';
 
 export const DEFAULT_SETTINGS: AppSettingsDto = {
+  keyboardShortcuts: {},
   theme: 'copper-night',
   language: 'en',
   autoFetchIntervalMs: 60_000,
