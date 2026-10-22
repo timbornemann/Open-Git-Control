@@ -14,6 +14,8 @@ type WorkingTreeSelection = {
   source: 'staged' | 'unstaged';
 };
 
+export type CommitHistoryEntry = { hash: string; diffRequest: DiffRequest | null };
+
 export type WorkingDirectoryFileSelection = {
   path: string;
   repoPath: string;
@@ -57,7 +59,9 @@ export const useMainViewInspector = ({
   );
   const [activeConflictPath, setActiveConflictPath] = useState<string | null>(null);
   const [showRecoveryCenter, setShowRecoveryCenter] = useState(false);
-  const [commitHistoryStack, setCommitHistoryStack] = useState<string[]>([]);
+  const [commitHistoryStack, setCommitHistoryStack] = useState<CommitHistoryEntry[]>([]);
+  const activeRepoRef = useRef(activeRepo);
+  activeRepoRef.current = activeRepo;
   const [workingTreeSelection, setWorkingTreeSelection] = useState<WorkingTreeSelection | null>(null);
   const [workingDirectoryFile, setWorkingDirectoryFile] = useState<WorkingDirectoryFileSelection | null>(null);
   const [isCommitInspectorOpen, setIsCommitInspectorOpen] = useState(false);
@@ -187,7 +191,11 @@ export const useMainViewInspector = ({
 
       if (selectedCommit === normalized) return;
 
-      setCommitHistoryStack((prev) => [...prev, selectedCommit]);
+      const previousDiff =
+        activeDiffRequest?.source === 'commit' && normalizeCommitHash(activeDiffRequest.commitHash) === normalizeCommitHash(selectedCommit)
+          ? activeDiffRequest
+          : null;
+      setCommitHistoryStack((prev) => [...prev, { hash: selectedCommit, diffRequest: previousDiff }]);
       setIsCommitInspectorOpen(true);
       if (onNavigateToCommit) {
         preserveNextNavigationHistoryRef.current = true;
@@ -196,7 +204,7 @@ export const useMainViewInspector = ({
         setSelectedCommit(normalized);
       }
     },
-    [onNavigateToCommit, setSelectedCommit],
+    [activeDiffRequest, onNavigateToCommit, setSelectedCommit],
   );
 
   const handleSelectWorkingTreeFile = useCallback(
@@ -271,14 +279,29 @@ export const useMainViewInspector = ({
   );
 
   const handleCommitBack = useCallback(() => {
-    setCommitHistoryStack((prev) => {
-      if (prev.length === 0) return prev;
-      const nextHash = normalizeCommitHash(prev[prev.length - 1]);
-      setIsCommitInspectorOpen(Boolean(nextHash));
-      setSelectedCommit(nextHash);
-      return prev.slice(0, -1);
+    const previous = commitHistoryStack.at(-1);
+    if (!previous) return;
+    const target =
+      previous.diffRequest && activeRepo
+        ? {
+            kind: 'file' as const,
+            path: previous.diffRequest.path,
+            identity: fileViewerIdentity(fileViewerRequestFromDiff(activeRepo, previous.diffRequest)),
+            view: 'diff' as const,
+          }
+        : { kind: 'view' as const, label: 'commit history' };
+    requestWorkingDirectoryNavigation(target, () => {
+      if (activeRepoRef.current !== activeRepo) return;
+      setCommitHistoryStack((stack) => stack.slice(0, -1));
+      setActiveConflictPath(null);
+      setWorkingDirectoryFile(null);
+      setWorkingTreeSelection(null);
+      setShowRecoveryCenter(false);
+      setIsCommitInspectorOpen(true);
+      setSelectedCommit(normalizeCommitHash(previous.hash));
+      setActiveDiffRequest(previous.diffRequest);
     });
-  }, [setSelectedCommit]);
+  }, [activeRepo, commitHistoryStack, setActiveDiffRequest, setSelectedCommit]);
 
   const closeInspector = useCallback(() => {
     requestWorkingDirectoryNavigation({ kind: 'view', label: 'graph' }, () => {

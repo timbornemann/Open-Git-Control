@@ -42,6 +42,7 @@ const renderInspector = (initialRepo: string | null) => {
       render();
     },
     onAutoOpenConflictResolverConsumed,
+    setSelectedCommit,
     unmount: () => act(() => root.unmount()),
   };
 };
@@ -60,6 +61,50 @@ afterEach(() => {
 });
 
 describe('useMainViewInspector working-directory viewer binding', () => {
+  it('restores the captured commit diff only after the navigation guard proceeds', () => {
+    const hook = renderInspector('C:/repositories/a');
+    const first = 'a'.repeat(40),
+      second = 'b'.repeat(40);
+    const original = { source: 'commit' as const, path: 'original/file.ts', commitHash: first };
+    act(() => hook.current.handleOpenDiff(original));
+    act(() => hook.current.handleSelectCommitFromHistory(second, first));
+    act(() => hook.current.handleOpenWorkingDirectoryFile('unsaved.ts'));
+    let proceed: (() => void) | undefined;
+    act(() =>
+      hook.current.setWorkingDirectoryNavigationGuard((_target, next) => {
+        proceed = next;
+      }),
+    );
+    act(() => hook.current.handleCommitBack());
+    expect(hook.current.workingDirectoryFilePath).toBe('unsaved.ts');
+    expect(hook.current.commitHistoryStack).toHaveLength(1);
+    act(() => proceed?.());
+    expect(hook.current.activeDiffRequest).toEqual(original);
+    expect(hook.current.workingDirectoryFilePath).toBeNull();
+    expect(hook.current.commitHistoryStack).toHaveLength(0);
+    expect(hook.setSelectedCommit).toHaveBeenLastCalledWith(first);
+    hook.unmount();
+  });
+
+  it('does not restore a captured diff into a different repository after a delayed guard', () => {
+    const hook = renderInspector('C:/repositories/a');
+    const first = 'a'.repeat(40),
+      second = 'b'.repeat(40);
+    act(() => hook.current.handleOpenDiff({ source: 'commit', path: 'file.ts', commitHash: first }));
+    act(() => hook.current.handleSelectCommitFromHistory(second, first));
+    let proceed: (() => void) | undefined;
+    act(() =>
+      hook.current.setWorkingDirectoryNavigationGuard((_target, next) => {
+        proceed = next;
+      }),
+    );
+    act(() => hook.current.handleCommitBack());
+    hook.rerender('C:/repositories/b');
+    act(() => proceed?.());
+    expect(hook.current.activeDiffRequest).toBeNull();
+    expect(hook.current.commitHistoryStack).toHaveLength(0);
+    hook.unmount();
+  });
   it('preserves requested editor positions through guarded navigation and removes them on repository change', () => {
     const hook = renderInspector('C:/repositories/a');
     let proceed: (() => void) | undefined;

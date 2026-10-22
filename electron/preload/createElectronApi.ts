@@ -13,6 +13,7 @@ import { createUpdaterApi } from './createUpdaterApi';
 import { createUserNotesApi } from './createUserNotesApi';
 import type { RepositoryMutation } from '../../src/shared/ipc/storageMaintenance';
 import type { PreviewSnapshot, ReadRequest } from '../../src/shared/cache/resource';
+import type { FileHistoryOptionsDto } from '../../src/shared/ipc/fileHistory';
 import type { IpcRenderer, IpcRendererEvent } from 'electron';
 import { IpcChannel } from '../../src/types/ipcContract';
 import type { ElectronAPI, ElectronFlatAPI } from '../../src/shared/ipc/contracts/electronApi';
@@ -232,10 +233,10 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => ipcRenderer.invoke(IpcChannel.GitClone, cloneUrl, targetDir, targetName),
     gitInit: (repoPath: string, options?: RepositoryInitializationOptionsDto) =>
       invokeGitOperationForRepo(repoPath, 'init', IpcChannel.GitInit, repoPath, options),
-    getFileHistory: (filePath: string, commitHash?: string, limit?: number, repoPath?: string) =>
+    getFileHistory: (filePath: string, commitHash?: string, limit?: number, repoPath?: string, options?: FileHistoryOptionsDto) =>
       repoPath
-        ? invokeGitOperationForRepo(repoPath, 'log', IpcChannel.GitFileHistory, filePath, commitHash, limit, repoPath)
-        : invokeGitOperation('log', IpcChannel.GitFileHistory, filePath, commitHash, limit),
+        ? invokeGitOperationForRepo(repoPath, 'log', IpcChannel.GitFileHistory, filePath, commitHash, limit, repoPath, ...(options ? [options] : []))
+        : invokeGitOperation('log', IpcChannel.GitFileHistory, filePath, commitHash, limit, ...(options ? [undefined, options] : [])),
     getFileBlame: (filePath: string, commitHash?: string, repoPath?: string, source?: 'staged' | 'unstaged') =>
       repoPath
         ? invokeGitOperationForRepo(repoPath, 'blame', IpcChannel.GitFileBlame, filePath, commitHash, repoPath, source)

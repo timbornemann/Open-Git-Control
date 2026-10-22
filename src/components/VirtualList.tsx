@@ -10,6 +10,7 @@ type VirtualListProps<T> = {
   className?: string;
   fillAvailableHeight?: boolean;
   focusRequest?: { index: number; id: number };
+  scrollRequest?: { index: number; id: React.Key };
 };
 
 export const calculateVirtualRange = (itemCount: number, scrollTop: number, viewportHeight: number, rowHeight: number, overscan: number) => {
@@ -31,12 +32,14 @@ export function VirtualList<T>({
   className,
   fillAvailableHeight = false,
   focusRequest,
+  scrollRequest,
 }: VirtualListProps<T>) {
   const [scrollTop, setScrollTop] = useState(0);
   const [availableHeight, setAvailableHeight] = useState(rowHeight);
   const listRef = useRef<HTMLDivElement>(null);
   const acceptedFocus = useRef<number | null>(null);
   const pendingFocus = useRef<number | null>(null);
+  const acceptedScroll = useRef<React.Key | null>(null);
   const viewportHeight = fillAvailableHeight ? Math.max(1, availableHeight) : Math.min(maxHeight, Math.max(rowHeight, items.length * rowHeight));
 
   useEffect(() => {
@@ -73,6 +76,20 @@ export function VirtualList<T>({
 
   const { startIndex, endIndex } = calculateVirtualRange(items.length, scrollTop, viewportHeight, rowHeight, overscan);
   const visibleItems = useMemo(() => items.slice(startIndex, endIndex), [endIndex, items, startIndex]);
+
+  useEffect(() => {
+    if (!scrollRequest) {
+      acceptedScroll.current = null;
+      return;
+    }
+    if (acceptedScroll.current === scrollRequest.id || !listRef.current) return;
+    acceptedScroll.current = scrollRequest.id;
+    if (scrollRequest.index < 0 || scrollRequest.index >= items.length) return;
+    const rowTop = scrollRequest.index * rowHeight;
+    const nextTop = rowTop < scrollTop ? rowTop : rowTop + rowHeight > scrollTop + viewportHeight ? rowTop + rowHeight - viewportHeight : scrollTop;
+    listRef.current.scrollTop = nextTop;
+    setScrollTop(nextTop);
+  }, [items.length, rowHeight, scrollRequest, scrollTop, viewportHeight]);
 
   useEffect(() => {
     if (!focusRequest) {

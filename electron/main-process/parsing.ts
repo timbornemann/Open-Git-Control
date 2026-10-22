@@ -6,6 +6,7 @@ export interface FileHistoryEntry {
   author: string;
   date: string;
   subject: string;
+  path?: string;
 }
 
 export interface FileBlameLine {
@@ -41,33 +42,44 @@ export const RELEASE_COMMIT_FORMAT = '--format=%H%x1f%h%x1f%s%x1f%an%x1f%aI%x1f%
 export function parseFileHistory(logOutput: string): FileHistoryEntry[] {
   if (!logOutput) return [];
 
-  return logOutput
-    .split('\x00')
-    .map((record) => record.replace(/^\r?\n/, '').trim())
-    .filter(Boolean)
-    .map((record) => {
-      let parts = record.split('\x1f');
-      if (parts.length < 5 && record.includes('\\x1f')) {
-        parts = record.split('\\x1f');
-      }
-      if (parts.length < 5 && record.includes('|')) {
-        parts = record.split('|');
-      }
+  const records = logOutput.split('\x00');
+  const entries: FileHistoryEntry[] = [];
+  let current: FileHistoryEntry | undefined;
+  for (let index = 0; index < records.length; index++) {
+    const record = records[index].replace(/^\r?\n/, '').trim();
+    if (!record) continue;
 
-      const [hashRaw = '', abbrevRaw = '', authorRaw = '', dateRaw = '', ...subjectRest] = parts;
-      const hash = hashRaw.trim();
-      if (!/^[0-9a-f]{7,64}$/i.test(hash)) {
-        return null;
-      }
+    // --name-status -z emits one path for ordinary changes and old/new paths
+    // for renames. Consume these as raw tokens: whitespace and separators in
+    // filenames must never be trimmed or interpreted as commit headers.
+    if (current && /^[ACDMRTUXB](?:\d+)?$/.test(record)) {
+      const firstPath = records[++index];
+      const path = /^[RC]/.test(record) ? records[++index] : firstPath;
+      if (path && !current.path) current.path = path;
+      continue;
+    }
 
-      const abbrevHash = (abbrevRaw || '').trim() || hash.slice(0, 8);
-      const author = (authorRaw || '').trim();
-      const date = (dateRaw || '').trim();
-      const subject = subjectRest.join('|').trim();
+    let parts = record.split('\x1f');
+    if (parts.length < 5 && record.includes('\\x1f')) {
+      parts = record.split('\\x1f');
+    }
+    if (parts.length < 5 && record.includes('|')) {
+      parts = record.split('|');
+    }
 
-      return { hash, abbrevHash, author, date, subject };
-    })
-    .filter((entry): entry is FileHistoryEntry => Boolean(entry));
+    const [hashRaw = '', abbrevRaw = '', authorRaw = '', dateRaw = '', ...subjectRest] = parts;
+    const hash = hashRaw.trim();
+    if (parts.length < 5 || !/^[0-9a-f]{7,64}$/i.test(hash)) continue;
+
+    const abbrevHash = (abbrevRaw || '').trim() || hash.slice(0, 8);
+    const author = (authorRaw || '').trim();
+    const date = (dateRaw || '').trim();
+    const subject = subjectRest.join('|').trim();
+
+    current = { hash, abbrevHash, author, date, subject };
+    entries.push(current);
+  }
+  return entries;
 }
 
 export function parseFileBlame(blameOutput: string): FileBlameLine[] {

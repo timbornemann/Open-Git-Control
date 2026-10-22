@@ -11,13 +11,15 @@ interface CommitDetailsProps {
   hash: string;
   onSelectCommit?: (hash: string) => void;
   onOpenDiff?: (request: DiffRequest) => void;
+  activeDiffRequest?: DiffRequest | null;
+  refreshTrigger?: number;
 }
 
 export { extractCommitDescription } from './useCommitDetailsData';
 
-export const CommitDetails: React.FC<CommitDetailsProps> = ({ repoPath, hash, onSelectCommit, onOpenDiff }) => {
+export const CommitDetails: React.FC<CommitDetailsProps> = ({ repoPath, hash, onSelectCommit, onOpenDiff, activeDiffRequest, refreshTrigger }) => {
   const { t } = useI18n();
-  const details = useCommitDetailsData({ repoPath, hash, onOpenDiff });
+  const details = useCommitDetailsData({ repoPath, hash, onOpenDiff, onSelectCommit, activeDiffRequest, refreshTrigger });
   const { commitDescription, files, filesError, filesSourceHint, isMergeCommit, loadingFiles, normalizedHash, selectedFile } = details;
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(() => new Set());
   useLayoutEffect(() => setCollapsedPaths(new Set()), [repoPath, normalizedHash]);
@@ -45,7 +47,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ repoPath, hash, on
           <CommitFileDetails
             repoPath={repoPath}
             details={details}
-            onSelectCommit={onSelectCommit}
+            onSelectCommit={onSelectCommit ? details.selectFileCommit : undefined}
             onClose={() => {
               details.setSelectedFilePath(null);
               details.setSelectedFileCommitHash(null);
@@ -60,6 +62,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ repoPath, hash, on
                 files={files}
                 collapsedPaths={collapsedPaths}
                 selectedFilePath={selectedFile?.path}
+                revealFilePath={details.revealFilePath}
                 onToggleDirectory={(path) =>
                   setCollapsedPaths((current) => {
                     const next = new Set(current);

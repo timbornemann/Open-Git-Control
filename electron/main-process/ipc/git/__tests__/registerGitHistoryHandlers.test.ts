@@ -37,6 +37,20 @@ describe('registerGitHistoryHandlers through registerGitHandlers', () => {
     });
   };
 
+  it('forwards complete history options and preserves historical paths in the response', async () => {
+    const hash = 'a'.repeat(40);
+    const read = vi.fn().mockResolvedValue(`${hash}\x1faaaaaaaa\x1fAuthor\x1f2026-10-22\x1fchange\0\nM\0old/ file.ts\0`);
+    register({ getRepoPath: () => 'C:/repo', history: { getFileHistory: read } });
+    const handler = handlers.get(IpcChannel.GitFileHistory)!;
+    const result = await handler({}, 'old/ file.ts', hash, 81, 'C:/repo', { includeFuture: true, offset: 80 });
+    expect(read).toHaveBeenCalledExactlyOnceWith('old/ file.ts', 81, hash, 'C:/repo', { includeFuture: true, offset: 80 });
+    expect(result.data[0]).toMatchObject({ hash, path: 'old/ file.ts' });
+    for (const options of [{ offset: -1 }, { offset: Number.NaN }, { includeFuture: 'yes' }, []]) {
+      expect(await handler({}, 'file.ts', hash, 81, 'C:/repo', options)).toMatchObject({ success: false });
+    }
+    expect(read).toHaveBeenCalledTimes(1);
+  });
+
   it('forwards the captured timeline commit and rejects untrusted revision arguments', async () => {
     const gitService = { getRepoPath: vi.fn(() => 'C:/repo'), history: { getFileTimelineData: vi.fn().mockResolvedValue([]) } };
     register(gitService);

@@ -8,6 +8,7 @@ import type { DiffRequest } from '@/types/diff';
 import type { WorkingTreeState } from '@/hooks/useWorkingTreeSnapshot';
 import { INSPECTOR_PANE_MIN_WIDTH } from '@/components/layout/hooks/useMainViewPaneResizer';
 import { WorkingDirectoryTree } from '@/components/working-directory/WorkingDirectoryTree';
+import type { CommitHistoryEntry } from '../hooks/useMainViewInspector';
 
 type WorkingTreeSelection = {
   path: string;
@@ -18,7 +19,8 @@ type MainInspectorPaneProps = {
   isContentResizing: boolean;
   onContentResizeStart: (event: React.PointerEvent<HTMLDivElement>) => void;
   workingTree: WorkingTreeState;
-  commitHistoryStack: string[];
+  commitHistoryStack: CommitHistoryEntry[];
+  activeDiffRequest: DiffRequest | null;
   workingTreeSelection: WorkingTreeSelection | null;
   isCommitInspectorOpen: boolean;
   handleOpenDiff: (request: DiffRequest) => void;
@@ -42,6 +44,7 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
   onContentResizeStart,
   workingTree,
   commitHistoryStack,
+  activeDiffRequest,
   workingTreeSelection,
   isCommitInspectorOpen,
   handleOpenDiff,
@@ -125,6 +128,8 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
             <CommitDetails
               repoPath={workingTree.dataRepoPath}
               hash={repository.selectedCommit}
+              activeDiffRequest={activeDiffRequest}
+              refreshTrigger={repository.refreshTrigger}
               onSelectCommit={(hash) => handleSelectCommitFromHistory(hash, repository.selectedCommit)}
               onOpenDiff={handleOpenDiff}
             />

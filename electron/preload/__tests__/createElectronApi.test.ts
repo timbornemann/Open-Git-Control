@@ -3,6 +3,17 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { createElectronApi } from '../createElectronApi';
 
 describe('createElectronApi', () => {
+  it('forwards complete file-history scope and pagination through both API namespaces', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true, data: [] });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+    const hash = 'a'.repeat(40);
+    await api.git.getFileHistory('old/file.ts', hash, 81, 'C:/repo', { includeFuture: true });
+    await api.getFileHistory('new/file.ts', hash, 81, undefined, { offset: 80 });
+    expect(invoke.mock.calls).toEqual([
+      [IpcChannel.GitFileHistory, 'old/file.ts', hash, 81, 'C:/repo', { includeFuture: true }],
+      [IpcChannel.GitFileHistory, 'new/file.ts', hash, 81, undefined, { offset: 80 }],
+    ]);
+  });
   it('exposes planner work operations in both namespaces', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

@@ -65,6 +65,25 @@ describe('main-process parsing helpers', () => {
     expect(parsed[0].subject).toBe('message');
   });
 
+  it('keeps the destination path of each history entry across renames and deletions', () => {
+    const header = (hash: string) => `${hash.repeat(40)}\x1f${hash.repeat(8)}\x1fAuthor\x1f2026-10-22\x1fsubject\x00`;
+    const raw = `${header('a')}\nD\x00new/file.ts\x00\x00${header('b')}\nR100\x00old/file.ts\x00new/file.ts\x00\x00${header('c')}\nM\x00old/file.ts\x00`;
+    expect(parseFileHistory(raw).map(({ hash, path }) => ({ hash, path }))).toEqual([
+      { hash: 'a'.repeat(40), path: 'new/file.ts' },
+      { hash: 'b'.repeat(40), path: 'new/file.ts' },
+      { hash: 'c'.repeat(40), path: 'old/file.ts' },
+    ]);
+  });
+
+  it('preserves raw history filenames and does not interpret filenames as commit metadata', () => {
+    const path = '\n leading\tname\\with\x1fseparators ';
+    const hash = 'a'.repeat(40);
+    const header = `${hash}\x1faaaaaaaa\x1fAuthor\x1f2026-10-22\x1fsubject\x00`;
+    expect(parseFileHistory(`${header}\nR100\x00${hash}\x00${path}\x00`)).toEqual([
+      { hash, abbrevHash: 'aaaaaaaa', author: 'Author', date: '2026-10-22', subject: 'subject', path },
+    ]);
+  });
+
   it('parses SHA-256 file history and blame records', () => {
     const hash = 'a'.repeat(64);
     const history = parseFileHistory(`${hash}\x1f${hash.slice(0, 12)}\x1fTim\x1f2026-07-10\x1fsha256 history\x00`);

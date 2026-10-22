@@ -103,6 +103,7 @@ export function isImmutableGitRead(method: string, args: unknown[]): boolean {
       sha(command[3])
     );
   }
+  if (method === 'getFileHistory' && (args[4] as { includeFuture?: boolean } | undefined)?.includeFuture) return false;
   if (['getFileHistory', 'getFileBlame', 'getFileBlameRange'].includes(method)) return sha(args[1]);
   const commandIndex = method === 'runGitCommandForRepo' ? 1 : 0;
   return ['show', 'commitDetails'].includes(String(args[commandIndex])) && args.slice(commandIndex + 1).some(sha);

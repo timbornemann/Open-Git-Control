@@ -211,3 +211,8 @@
 .file-blame-panel__more {
   margin: 8px;
 }
+
+.file-history-panel__more {
+  align-self: flex-start;
+  margin-top: 10px;
+}

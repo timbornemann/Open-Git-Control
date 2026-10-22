@@ -14,9 +14,10 @@ type Props = {
   onToggleDirectory: (path: string) => void;
   onSelectFile: (file: CommitFileDetail) => void;
   selectedFilePath?: string | null;
+  revealFilePath?: string | null;
 };
 
-export function CommitFileTree({ repoPath, files, collapsedPaths, onToggleDirectory, onSelectFile, selectedFilePath }: Props) {
+export function CommitFileTree({ repoPath, files, collapsedPaths, onToggleDirectory, onSelectFile, selectedFilePath, revealFilePath }: Props) {
   const { tr } = useI18n();
   const nodes = useMemo(() => buildCommitFileTree(files), [files]);
   const rows = useMemo(() => commitFileTreeRows(nodes, collapsedPaths), [nodes, collapsedPaths]);
@@ -46,6 +47,9 @@ export function CommitFileTree({ repoPath, files, collapsedPaths, onToggleDirect
         fillAvailableHeight
         overscan={10}
         focusRequest={focusRequest}
+        scrollRequest={
+          revealFilePath ? { index: rows.findIndex(({ node }) => node.kind === 'file' && node.path === revealFilePath), id: revealFilePath } : undefined
+        }
         getKey={({ node }) => node.key}
         renderItem={({ node, isLast, ancestorIsLast }, index) => {
           const open = node.kind === 'directory' && !collapsedPaths.has(node.path);

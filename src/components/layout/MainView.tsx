@@ -193,6 +193,7 @@ const MainViewComponent: React.FC = () => {
             onContentResizeStart={handleContentResizeStart}
             workingTree={workingTree}
             commitHistoryStack={commitHistoryStack}
+            activeDiffRequest={activeDiffRequest}
             workingTreeSelection={workingTreeSelection}
             onOpenWorkingDirectoryFile={handleOpenWorkingDirectoryFile}
             workingDirectoryFilePath={workingDirectoryFilePath}

@@ -73,7 +73,7 @@ describe('historical commit file tree integration', () => {
     expect(host.querySelector('.commit-file-details__path')?.textContent).toBe('Repository root');
     expect(host.querySelector('.commit-file-details__status')?.textContent).toBe('Added');
     expect([...host.querySelectorAll('.commit-file-details__tab')].map((tab) => tab.textContent)).toEqual(['History', 'Blame']);
-    expect(gitClient.getFileHistory).toHaveBeenCalledWith('README.md', firstHash, 80, 'C:/repos/project');
+    expect(gitClient.getFileHistory).toHaveBeenCalledWith('README.md', firstHash, 81, 'C:/repos/project', { includeFuture: true });
     await click(host.querySelector<HTMLButtonElement>('button[aria-label="Close file details"]')!);
     expect(host.querySelector('.commit-file-details')).toBeNull();
     expect(content.children).toHaveLength(1);
@@ -145,7 +145,7 @@ describe('historical commit file tree integration', () => {
     expect(host.querySelector('.commit-file-details__previous-path')?.textContent).toContain('old/file.ts');
     expect(host.querySelector('.commit-file-details__status')?.textContent).toBe('Renamed');
     expect(onOpenDiff).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ source: 'commit', path, commitHash: firstHash }));
-    expect(gitClient.getFileHistory).toHaveBeenCalledWith(path, firstHash, 80, 'C:/repos/project');
+    expect(gitClient.getFileHistory).toHaveBeenCalledWith(path, firstHash, 81, 'C:/repos/project', { includeFuture: true });
     onOpenDiff.mockClear();
     await click(button('Blame'));
     expect(gitClient.getFileBlameRange).toHaveBeenCalledWith(path, firstHash, 1, expect.any(Number), 'C:/repos/project');
@@ -204,6 +204,7 @@ describe('historical commit file tree integration', () => {
     expect(historyEntry.querySelector('time')?.getAttribute('datetime')).toBe(date);
     await click(historyEntry);
     expect(onSelectCommit).toHaveBeenLastCalledWith(firstHash);
+    expect(onOpenDiff).toHaveBeenCalledTimes(2);
     await click(button('Blame'));
     expect(button('Blame').getAttribute('aria-pressed')).toBe('true');
     expect(host.querySelector('.file-blame-line__author')?.textContent).toBe('Other author');
@@ -211,7 +212,7 @@ describe('historical commit file tree integration', () => {
     await click(host.querySelector<HTMLButtonElement>('.file-blame-line__commit')!);
     expect(onSelectCommit).toHaveBeenLastCalledWith(secondHash);
     await click(button('History'));
-    expect(onOpenDiff).toHaveBeenCalledTimes(1);
+    expect(onOpenDiff).toHaveBeenCalledTimes(2);
   });
 
   it('localizes file details and keeps deleted-file blame protection', async () => {

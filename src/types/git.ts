@@ -41,6 +41,8 @@ export type GitFileHistoryEntryDto = {
   author: string;
   date: string;
   subject: string;
+  /** Repository-relative path at this commit, including the destination of a rename. */
+  path?: string;
 };
 
 export type GitFileBlameLineDto = {

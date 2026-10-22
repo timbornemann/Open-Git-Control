@@ -12,7 +12,9 @@ type FileHistoryPanelProps = {
   formatRelativeDate?: (dateString: string) => string;
   intro?: string;
   currentHash?: string | null;
-  onSelectCommit?: (hash: string) => void;
+  onSelectCommit?: (hash: string, path?: string) => void;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
 };
 
 const normalizeCommitHash = (value: string): string => extractGitObjectId(value) || '';
@@ -26,6 +28,8 @@ export const FileHistoryPanel: React.FC<FileHistoryPanelProps> = ({
   intro,
   currentHash,
   onSelectCommit,
+  hasMore,
+  onLoadMore,
 }) => {
   const { t, tr } = useI18n();
 
@@ -53,7 +57,7 @@ export const FileHistoryPanel: React.FC<FileHistoryPanelProps> = ({
             type="button"
             key={`${entry.hash}-${entry.subject}`}
             className={`file-history-entry${isCurrentCommit ? ' is-current' : ''}`}
-            onClick={() => normalizedEntryHash && onSelectCommit?.(normalizedEntryHash)}
+            onClick={() => normalizedEntryHash && onSelectCommit?.(normalizedEntryHash, entry.path)}
             title={
               onSelectCommit && normalizedEntryHash
                 ? tr(`Commit ${normalizedEntryHash.slice(0, 8)} öffnen`, `Open commit ${normalizedEntryHash.slice(0, 8)}`)
@@ -76,6 +80,11 @@ export const FileHistoryPanel: React.FC<FileHistoryPanelProps> = ({
           </button>
         );
       })}
+      {hasMore && onLoadMore && (
+        <button type="button" className="staging-tool-btn file-history-panel__more" onClick={() => void onLoadMore()} disabled={loading}>
+          {loading ? tr('Laden …', 'Loading…') : tr('Weitere Commits laden', 'Load more commits')}
+        </button>
+      )}
     </div>
   );
 };

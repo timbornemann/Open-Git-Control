@@ -12,7 +12,7 @@ import type { useCommitDetailsData } from './useCommitDetailsData';
 type Props = {
   repoPath: string | null;
   details: ReturnType<typeof useCommitDetailsData>;
-  onSelectCommit?: (hash: string) => void;
+  onSelectCommit?: (hash: string, path?: string) => void;
   onClose: () => void;
 };
 
@@ -154,11 +154,13 @@ export function CommitFileDetails({ repoPath, details, onSelectCommit, onClose }
             entries={details.historyEntries}
             loading={details.historyLoading}
             error={details.historyError}
+            hasMore={details.historyHasMore}
+            onLoadMore={details.loadMoreHistory}
             formatDate={details.formatDate}
             formatRelativeDate={details.formatRelativeDate}
             intro={tr(
-              'Änderungen bis zu diesem Commit. Eintrag anklicken, um den Commit zu öffnen.',
-              'Changes up to this commit. Select an entry to open the commit.',
+              'Dateiverlauf inklusive neuerer Commits. Eintrag anklicken, um die Änderung zu öffnen.',
+              'File history including newer commits. Select an entry to open the change.',
             )}
             currentHash={details.normalizedHash}
             onSelectCommit={onSelectCommit}

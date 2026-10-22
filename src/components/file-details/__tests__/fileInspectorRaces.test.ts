@@ -88,9 +88,9 @@ describe('file inspector request generations', () => {
       state?.setSelectedFileCommitHash(commitHash);
       state?.setSelectedFilePath('a.ts');
     });
-    await vi.waitFor(() => expect(gitClient.getFileHistory).toHaveBeenCalledWith('a.ts', commitHash, 80, repoPath));
+    await vi.waitFor(() => expect(gitClient.getFileHistory).toHaveBeenCalledWith('a.ts', commitHash, 81, repoPath, { includeFuture: true }));
     act(() => state?.setSelectedFilePath('b.ts'));
-    await vi.waitFor(() => expect(gitClient.getFileHistory).toHaveBeenCalledWith('b.ts', commitHash, 80, repoPath));
+    await vi.waitFor(() => expect(gitClient.getFileHistory).toHaveBeenCalledWith('b.ts', commitHash, 81, repoPath, { includeFuture: true }));
 
     await act(async () => {
       b.resolve({ success: true, data: [{ hash: 'b'.repeat(40), abbrevHash: 'bbbbbbb', author: 'B', date: '', subject: 'history-b' }] });

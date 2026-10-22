@@ -2,6 +2,7 @@ import type { ElectronRepositorySecretScanAllowlistAPI } from './repositorySecre
 import type { RepositoryAnalyticsApi } from '../repositoryAnalytics';
 import type { WorkingTreeWatchApi } from '../workingTreeWatch';
 import type { ReadRequest } from '../../cache/resource';
+import type { FileHistoryOptionsDto } from '../fileHistory';
 import type { GitLfsApi } from '../gitLfs';
 import type { BranchCleanupApi } from '../branchCleanup';
 import type { BranchChangeApi } from '../branchChange';
@@ -290,7 +291,13 @@ export interface ElectronGitAPI
   cancelSecretScan: (repoPath: string) => Promise<{ success: boolean; cancelled: boolean; error?: string }>;
   gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => Promise<GitCloneResultDto>;
   gitInit: (repoPath: string, options?: RepositoryInitializationOptionsDto) => Promise<GitInitResultDto>;
-  getFileHistory: (filePath: string, commitHash?: string, limit?: number, repoPath?: string) => Promise<IpcResult<GitFileHistoryEntryDto[]>>;
+  getFileHistory: (
+    filePath: string,
+    commitHash?: string,
+    limit?: number,
+    repoPath?: string,
+    options?: FileHistoryOptionsDto,
+  ) => Promise<IpcResult<GitFileHistoryEntryDto[]>>;
   getFileBlame: (filePath: string, commitHash?: string, repoPath?: string, source?: FileBlameSourceDto) => Promise<IpcResult<GitFileBlameLineDto[]>>;
   getFileTimelineData: (limit?: number, repoPath?: string, commitHash?: string) => Promise<IpcResult<FileTimelineCommitDto[]>>;
   readRepoFile: (filePath: string, repoPath?: string) => Promise<RepoFileReadResultDto>;

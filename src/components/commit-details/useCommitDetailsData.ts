@@ -1,14 +1,14 @@
 import { useBlamePreview } from '@/data/useBlamePreview';
 import { useResourceState } from '@/data/resourceHooks';
 import { loadCommitOverview, EMPTY_COMMIT_OVERVIEW } from '@/data/commitDetails';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
-import type { GitFileHistoryEntryDto } from '@/types/git';
 import { useI18n } from '@/i18n';
 import { extractGitObjectId } from '@/utils/gitObjectId';
 import { gitClient } from '@/services/gitClient';
 import { BLAME_LOOKAHEAD_COUNT, splitBlamePage } from '../file-details/blamePagination';
 import type { CommitFileDetail } from '@/utils/gitParsing';
+import { useCommitFileHistory } from './useCommitFileHistory';
 
 export type DetailsTab = 'history' | 'blame';
 
@@ -16,6 +16,9 @@ type Params = {
   repoPath: string | null;
   hash: string;
   onOpenDiff?: (request: DiffRequest) => void;
+  onSelectCommit?: (hash: string) => void;
+  activeDiffRequest?: DiffRequest | null;
+  refreshTrigger?: number;
 };
 
 export const extractCommitDescription = (message: string): string => {
@@ -28,7 +31,7 @@ export const extractCommitDescription = (message: string): string => {
   return bodyLines.join('\n');
 };
 
-export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => {
+export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff, onSelectCommit, activeDiffRequest, refreshTrigger = 0 }: Params) => {
   const { t, tr, locale } = useI18n();
 
   const normalizedHash = useMemo(() => {
@@ -44,16 +47,8 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
     : null;
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [selectedFileCommitHash, setSelectedFileCommitHash] = useState<string | null>(null);
+  const [revealFilePath, setRevealFilePath] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DetailsTab>('history');
-
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState<string | null>(null);
-  const [historyEntries, setHistoryEntries, hasHistory] = useResourceState<GitFileHistoryEntryDto[]>(
-    'git',
-    'getFileHistory',
-    [selectedFilePath, normalizedHash, 80, repoPath],
-    [],
-  );
 
   const [blameLoading, setBlameLoading] = useState(false);
   const [blameError, setBlameError] = useState<string | null>(null);
@@ -71,22 +66,27 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
   // view of a different commit.
   const requestGenerationRef = useRef(0);
   const fileRequestGenerationRef = useRef(0);
+  const pendingFileCommitRef = useRef<{ repoPath: string | null; fromHash: string; hash: string; path: string; arrived?: boolean } | null>(null);
+  const restoredDiffRef = useRef<string | null>(null);
 
   useLayoutEffect(() => {
     requestGenerationRef.current += 1;
+    const pending = pendingFileCommitRef.current;
+    if (pending && (pending.repoPath !== repoPath || (pending.hash !== normalizedHash && (pending.fromHash !== normalizedHash || pending.arrived)))) {
+      pendingFileCommitRef.current = null;
+    }
+    if (pending?.hash === normalizedHash) pending.arrived = true;
     setLoadingFiles(false);
     setFilesError(null);
     setSelectedFilePath(null);
     setSelectedFileCommitHash(null);
+    setRevealFilePath(null);
     setActiveTab('history');
-    setHistoryError(null);
     setBlameError(null);
   }, [normalizedHash, repoPath]);
 
   useLayoutEffect(() => {
     fileRequestGenerationRef.current += 1;
-    setHistoryLoading(false);
-    setHistoryError(null);
     setBlameLoading(false);
     setBlameError(null);
   }, [normalizedHash, repoPath, selectedFileCommitHash, selectedFilePath]);
@@ -115,37 +115,7 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
     [files, normalizedHash, selectedFileCommitHash, selectedFilePath],
   );
   const isDeletedFile = selectedFile?.status.startsWith('D') ?? false;
-
-  useEffect(() => {
-    if (!repoPath || !selectedFile || !gitClient.isAvailable()) return;
-
-    const generation = fileRequestGenerationRef.current;
-    const isCurrent = () => fileRequestGenerationRef.current === generation;
-
-    const fetchHistory = async () => {
-      if (activeTab !== 'history') return;
-
-      setHistoryLoading(!hasHistory);
-      setHistoryError(null);
-      try {
-        const result = await gitClient.getFileHistory(selectedFile.path, normalizedHash, 80, repoPath);
-        if (!isCurrent()) return;
-        if (result.success) {
-          setHistoryEntries(result.data || []);
-        } else {
-          setHistoryError(result.error || t('generated.components.commitdetails.could_not_load_file_history_4fb3f0d4'));
-        }
-      } catch (fetchError) {
-        if (!isCurrent()) return;
-        console.error(fetchError);
-        setHistoryError(t('generated.components.commitdetails.could_not_load_file_history_4fb3f0d4'));
-      } finally {
-        if (isCurrent()) setHistoryLoading(false);
-      }
-    };
-
-    fetchHistory();
-  }, [activeTab, normalizedHash, repoPath, selectedFile, t, setHistoryEntries, hasHistory]);
+  const history = useCommitFileHistory(repoPath, selectedFile?.path, normalizedHash, activeTab === 'history', refreshTrigger);
 
   useEffect(() => {
     if (!repoPath || !selectedFile || !gitClient.isAvailable()) return;
@@ -205,21 +175,73 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
     }
   };
 
-  const openFileDiff = (path: string) => {
-    if (!normalizedHash) return;
-    onOpenDiff?.({
-      source: 'commit',
-      path,
-      commitHash: normalizedHash,
-      title: tr(`Commit Diff ${normalizedHash.slice(0, 8)}`, `Commit diff ${normalizedHash.slice(0, 8)}`),
-    });
+  const openFileDiff = useCallback(
+    (path: string) => {
+      if (!normalizedHash) return;
+      onOpenDiff?.({
+        source: 'commit',
+        path,
+        commitHash: normalizedHash,
+        title: tr(`Commit Diff ${normalizedHash.slice(0, 8)}`, `Commit diff ${normalizedHash.slice(0, 8)}`),
+      });
+    },
+    [normalizedHash, onOpenDiff, tr],
+  );
+
+  const selectFile = useCallback(
+    (file: CommitFileDetail) => {
+      pendingFileCommitRef.current = null;
+      setRevealFilePath(null);
+      setSelectedFilePath(file.path);
+      setSelectedFileCommitHash(normalizedHash);
+      openFileDiff(file.path);
+    },
+    [normalizedHash, openFileDiff],
+  );
+
+  const selectFileCommit = (hash: string, path = selectedFile?.path) => {
+    const targetHash = extractGitObjectId(hash);
+    if (!targetHash || !path || !onSelectCommit) return;
+    if (targetHash === normalizedHash) {
+      const file = files.find((file) => file.path === path) || files.find((file) => file.oldPath === path);
+      if (file) selectFile(file);
+    } else {
+      pendingFileCommitRef.current = { repoPath, fromHash: normalizedHash, hash: targetHash, path };
+    }
+    onSelectCommit(targetHash);
   };
 
-  const selectFile = (file: CommitFileDetail) => {
+  useEffect(() => {
+    const pending = pendingFileCommitRef.current;
+    if (!pending || pending.repoPath !== repoPath || pending.hash !== normalizedHash) return;
+    if (filesError) {
+      pendingFileCommitRef.current = null;
+      return;
+    }
+    if (loadingFiles || !hasOverview) return;
+    pendingFileCommitRef.current = null;
+    const file = files.find((file) => file.path === pending.path) || files.find((file) => file.oldPath === pending.path);
+    if (file) {
+      selectFile(file);
+      setRevealFilePath(file.path);
+    }
+  }, [files, filesError, hasOverview, loadingFiles, normalizedHash, repoPath, selectFile]);
+
+  useEffect(() => {
+    if (activeDiffRequest?.source !== 'commit' || extractGitObjectId(activeDiffRequest.commitHash) !== normalizedHash) {
+      restoredDiffRef.current = null;
+      return;
+    }
+    const identity = JSON.stringify([repoPath, normalizedHash, activeDiffRequest.path]);
+    if (restoredDiffRef.current === identity || loadingFiles || !hasOverview || filesError) return;
+    restoredDiffRef.current = identity;
+    const file = files.find((file) => file.path === activeDiffRequest.path);
+    if (!file || selectedFile?.path === file.path) return;
+    pendingFileCommitRef.current = null;
     setSelectedFilePath(file.path);
     setSelectedFileCommitHash(normalizedHash);
-    openFileDiff(file.path);
-  };
+    setRevealFilePath(file.path);
+  }, [activeDiffRequest, files, filesError, hasOverview, loadingFiles, normalizedHash, repoPath, selectedFile?.path]);
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '-';
@@ -277,16 +299,20 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
     formatBlameDate,
     formatDate,
     formatRelativeDate,
-    historyEntries,
-    historyError,
-    historyLoading: historyLoading || Boolean(selectedFile && activeTab === 'history' && !hasHistory && !historyError),
+    historyEntries: history.entries,
+    historyError: history.error,
+    historyLoading: history.loading,
+    historyHasMore: history.hasMore,
+    loadMoreHistory: history.loadMore,
     isDeletedFile,
     isMergeCommit,
     loadMoreBlame,
     loadingFiles: loadingFiles || Boolean(normalizedHash && repoPath && !hasOverview && !filesError),
     normalizedHash,
+    revealFilePath,
     selectedFile,
     selectFile,
+    selectFileCommit,
     setActiveTab,
     setSelectedFileCommitHash,
     setSelectedFilePath,

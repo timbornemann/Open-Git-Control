@@ -1,5 +1,7 @@
 import { normalizeRepositoryRelativePath, toLiteralPathspec } from './RepositoryPathSafety';
 import { readGraphRefs } from './GraphRefSnapshot';
+import type { FileHistoryOptionsDto } from '../../src/shared/ipc/fileHistory';
+import { resolveLatestFileRevision } from './FileHistoryScope';
 
 const COMMIT_HASH_RE = /^[0-9a-f]{7,64}$/i;
 
@@ -179,17 +181,23 @@ export class HistoryService {
     return this.runCommand(['diff-tree', '--root', '--no-commit-id', '--name-status', '-r', '-M', '-z', normalizedHash]);
   }
 
-  async getFileHistory(filePath: string, limit: number = 100, commitHash?: string, repoPath?: string): Promise<string> {
+  async getFileHistory(filePath: string, limit: number = 100, commitHash?: string, repoPath?: string, options?: FileHistoryOptionsDto): Promise<string> {
     const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 100;
+    const offset = Number.isFinite(options?.offset) ? Math.max(0, Math.floor(options!.offset!)) : 0;
     const format = '%H%x1f%h%x1f%an%x1f%ad%x1f%s%x00';
-    const args = ['log', '--follow', '-z', `-${safeLimit}`, `--pretty=format:${format}`, '--date=iso'];
+    const args = ['log', '--follow', '--topo-order', '--name-status', '-M', '-z', `-${safeLimit}`, `--pretty=format:${format}`, '--date=iso'];
+    if (offset) args.push(`--skip=${offset}`);
 
     const normalizedHash = normalizeOptionalCommitHash(commitHash);
-    if (normalizedHash) {
-      args.push(normalizedHash);
+    const scope =
+      normalizedHash && options?.includeFuture
+        ? await resolveLatestFileRevision(filePath, normalizedHash, (args) => this.execute(args, repoPath, undefined, 'interactive'))
+        : { path: filePath, revision: normalizedHash };
+    if (scope.revision) {
+      args.push(scope.revision);
     }
 
-    args.push('--', toLiteralPathspec(filePath));
+    args.push('--', toLiteralPathspec(scope.path));
     // Visible file details must survive concurrent foreground diff reads.
     return this.execute(args, repoPath, undefined, 'interactive');
   }

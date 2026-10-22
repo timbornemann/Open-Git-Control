@@ -1,5 +1,6 @@
 import { beginReadRequest } from '../../readRequests';
 import type { ReadRequest } from '../../../../src/shared/cache/resource';
+import type { FileHistoryOptionsDto } from '../../../../src/shared/ipc/fileHistory';
 import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
 import type { CommitStatsPriority, CommitStatsService } from '../../../CommitStatsService';
 import type { GitService } from '../../../GitService';
@@ -191,7 +192,7 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
 
   ipcMain.handle(
     IpcChannel.GitFileHistory,
-    async (_event: unknown, filePath: string, commitHash?: string, limit: number = 100, requestedRepoPath?: unknown) => {
+    async (_event: unknown, filePath: string, commitHash?: string, limit: number = 100, requestedRepoPath?: unknown, options?: FileHistoryOptionsDto) => {
       try {
         const normalizedPath = String(filePath ?? '');
         if (!normalizedPath) {
@@ -199,7 +200,10 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
         }
 
         const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitFileHistory);
-        const raw = await gitService.history.getFileHistory(normalizedPath, limit, commitHash, repoPath);
+        if (options !== undefined && (!options || typeof options !== 'object' || Array.isArray(options))) throw new Error('Invalid file history options.');
+        if (options?.includeFuture !== undefined && typeof options.includeFuture !== 'boolean') throw new Error('Invalid file history scope.');
+        if (options?.offset !== undefined && (!Number.isSafeInteger(options.offset) || options.offset < 0)) throw new Error('Invalid file history offset.');
+        const raw = await gitService.history.getFileHistory(normalizedPath, limit, commitHash, repoPath, ...(options ? [options] : []));
         return { success: true, data: parseFileHistory(raw) };
       } catch (error: unknown) {
         return { success: false, error: error instanceof Error ? error.message : String(error) };
