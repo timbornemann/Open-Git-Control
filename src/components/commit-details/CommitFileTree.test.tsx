@@ -106,20 +106,48 @@ describe('CommitFileTree', () => {
   it('moves Tab focus through unmounted rows and lets keyboard users leave the list at its boundaries', async () => {
     const files = Array.from({ length: 70 }, (_, index) => ({ status: 'A', path: `file-${String(index).padStart(3, '0')}.ts` }));
     await act(async () => root.render(<Harness files={files} />));
-    act(() => row('file:file-000.ts')!.focus());
-    const tab = async (shiftKey = false) => {
+    const focus = (index: number) => act(() => row(`file:${files[index].path}`)!.focus());
+    const expectFocused = (index: number) => expect((document.activeElement as HTMLButtonElement).dataset.nodeKey).toBe(`file:${files[index].path}`);
+    const renderedIndexes = () => [...host.querySelectorAll<HTMLElement>('[data-virtual-row]')].map((element) => Number(element.dataset.virtualRow));
+    const tab = (shiftKey = false) => {
       const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true });
-      await act(async () => document.activeElement!.dispatchEvent(event));
+      // Keyboard handlers and focus effects are synchronous. Async act would
+      // add an event-loop round trip for every key under CI load.
+      act(() => document.activeElement!.dispatchEvent(event));
       return event;
     };
-    expect((await tab(true)).defaultPrevented).toBe(false);
-    for (let index = 1; index < files.length; index++) {
-      expect((await tab()).defaultPrevented).toBe(true);
-      expect((document.activeElement as HTMLButtonElement).dataset.nodeKey).toBe(`file:${files[index].path}`);
-    }
-    expect((await tab()).defaultPrevented).toBe(false);
-    await tab(true);
-    expect((document.activeElement as HTMLButtonElement).dataset.nodeKey).toBe('file:file-068.ts');
+
+    focus(0);
+    expect(tab(true).defaultPrevented).toBe(false);
+    expect(tab().defaultPrevented).toBe(true);
+    expectFocused(1);
+
+    // Start at each edge of the rendered window so both directions must mount
+    // a missing target. Walking every intermediate row adds no new coverage.
+    const lastRendered = renderedIndexes().at(-1)!;
+    expect(lastRendered).toBeLessThan(files.length - 1);
+    expect(row(`file:${files[lastRendered + 1].path}`)).toBeUndefined();
+    focus(lastRendered);
+    expect(tab().defaultPrevented).toBe(true);
+    expectFocused(lastRendered + 1);
+
+    const firstRendered = renderedIndexes()[0];
+    expect(firstRendered).toBeGreaterThan(0);
+    expect(row(`file:${files[firstRendered - 1].path}`)).toBeUndefined();
+    focus(firstRendered);
+    expect(tab(true).defaultPrevented).toBe(true);
+    expectFocused(firstRendered - 1);
+
+    const list = host.querySelector<HTMLElement>('.working-tree-list')!;
+    act(() => {
+      list.scrollTop = files.length * 25;
+      list.dispatchEvent(new Event('scroll', { bubbles: true }));
+    });
+    focus(files.length - 1);
+    expect(tab().defaultPrevented).toBe(false);
+    expect(tab(true).defaultPrevented).toBe(true);
+    expectFocused(files.length - 2);
+    expect(onSelectFile).not.toHaveBeenCalled();
     expect(host.querySelectorAll('[data-node-key]').length).toBeLessThan(40);
   });
 });
