@@ -31,7 +31,7 @@ tempfile = "3.23"
 url = "2.5"
 uuid = { version = "1.18", features = ["v4"] }
 sys-locale = "0.3"
-zip = { version = "4.6", default-features = false, features = ["deflate"] }
+zip = { version = "9.1.2", default-features = false, features = ["deflate"] }
 slint = { version = "=1.18.1", optional = true, default-features = false, features = ["std", "backend-winit", "renderer-software", "accessibility", "compat-1-18"] }
 rfd = { version = "0.15", optional = true }
 

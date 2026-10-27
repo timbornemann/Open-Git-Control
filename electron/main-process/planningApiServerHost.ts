@@ -36,16 +36,37 @@ const createAuthToken = (configuredToken?: string): string => {
 
 const headerValue = (value: string | string[] | undefined): string => (Array.isArray(value) ? String(value[0] || '') : String(value || ''));
 
-const isAllowedCorsOrigin = (origin: string): boolean => {
-  if (!origin) return false;
-  try {
-    const parsed = new URL(origin);
-    const protocolAllowed = parsed.protocol === 'http:' || parsed.protocol === 'https:';
-    const hostname = parsed.hostname.toLowerCase();
-    return protocolAllowed && (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]');
-  } catch {
-    return false;
+const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+const formatHostname = (host: string): string => (host.includes(':') && !host.startsWith('[') ? `[${host}]` : host);
+
+const requireTrustedRequestUrl = (request: http.IncomingMessage, host: string): URL => {
+  const hosts = request.headersDistinct.host;
+  // Validate against the configured listener and socket, never a forwarded/client-supplied authority.
+  const port = request.socket.localPort;
+  const configuredHostname = new URL(`http://${formatHostname(host)}`).hostname;
+  const hostnames = LOOPBACK_HOSTNAMES.has(configuredHostname) ? LOOPBACK_HOSTNAMES : new Set([configuredHostname]);
+  const authorities = [...hostnames].map((hostname) => new URL(`http://${hostname}:${port}`).host);
+  if (hosts?.length !== 1 || !authorities.includes(hosts[0].toLowerCase())) {
+    throw new ApiError(403, 'INVALID_HOST', 'The Host header must identify this Planning API server and its listening port.');
   }
+
+  const baseUrl = new URL(`http://${hosts[0]}`);
+  const origins = request.headersDistinct.origin;
+  if (origins && (origins.length !== 1 || origins[0] !== baseUrl.origin)) {
+    throw new ApiError(403, 'FORBIDDEN_ORIGIN', 'Browser requests must originate from this Planning API server.');
+  }
+
+  let url: URL;
+  try {
+    url = new URL(request.url || '/', baseUrl);
+  } catch {
+    throw new ApiError(400, 'INVALID_REQUEST_TARGET', 'Invalid request URL.');
+  }
+  if (url.origin !== baseUrl.origin || url.username || url.password) {
+    throw new ApiError(400, 'INVALID_REQUEST_TARGET', 'The request URL must target this Planning API server.');
+  }
+  return url;
 };
 
 const timingSafeTokenEquals = (candidate: string, expected: string): boolean => {
@@ -162,11 +183,13 @@ const jsonRpcParseError = () =>
   }) as const;
 
 export const createPlanningApiRequestHandler =
-  (deps: PlanningApiHostDeps & { getAuthToken: () => string }) =>
+  (deps: PlanningApiHostDeps & { host: string; getAuthToken: () => string }) =>
   async (request: http.IncomingMessage, response: http.ServerResponse): Promise<void> => {
-    setCommonHeaders(response, request);
+    setCommonHeaders(response);
 
     try {
+      const url = requireTrustedRequestUrl(request, deps.host);
+      if (request.headers.origin) setCorsHeaders(response, request.headers.origin);
       const method = (request.method || 'GET').toUpperCase() as HttpMethod;
       if (!['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'].includes(method)) {
         throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed.');
@@ -177,7 +200,6 @@ export const createPlanningApiRequestHandler =
         return;
       }
 
-      const url = new URL(request.url || '/', `http://${request.headers.host || `${DEFAULT_HOST}:${DEFAULT_PORT}`}`);
       requireAuthorizedRequest(request, url, method, deps.getAuthToken());
       if (url.pathname === '/') {
         redirect(response, '/api/');
@@ -236,6 +258,7 @@ export async function startPlanningApiHost(options: PlanningApiServerOptions, de
   const getAuthToken = options.authTokenProvider || (() => staticAuthToken);
   const handler = createPlanningApiRequestHandler({
     ...deps,
+    host,
     getAuthToken,
   });
 
@@ -248,7 +271,7 @@ export async function startPlanningApiHost(options: PlanningApiServerOptions, de
       return {
         host,
         port: actualPort,
-        url: `http://${host}:${actualPort}`,
+        url: `http://${formatHostname(host)}:${actualPort}`,
         get authToken() {
           return getAuthToken();
         },
@@ -299,16 +322,16 @@ const getConfiguredPort = (): number => {
   return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_PORT;
 };
 
-const setCommonHeaders = (response: http.ServerResponse, request?: http.IncomingMessage): void => {
-  const origin = headerValue(request?.headers.origin);
-  if (isAllowedCorsOrigin(origin)) {
-    response.setHeader('Access-Control-Allow-Origin', origin);
-    response.setHeader('Vary', 'Origin');
-  }
+const setCommonHeaders = (response: http.ServerResponse): void => {
+  response.setHeader('Vary', 'Origin');
+  response.setHeader('Cache-Control', 'no-store');
+};
+
+const setCorsHeaders = (response: http.ServerResponse, origin: string): void => {
+  response.setHeader('Access-Control-Allow-Origin', origin);
   response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   response.setHeader('Access-Control-Allow-Headers', `content-type, accept, mcp-protocol-version, authorization, ${AUTH_HEADER_NAME}`);
   response.setHeader('Access-Control-Max-Age', '86400');
-  response.setHeader('Cache-Control', 'no-store');
 };
 
 const sendJson = (response: http.ServerResponse, statusCode: number, payload: unknown): void => {

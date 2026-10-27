@@ -23,7 +23,7 @@ pub fn bundle(archive: &Path, destination: &Path, control: &Control) -> Result<P
     for index in 0..zip.len() {
         control.check()?;
         let entry = zip.by_index(index)?;
-        let relative = path(entry.name())?;
+        let relative = path(&entry.name()?)?;
         ensure!(
             seen.insert(relative),
             "The archive contains duplicate paths."
@@ -38,7 +38,7 @@ pub fn bundle(archive: &Path, destination: &Path, control: &Control) -> Result<P
     for index in 0..zip.len() {
         control.check()?;
         let mut entry = zip.by_index(index)?;
-        let relative = path(entry.name())?;
+        let relative = path(&entry.name()?)?;
         if relative.starts_with("__MACOSX") {
             continue;
         }

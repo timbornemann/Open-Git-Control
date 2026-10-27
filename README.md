@@ -568,6 +568,7 @@ Branch/PR associations and workflow history are portable optional `references` i
   - `POST /api/mcp/tools/call`
 - All data and MCP endpoints require a token.
 - Public health and docs endpoints are available without protected data.
+- HTTP requests must use a loopback `Host` (`127.0.0.1`, `localhost`, or `[::1]`) with the API's actual listening port. Browser requests are accepted only from the same HTTP origin; other local services, opaque origins (`null`), and remote websites are rejected, including preflight requests. Native REST/MCP clients can omit `Origin` and continue using the token header.
 - Token can be sent as:
   - `x-open-git-control-token: <TOKEN>`
   - `Authorization: Bearer <TOKEN>`
