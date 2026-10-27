@@ -81,7 +81,7 @@ const splitPathspecTail = (args: string[], commandName: GitCommandName): { befor
 
 const normalizeLiteralPathspecTail = (args: string[], commandName: GitCommandName): string[] => {
   const separator = args.indexOf('--');
-  if (separator < 0 || !PATHSPEC_COMMANDS.has(commandName)) return args;
+  if (separator < 0 || !PATHSPEC_COMMANDS.has(commandName)) return commandName === 'diff' ? [...args, '--'] : args;
   return [...args.slice(0, separator + 1), ...args.slice(separator + 1).map((filePath) => toLiteralPathspec(filePath, 'Pathspec'))];
 };
 
@@ -353,7 +353,7 @@ const validateDiffArgs = (args: string[]): void => {
   }
   const refs = before.filter((arg) => !arg.startsWith('-'));
   if (refs.length > 2) throw new Error('Unsupported argument combination for git diff.');
-  refs.forEach((ref) => assertSafeValue(ref, 'diff revision'));
+  refs.forEach((ref) => normalizeRepositoryRelativePath(ref.replace(/\\/g, '/'), 'Diff revision'));
 };
 
 const validateShowArgs = (args: string[]): void => {
@@ -491,7 +491,7 @@ export function validateCommandArgs(commandName: GitCommandName, args: string[])
   validateCommandSpecificArgs(commandName, args);
 }
 
-/** Validates IPC arguments and converts every accepted pathspec to literal mode. */
+/** Validates IPC paths and terminates diff revisions to prevent implicit --no-index. */
 export function normalizeCommandArgs(commandName: GitCommandName, rawArgs: unknown[]): string[] {
   const args = normalizeArgs(rawArgs);
   validateCommandArgs(commandName, args);

@@ -114,6 +114,58 @@ describe('gitCommandPolicy', () => {
     expect(() => validateCommandArgs('diff', ['--name-status', '-M', '-z', 'a'.repeat(40), 'b'.repeat(40)])).not.toThrow();
   });
 
+  it.each(
+    [
+      [],
+      ['--numstat'],
+      ['--numstat', '--cached'],
+      ['--name-status', '-M', '-z', `${'a'.repeat(40)}^1`, 'b'.repeat(40)],
+      ['--no-color', '--unified=3', 'HEAD~1', 'HEAD'],
+      ['--stat', 'feature/topic..main'],
+      ['feature/topic...origin/main'],
+      ['refs/heads/feature/topic', 'refs/remotes/origin/main'],
+      ['stash@{0}^1', 'stash@{0}'],
+      ['HEAD:before.txt', 'HEAD:after.txt'],
+    ].map((args) => ({ args })),
+  )('terminates diff revisions explicitly for $args', ({ args }) => {
+    expect(normalizeCommandArgs('diff', args)).toEqual([...args, '--']);
+  });
+
+  it('keeps diff paths literal and separated from revisions', () => {
+    expect(normalizeCommandArgs('diff', ['HEAD~1', 'HEAD', '--', 'docs/[draft].md', '-file.txt'])).toEqual([
+      'HEAD~1',
+      'HEAD',
+      '--',
+      ':(literal)docs/[draft].md',
+      ':(literal)-file.txt',
+    ]);
+    expect(normalizeCommandArgs('diff', ['--cached', '--', ':(glob)**/*.env'])).toEqual(['--cached', '--', ':(literal):(glob)**/*.env']);
+  });
+
+  it.each([
+    '/outside/private.txt',
+    '/dev/null',
+    'C:/outside/private.txt',
+    'C:\\outside\\private.txt',
+    '\\\\server\\share\\private.txt',
+    '//server/share/private.txt',
+    '../private.txt',
+    'nested/../../private.txt',
+    '..\\private.txt',
+    'nested\\..\\..\\private.txt',
+  ])('rejects filesystem paths in the diff revision position: %s', (filePath) => {
+    expect(() => validateCommandArgs('diff', [filePath])).toThrow('Diff revision');
+    expect(() => normalizeCommandArgs('diff', [filePath, 'HEAD'])).toThrow('Diff revision');
+    expect(() => normalizeCommandArgs('diff', ['--numstat', 'HEAD', filePath])).toThrow('Diff revision');
+    expect(() => normalizeCommandArgs('diff', [filePath, '--', 'tracked.txt'])).toThrow('Diff revision');
+  });
+
+  it('rejects explicit no-index diffs and paths outside the repository after --', () => {
+    expect(() => normalizeCommandArgs('diff', ['--no-index', 'first.txt', 'second.txt'])).toThrow('Unsupported argument for git diff.');
+    expect(() => normalizeCommandArgs('diff', ['--', '../first.txt', '../second.txt'])).toThrow('Pathspec must be repository-relative.');
+    expect(() => normalizeCommandArgs('diff', ['--', 'C:/outside/first.txt'])).toThrow('Pathspec must be repository-relative.');
+  });
+
   it('allows only the scoped PR upstream configuration required by review branches', () => {
     expect(() => validateCommandArgs('branch', ['--list', 'pr-42-feature'])).not.toThrow();
     expect(() => validateCommandArgs('config', ['--local', 'branch.pr-42-feature.remote', 'origin'])).not.toThrow();
