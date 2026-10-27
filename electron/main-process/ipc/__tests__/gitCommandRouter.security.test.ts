@@ -7,9 +7,11 @@ import type { GitCommandName } from '../../gitCommandPolicy';
 import { handleGitCommand } from '../gitCommandRouter';
 import { assertGitWorkingTreePaths } from '../../../git/GitWorkingTreePathGuard';
 
+// Git expands Windows 8.3 temp aliases and macOS /var before selecting a repo.
+const fixtureParent = fs.realpathSync.native(os.tmpdir());
 const roots: string[] = [];
 async function fixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-policy-security-'));
+  const root = fs.mkdtempSync(path.join(fixtureParent, 'ogc-policy-security-'));
   roots.push(root);
   const repo = path.join(root, 'repo');
   const outside = path.join(root, 'outside');
@@ -44,7 +46,7 @@ async function fixture() {
 afterEach(async () => {
   vi.restoreAllMocks();
   for (const root of roots.splice(0)) {
-    if (path.dirname(path.resolve(root)) !== path.resolve(os.tmpdir()) || !path.basename(root).startsWith('ogc-policy-security-'))
+    if (path.dirname(path.resolve(root)) !== path.resolve(fixtureParent) || !path.basename(root).startsWith('ogc-policy-security-'))
       throw new Error('Unsafe test cleanup.');
     await fs.promises.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
@@ -201,7 +203,9 @@ describe('Git IPC command security with real repositories', { timeout: 30000 }, 
   it('keeps ignored aliases, deleted files, literal names and symlink entries usable', async () => {
     const f = await fixture();
     f.link();
-    f.write('.gitignore', 'redirected/\n');
+    // A trailing slash only ignores directories, not POSIX symlink entries.
+    f.write('.gitignore', '/redirected\n');
+    expect(await f.run(['check-ignore', '--', 'redirected'])).toBe('redirected');
     f.write('docs/[draft].txt', 'literal draft\n');
     f.write('..notes', 'valid dot-prefixed name\n');
     fs.unlinkSync(path.join(f.repo, 'tracked.txt'));
@@ -258,7 +262,8 @@ describe('Git IPC command security with real repositories', { timeout: 30000 }, 
       await f.run(['config', 'core.symlinks', symlinks]);
       expect(await f.command('add', '--', 'file-link.txt')).toMatchObject({ success: true });
       expect(await f.run(['ls-files', '--stage', '--', 'file-link.txt'])).toMatch(/^120000 /);
-      expect(await f.run(['show', ':file-link.txt'])).toBe(target);
+      // Git for Windows serializes separators as '/', while Node uses '\\'.
+      expect(path.normalize(await f.run(['show', ':file-link.txt']))).toBe(path.normalize(target));
     }
   });
 });

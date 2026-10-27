@@ -2,9 +2,14 @@ use ogc_recovery::{archive, model::Control};
 use std::{fs, io::Write};
 use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 
+fn fixture() -> tempfile::TempDir {
+    // Match production's canonical anchor, including macOS /var -> /private/var.
+    tempfile::tempdir_in(std::env::temp_dir().canonicalize().unwrap()).unwrap()
+}
+
 #[test]
 fn extracts_deflated_bundle_with_utf8_names_without_privileged_permissions() {
-    let root = tempfile::tempdir().unwrap();
+    let root = fixture();
     let source = root.path().join("app.zip");
     let destination = root.path().join("extracted");
     fs::create_dir(&destination).unwrap();
@@ -48,7 +53,7 @@ fn extracts_deflated_bundle_with_utf8_names_without_privileged_permissions() {
 #[test]
 fn rejects_archive_paths_and_symlink_targets_outside_the_bundle() {
     for symlink in [false, true] {
-        let root = tempfile::tempdir().unwrap();
+        let root = fixture();
         let source = root.path().join("hostile.zip");
         let destination = root.path().join("extracted");
         fs::create_dir(&destination).unwrap();
