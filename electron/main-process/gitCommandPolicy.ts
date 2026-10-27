@@ -1,12 +1,12 @@
 import { isGitCommandName, MAX_ARGS_BY_GIT_COMMAND, type GitCommandName } from '../../src/shared/ipc/gitCommands';
-import { normalizeRepositoryRelativePath, toLiteralPathspec } from '../git/RepositoryPathSafety';
+import { normalizeRepositoryRelativePath } from '../git/RepositoryPathSafety';
 import { parseMergeIntoBranchArgs } from './gitMergeCommandPolicy';
+import { assertSafeRemoteUrl, assertSafeRevision, assertSafeValue, isSafeShowFormat, normalizeGitPathspecs, PATHSPEC_COMMANDS } from './gitCommandArguments';
 
 export type { GitCommandName };
 
 const COMMIT_HASH_RE = /^[0-9a-f]{7,64}$/i;
 const STASH_REF_RE = /^stash@\{\d+\}(?:\^\d+)?$/;
-const PATHSPEC_COMMANDS = new Set<GitCommandName>(['add', 'checkout', 'clean', 'diff', 'reset', 'rm', 'show', 'stash']);
 
 export function createJobId(operation: string): string {
   return operation + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
@@ -38,22 +38,9 @@ export function assertAllowedGitCommand(commandName: unknown): asserts commandNa
   }
 }
 
-const assertSafeValue = (value: string, label: string): void => {
-  if (!value || value.startsWith('-')) {
-    throw new Error(`Invalid ${label}.`);
-  }
-};
-
 const assertCommitHash = (value: string, label = 'commit hash'): void => {
   if (!COMMIT_HASH_RE.test(value)) {
     throw new Error(`Invalid ${label}.`);
-  }
-};
-
-const assertSafeRemoteUrl = (value: string): void => {
-  assertSafeValue(value, 'remote URL');
-  if (/^[a-z][a-z0-9+.-]*::/i.test(value)) {
-    throw new Error('Git remote-helper URLs are not allowed.');
   }
 };
 
@@ -77,12 +64,6 @@ const splitPathspecTail = (args: string[], commandName: GitCommandName): { befor
   }
   paths.forEach((filePath) => normalizeRepositoryRelativePath(filePath, 'Pathspec'));
   return { before: args.slice(0, separator), paths };
-};
-
-const normalizeLiteralPathspecTail = (args: string[], commandName: GitCommandName): string[] => {
-  const separator = args.indexOf('--');
-  if (separator < 0 || !PATHSPEC_COMMANDS.has(commandName)) return commandName === 'diff' ? [...args, '--'] : args;
-  return [...args.slice(0, separator + 1), ...args.slice(separator + 1).map((filePath) => toLiteralPathspec(filePath, 'Pathspec'))];
 };
 
 const validateLogArgs = (args: string[]): void => {
@@ -226,7 +207,7 @@ const validateForEachRefArgs = (args: string[]): void => {
 };
 
 const validateAdoptRemoteTagArgs = (args: string[]): void => {
-  if (args.length !== 2 || !/^[A-Za-z0-9._-]+$/.test(args[0])) {
+  if (args.length !== 2 || !/^[A-Za-z0-9._-]+$/.test(args[0]) || args[0].startsWith('-')) {
     throw new Error('Invalid remote tag adoption request.');
   }
   assertSafeValue(args[1], 'tag name');
@@ -262,23 +243,23 @@ const validatePushArgs = (args: string[]): void => {
 const validateCheckoutArgs = (args: string[]): void => {
   const { before, paths } = splitPathspecTail(args, 'checkout');
   if (paths.length > 0) {
-    if (before.length === 0 || (before.length === 1 && ['--ours', '--theirs'].includes(before[0])) || (before.length === 1 && !before[0].startsWith('-')))
-      return;
+    if (before.length === 0 || (before.length === 1 && ['--ours', '--theirs'].includes(before[0]))) return;
+    if (before.length === 1 && !before[0].startsWith('-')) return assertSafeRevision(before[0], 'Checkout revision');
     throw new Error('Unsupported argument combination for git checkout.');
   }
-  if (before.length === 1 && !before[0].startsWith('-')) return;
+  if (before.length === 1 && !before[0].startsWith('-')) return assertSafeRevision(before[0], 'Checkout revision');
   if (before.length >= 2 && before.length <= 3 && ['-b', '-B'].includes(before[0])) {
     assertSafeValue(before[1], 'branch name');
-    if (before.length === 3) assertSafeValue(before[2], 'checkout target');
+    if (before.length === 3) assertSafeRevision(before[2], 'Checkout revision');
     return;
   }
   if (before.length === 2 && before[0] === '--track') {
-    assertSafeValue(before[1], 'remote branch');
+    assertSafeRevision(before[1], 'Checkout revision');
     return;
   }
   if (before.length === 4 && before[0] === '-b' && before[2] === '--track') {
     assertSafeValue(before[1], 'branch name');
-    assertSafeValue(before[3], 'remote branch');
+    assertSafeRevision(before[3], 'Checkout revision');
     return;
   }
   throw new Error('Unsupported argument combination for git checkout.');
@@ -353,18 +334,18 @@ const validateDiffArgs = (args: string[]): void => {
   }
   const refs = before.filter((arg) => !arg.startsWith('-'));
   if (refs.length > 2) throw new Error('Unsupported argument combination for git diff.');
-  refs.forEach((ref) => normalizeRepositoryRelativePath(ref.replace(/\\/g, '/'), 'Diff revision'));
+  refs.forEach((ref) => assertSafeRevision(ref, 'Diff revision'));
 };
 
 const validateShowArgs = (args: string[]): void => {
   const { before } = splitPathspecTail(args, 'show');
   const options = before.filter((arg) => arg.startsWith('-'));
-  if (options.some((arg) => !['-s', '--quiet', '--name-status'].includes(arg) && !arg.startsWith('--format='))) {
+  if (options.some((arg) => !['-s', '--quiet', '--name-status'].includes(arg) && !isSafeShowFormat(arg))) {
     throw new Error('Unsupported argument for git show.');
   }
   const refs = before.filter((arg) => !arg.startsWith('-'));
   if (refs.length > 1) throw new Error('Unsupported argument combination for git show.');
-  refs.forEach((ref) => assertSafeValue(ref, 'show revision'));
+  refs.forEach((ref) => assertSafeRevision(ref, 'Show revision'));
 };
 
 const validateAddArgs = (args: string[]): void => {
@@ -491,9 +472,9 @@ export function validateCommandArgs(commandName: GitCommandName, args: string[])
   validateCommandSpecificArgs(commandName, args);
 }
 
-/** Validates IPC paths and terminates diff revisions to prevent implicit --no-index. */
+/** Validates IPC operands and keeps Git revisions separate from literal pathspecs. */
 export function normalizeCommandArgs(commandName: GitCommandName, rawArgs: unknown[]): string[] {
   const args = normalizeArgs(rawArgs);
   validateCommandArgs(commandName, args);
-  return normalizeLiteralPathspecTail(args, commandName);
+  return normalizeGitPathspecs(args, commandName);
 }

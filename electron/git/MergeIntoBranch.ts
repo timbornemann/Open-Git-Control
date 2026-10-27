@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import type { GitRunner } from './GitRunner';
 import type { CommitEditGit } from './CommitEditGit';
 import { MERGE_MODES, mergeModeFlags, type MergeIntoBranchRequest } from '../../src/shared/git/merge';
+import { assertGitWorkingTreePaths } from './GitWorkingTreePathGuard';
 
 const oidPattern = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
 
@@ -48,6 +49,7 @@ export function mergeIntoBranch(
     }
     await assertBranchState(git, repoPath, request, request.sourceBranch);
     await assertCleanState(git, repoPath);
+    await assertGitWorkingTreePaths(repoPath, ['checkout', request.targetBranch, '--'], (args) => git.run(repoPath, args));
     assertRepositoryCurrent();
     await git.run(repoPath, ['checkout', '--no-guess', '--no-overwrite-ignore', request.targetBranch]);
     try {

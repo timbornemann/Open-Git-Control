@@ -1,5 +1,6 @@
 import type { CommitEditGit } from './CommitEditGit';
 import { CHECK_PREFIX, CommitEditBlockedError } from './commitMessageEditInspection';
+import { assertSafeGitRemoteTransport } from './GitRemoteTransportSafety';
 
 export async function verifyUnpublished(
   git: CommitEditGit,
@@ -15,8 +16,8 @@ export async function verifyUnpublished(
     for (const flags of [[], ['--push']]) {
       const urls = await git.run(repo, ['remote', 'get-url', ...flags, '--all', name]);
       for (const url of urls.split('\n').filter(Boolean)) {
-        if (url.startsWith('-') || /[\0\r\n]/.test(url) || /^[a-z][a-z0-9+.-]*::/i.test(url))
-          throw new Error('Unsupported remote URL for publication verification.');
+        if (url.startsWith('-') || /[\0\r\n]/.test(url)) throw new Error('Unsupported remote URL for publication verification.');
+        assertSafeGitRemoteTransport(url, 'Unsupported remote URL for publication verification.');
         targets.add(url);
       }
     }

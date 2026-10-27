@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { GitRunner } from './GitRunner';
 import type { GitTransferOptions } from './GitProcessTypes';
+import { assertSafeGitRemoteTransport } from './GitRemoteTransportSafety';
 
 export type CloneRepositoryResult = {
   success: boolean;
@@ -17,9 +18,7 @@ export class CloneService {
     if (!source || source.length > 2_000 || /[\0\r\n]/.test(source)) {
       throw new Error('Clone source is invalid.');
     }
-    if (/^[a-z][a-z0-9+.-]*::/i.test(source)) {
-      throw new Error('Git remote-helper clone sources are not allowed.');
-    }
+    assertSafeGitRemoteTransport(source, 'Git remote-helper clone sources are not allowed.');
     return source;
   }
 

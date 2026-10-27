@@ -7,6 +7,8 @@ import { mergeIntoBranch } from '../../git/MergeIntoBranch';
 import { parseMergeIntoBranchArgs } from '../gitMergeCommandPolicy';
 import { requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
 import { observesPlannerBranchRename, plannerBranchRename } from '../plannerWorkEvents';
+import { protectGitReadArgs } from '../gitCommandArguments';
+import { assertGitWorkingTreePaths } from '../../git/GitWorkingTreePathGuard';
 
 type GitCommandRouterEvent = {
   sender: any;
@@ -52,8 +54,11 @@ const executeStreamingCommand: GitCommandExecutor = async ({ gitService, event, 
 
 const STRUCTURED_LOG_FORMAT = '%H%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%P%x1f%(decorate:prefix=,suffix=,separator=%x1d)%x00';
 
-const runInContext = (context: GitCommandExecutionContext, args: string[]): Promise<string> =>
-  context.repoPath ? context.gitService.runCommandAtPath(context.repoPath, args) : context.gitService.runCommand(args);
+const runInContext = async (context: GitCommandExecutionContext, args: string[]): Promise<string> => {
+  const read = (query: string[]) => (context.repoPath ? context.gitService.runCommandAtPath(context.repoPath, query) : context.gitService.runCommand(query));
+  await assertGitWorkingTreePaths(context.repoPath || context.gitService.requireActiveRepoPath(), args, read);
+  return read(protectGitReadArgs(args));
+};
 
 const executeForensicHistory: GitCommandExecutor = async (context) => {
   const { args } = context;
@@ -186,12 +191,14 @@ const COMMAND_EXECUTORS: Partial<Record<GitCommandName, GitCommandExecutor>> = {
           : gitService.getStatus(),
   statusPorcelain: async ({ gitService, repoPath }) => (repoPath ? gitService.getStatusPorcelainAtPath(repoPath) : gitService.getStatusPorcelain()),
   log: executeLog,
-  diff: (context) => {
+  diff: async (context) => {
     if (!context.args.includes('--numstat')) return runInContext(context, ['diff', ...context.args]);
     const repo = context.repoPath || context.gitService.requireActiveRepoPath();
-    if (context.gitService.isBareRepositoryAtPath?.(repo)) return Promise.resolve('');
-    return context.gitService.runPollingCommandAtPath(repo, ['diff', ...context.args]);
+    if (context.gitService.isBareRepositoryAtPath?.(repo)) return '';
+    await assertGitWorkingTreePaths(repo, ['diff', ...context.args], (query) => context.gitService.runCommandAtPath(repo, query));
+    return context.gitService.runPollingCommandAtPath(repo, protectGitReadArgs(['diff', ...context.args]));
   },
+  show: (context) => runInContext(context, ['show', ...context.args]),
   branches: async (context) => runInContext(context, ['branch', '-a']),
   commitDetails: executeCommitDetails,
   conflictTakeOurs: async (context) => runInContext(context, ['checkout', '--ours', '--', toLiteralPathspec(context.args[0])]),
@@ -239,8 +246,7 @@ const executeGitCommand = async (context: GitCommandExecutionContext): Promise<s
   }
   const executor = COMMAND_EXECUTORS[context.commandName];
   if (executor) return executor(context);
-  if (context.repoPath) return context.gitService.runCommandAtPath(context.repoPath, [context.commandName, ...context.args]);
-  return context.gitService.runCommand([context.commandName, ...context.args]);
+  return runInContext(context, [context.commandName, ...context.args]);
 };
 
 export const handleGitCommand = async (event: GitCommandRouterEvent, gitService: GitService, commandName: unknown, rawArgs: unknown[], repoPath?: string) => {

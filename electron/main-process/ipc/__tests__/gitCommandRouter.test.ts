@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { handleGitCommand } from '../gitCommandRouter';
+vi.mock('../../../git/GitWorkingTreePathGuard', () => ({ assertGitWorkingTreePaths: vi.fn().mockResolvedValue(undefined) }));
 
 describe('gitCommandRouter conflict resolution', () => {
   it('honors conflict-marker-size before staging through the IPC route', async () => {

@@ -1,4 +1,5 @@
 import type { HostedRepositoryRef, RepositoryEndpoint } from '../../src/types/hostingDtos';
+import { assertSafeGitRemoteTransport } from './GitRemoteTransportSafety';
 import type {
   GitRemoteSnapshotDto,
   RemotePreferences,
@@ -26,9 +27,11 @@ export function remoteName(value: unknown): string {
 }
 
 export function remoteUrl(value: unknown): string {
-  if (typeof value !== 'string' || !value.trim() || value.length > 4_096 || hasControls(value) || value.startsWith('-') || /^[a-z][a-z0-9+.-]*::/i.test(value))
+  if (typeof value !== 'string' || !value.trim() || value.length > 4_096 || hasControls(value) || value.startsWith('-'))
     throw new Error('Invalid Git remote URL.');
   const url = value.trim();
+  if (url.startsWith('-')) throw new Error('Invalid Git remote URL.');
+  assertSafeGitRemoteTransport(url);
   const scheme = /^([a-z][a-z0-9+.-]*):\/\//i.exec(url)?.[1]?.toLowerCase();
   if (scheme && !['https', 'http', 'ssh', 'git', 'file', 'ftp', 'ftps'].includes(scheme)) throw new Error('Unsupported Git remote transport.');
   if (scheme) {

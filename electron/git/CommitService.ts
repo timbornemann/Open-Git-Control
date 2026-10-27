@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { cleanupPrivateTempDir, createPrivateTempDir, writePrivateTempFile } from './PrivateTempFiles';
 import { toLiteralPathspec } from './RepositoryPathSafety';
+import { assertGitWorkingTreePaths } from './GitWorkingTreePathGuard';
 
 export type CommitMessageInput = {
   title: string;
@@ -58,6 +59,11 @@ export class CommitService {
       throw new Error('Commit message is too long.');
     }
 
+    const entries = paths ? this.normalizePathspecEntries(paths) : undefined;
+    if (entries) {
+      if (!entries.length) throw new Error('At least one path is required.');
+      await assertGitWorkingTreePaths(normalizedPath, ['add', '--', ...entries], (query) => this.executeGit(normalizedPath, query));
+    }
     const tempDir = createPrivateTempDir('ogc-commit-message-');
     const messageFile = path.join(tempDir, 'message.txt');
     writePrivateTempFile(messageFile, message);
@@ -68,8 +74,8 @@ export class CommitService {
     if (input.signoff) args.push('--signoff');
     if (input.allowEmpty) args.push('--allow-empty');
     args.push('-F', messageFile);
-    if (paths) {
-      const pathspec = this.createPathspecFile('ogc-commit-pathspec-', this.normalizePathspecEntries(paths));
+    if (entries) {
+      const pathspec = this.createPathspecFile('ogc-commit-pathspec-', entries);
       pathspecTempDir = pathspec.tempDir;
       args.push(`--pathspec-from-file=${pathspec.pathspecFile}`, '--pathspec-file-nul');
     }
@@ -105,6 +111,8 @@ export class CommitService {
     let remaining = this.normalizePathspecEntries(paths);
 
     while (remaining.length > 0) {
+      if (commandName === 'add')
+        await assertGitWorkingTreePaths(normalizedPath, ['add', '--', ...remaining], (query) => this.executeGit(normalizedPath, query));
       const pathspec = this.createPathspecFile(tempPrefix, remaining);
       try {
         return await this.executeGit(normalizedPath, [commandName, `--pathspec-from-file=${pathspec.pathspecFile}`, '--pathspec-file-nul']);

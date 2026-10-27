@@ -71,6 +71,7 @@ describe('GitService commitWithMessage', () => {
     let messageFilePath = '';
     let pathspecFilePath = '';
     const runner = vi.fn(async (_file: string, args: string[]) => {
+      if (args[0] === 'ls-files') return { stdout: 'src/app.ts\0docs/read me.md\0', stderr: '' };
       const fileFlagIndex = args.indexOf('-F');
       expect(fileFlagIndex).toBeGreaterThan(0);
       messageFilePath = args[fileFlagIndex + 1];
