@@ -227,9 +227,7 @@
       "description": "",
       "priority": "medium",
       "status": "planned",
-      "tags": [
-        "Planned"
-      ],
+      "tags": ["Planned"],
       "createdAt": 1793053833086,
       "updatedAt": 1793053833086
     }
