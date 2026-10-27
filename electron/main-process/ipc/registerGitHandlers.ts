@@ -7,7 +7,7 @@ import type { WorkingTreeService } from '../../WorkingTreeService';
 import type { AppSettings } from '../../settings';
 import { redactGitSensitiveText } from '../../git/GitErrorFormatter';
 import { IpcChannel } from '../../../src/types/ipcContract';
-import { createJobId } from '../gitCommandPolicy';
+import { createJobId, normalizeCommandArgs } from '../gitCommandPolicy';
 import { registerGitDiffPreviewHandler } from './git/registerGitDiffPreviewHandler';
 import { registerDiffLineSelectionHandler } from './git/registerDiffLineSelectionHandler';
 import { registerUntrackFilesHandlers } from './git/registerUntrackFilesHandlers';
@@ -258,6 +258,11 @@ export function registerGitHandlers({
       return { success: false, error: error instanceof Error ? error.message : 'No repository selected.' };
     }
     if (commandName === 'push') {
+      try {
+        normalizeCommandArgs('push', rawArgs);
+      } catch (error: unknown) {
+        return { success: false, error: error instanceof Error ? error.message : 'Invalid push arguments.' };
+      }
       const scanBlock = await secretScanPushGuard.requirePushSecretScanApproval(event, rawArgs, repoPath);
       if (scanBlock) return scanBlock;
       try {
@@ -296,6 +301,11 @@ export function registerGitHandlers({
       return { success: false, error: error instanceof Error ? error.message : 'Requested repository is not the active repository.' };
     }
     if (commandName === 'push') {
+      try {
+        normalizeCommandArgs('push', rawArgs);
+      } catch (error: unknown) {
+        return { success: false, error: error instanceof Error ? error.message : 'Invalid push arguments.' };
+      }
       const scanBlock = await secretScanPushGuard.requirePushSecretScanApproval(event, rawArgs, repoPath);
       if (scanBlock) return scanBlock;
       try {

@@ -1,6 +1,7 @@
 import { isGitCommandName, MAX_ARGS_BY_GIT_COMMAND, type GitCommandName } from '../../src/shared/ipc/gitCommands';
 import { normalizeRepositoryRelativePath } from '../git/RepositoryPathSafety';
 import { parseMergeIntoBranchArgs } from './gitMergeCommandPolicy';
+import { assertSafeFetchRefspec, isPushLease, safePushRefspec } from '../git/GitRefspecSafety';
 import { assertSafeRemoteUrl, assertSafeRevision, assertSafeValue, isSafeShowFormat, normalizeGitPathspecs, PATHSPEC_COMMANDS } from './gitCommandArguments';
 
 export type { GitCommandName };
@@ -191,7 +192,7 @@ const validateFetchArgs = (args: string[]): void => {
     throw new Error('Unsupported argument combination for git fetch.');
   }
   if (values[0]) assertSafeRemoteUrl(values[0]);
-  if (values[1]) assertSafeValue(values[1], 'refspec');
+  if (values[1]) assertSafeFetchRefspec(values[1]);
 };
 
 const TAG_REFERENCE_STATUS_FORMAT = '--format=%(refname)%00%(objectname)%00%(*objectname)';
@@ -237,7 +238,8 @@ const validatePushArgs = (args: string[]): void => {
     throw new Error('Unsupported argument combination for git push.');
   }
   if (values[0]) assertSafeRemoteUrl(values[0]);
-  if (values[1]) assertSafeValue(values[1], 'push ref');
+  if (options.includes('--force-with-lease=')) throw new Error('Invalid force-with-lease argument.');
+  if (values[1]) safePushRefspec(values[1], options.some(isPushLease));
 };
 
 const validateCheckoutArgs = (args: string[]): void => {

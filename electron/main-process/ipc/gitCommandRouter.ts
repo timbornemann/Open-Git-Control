@@ -9,6 +9,8 @@ import { requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
 import { observesPlannerBranchRename, plannerBranchRename } from '../plannerWorkEvents';
 import { protectGitReadArgs } from '../gitCommandArguments';
 import { assertGitWorkingTreePaths } from '../../git/GitWorkingTreePathGuard';
+import { explicitPushArguments } from '../../git/GitPushArguments';
+import { gitConfigurationEnvironment } from '../../git/remoteTransferValidation';
 
 type GitCommandRouterEvent = {
   sender: any;
@@ -212,6 +214,13 @@ const COMMAND_EXECUTORS: Partial<Record<GitCommandName, GitCommandExecutor>> = {
   cherryPickContinue: async (context) => executeSequencerCommand(context, ['cherry-pick', '--continue'], { GIT_EDITOR: 'true' }),
   cherryPickAbort: async (context) => executeSequencerCommand(context, ['cherry-pick', '--abort']),
   fetch: executeStreamingCommand,
+  push: async (context) => {
+    const args = await explicitPushArguments(context.args, (query) => runInContext(context, query));
+    const remote = args[args.indexOf('--') + 1];
+    return context.gitService.runner.run(context.repoPath || context.gitService.requireActiveRepoPath(), args, {
+      envOverrides: gitConfigurationEnvironment([[`remote.${remote}.mirror`, 'false']], process.env),
+    });
+  },
   forEachRef: (context) => runInContext(context, ['for-each-ref', ...context.args]),
   adoptRemoteTag: executeAdoptRemoteTag,
   pull: executeStreamingCommand,

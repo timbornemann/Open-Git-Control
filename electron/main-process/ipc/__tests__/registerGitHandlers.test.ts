@@ -340,6 +340,7 @@ describe('registerGitHandlers', () => {
       stats: { checkedLines: 0, stagedLines: 0, toPushLines: 0, tagLines: 0 },
     });
     const gitService = {
+      runner: { run: vi.fn().mockResolvedValue('push ok') },
       runCommandAtPath: vi.fn().mockResolvedValue('push ok'),
       getRepoPath: vi.fn(() => 'C:/repo'),
       resolveRepositoryPathAsync: vi.fn((repoPath: string) => repoPath),
@@ -376,7 +377,11 @@ describe('registerGitHandlers', () => {
 
     expect(result).toEqual({ success: true, data: 'push ok' });
     expect(scanPushDiffs).toHaveBeenCalledWith(expect.objectContaining({ repoPath: 'C:/repo', includeTags: true, strictness: 'medium' }));
-    expect(gitService.runCommandAtPath).toHaveBeenCalledWith('C:/repo', ['push', '--tags']);
+    expect(gitService.runner.run).toHaveBeenCalledWith(
+      'C:/repo',
+      ['push', '--no-mirror', '--no-force', '--', 'origin', 'refs/tags/*:refs/tags/*'],
+      expect.any(Object),
+    );
   });
 
   it('requires an in-app confirmation for push findings instead of trusting a renderer flag', async () => {
@@ -435,7 +440,12 @@ describe('registerGitHandlers', () => {
       stats: { checkedLines: 1, stagedLines: 1, toPushLines: 0, tagLines: 0 },
     });
     const gitService = {
-      runCommandAtPath: vi.fn().mockResolvedValue('push ok'),
+      runner: { run: vi.fn().mockResolvedValue('push ok') },
+      runCommandAtPath: vi.fn(async (_repo: string, args: string[]) => {
+        if (args[0] === 'symbolic-ref') return 'refs/heads/main';
+        if (args[0] === 'config') return 'branch.main.remote\norigin\0branch.main.merge\nrefs/heads/main\0';
+        return 'push ok';
+      }),
       getRepoPath: vi.fn(() => 'C:/repo'),
       resolveRepositoryPathAsync: vi.fn((repoPath: string) => repoPath),
       getStatus: vi.fn(),
@@ -475,7 +485,11 @@ describe('registerGitHandlers', () => {
 
     expect(result).toEqual({ success: true, data: 'push ok' });
     expect(scanPushDiffs).toHaveBeenCalledTimes(1);
-    expect(gitService.runCommandAtPath).toHaveBeenCalledWith('C:/repo', ['push']);
+    expect(gitService.runner.run).toHaveBeenCalledWith(
+      'C:/repo',
+      ['push', '--no-mirror', '--no-force', '--', 'origin', 'refs/heads/main:refs/heads/main'],
+      expect.any(Object),
+    );
   });
 
   it('does not honor an approval granted for a different push destination', async () => {

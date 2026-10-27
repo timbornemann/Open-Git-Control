@@ -64,8 +64,26 @@ describe('gitCommandPolicy', () => {
 
   it('allows the tag-free background fetch used for remote status checks', () => {
     expect(() => validateCommandArgs('fetch', ['origin', '--prune', '--no-tags', '--quiet'])).not.toThrow();
-    expect(() => validateCommandArgs('fetch', ['origin', '--prune', '--no-tags', '--quiet', '+refs/tags/*:refs/ogc/remote-tags/origin/*'])).not.toThrow();
-    expect(() => validateCommandArgs('fetch', ['origin', '--no-tags', '--quiet', '+refs/tags/v2.0.3:refs/tags/v2.0.3'])).not.toThrow();
+    expect(() => validateCommandArgs('fetch', ['origin', '--no-tags', '--quiet', 'refs/tags/v2.0.3:refs/tags/v2.0.3'])).not.toThrow();
+  });
+
+  it.each(['+HEAD:refs/heads/main', '+refs/heads/main:refs/heads/other', '+refs/tags/*:refs/ogc/remote-tags/origin/*'])('rejects force refspec %s', (ref) => {
+    expect(() => validateCommandArgs('fetch', ['origin', ref])).toThrow('Force refspecs are not allowed');
+    expect(() => validateCommandArgs('push', ['origin', ref])).toThrow('Force refspecs require --force-with-lease');
+  });
+
+  it.each([':main', ':refs/heads/main', '+:main', ':', '+:'])('rejects deletion or matching refspec %s even with a lease', (ref) => {
+    expect(() => validateCommandArgs('push', ['origin', ref])).toThrow();
+    expect(() => normalizeCommandArgs('push', ['--force-with-lease', 'origin', ref])).toThrow('Deletion and matching push refspecs');
+  });
+
+  it.each(['--force-with-lease', `--force-with-lease=refs/heads/main:${'a'.repeat(40)}`])('only accepts a force refspec when a push uses %s', (lease) => {
+    expect(normalizeCommandArgs('push', [lease, 'origin', '+HEAD:refs/heads/main'])).toEqual([lease, 'origin', '+HEAD:refs/heads/main']);
+    expect(normalizeCommandArgs('push', [lease, '+remote', 'HEAD'])).toEqual([lease, '+remote', 'HEAD']);
+  });
+
+  it('rejects an empty lease option instead of accepting it as authorization for a force refspec', () => {
+    expect(() => normalizeCommandArgs('push', ['--force-with-lease=', 'origin', '+HEAD:refs/heads/main'])).toThrow('Invalid force-with-lease');
   });
 
   it('allows only the bounded tag-reference query used for conflict indicators', () => {
