@@ -43,6 +43,10 @@ export const buildCommitHistoryMenuActions = ({
     },
     {
       label: tr(`Cherry-Pick ${shortHash}`, `Cherry-pick ${shortHash}`),
+      description: tr(
+        'Übernimmt die Änderungen dieses einzelnen Commits als neuen Commit in deinen aktuellen Branch.',
+        "Applies this commit's changes as a new commit on your current branch.",
+      ),
       icon: 'CP',
       action: () =>
         runGitAction(gitClient.buildCherryPickCommitArgs(hash), tr(`Cherry-Pick von ${shortHash} erfolgreich.`, `Successfully cherry-picked ${shortHash}.`)),
@@ -52,6 +56,10 @@ export const buildCommitHistoryMenuActions = ({
       : [
           {
             label: tr(`Revert ${shortHash}`, `Revert ${shortHash}`),
+            description: tr(
+              'Erstellt einen neuen Commit, der die Änderungen dieses Commits rückgängig macht. Der ursprüngliche Commit bleibt erhalten.',
+              "Creates a new commit that undoes this commit's changes. The original commit stays in the history.",
+            ),
             icon: 'RV',
             action: () =>
               runGitAction(
@@ -68,6 +76,10 @@ export const buildCommitHistoryMenuActions = ({
     },
     {
       label: tr(`Reset --soft auf ${shortHash}`, `Reset --soft to ${shortHash}`),
+      description: tr(
+        'Setzt den Branch auf diesen Commit zurück. Deine Dateien und die für den nächsten Commit vorgemerkten Änderungen (Staging) bleiben unverändert.',
+        'Moves your branch back to this commit. Your files and the changes staged for the next commit stay unchanged.',
+      ),
       icon: 'RS',
       action: () => {
         setConfirmDialog({
@@ -92,6 +104,10 @@ export const buildCommitHistoryMenuActions = ({
     },
     {
       label: tr(`Reset --mixed auf ${shortHash}`, `Reset --mixed to ${shortHash}`),
+      description: tr(
+        'Setzt den Branch auf diesen Commit zurück und leert die Staging-Auswahl. Deine Dateien bleiben unverändert; Änderungen kannst du neu vormerken.',
+        'Moves your branch back to this commit and clears the staging selection. Your files stay unchanged; you can stage the changes again.',
+      ),
       icon: 'RM',
       action: () => {
         setConfirmDialog({
@@ -119,6 +135,10 @@ export const buildCommitHistoryMenuActions = ({
     },
     {
       label: tr(`Reset --hard auf ${shortHash}`, `Reset --hard to ${shortHash}`),
+      description: tr(
+        'Setzt den Branch und die erfassten Dateien auf diesen Commit zurück. Dabei gehen nicht committete Änderungen verloren.',
+        'Resets your branch and tracked files to this commit. Uncommitted changes will be lost.',
+      ),
       icon: 'RH',
       danger: true,
       action: () => {
@@ -147,6 +167,10 @@ export const buildCommitHistoryMenuActions = ({
     },
     {
       label: tr(`Interaktiver Rebase bis ${shortHash}`, `Interactive rebase through ${shortHash}`),
+      description: tr(
+        'Lässt dich diesen und die folgenden Commits umordnen, bearbeiten, zusammenfassen oder entfernen. Dabei wird die Commit-Historie neu geschrieben.',
+        'Lets you reorder, edit, combine or remove this commit and the commits after it. This rewrites the commit history.',
+      ),
       icon: 'IR',
       action: () => {
         if (!layout) return;
@@ -242,6 +266,10 @@ export const buildCommitHistoryMenuActions = ({
     },
     {
       label: tr('Commit-Hash kopieren', 'Copy commit hash'),
+      description: tr(
+        'Kopiert die vollständige eindeutige Kennung dieses Commits in die Zwischenablage.',
+        'Copies the full unique identifier of this commit to the clipboard.',
+      ),
       icon: 'ID',
       action: () => {
         navigator.clipboard.writeText(hash);
@@ -253,6 +281,10 @@ export const buildCommitHistoryMenuActions = ({
   if (node.isMerge) {
     actions.splice(2, 0, {
       label: tr(`Merge ${shortHash} reverten`, `Revert merge ${shortHash}`),
+      description: tr(
+        'Macht die durch diesen Merge hinzugekommenen Änderungen mit einem neuen Commit rückgängig. Die bisherigen Commits bleiben erhalten.',
+        'Creates a new commit that undoes the changes introduced by this merge. The existing commits stay in the history.',
+      ),
       icon: 'MR',
       action: () => {
         setConfirmDialog({

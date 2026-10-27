@@ -64,7 +64,12 @@ export const useCommitGraphContextMenu = ({ branches, currentBranch, onMergeBran
 
     updateContextMenuPlacement();
     const frame = window.requestAnimationFrame(updateContextMenuPlacement);
-    return () => window.cancelAnimationFrame(frame);
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateContextMenuPlacement) : null;
+    if (contextMenuRef.current) observer?.observe(contextMenuRef.current);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer?.disconnect();
+    };
   }, [contextMenu, mergeCtxExpanded, updateContextMenuPlacement]);
 
   useEffect(() => {

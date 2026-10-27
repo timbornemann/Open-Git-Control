@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import type { CatalogTranslateFn } from '@/i18n';
+import type { CatalogTranslateFn, TranslateFn } from '@/i18n';
 import type { GraphNode } from '@/utils/graphLayout';
 
 export type ContextMenuState = {
@@ -18,6 +18,7 @@ export type ContextMenuPlacement = {
 
 export type MenuAction = {
   label: string;
+  description?: string;
   icon: string;
   danger?: boolean;
   separator?: boolean;
@@ -49,6 +50,7 @@ type CommitContextMenuProps = {
   onMergeCommit: (hash: string, shortHash: string) => void;
   onMergeBranchRef: (branchRef: string) => void;
   t: CatalogTranslateFn;
+  tr: TranslateFn;
 };
 
 export const CommitContextMenu: React.FC<CommitContextMenuProps> = ({
@@ -65,6 +67,7 @@ export const CommitContextMenu: React.FC<CommitContextMenuProps> = ({
   onMergeCommit,
   onMergeBranchRef,
   t,
+  tr,
 }) => {
   const primaryMenu = menuActions.slice(0, 4);
   const tailMenu = menuActions.slice(4);
@@ -77,7 +80,10 @@ export const CommitContextMenu: React.FC<CommitContextMenuProps> = ({
     return (
       <button key={`act-${idx}`} type="button" className={`ctx-menu-item ${item.danger ? 'danger' : ''}`} onClick={() => onRunMenuAction(item)}>
         <span className="ctx-menu-icon">{item.icon}</span>
-        {item.label}
+        <span className="ctx-menu-label">
+          <span>{item.label}</span>
+          {item.description && <span className="ctx-menu-help">{item.description}</span>}
+        </span>
       </button>
     );
   };
@@ -92,7 +98,7 @@ export const CommitContextMenu: React.FC<CommitContextMenuProps> = ({
     >
       <div
         ref={contextMenuRef}
-        className="ctx-menu"
+        className="ctx-menu commit-context-menu"
         style={{
           left: contextMenuPlacement?.left ?? contextMenu.x,
           top: contextMenuPlacement?.top ?? contextMenu.y,
@@ -118,7 +124,15 @@ export const CommitContextMenu: React.FC<CommitContextMenuProps> = ({
               }}
             >
               {mergeCtxExpanded ? <ChevronDown size={14} className="ctx-menu-merge-chevron" /> : <ChevronRight size={14} className="ctx-menu-merge-chevron" />}
-              {t('generated.components.layout.branchcontextmenu.merge_into_current_branch_07cabe72')}
+              <span className="ctx-menu-label">
+                <span>{t('generated.components.layout.branchcontextmenu.merge_into_current_branch_07cabe72')}</span>
+                <span className="ctx-menu-help">
+                  {tr(
+                    'Zeigt Optionen zum Zusammenführen von Commits und Branches mit deinem aktuellen Branch.',
+                    'Shows options for merging commits and branches into your current branch.',
+                  )}
+                </span>
+              </span>
             </button>
             {mergeCtxExpanded && (
               <div className="ctx-menu-merge-body">
@@ -127,6 +141,12 @@ export const CommitContextMenu: React.FC<CommitContextMenuProps> = ({
                   <button type="button" className="ctx-menu-merge-item" onClick={() => onMergeCommit(mergeContextPayload.hash, mergeContextPayload.shortHash)}>
                     {t('generated.components.layout.main.mainprimarypane.merge_83b759bf')} {mergeContextPayload.shortHash}
                     <span className="ctx-menu-merge-item-hint">{t('generated.components.commit_graph.commitcontextmenu.git_merge_commit_hash_71f2f1a9')}</span>
+                    <span className="ctx-menu-help">
+                      {tr(
+                        'Übernimmt die Änderungen dieses Entwicklungsstands in deinen aktuellen Branch. Bei Bedarf erstellt Git einen Merge-Commit.',
+                        'Merges this point in history into your current branch, creating a merge commit if needed.',
+                      )}
+                    </span>
                   </button>
                 </div>
                 {mergeContextPayload.refsHere.length > 0 && (
@@ -136,6 +156,9 @@ export const CommitContextMenu: React.FC<CommitContextMenuProps> = ({
                       <button key={ref} type="button" className="ctx-menu-merge-item" onClick={() => onMergeBranchRef(ref)}>
                         {ref}
                         <span className="ctx-menu-merge-item-hint">{t('generated.components.commit_graph.commitcontextmenu.merge_branch_ref_a4db347a')}</span>
+                        <span className="ctx-menu-help">
+                          {t('generated.components.layout.branchcontextmenu.merges_this_branch_into_the_currently_checked_out_branch_88f4ab90')}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -150,6 +173,9 @@ export const CommitContextMenu: React.FC<CommitContextMenuProps> = ({
                           {row.scope === 'remote'
                             ? t('generated.components.commit_graph.commitcontextmenu.remote_tracking_fa1e6664')
                             : t('generated.components.layout.sidebar.githubconnectedcontent.local_0a3c619d')}
+                        </span>
+                        <span className="ctx-menu-help">
+                          {t('generated.components.layout.branchcontextmenu.merges_this_branch_into_the_currently_checked_out_branch_88f4ab90')}
                         </span>
                       </button>
                     ))}

@@ -65,6 +65,14 @@ export const buildCommitMenuActions = ({
     tr,
   }),
   ...(onEditCommitMessage
-    ? [{ label: tr('Commit-Nachricht bearbeiten …', 'Edit commit message …'), icon: '✎', separator: true, action: () => onEditCommitMessage(node.commit.hash) }]
+    ? [
+        {
+          label: tr('Commit-Nachricht bearbeiten …', 'Edit commit message …'),
+          description: tr('Öffnet den Editor, um die Nachricht dieses Commits zu ändern.', 'Opens the editor to change this commit message.'),
+          icon: '✎',
+          separator: true,
+          action: () => onEditCommitMessage(node.commit.hash),
+        },
+      ]
     : []),
 ];

@@ -80,6 +80,7 @@ export const CommitGraphContextMenuLayer = ({
         onMergeBranch?.(branchRef, 'default');
       }}
       t={t}
+      tr={tr}
     />
   );
 };

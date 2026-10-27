@@ -107,6 +107,12 @@ export const buildCommitRefMenuActions = ({
 
   const checkoutRefActions: MenuAction[] = checkoutCandidates.map((candidate) => ({
     label: tr(`Branch auschecken: ${candidate.label}`, `Check out branch: ${candidate.label}`),
+    description: candidate.args.includes('--track')
+      ? tr(
+          'Legt einen lokalen Branch zu diesem Remote-Branch an und wechselt dorthin. Der lokale Branch verfolgt die Änderungen auf dem Remote.',
+          'Creates and switches to a local branch that tracks this remote branch.',
+        )
+      : tr('Wechselt zu diesem lokalen Branch und zeigt dessen Dateistand.', 'Switches to this local branch and its version of the files.'),
     icon: 'CB',
     action: () => {
       void runGitAction(candidate.args, candidate.successMessage);
@@ -117,6 +123,7 @@ export const buildCommitRefMenuActions = ({
     ...checkoutRefActions,
     {
       label: tr(`Neuen Branch von ${shortHash} erstellen...`, `Create new branch from ${shortHash}...`),
+      description: tr('Erstellt einen neuen Branch an diesem Commit und wechselt direkt dorthin.', 'Creates a new branch at this commit and switches to it.'),
       icon: 'NB',
       action: () => {
         const suggested = `checkout-${shortHash}`;
@@ -158,6 +165,10 @@ export const buildCommitRefMenuActions = ({
     },
     {
       label: tr('Nur Commit (detached HEAD) auschecken...', 'Check out commit only (detached HEAD)...'),
+      description: tr(
+        'Zeigt den Dateistand dieses Commits ohne aktiven Branch. Lege für neue Commits einen Branch an, um sie später leicht wiederzufinden.',
+        'Checks out this commit without an active branch. Create a branch for any new commits so you can easily find them later.',
+      ),
       icon: '!',
       action: () => {
         setConfirmDialog({
@@ -188,6 +199,7 @@ export const buildCommitRefMenuActions = ({
     },
     {
       label: tr('Neuen Branch erstellen...', 'Create new branch...'),
+      description: tr('Erstellt einen neuen Branch an diesem Commit und wechselt direkt dorthin.', 'Creates a new branch at this commit and switches to it.'),
       icon: 'B',
       action: () => {
         setInputDialog({
@@ -215,6 +227,10 @@ export const buildCommitRefMenuActions = ({
     },
     {
       label: tr('Tag erstellen...', 'Create tag...'),
+      description: tr(
+        'Markiert diesen Commit mit einem Namen, zum Beispiel einer Versionsnummer. Der Tag wird zunächst nur lokal angelegt.',
+        'Marks this commit with a name, such as a version number. The tag is created locally first.',
+      ),
       icon: 'T',
       action: () => {
         setInputDialog({

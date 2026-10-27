@@ -229,6 +229,10 @@
   line-height: 1.2;
 }
 
+.commit-context-menu {
+  width: 380px;
+}
+
 .ctx-menu-help {
   display: none;
   margin-top: 3px;
@@ -239,8 +243,17 @@
 }
 
 .ctx-menu-item:hover .ctx-menu-help,
-.ctx-menu-item:focus-visible .ctx-menu-help {
+.ctx-menu-item:focus-visible .ctx-menu-help,
+.ctx-menu-merge-toggle:hover .ctx-menu-help,
+.ctx-menu-merge-toggle:focus-visible .ctx-menu-help,
+.ctx-menu-merge-item:hover .ctx-menu-help,
+.ctx-menu-merge-item:focus-visible .ctx-menu-help {
   display: block;
+}
+
+.ctx-menu-merge-item .ctx-menu-help {
+  font-family: Inter, system-ui, sans-serif;
+  font-weight: 400;
 }
 
 .ctx-menu-sep {
