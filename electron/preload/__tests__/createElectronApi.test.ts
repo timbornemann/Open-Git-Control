@@ -3,6 +3,17 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { createElectronApi } from '../createElectronApi';
 
 describe('createElectronApi', () => {
+  it('forwards JSON Schema validation through flat and app APIs', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true, data: [] });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+    const request = { source: '{}', schemaSource: '{"type":"object"}' };
+    await api.app.validateJsonSchema(request);
+    await api.validateJsonSchema(request);
+    expect(invoke.mock.calls).toEqual([
+      [IpcChannel.AppValidateJsonSchema, request],
+      [IpcChannel.AppValidateJsonSchema, request],
+    ]);
+  });
   it('forwards complete file-history scope and pagination through both API namespaces', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true, data: [] });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

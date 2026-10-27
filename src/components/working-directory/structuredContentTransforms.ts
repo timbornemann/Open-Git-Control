@@ -1,4 +1,4 @@
-import type { ErrorObject } from 'ajv';
+import { jsonSchemaClient } from '@/services/jsonSchemaClient';
 import { parseJsonText } from './fileContentTransforms';
 
 const yamlDocument = async (source: string) => {
@@ -60,25 +60,8 @@ export const minifyHtmlText = async (source: string): Promise<string> => {
   });
 };
 
-const describeSchemaError = (error: ErrorObject): string => {
-  const location = error.instancePath || '$';
-  return `${location}: ${error.message || error.keyword}`;
-};
-
 export const validateJsonWithSchema = async (source: string, schemaSource: string): Promise<string[]> => {
-  const schema = parseJsonText(schemaSource);
-  const data = parseJsonText(source);
-  try {
-    const dialect = schema && typeof schema === 'object' && '$schema' in schema ? String((schema as { $schema?: unknown }).$schema || '') : '';
-    const module = dialect.includes('2020-12')
-      ? await import('ajv/dist/2020')
-      : dialect.includes('2019-09')
-        ? await import('ajv/dist/2019')
-        : await import('ajv');
-    const ajv = new module.default({ allErrors: true, strict: false });
-    const validate = ajv.compile(schema as object);
-    return validate(data) ? [] : (validate.errors || []).map(describeSchemaError);
-  } catch (error: unknown) {
-    throw new Error(`Invalid JSON Schema: ${error instanceof Error ? error.message : String(error)}`);
-  }
+  const result = await jsonSchemaClient.validate({ source, schemaSource });
+  if (!result.success) throw new Error(result.error);
+  return result.data;
 };

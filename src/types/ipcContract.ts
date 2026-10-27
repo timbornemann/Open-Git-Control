@@ -35,6 +35,7 @@ export const enum IpcChannel {
   AiTestConnection = 'ai:testConnection',
   AppCancelRead = 'app:cancelRead',
   AppBootstrap = 'app:bootstrap',
+  AppValidateJsonSchema = 'app:validateJsonSchema',
   AppSystemToolsStatus = 'app:systemTools:status',
   AppSystemToolsRecheck = 'app:systemTools:recheck',
   AppSystemToolInstall = 'app:systemTools:install',

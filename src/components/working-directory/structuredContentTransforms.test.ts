@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   formatHtmlText,
   formatXmlText,
@@ -10,6 +10,10 @@ import {
   validateYamlText,
   yamlToJson,
 } from './structuredContentTransforms';
+const validation = vi.hoisted(() => vi.fn());
+vi.mock('@/services/jsonSchemaClient', () => ({ jsonSchemaClient: { validate: validation } }));
+beforeEach(() => validation.mockReset().mockResolvedValue({ success: true, data: [] }));
+afterEach(() => vi.unstubAllGlobals());
 
 describe('structured content transforms', () => {
   it('formats and minifies strict XML', async () => {
@@ -43,7 +47,10 @@ describe('structured content transforms', () => {
   it('reports JSON Schema validation issues', async () => {
     const schema = '{"type":"object","required":["name"],"properties":{"name":{"type":"string"}}}';
     await expect(validateJsonWithSchema('{"name":"Ada"}', schema)).resolves.toEqual([]);
+    validation.mockResolvedValueOnce({ success: true, data: ['/name: must be string'] });
     expect((await validateJsonWithSchema('{"name":42}', schema))[0]).toContain('must be string');
+    expect(validation).toHaveBeenLastCalledWith({ source: '{"name":42}', schemaSource: schema });
+    validation.mockResolvedValueOnce({ success: false, error: 'Invalid JSON Schema: type must be a valid JSON type' });
     await expect(validateJsonWithSchema('{}', '{"type":"unknown"}')).rejects.toThrow('Invalid JSON Schema');
   });
 
@@ -51,6 +58,16 @@ describe('structured content transforms', () => {
     const schema = '{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"array","prefixItems":[{"type":"string"}]}';
 
     await expect(validateJsonWithSchema('["ok"]', schema)).resolves.toEqual([]);
+    expect(validation).toHaveBeenLastCalledWith({ source: '["ok"]', schemaSource: schema });
+    validation.mockResolvedValueOnce({ success: true, data: ['/0: must be string'] });
     expect((await validateJsonWithSchema('[42]', schema))[0]).toContain('must be string');
+  });
+
+  it('validates without dynamic code generation in a production-CSP renderer', async () => {
+    vi.stubGlobal('Function', function () {
+      throw new EvalError('Dynamic code generation is blocked by CSP.');
+    });
+    await expect(validateJsonWithSchema('{"valid":true}', '{"type":"object"}')).resolves.toEqual([]);
+    expect(validation).toHaveBeenCalledWith({ source: '{"valid":true}', schemaSource: '{"type":"object"}' });
   });
 });

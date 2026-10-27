@@ -38,6 +38,7 @@ import { registerGitIdentityHandlers } from './registerGitIdentityHandlers';
 import { registerRepositoryLocationHandlers } from './registerRepositoryLocationHandlers';
 import { registerStorageMaintenanceHandlers } from './registerStorageMaintenanceHandlers';
 import { RepositoryLocationService } from '../RepositoryLocationService';
+import { registerJsonSchemaValidationHandler } from './registerJsonSchemaValidationHandler';
 
 type SetupIpcDeps = {
   gitService: GitService;
@@ -78,6 +79,7 @@ export function setupIPC({
   const repositoryRunService = new RepositoryRunService(repositoryRunConfigService);
   registerReadCancellation();
   registerBootstrapHandlers();
+  registerJsonSchemaValidationHandler();
   registerDialogHandlers({ gitService });
   const pushGuard = registerGitHandlers({
     gitService,

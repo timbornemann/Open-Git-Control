@@ -59,6 +59,10 @@ jobs:
         if: runner.os == 'Windows'
         run: npm run test:startup:electron
 
+      - name: Verify archived JSON Schema validation under production CSP
+        if: runner.os == 'Windows'
+        run: npm run test:schema:electron
+
   recovery:
     name: Native recovery (${{ matrix.os }})
     permissions:
