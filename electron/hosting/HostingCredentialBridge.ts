@@ -3,6 +3,7 @@ import { createServer, type Server } from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createPrivateTempDir, cleanupPrivateTempDir } from '../git/PrivateTempFiles';
+import { gitHelperEnvironment, gitNodeHelperCommand } from '../git/GitNodeHelper';
 
 export type GitCredentialEnvironment = { envOverrides: NodeJS.ProcessEnv; signal?: AbortSignal; dispose: () => void };
 export type GitCredentialRequest = {
@@ -53,11 +54,12 @@ function configEnvironment(base: NodeJS.ProcessEnv, helper: string, urls: string
 
 const HELPER_SOURCE = `const http = require('http');
 if(process.argv[2] !== 'get') process.exit(0);
+const {port,key} = JSON.parse(require('fs').readFileSync(require('path').join(__dirname,'broker.json'),'utf8'));
 let input=''; process.stdin.setEncoding('utf8');
 process.stdin.on('data',chunk=>{input+=chunk;if(input.length>16384)process.exit(1);});
 process.stdin.on('end',()=>{
   const fields={};for(const line of input.split(/\\r?\\n/)){const index=line.indexOf('=');if(index>0)fields[line.slice(0,index)]=line.slice(index+1);}
-  const request = http.request({hostname:'127.0.0.1',port:process.env.OGC_GIT_BROKER_PORT,path:'/',method:'POST',headers:{'Authorization':'Bearer '+process.env.OGC_GIT_BROKER_KEY,'Content-Type':'application/json'},timeout:10000},response=>{
+  const request = http.request({hostname:'127.0.0.1',port,path:'/',method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},timeout:10000},response=>{
     let data=''; response.on('data',chunk=>{data+=chunk; if(data.length>65536) request.destroy();});
     response.on('end',()=>{if(response.statusCode===200) process.stdout.write(data); else process.exitCode=1;});
   });
@@ -65,7 +67,7 @@ process.stdin.on('end',()=>{
 });
 `;
 
-/** A short-lived loopback broker. Helper files contain no credentials. */
+/** A short-lived loopback broker. Private helper data holds only its scoped capability, never account credentials. */
 export class HostingCredentialBridge {
   constructor(private readonly credentialFor: (connectionId: string, urls: string[]) => Promise<GitCredentialIdentity>) {}
 
@@ -97,9 +99,7 @@ export class HostingCredentialBridge {
     const key = randomBytes(32).toString('hex');
     const directory = createPrivateTempDir('ogc-git-auth-');
     const helperPath = path.join(directory, 'credential-helper.cjs');
-    fs.writeFileSync(helperPath, HELPER_SOURCE, { mode: 0o600 });
-    const quote = (value: string) => `'${value.replace(/'/g, "'\\''")}'`;
-    const helper = `!${quote(process.execPath.replace(/\\/g, '/'))} ${quote(helperPath.replace(/\\/g, '/'))}`;
+    const helper = `!${gitNodeHelperCommand(helperPath)}`;
     let disposed = false;
     let server: Server | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -113,6 +113,7 @@ export class HostingCredentialBridge {
       cleanupPrivateTempDir(directory);
     };
     try {
+      fs.writeFileSync(helperPath, HELPER_SOURCE, { mode: 0o600, flag: 'wx' });
       server = createServer((incoming, outgoing) => {
         if (disposed || !identity.isCurrent() || incoming.method !== 'POST' || incoming.headers.authorization !== `Bearer ${key}`) {
           outgoing.writeHead(403);
@@ -152,6 +153,7 @@ export class HostingCredentialBridge {
           else reject(new Error('Credential broker could not listen.'));
         });
       });
+      fs.writeFileSync(path.join(directory, 'broker.json'), JSON.stringify({ port, key }), { mode: 0o600, flag: 'wx' });
       if (request.signal?.aborted) {
         dispose();
         request.signal.throwIfAborted();
@@ -159,7 +161,7 @@ export class HostingCredentialBridge {
       request.signal?.addEventListener('abort', dispose, { once: true });
       timer = setTimeout(dispose, 10 * 60_000);
       return {
-        envOverrides: {
+        envOverrides: gitHelperEnvironment({
           ...configEnvironment(request.envOverrides || {}, helper, [...request.urls, ...defaultLfsUrls, ...(request.lfsUrls ?? [])]),
           GIT_ASKPASS: '',
           GIT_TERMINAL_PROMPT: '0',
@@ -169,10 +171,7 @@ export class HostingCredentialBridge {
           GIT_TRACE_CURL: '0',
           GIT_TRACE2: '0',
           GIT_TRACE2_EVENT: '0',
-          ELECTRON_RUN_AS_NODE: '1',
-          OGC_GIT_BROKER_PORT: String(port),
-          OGC_GIT_BROKER_KEY: key,
-        },
+        }),
         signal: request.signal,
         dispose,
       };

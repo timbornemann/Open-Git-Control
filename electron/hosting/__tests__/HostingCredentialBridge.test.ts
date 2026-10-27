@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { HostingCredentialBridge } from '../HostingCredentialBridge';
 import { redactHostingSecrets, registerHostingSecrets } from '../hostingRedaction';
 import { normalizeConnectionUrls } from '../hostingUrls';
@@ -7,6 +7,15 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { createRequire } from 'node:module';
+import * as privateTempFiles from '../../git/PrivateTempFiles';
+
+function brokerDetails(env: NodeJS.ProcessEnv): { port: number; key: string; file: string } {
+  const index = Object.keys(env).find((key) => key.startsWith('GIT_CONFIG_KEY_') && env[key] === 'credential.helper' && env[key.replace('_KEY_', '_VALUE_')]);
+  const command = env[index!.replace('_KEY_', '_VALUE_')]!;
+  const helperPath = / '((?:[^']|'\\'')*)'$/.exec(command)![1].replace(/'\\''/g, "'");
+  const file = path.join(path.dirname(helperPath), 'broker.json');
+  return { ...JSON.parse(fs.readFileSync(file, 'utf8')), file };
+}
 
 const fillCredential = (env: NodeJS.ProcessEnv, host: string, repoPath: string) =>
   new Promise<string>((resolve, reject) => {
@@ -42,15 +51,22 @@ describe('destination-bound credential broker', () => {
       urls: ['https://forge.example.test/project/repo.git'],
       envOverrides: { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'push.followTags', GIT_CONFIG_VALUE_0: 'false' },
     });
+    const broker = brokerDetails(operation.envOverrides);
     const credential = async (host: string, repoPath: string) =>
-      fetch(`http://127.0.0.1:${operation.envOverrides.OGC_GIT_BROKER_PORT}/`, {
+      fetch(`http://127.0.0.1:${broker.port}/`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${operation.envOverrides.OGC_GIT_BROKER_KEY}` },
+        headers: { Authorization: `Bearer ${broker.key}` },
         body: JSON.stringify({ protocol: 'https', host, path: repoPath }),
       });
     try {
       expect(operation.envOverrides.GIT_CONFIG_COUNT).toBe('8');
       expect(operation.envOverrides.GIT_CONFIG_KEY_0).toBe('push.followTags');
+      expect(operation.envOverrides.OGC_GIT_BROKER_KEY).toBeUndefined();
+      expect(operation.envOverrides.OGC_GIT_BROKER_PORT).toBeUndefined();
+      expect(operation.envOverrides.ELECTRON_RUN_AS_NODE).toBeUndefined();
+      expect(Object.values(operation.envOverrides).join('\n')).not.toContain(broker.key);
+      expect(fs.readFileSync(broker.file, 'utf8')).not.toContain('opaque-secret');
+      if (process.platform !== 'win32') expect(fs.statSync(broker.file).mode & 0o077).toBe(0);
       expect(await (await credential('forge.example.test', 'project/repo.git')).text()).toBe('username=selected-user\npassword=opaque-secret\n\n');
       expect((await credential('forge.example.test', 'project/repo.git/info/lfs')).status).toBe(200);
       expect((await credential('forge.example.test', 'project/other.git/info/lfs')).status).toBe(403);
@@ -60,12 +76,14 @@ describe('destination-bound credential broker', () => {
       const filled = await fillCredential(operation.envOverrides, 'forge.example.test', 'project/repo.git');
       expect(filled).toContain('username=selected-user');
       expect(filled).toContain('password=opaque-secret');
+      expect(await fillCredential(operation.envOverrides, 'forge.example.test', 'project/repo.git/info/lfs')).toContain('password=opaque-secret');
       await expect(fillCredential(operation.envOverrides, 'forge.example.test', 'project/other.git')).rejects.toThrow('rejected');
       active = false;
       expect((await credential('forge.example.test', 'project/repo.git')).status).toBe(403);
     } finally {
       operation.dispose();
     }
+    expect(fs.existsSync(broker.file)).toBe(false);
   });
 
   it('rejects unrelated LFS servers and repository paths instead of sharing the selected account', async () => {
@@ -81,9 +99,76 @@ describe('destination-bound credential broker', () => {
     const bridge = new HostingCredentialBridge(async () => ({ username: 'user', password: 'password', isCurrent: () => true }));
     await expect(bridge.createGitCredentialEnvironment({ connectionId: 'one', urls: ['http://forge.test/repo.git'] })).rejects.toThrow('HTTPS');
     const operation = await bridge.createGitCredentialEnvironment({ connectionId: 'one', urls: ['https://forge.test/repo.git'], signal: controller.signal });
+    const broker = brokerDetails(operation.envOverrides);
     controller.abort();
-    await expect(fetch(`http://127.0.0.1:${operation.envOverrides.OGC_GIT_BROKER_PORT}/`)).rejects.toThrow();
+    await expect(fetch(`http://127.0.0.1:${broker.port}/`)).rejects.toThrow();
+    expect(fs.existsSync(broker.file)).toBe(false);
     operation.dispose();
+  });
+
+  it('clears inherited helper variables without changing the parent environment or unrelated overrides', async () => {
+    vi.stubEnv('ELECTRON_RUN_AS_NODE', 'parent-value');
+    vi.stubEnv('OGC_GIT_BROKER_KEY', 'parent-key');
+    vi.stubEnv('OGC_GIT_BROKER_PORT', 'parent-port');
+    const bridge = new HostingCredentialBridge(async () => ({ username: 'user', password: 'token', isCurrent: () => true }));
+    let operation: Awaited<ReturnType<HostingCredentialBridge['createGitCredentialEnvironment']>> | undefined;
+    try {
+      operation = await bridge.createGitCredentialEnvironment({
+        connectionId: 'one',
+        urls: ['https://forge.test/repo.git'],
+        envOverrides: {
+          OGC_GIT_BROKER_KEY: 'old-key',
+          electron_run_as_node: 'old-mode',
+          ogc_git_broker_key: 'old-key',
+          ogc_git_broker_port: 'old-port',
+          CUSTOM_GIT_SETTING: 'preserved',
+        },
+      });
+      for (const [name, value] of Object.entries(operation.envOverrides)) {
+        if (['ELECTRON_RUN_AS_NODE', 'OGC_GIT_BROKER_KEY', 'OGC_GIT_BROKER_PORT'].includes(name.toUpperCase())) expect(value).toBeUndefined();
+      }
+      expect(operation.envOverrides.CUSTOM_GIT_SETTING).toBe('preserved');
+      expect(process.env.ELECTRON_RUN_AS_NODE).toBe('parent-value');
+      expect(process.env.OGC_GIT_BROKER_KEY).toBe('parent-key');
+      expect(await fillCredential(operation.envOverrides, 'forge.test', 'repo.git')).toContain('password=token');
+    } finally {
+      operation?.dispose();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('removes the private capability when the broker expires', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const bridge = new HostingCredentialBridge(async () => ({ username: 'user', password: 'token', isCurrent: () => true }));
+    let operation: Awaited<ReturnType<HostingCredentialBridge['createGitCredentialEnvironment']>> | undefined;
+    try {
+      operation = await bridge.createGitCredentialEnvironment({ connectionId: 'one', urls: ['https://forge.test/repo.git'] });
+      const broker = brokerDetails(operation.envOverrides);
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+      expect(fs.existsSync(path.dirname(broker.file))).toBe(false);
+    } finally {
+      operation?.dispose();
+      vi.useRealTimers();
+    }
+  });
+
+  it('cleans up the broker and private capability when configuration preparation fails', async () => {
+    const create = vi.spyOn(privateTempFiles, 'createPrivateTempDir');
+    try {
+      const bridge = new HostingCredentialBridge(async () => ({ username: 'user', password: 'token', isCurrent: () => true }));
+      await expect(
+        bridge.createGitCredentialEnvironment({
+          connectionId: 'one',
+          urls: ['https://forge.test/repo.git'],
+          envOverrides: { GIT_CONFIG_COUNT: 'invalid' },
+        }),
+      ).rejects.toThrow('Invalid inherited Git configuration');
+      const directory = create.mock.results.at(-1)?.value as string | undefined;
+      expect(directory).toBeDefined();
+      expect(fs.existsSync(directory!)).toBe(false);
+    } finally {
+      create.mockRestore();
+    }
   });
 
   it.each(['', 'other-account@'])('resets inherited authentication headers for the exact selected endpoint with username %s', async (username) => {
@@ -124,7 +209,8 @@ describe('destination-bound credential broker', () => {
       try {
         Object.defineProperty(process, 'execPath', { ...execPathDescriptor, value: electronExecutable });
         operation = await bridge.createGitCredentialEnvironment({ connectionId: 'electron', urls: ['https://forge.example.test/project/repo.git'] });
-        expect(operation.envOverrides.ELECTRON_RUN_AS_NODE).toBe('1');
+        expect(operation.envOverrides.ELECTRON_RUN_AS_NODE).toBeUndefined();
+        expect(operation.envOverrides.GIT_CONFIG_VALUE_1).toContain('!ELECTRON_RUN_AS_NODE=1 ');
         expect(operation.envOverrides.GIT_CONFIG_VALUE_1).toContain(electronExecutable.replace(/\\/g, '/'));
         const filled = await fillCredential(operation.envOverrides, 'forge.example.test', 'project/repo.git');
         expect(filled).toContain('username=electron-user');

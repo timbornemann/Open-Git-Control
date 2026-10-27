@@ -4,6 +4,7 @@ import type { CommitRecord, EditSnapshot } from './commitMessageEditInspection';
 import { readCommit } from './commitMessageEditInspection';
 import { editTempRoot, editWorktree, type EditJournal } from './commitMessageEditJournal';
 import { writePrivateTempFile } from './PrivateTempFiles';
+import { gitHelperEnvironment, gitNodeHelperCommand } from './GitNodeHelper';
 
 const quoteShellPath = (value: string) => `'${value.replace(/\\/g, '/').replace(/'/g, `'\\''`)}'`;
 
@@ -38,7 +39,7 @@ export async function prepareRewrite(git: CommitEditGit, repo: string, snapshot:
   if (snapshot.commits.length === 1) {
     await git.run(worktree, [...config, 'commit', '--amend', '--only', '--allow-empty', '--cleanup=verbatim', '-F', messageFile]);
   } else {
-    const editor = `${quoteShellPath(process.execPath)} ${quoteShellPath(helperFile)}`;
+    const editor = gitNodeHelperCommand(helperFile);
     const parent = snapshot.commits[0].parents[0];
     await git.run(
       worktree,
@@ -57,11 +58,10 @@ export async function prepareRewrite(git: CommitEditGit, repo: string, snapshot:
         ...(parent ? [parent] : ['--root']),
       ],
       {
-        envOverrides: {
-          ELECTRON_RUN_AS_NODE: '1',
+        envOverrides: gitHelperEnvironment({
           GIT_EDITOR: `${editor} ${quoteShellPath(messageFile)}`,
           GIT_SEQUENCE_EDITOR: `${editor} ${quoteShellPath(todoFile)}`,
-        },
+        }),
       },
     );
   }

@@ -30,10 +30,9 @@ describe('normalizeInteractiveRebaseTodo', () => {
 
     const run = vi.fn(async (_repoPath: string, args: string[], options: any = {}) => {
       if (args[0] === 'rebase' && args[1] === '-i') {
-        expect(options.envOverrides).toMatchObject({ ELECTRON_RUN_AS_NODE: '1', GIT_EDITOR: 'true', LC_ALL: 'C' });
-        const quotedParts = [...String(options.envOverrides.GIT_SEQUENCE_EDITOR).matchAll(/"([^"]+)"/g)];
-        const helperPath = quotedParts.at(-1)?.[1];
-        expect(helperPath).toBeTruthy();
+        expect(options.envOverrides).toMatchObject({ ELECTRON_RUN_AS_NODE: undefined, GIT_EDITOR: 'true', LC_ALL: 'C' });
+        expect(options.envOverrides.GIT_SEQUENCE_EDITOR).toContain('ELECTRON_RUN_AS_NODE=1 ');
+        const helperPath = path.join(path.dirname(options.envOverrides.OGC_REBASE_TODO_FILE), 'editor.js');
         execFileSync(process.execPath, [String(helperPath), todoTarget], {
           env: { ...process.env, ...options.envOverrides },
         });

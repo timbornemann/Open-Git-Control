@@ -1,6 +1,7 @@
 import * as path from 'path';
 import type { GitRunner } from './GitRunner';
 import { cleanupPrivateTempDir, createPrivateTempDir, writePrivateTempFile } from './PrivateTempFiles';
+import { gitHelperEnvironment, gitNodeHelperCommand } from './GitNodeHelper';
 
 const REBASE_TODO_ACTIONS = new Set(['pick', 'reword', 'edit', 'squash', 'fixup', 'drop']);
 const COMMIT_HASH_RE = /^[0-9a-f]{7,64}$/i;
@@ -102,18 +103,14 @@ export class RebaseService {
     writePrivateTempFile(helperPath, helperScript);
     writePrivateTempFile(todoPath, JSON.stringify(normalizedLines));
 
-    const quotedNode = `"${process.execPath.replace(/"/g, '\\"')}"`;
-    const quotedHelper = `"${helperPath.replace(/"/g, '\\"')}"`;
-
     try {
       return await this.runGit.run(repoPath, ['rebase', '-i', normalizedBase], {
-        envOverrides: {
-          ELECTRON_RUN_AS_NODE: '1',
+        envOverrides: gitHelperEnvironment({
           GIT_EDITOR: 'true',
-          GIT_SEQUENCE_EDITOR: `${quotedNode} ${quotedHelper}`,
+          GIT_SEQUENCE_EDITOR: gitNodeHelperCommand(helperPath),
           LC_ALL: 'C',
           OGC_REBASE_TODO_FILE: todoPath,
-        },
+        }),
         requestedKind: 'write',
       });
     } finally {
