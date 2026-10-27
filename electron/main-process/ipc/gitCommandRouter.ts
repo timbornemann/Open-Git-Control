@@ -9,7 +9,7 @@ import { requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
 import { observesPlannerBranchRename, plannerBranchRename } from '../plannerWorkEvents';
 import { protectGitReadArgs } from '../gitCommandArguments';
 import { assertGitWorkingTreePaths } from '../../git/GitWorkingTreePathGuard';
-import { explicitPushArguments } from '../../git/GitPushArguments';
+import { explicitPushArguments, prepareForcePushArguments } from '../../git/GitPushArguments';
 import { gitConfigurationEnvironment } from '../../git/remoteTransferValidation';
 
 type GitCommandRouterEvent = {
@@ -214,6 +214,11 @@ const COMMAND_EXECUTORS: Partial<Record<GitCommandName, GitCommandExecutor>> = {
   cherryPickContinue: async (context) => executeSequencerCommand(context, ['cherry-pick', '--continue'], { GIT_EDITOR: 'true' }),
   cherryPickAbort: async (context) => executeSequencerCommand(context, ['cherry-pick', '--abort']),
   fetch: executeStreamingCommand,
+  prepareForcePush: async (context) => {
+    const args = await prepareForcePushArguments(context.args, (query) => runInContext(context, query));
+    normalizeCommandArgs('push', args.slice(1));
+    return JSON.stringify(args);
+  },
   push: async (context) => {
     const args = await explicitPushArguments(context.args, (query) => runInContext(context, query));
     const remote = args[args.indexOf('--') + 1];

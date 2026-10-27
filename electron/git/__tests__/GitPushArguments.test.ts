@@ -85,11 +85,12 @@ describe('explicit push arguments', () => {
 
   it('never forwards + to Git or changes the target of a leased source-only force refspec', async () => {
     const config: Array<[string, string]> = [...base, ['remote.origin.push', '+refs/heads/main:refs/heads/review']];
-    expect(await fixture(config).resolve(['--force-with-lease', 'origin', '+main'])).toEqual([
+    const lease = `--force-with-lease=refs/heads/main:${'a'.repeat(40)}`;
+    expect(await fixture(config).resolve([lease, 'origin', '+main'])).toEqual([
       'push',
       '--no-mirror',
       '--no-force',
-      '--force-with-lease',
+      lease,
       '--',
       'origin',
       'main:refs/heads/main',

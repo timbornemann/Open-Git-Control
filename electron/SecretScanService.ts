@@ -7,6 +7,7 @@ import type { SecretScanProgressDto, SecretScanPushScopeDto } from '../src/types
 import type { PushSecretScanScope } from './git/PushSecretScanScope';
 import { SecretScanHistoryCache, SECRET_SCAN_HISTORY_ENV, type HistoryScanEntry } from './git/SecretScanHistoryCache';
 import type { GitRunOptions } from './git/GitProcessTypes';
+import { expandPushScanSources } from './git/SecretScanPushRefspecs';
 
 export type SecretScanStrictness = 'low' | 'medium' | 'high';
 export type SecretScanSource = 'staged' | 'to-push' | 'tag';
@@ -948,7 +949,10 @@ export class SecretScanService {
     };
 
     if (explicitRefspecs.length > 0) {
-      const revisions = [...new Set(explicitRefspecs.map(normalizeRefspecSource).filter((source): source is string => Boolean(source)))];
+      const sources = explicitRefspecs.map(normalizeRefspecSource).filter((source): source is string => Boolean(source));
+      const revisions = await expandPushScanSources(sources, explicitRefspecs.includes(':'), args, (query) =>
+        this.gitService.runCommandAtPath(repoPath, query),
+      );
       return { revisions, excludeRemote, includeTags };
     }
 

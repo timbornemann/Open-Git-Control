@@ -239,6 +239,7 @@ Tests und Builds als strukturiertes Protokoll lesen, Probleme prüfen und genann
 - Auswahlmodi für Fetch, Pull und Push unabhängig auf der Repository-Seite Remote-Konfiguration einstellen.
 - **Remote-Konfiguration** aus dem Pull- oder Push-Dropdown öffnen.
 - Force-with-lease gegen den geprüften Stand jedes Endpunkts bestätigen.
+- Auch Force-Pushes aus der Toolbar halten Ziel-Refs und erwartete Objekt-IDs vor der Bestätigung fest; Hintergrund-Fetches können eine bestätigte Lease nicht verändern.
 - Upstream ausdrücklich unter Remote-Konfiguration setzen.
 - Ergebnisse je Ziel prüfen und erfolglose Ziele mit dem geprüften Commit erneut versuchen.
 - Repository-spezifische Run-, Test-, Format-, Start- und Build-Workflows starten.

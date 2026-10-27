@@ -239,6 +239,7 @@ Read test and build output as a structured transcript, inspect Problems and open
 - Configure independent Fetch, Pull and Push selection modes on the repository's Remote configuration page.
 - Open **Remote configuration** from either the Pull or Push dropdown.
 - Confirm force-with-lease against each destination's inspected revision.
+- Toolbar force pushes also freeze destination refs and expected object IDs before confirmation; background fetches cannot change an approved lease.
 - Set upstream explicitly in Remote configuration.
 - Inspect results and retry unsuccessful destinations with the reviewed commit.
 - Run repository-specific Run, Test, Format, Start, and Build workflows.

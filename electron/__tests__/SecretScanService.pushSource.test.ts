@@ -3,6 +3,36 @@ import { SecretScanService } from '../SecretScanService';
 import { createGitServiceMock } from './secretScanTestUtils';
 
 describe('SecretScanService push source selection', () => {
+  it.each(['wildcard', 'matching'])('scans the non-HEAD history of a prepared %s force push', async (mode) => {
+    const commit = 'e'.repeat(40);
+    const diff = ['diff --git a/.env b/.env', '+++ b/.env', '@@ -0,0 +1 @@', '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF'].join('\n');
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'symbolic-ref --quiet --short HEAD': 'main',
+        remote: 'origin',
+        'for-each-ref --format=%(refname)': 'refs/heads/main\nrefs/heads/release\nrefs/heads/local-only',
+        'rev-list --reverse --topo-order refs/heads/release': commit,
+        [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${commit}`]: diff,
+      }),
+    );
+    const result = await service.scanPushDiffs({
+      repoPath: '/tmp/repo',
+      strictness: 'low',
+      allowlistText: '',
+      pushArgs: [
+        '--no-follow-tags',
+        `--force-with-lease=refs/heads/release:${'a'.repeat(40)}`,
+        '--force-with-lease=refs/heads/local-only:',
+        'origin',
+        mode === 'matching' ? ':' : 'refs/heads/*:refs/heads/*',
+      ],
+    });
+    expect(result.findings).toHaveLength(1);
+    expect(result.historyScanIncomplete).toBeUndefined();
+    expect(result.notes.join('\n')).toContain('refs/heads/release');
+    if (mode === 'matching') expect(result.notes.join('\n')).not.toContain('requested push source refs/heads/local-only');
+  });
+
   it('honors branch.pushRemote before remote.pushDefault when choosing configured push sources', async () => {
     const runCommandAtPath = vi.fn(
       async (_repoPath: string, args: string[]) =>

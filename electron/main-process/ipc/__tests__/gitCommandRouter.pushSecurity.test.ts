@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GitService } from '../../../GitService';
 import { handleGitCommand } from '../gitCommandRouter';
-import { explicitPushArguments } from '../../../git/GitPushArguments';
+import { explicitPushArguments, prepareForcePushArguments } from '../../../git/GitPushArguments';
 import { normalizeCommandArgs } from '../../gitCommandPolicy';
 
 const roots: string[] = [];
@@ -32,6 +32,11 @@ async function fixture() {
   await run(['remote', 'add', 'origin', remote]);
   await run(['push', '-u', 'origin', 'HEAD:refs/heads/main']);
   const push = (...args: string[]) => handleGitCommand({ sender: { send: vi.fn() } }, service, 'push', args, repo);
+  const prepare = async (...args: string[]) => {
+    const result = await handleGitCommand({ sender: {} }, service, 'prepareForcePush', args, repo);
+    if (!result.success) throw new Error(result.error);
+    return (JSON.parse(result.data!) as string[]).slice(1);
+  };
   const diverge = async () => {
     await run(['commit', '--allow-empty', '-m', 'local']);
     const local = await run(['rev-parse', 'HEAD']);
@@ -42,7 +47,7 @@ async function fixture() {
     await run(['checkout', 'main']);
     return { local, remoteHead };
   };
-  return { root, repo, service, run, server, push, base, diverge };
+  return { root, repo, service, run, server, push, prepare, base, diverge };
 }
 
 afterEach(async () => {
@@ -101,17 +106,19 @@ describe('git push refspec security', { timeout: 60000 }, () => {
     expect(await f.server(['rev-parse', 'refs/heads/main'])).toBe(local);
   });
 
-  it('preserves the force-with-lease flow using remote-tracking refs and an implicit current branch', async () => {
+  it('rejects the confirmed lease after a remote change and a background fetch, then permits a freshly prepared rewrite', async () => {
     const f = await fixture();
+    const prepared = await f.prepare('--force-with-lease');
     const { local, remoteHead } = await f.diverge();
-    await f.run(['update-ref', 'refs/remotes/origin/main', f.base]);
-    expect(await f.push('--force-with-lease', 'origin', '+HEAD:refs/heads/main')).toMatchObject({
+    await f.run(['fetch', 'origin']);
+    expect(await f.run(['rev-parse', 'refs/remotes/origin/main'])).toBe(remoteHead);
+    expect(await f.push(...prepared)).toMatchObject({
       success: false,
       error: expect.stringMatching(/stale info/i),
     });
     expect(await f.server(['rev-parse', 'refs/heads/main'])).toBe(remoteHead);
-    await f.run(['update-ref', 'refs/remotes/origin/main', remoteHead]);
-    expect(await f.push('--force-with-lease')).toMatchObject({ success: true });
+    expect(await f.push('--force-with-lease')).toMatchObject({ success: false, error: expect.stringContaining('Prepare the force push') });
+    expect(await f.push(...(await f.prepare('--force-with-lease')))).toMatchObject({ success: true });
     expect(await f.server(['rev-parse', 'refs/heads/main'])).toBe(local);
   });
 
@@ -127,6 +134,33 @@ describe('git push refspec security', { timeout: 60000 }, () => {
     expect(await f.server(['for-each-ref', '--format=%(refname)', 'refs/heads'])).toBe('refs/heads/keep\nrefs/heads/main');
     expect(await f.push('origin')).toMatchObject({ success: false, error: expect.stringContaining('Deletion') });
     expect(await f.server(['rev-parse', 'refs/heads/keep'])).toBe(f.base);
+  });
+
+  it('protects a destination that was absent during preparation and retains explicit upstream setup', async () => {
+    const f = await fixture();
+    await f.run(['commit', '--allow-empty', '-m', 'local']);
+    const head = await f.run(['rev-parse', 'HEAD']);
+    const prepared = await f.prepare('--force-with-lease', '-u', 'origin', 'HEAD:refs/heads/new');
+    expect(prepared).toContain('--force-with-lease=refs/heads/new:');
+    await f.server(['update-ref', 'refs/heads/new', f.base]);
+    await f.run(['fetch', 'origin']);
+    expect(await f.push(...prepared)).toMatchObject({ success: false, error: expect.stringMatching(/stale info/i) });
+    expect(await f.server(['rev-parse', 'refs/heads/new'])).toBe(f.base);
+    expect(await f.push(...(await f.prepare('--force-with-lease', '-u', 'origin', 'HEAD:refs/heads/new')))).toMatchObject({ success: true });
+    expect(await f.server(['rev-parse', 'refs/heads/new'])).toBe(head);
+    expect(await f.run(['config', '--get', 'branch.main.merge'])).toBe('refs/heads/new');
+  });
+
+  it('preserves force-with-lease matching semantics without publishing local-only branches', async () => {
+    const f = await fixture();
+    const { local } = await f.diverge();
+    await f.run(['branch', 'local-only']);
+    await f.run(['config', 'push.default', 'matching']);
+    const prepared = await f.prepare('--force-with-lease');
+    expect(prepared).toContain(':');
+    expect(await f.push(...prepared)).toMatchObject({ success: true });
+    expect(await f.server(['rev-parse', 'refs/heads/main'])).toBe(local);
+    expect(await f.server(['for-each-ref', '--format=%(refname)', 'refs/heads/local-only'])).toBe('');
   });
 
   it('preserves ordinary default pushes, custom destinations, upstream setup and tag pushes', async () => {
@@ -154,7 +188,9 @@ describe('git push refspec security', { timeout: 60000 }, () => {
     await f.run(['commit', '--allow-empty', '-m', 'next']);
     const compare = async (args: string[]) => {
       const native = await f.run(['push', '--porcelain', '--dry-run', ...args]);
-      const explicit = await explicitPushArguments(normalizeCommandArgs('push', args), f.run);
+      const normalized = normalizeCommandArgs('push', args);
+      const protectedArgs = args.includes('--force-with-lease') ? (await prepareForcePushArguments(normalized, f.run)).slice(1) : normalized;
+      const explicit = await explicitPushArguments(protectedArgs, f.run);
       const protectedPush = await f.run(['push', '--porcelain', '--dry-run', ...explicit.slice(1)]);
       const updates = (output: string) => output.split('\n').filter((line) => /^[ *+=!\-]\t/.test(line));
       expect(updates(protectedPush), JSON.stringify(args)).toEqual(updates(native));

@@ -227,6 +227,7 @@ const validatePushArgs = (args: string[]): void => {
         !arg.startsWith('--force-with-lease=') &&
         arg !== '--tags' &&
         arg !== '--follow-tags' &&
+        arg !== '--no-follow-tags' &&
         arg !== '-u' &&
         arg !== '--set-upstream',
     )
@@ -234,12 +235,16 @@ const validatePushArgs = (args: string[]): void => {
     throw new Error('Unsupported argument for git push.');
   }
   const values = args.filter((arg) => !arg.startsWith('-'));
-  if (values.length > 2 || (options.includes('--tags') && values.length > 0)) {
+  if (options.includes('--tags') && values.length > 0) {
     throw new Error('Unsupported argument combination for git push.');
   }
   if (values[0]) assertSafeRemoteUrl(values[0]);
   if (options.includes('--force-with-lease=')) throw new Error('Invalid force-with-lease argument.');
-  if (values[1]) safePushRefspec(values[1], options.some(isPushLease));
+  for (const ref of values.slice(1)) {
+    // Matching is needed when replaying a prepared default push; deletions remain forbidden.
+    if (ref === ':' && options.some((option) => /^--force-with-lease=refs\/[^:]+:/.test(option))) continue;
+    safePushRefspec(ref, options.some(isPushLease));
+  }
 };
 
 const validateCheckoutArgs = (args: string[]): void => {
@@ -424,6 +429,7 @@ const validateCommandSpecificArgs = (commandName: GitCommandName, args: string[]
     case 'pull':
       return validatePullArgs(args);
     case 'push':
+    case 'prepareForcePush':
       return validatePushArgs(args);
     case 'checkout':
       return validateCheckoutArgs(args);

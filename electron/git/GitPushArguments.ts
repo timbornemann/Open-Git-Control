@@ -1,11 +1,12 @@
 import { gitConfigurationEntries } from './GitConfigurationEntries';
 import { safePushRefspec } from './GitRefspecSafety';
 import { assertSafeRemoteUrl } from '../main-process/gitCommandArguments';
+import { assertExplicitPushLeases, pinPushLeases } from './GitPushLease';
 
 type ReadGit = (args: string[]) => Promise<string>;
 
 /** Resolve defaults locally, then keep remote.push and remote.mirror out of the executed push. */
-export async function explicitPushArguments(args: string[], read: ReadGit): Promise<string[]> {
+async function resolvePushArguments(args: string[], read: ReadGit): Promise<string[]> {
   const entries = gitConfigurationEntries(await read(['config', '--null', '--list']));
   const all = (key: string) => entries.filter(([name]) => name === key.replace(/\.[^.]+$/, (variable) => variable.toLowerCase())).map(([, value]) => value);
   const get = (key: string) => all(key).at(-1) ?? '';
@@ -85,7 +86,7 @@ export async function explicitPushArguments(args: string[], read: ReadGit): Prom
 
   let refs: string[];
   if (values[1]) {
-    refs = [await complete(values[1], !values[1].startsWith('+'))];
+    refs = await Promise.all(values.slice(1).map((ref) => (ref === ':' ? Promise.resolve(':') : complete(ref, !ref.startsWith('+')))));
   } else if (args.includes('--tags')) {
     refs = ['refs/tags/*:refs/tags/*'];
   } else if (configured.length) {
@@ -96,4 +97,14 @@ export async function explicitPushArguments(args: string[], read: ReadGit): Prom
   }
   // The caller also disables remote.<name>.mirror with process-local configuration.
   return ['push', '--no-mirror', '--no-force', ...options, '--', remote, ...refs];
+}
+
+export async function prepareForcePushArguments(args: string[], read: ReadGit): Promise<string[]> {
+  return pinPushLeases(await resolvePushArguments(args, read), read);
+}
+
+export async function explicitPushArguments(args: string[], read: ReadGit): Promise<string[]> {
+  const explicit = await resolvePushArguments(args, read);
+  await assertExplicitPushLeases(explicit, read);
+  return explicit;
 }

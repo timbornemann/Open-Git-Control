@@ -16,6 +16,7 @@ import { useRemoteRecoveryWorkflow } from './useRemoteRecoveryWorkflow';
 import { requestRemoteTransfer } from '@/components/hosting/remoteTransferDialogState';
 import { awaitPullTransfer, pullIntentFromArguments } from '@/components/hosting/awaitPullTransfer';
 import { executeGuidedBranchChange, guidedBranchTarget } from './executeGuidedBranchChange';
+import { prepareForcePushCommand } from './prepareForcePushCommand';
 
 type Toast = { msg: string; isError: boolean };
 
@@ -335,6 +336,13 @@ export const useGitCommandWorkflow = ({
           releaseWorkflowRun();
           return false;
         }
+
+        const prepared = await prepareForcePushCommand(args, repoAtStart, isStillActiveRepo, recoverFromGitCommandFailure);
+        if ('result' in prepared) {
+          releaseWorkflowRun();
+          return prepared.result;
+        }
+        args = prepared.args;
 
         const branchTarget = guidedBranchTarget(args);
         if (branchTarget) {

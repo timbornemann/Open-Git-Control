@@ -23,6 +23,7 @@ export const GIT_COMMAND_NAMES = [
   'fetch',
   'pull',
   'push',
+  'prepareForcePush',
   'checkout',
   'commit',
   'reset',
@@ -65,7 +66,9 @@ export const MAX_ARGS_BY_GIT_COMMAND: Readonly<Partial<Record<GitCommandName, nu
   cherryPickAbort: 0,
   fetch: 8,
   pull: 6,
-  push: 8,
+  // Prepared pushes carry an explicit lease for every configured destination.
+  push: 4096,
+  prepareForcePush: 8,
   branch: 4,
   config: 3,
   remote: 4,
