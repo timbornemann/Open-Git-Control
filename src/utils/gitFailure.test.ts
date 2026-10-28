@@ -22,6 +22,8 @@ describe('Git failure explanations', () => {
     ["fatal: Unable to create '/repo/.git/index.lock': File exists", 'locked'],
     ['[REPO_UNAVAILABLE] fatal: not a git repository', 'repository'],
     ['Git operation was aborted.', 'cancelled'],
+    ["fatal: couldn't find remote ref test-branch", 'remote-branch-missing'],
+    ["Your configuration specifies to merge with the ref 'refs/heads/test-branch'\nfrom the remote, but no such ref was fetched.", 'remote-branch-missing'],
   ])('explains %s', (raw, kind) => {
     expect(describeGitFailure(raw, en, true)?.kind).toBe(kind);
     expect(describeGitFailure(raw, (de) => de, true)?.explanation).not.toBe(raw);
@@ -33,6 +35,21 @@ describe('Git failure explanations', () => {
       'locked',
     );
     expect(describeGitFailure('Command failed: git add "Internal Server Error.txt"\nfatal: disk full', en)?.kind).toBe('unknown');
+    expect(
+      describeGitFailure('Command failed: git add "fatal: couldn\'t find remote ref test-branch"\nGit Output: fatal: index.lock: File exists', en)?.kind,
+    ).toBe('locked');
+  });
+
+  it('explains a deleted pull source without claiming that its local branch was removed', () => {
+    const input = {
+      msg: "fatal: couldn't find remote ref test-branch",
+      isError: true,
+      gitContext: { repoPath: '/repo', remote: 'origin', branch: 'test-branch' },
+    };
+    const output = explainGitNotification(input, en);
+    expect(output.msg).toContain('local branch and commits are preserved');
+    expect(output.msg).toContain('default branch');
+    expect(output.technicalDetails).toBe(input.msg);
   });
 
   it.each(["fatal: could not read 'src/AbortError.ts': bad object", "fatal: could not write 'operation was aborted.txt': Permission denied"])(

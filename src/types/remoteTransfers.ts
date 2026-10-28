@@ -38,6 +38,10 @@ export interface GitPullConfigurationDto {
   fastForward: { key: string; value: 'false' | 'true' | 'only' } | null;
   mergeOptions: string | null;
 }
+export interface GitPullRecoveryDto {
+  branchExists: boolean;
+  defaultBranch: { name: string; localExists: boolean } | null;
+}
 export interface RemoteSelectionSnapshot {
   remotes: Array<{ name: string; urls: string[]; bindings: RepositoryEndpoint[] }>;
 }
@@ -102,6 +106,8 @@ export interface RemoteTransferOperations {
   editRemote: { input: { repoPath: string; mutation: RemoteMutation }; output: GitRemoteSnapshotDto };
   getPreferences: { input: { repoPath: string }; output: RemotePreferences };
   getPullConfiguration: { input: { repoPath: string }; output: GitPullConfigurationDto };
+  getPullRecovery: { input: { repoPath: string; remote: string; branch: string }; output: GitPullRecoveryDto };
+  preparePullRecovery: { input: { repoPath: string; remote: string; branch: string; defaultBranch: string }; output: GitPullRecoveryDto };
   setPreferences: { input: { repoPath: string; preferences: RemotePreferences }; output: RemotePreferences };
   fetch: {
     input: {

@@ -1,5 +1,12 @@
 import { create } from 'zustand';
-import type { GitPushBatchDto, GitPushPlanDto, GitRemoteSnapshotDto, RemotePreferences, RemoteTransferOperations } from '@/types/remoteTransfers';
+import type {
+  GitPullRecoveryDto,
+  GitPushBatchDto,
+  GitPushPlanDto,
+  GitRemoteSnapshotDto,
+  RemotePreferences,
+  RemoteTransferOperations,
+} from '@/types/remoteTransfers';
 import type { SecretScanResultDto } from '@/types/gitDtos';
 import type { RemoteTransferDialog } from './remoteTransferDialogState';
 
@@ -25,6 +32,7 @@ export interface RemoteTransferState {
   scan: SecretScanResultDto | null;
   batch: GitPushBatchDto | null;
   failedPull: RemoteTransferOperations['pull']['input'] | null;
+  pullRecovery: GitPullRecoveryDto | null;
   retrying: boolean;
   error: string;
   resultVisible: boolean;
@@ -44,6 +52,7 @@ export const initialRemoteTransferState = (): RemoteTransferState => ({
   scan: null,
   batch: null,
   failedPull: null,
+  pullRecovery: null,
   retrying: false,
   error: '',
   resultVisible: true,

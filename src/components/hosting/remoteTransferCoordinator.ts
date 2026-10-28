@@ -2,12 +2,13 @@ import { addSecretScanFindingPaths } from '@/services/repositorySecretScanAllowl
 import { transferClient } from '@/services/hostingClient';
 import { gitClient } from '@/services/gitClient';
 import { createRemoteSelectionSnapshot, rememberRemoteTransferSelection, resolveRemoteTransferSelection } from '@/utils/remoteTransferSelection';
-import type { RemoteSelectionMode, RemoteTransferAction } from '@/types/remoteTransfers';
+import type { GitPullRecoveryDto, RemoteSelectionMode, RemoteTransferAction, RemoteTransferOperations } from '@/types/remoteTransfers';
 import type { RemoteTransferDialog } from './remoteTransferDialogState';
 import { initialRemoteTransferState, useRemoteTransferState, type RemoteTransferSelection, type RemoteTransferState } from './remoteTransferState';
 import { syncRemoteTags } from './syncRemoteTags';
 import { notifyRemoteSyncSuccess } from '@/data/remoteSyncEvents';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
+import { isMissingRemoteBranchError } from '@/shared/git/pullErrors';
 
 export interface RemoteTransferContext {
   repoPath: string | null;
@@ -61,7 +62,13 @@ export class RemoteTransferCoordinator {
         : reason instanceof Error
           ? reason.message
           : String(reason);
-      this.set({ phase: this.cancelled && !this.state.batch ? 'idle' : 'result', busy: false, cancelling: false, resultVisible: false, error });
+      this.set({
+        phase: this.cancelled && !this.state.batch ? 'idle' : 'result',
+        busy: false,
+        cancelling: false,
+        resultVisible: !this.cancelled && Boolean(this.state.pullRecovery),
+        error,
+      });
       this.environment.toast(error, !this.cancelled);
     }
   }
@@ -169,7 +176,7 @@ export class RemoteTransferCoordinator {
   private async perform(selection: RemoteTransferSelection) {
     const intent = this.state.intent;
     if (!intent) return;
-    this.set({ phase: 'running', busy: true, selection, error: '', failedPull: null });
+    this.set({ phase: 'running', busy: true, selection, error: '', failedPull: null, pullRecovery: null });
     if (intent.mode === 'push') {
       await this.preparePush();
       return;
@@ -191,17 +198,37 @@ export class RemoteTransferCoordinator {
       mode: intent.pullMode ?? this.state.preferences.pullStrategy ?? 'default',
       ...(intent.autostash ? { autostash: true } : {}),
     };
+    await this.executePull(input);
+    this.finish(this.environment.tr(`Pull von ${remote}/${input.branch} abgeschlossen.`, `Pull from ${remote}/${input.branch} completed.`));
+  }
+  private async inspectFailedPull() {
+    const input = this.state.failedPull;
+    if (!input) return;
+    this.set({ pullRecovery: { branchExists: false, defaultBranch: null } });
+    const generation = this.generation;
+    try {
+      const { repoPath, remote, branch } = input;
+      const pullRecovery = await this.scoped(() => transferClient.request('getPullRecovery', { repoPath, remote, branch }));
+      this.set({ pullRecovery });
+    } catch {
+      // Keep the original diagnostic if the server cannot be queried again.
+      this.assertContext(generation);
+    }
+  }
+  private async executePull(input: RemoteTransferOperations['pull']['input']) {
     const generation = this.generation;
     try {
       await this.scoped(() => transferClient.request('pull', input));
     } catch (error) {
       if (generation === this.generation && this.context === remoteTransferContextKey(this.environment.getContext())) {
-        if (!this.cancelled) this.set({ failedPull: input });
+        if (!this.cancelled) {
+          this.set({ failedPull: input, pullRecovery: null });
+          if (isMissingRemoteBranchError(error instanceof Error ? error.message : String(error))) await this.inspectFailedPull();
+        }
         this.environment.refresh();
       }
       throw error;
     }
-    this.finish(this.environment.tr(`Pull von ${remote}/${input.branch} abgeschlossen.`, `Pull from ${remote}/${input.branch} completed.`));
   }
   private async scanPlan() {
     const { intent, plan } = this.state;
@@ -352,13 +379,41 @@ export class RemoteTransferCoordinator {
     this.set({ busy: true, phase: 'running', transferStage: 'transferring', error: '' });
     await this.run(async () => {
       await this.verifyTargets();
-      await this.scoped(() => transferClient.request('pull', input));
+      await this.executePull(input);
       this.finish(this.environment.tr(`Pull von ${input.remote}/${input.branch} abgeschlossen.`, `Pull from ${input.remote}/${input.branch} completed.`));
+    });
+  }
+  async switchPullToDefault(changeBranch: (repoPath: string, remote: string, branch: NonNullable<GitPullRecoveryDto['defaultBranch']>) => Promise<boolean>) {
+    const input = this.state.failedPull;
+    const target = this.state.pullRecovery?.defaultBranch;
+    if (this.state.busy || !input || !target) return;
+    const originalError = this.state.error;
+    this.cancelled = false;
+    this.set({ busy: true, phase: 'running', transferStage: 'transferring', error: '' });
+    const generation = this.generation;
+    await this.run(async () => {
+      await this.verifyTargets();
+      let recovery: GitPullRecoveryDto;
+      try {
+        recovery = await this.scoped(() => transferClient.request('preparePullRecovery', { ...input, defaultBranch: target.name }));
+      } catch (error) {
+        this.assertContext(generation);
+        await this.inspectFailedPull();
+        throw error;
+      }
+      await this.verifyTargets();
+      if (!recovery.defaultBranch || recovery.defaultBranch.name !== target.name) throw new Error('The remote default branch changed. Review recovery again.');
+      this.environment.refresh();
+      // The guarded branch workflow takes over and may ask how to handle local changes.
+      this.set({ busy: false, phase: 'result', resultVisible: false });
+      const switched = await changeBranch(input.repoPath, input.remote, recovery.defaultBranch);
+      if (!switched && generation === this.generation && this.context === remoteTransferContextKey(this.environment.getContext()))
+        this.set({ resultVisible: true, error: originalError });
     });
   }
   private finish(message: string) {
     const { intent, selection } = this.state;
-    this.set({ phase: 'idle', busy: false, cancelling: false, failedPull: null, error: '' });
+    this.set({ phase: 'idle', busy: false, cancelling: false, failedPull: null, pullRecovery: null, error: '' });
     if (intent && (intent.mode === 'fetch' || intent.mode === 'pull')) notifyRemoteSyncSuccess(intent.repoPath, selection.selectedRemoteNames[0], intent.mode);
     this.environment.refresh();
     this.environment.toast(message, false);

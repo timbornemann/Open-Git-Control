@@ -35,6 +35,8 @@ const operations = new Set<RemoteTransferOperation>([
   'editRemote',
   'getPreferences',
   'getPullConfiguration',
+  'getPullRecovery',
+  'preparePullRecovery',
   'setPreferences',
   'fetch',
   'pull',
@@ -44,8 +46,17 @@ const operations = new Set<RemoteTransferOperation>([
   'retryPush',
   'cancel',
 ]);
-const writes = new Set<RemoteTransferOperation>(['editRemote', 'setPreferences', 'fetch', 'pull', 'setUpstream', 'executePush', 'retryPush']);
-const transfers = new Set<RemoteTransferOperation>(['fetch', 'pull', 'planPush', 'executePush', 'retryPush']);
+const writes = new Set<RemoteTransferOperation>([
+  'editRemote',
+  'setPreferences',
+  'fetch',
+  'pull',
+  'preparePullRecovery',
+  'setUpstream',
+  'executePush',
+  'retryPush',
+]);
+const transfers = new Set<RemoteTransferOperation>(['fetch', 'pull', 'preparePullRecovery', 'planPush', 'executePush', 'retryPush']);
 
 /** Paths and plans are main-owned authority. Renderer inputs only select typed operations. */
 export function registerRemoteTransferHandlers({
@@ -163,6 +174,12 @@ export function registerRemoteTransferHandlers({
             break;
           case 'getPullConfiguration':
             data = await service.getPullConfiguration(repoPath, context.signal);
+            break;
+          case 'getPullRecovery':
+            data = await service.getPullRecovery(repoPath, input as RemoteTransferOperations['getPullRecovery']['input'], context);
+            break;
+          case 'preparePullRecovery':
+            data = await service.preparePullRecovery(repoPath, input as RemoteTransferOperations['preparePullRecovery']['input'], context);
             break;
           case 'checkConnection':
             data = await service.checkConnection(repoPath, input as RemoteTransferOperations['checkConnection']['input'], context);

@@ -1,6 +1,6 @@
 import { requestSecretScanAllowlistEditor } from '@/components/repository-security/secretScanAllowlistNavigation';
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import { useGitStore, useSettingsStore, useUIStore } from '@/contexts/AppStateContext';
+import { useGitStore, useSettingsStore, useUIStore, useWorkflowStore } from '@/contexts/AppStateContext';
 import { DialogFrame } from '@/components/DialogFrame';
 import { useI18n } from '@/i18n';
 import { useHostingState } from './hostingState';
@@ -10,6 +10,7 @@ import { RemoteTransferCoordinator, remoteTransferContextKey, type RemoteTransfe
 import { RemoteTransferPanel } from './RemoteTransferPanel';
 import { useRemoteTransferNotifications } from './useRemoteTransferNotifications';
 import './hosting.css';
+import { gitWorkflowCommands } from '@/components/layout/workflows/gitWorkflowCommands';
 
 /** Mounted once regardless of the selected repository subpage. */
 export function RemoteTransferHost({ onOpenConfiguration }: { onOpenConfiguration: (repoPath: string) => void }) {
@@ -20,6 +21,7 @@ export function RemoteTransferHost({ onOpenConfiguration }: { onOpenConfiguratio
   const refresh = useGitStore((state) => state.triggerRefresh);
   const scanEnabled = useSettingsStore((state) => state.settings.secretScanBeforePushEnabled);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
+  const runGitCommand = useWorkflowStore((state) => state.runGitCommand);
   const connections = useHostingState((state) => state.connections);
   const accounts = JSON.stringify(connections.map(({ id, authenticated, username, userId, apiBaseUrl }) => [id, authenticated, username, userId, apiBaseUrl]));
   const context: RemoteTransferContext = { repoPath, branch, accounts, scanEnabled };
@@ -83,6 +85,21 @@ export function RemoteTransferHost({ onOpenConfiguration }: { onOpenConfiguratio
           }}
           retryPush={() => void coordinator.retryPush()}
           retryPull={() => void coordinator.retryPull()}
+          switchPullToDefault={() =>
+            void coordinator.switchPullToDefault((path, remote, target) =>
+              runGitCommand(
+                target.localExists
+                  ? gitWorkflowCommands.checkoutBranch(target.name)
+                  : gitWorkflowCommands.createBranchFromRef(target.name, `refs/remotes/${remote}/${target.name}`),
+                tr(
+                  `Zu ${target.name} gewechselt. Führe dort Pull aus, um den Branch zu aktualisieren.`,
+                  `Switched to ${target.name}. Pull there to update the branch.`,
+                ),
+                tr('Branch wird gewechselt …', 'Switching branch …'),
+                { expectedRepoPath: path },
+              ),
+            )
+          }
           openWorkspace={() => {
             coordinator.close();
             setActiveTab('repo');

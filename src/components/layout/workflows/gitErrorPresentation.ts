@@ -161,6 +161,7 @@ export function prepareGitErrorNotification(message: NotificationMessage, read: 
       action = { label: tr('Repository-Liste öffnen', 'Open repository list'), onClick: run(environment.openRepositories, false) };
       break;
     case 'local-changes':
+    case 'remote-branch-missing':
     case 'diverged':
     case 'locked':
     case 'unknown':

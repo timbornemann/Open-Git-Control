@@ -12,6 +12,8 @@ const mocked = vi.hoisted(() => ({
   getRemotes: vi.fn(),
   getPreferences: vi.fn(),
   getPullConfiguration: vi.fn(),
+  getPullRecovery: vi.fn(),
+  preparePullRecovery: vi.fn(),
   checkConnection: vi.fn(),
   editRemote: vi.fn(),
   executePush: vi.fn(),
@@ -28,6 +30,8 @@ vi.mock('../../../git/RemoteTransferService', () => ({
     getRemotes = mocked.getRemotes;
     getPreferences = mocked.getPreferences;
     getPullConfiguration = mocked.getPullConfiguration;
+    getPullRecovery = mocked.getPullRecovery;
+    preparePullRecovery = mocked.preparePullRecovery;
     checkConnection = mocked.checkConnection;
     editRemote = mocked.editRemote;
     executePush = mocked.executePush;
@@ -53,6 +57,8 @@ describe('repository authority for structured remote transfers', () => {
     mocked.getRemotes.mockResolvedValue({ remotes: [] });
     mocked.getPreferences.mockReturnValue({});
     mocked.getPullConfiguration.mockResolvedValue({ branch: 'main', rebase: null, fastForward: null, mergeOptions: null });
+    mocked.getPullRecovery.mockResolvedValue({ branchExists: false, defaultBranch: { name: 'main', localExists: true } });
+    mocked.preparePullRecovery.mockResolvedValue({ branchExists: false, defaultBranch: { name: 'main', localExists: true } });
     mocked.checkConnection.mockResolvedValue(true);
     mocked.editRemote.mockResolvedValue({ remotes: [] });
     mocked.fetch.mockResolvedValue({ output: '' });
@@ -74,6 +80,25 @@ describe('repository authority for structured remote transfers', () => {
       tagsOnly: true,
     });
     expect(registry.isRepositoryBusy(activeRepo)).toBe(false);
+  });
+  it.each(['getPullRecovery', 'preparePullRecovery'] as const)('binds %s to the active repository and cancellation context', async (operation) => {
+    const input = { repoPath: activeRepo, remote: 'origin', branch: 'deleted', defaultBranch: 'main' };
+    await expect(invoke(operation, input)).resolves.toMatchObject({ success: true, data: { defaultBranch: { name: 'main' } } });
+    expect(mocked[operation]).toHaveBeenCalledWith(activeRepo, input, expect.objectContaining({ signal: expect.any(AbortSignal), ownerId: 7 }));
+    await expect(invoke(operation, { ...input, repoPath: 'C:/repos/saved' })).resolves.toMatchObject({ success: false });
+    expect(mocked[operation]).toHaveBeenCalledTimes(1);
+  });
+  it('blocks a recovery fetch while a protected commit owns the repository', async () => {
+    const release = beginCommitProtection(activeRepo)!;
+    try {
+      await expect(invoke('preparePullRecovery', { repoPath: activeRepo, remote: 'origin', branch: 'deleted', defaultBranch: 'main' })).resolves.toEqual({
+        success: false,
+        error: COMMIT_PROTECTION_BUSY_ERROR,
+      });
+      expect(mocked.preparePullRecovery).not.toHaveBeenCalled();
+    } finally {
+      release();
+    }
   });
   it('returns a deferred automatic sync without emitting a failure or completed fetch', async () => {
     mocked.fetch.mockRejectedValueOnce(new BackgroundFetchPreemptedError());

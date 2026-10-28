@@ -81,7 +81,9 @@ export function useRemoteTransferNotifications(coordinator: RemoteTransferCoordi
           ? [
               {
                 label: current.failedPull
-                  ? translate.current('Pull wiederaufnehmen', 'Resume pull')
+                  ? current.pullRecovery
+                    ? translate.current('Branch-Wiederherstellung öffnen', 'Open branch recovery')
+                    : translate.current('Pull wiederaufnehmen', 'Resume pull')
                   : translate.current('Übertragungsergebnis öffnen', 'Open transfer result'),
                 onClick: () => {
                   if (useRemoteTransferState.getState().intent === current.intent) coordinator.showResult();

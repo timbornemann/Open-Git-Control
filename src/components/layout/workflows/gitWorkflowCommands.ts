@@ -21,6 +21,10 @@ export const gitWorkflowCommands = {
     return gitClient.buildCheckoutRemoteBranchArgs(remoteRef);
   },
 
+  createBranchFromRef(branchName: string, ref: string): GitCommandArgs {
+    return gitClient.buildCreateBranchArgs(branchName, ref);
+  },
+
   pullRebase(): GitCommandArgs {
     return gitClient.buildPullRebaseArgs();
   },

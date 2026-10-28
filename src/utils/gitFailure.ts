@@ -1,6 +1,7 @@
 import { redactGitCredentials } from '@/shared/git/redaction';
 import type { NotificationMessage } from '@/types/notifications';
 import { isGitCancellation } from './gitCancellation';
+import { isMissingRemoteBranchError } from '@/shared/git/pullErrors';
 
 export type GitFailureKind =
   | 'git-missing'
@@ -14,6 +15,7 @@ export type GitFailureKind =
   | 'locked'
   | 'repository'
   | 'configuration'
+  | 'remote-branch-missing'
   | 'cancelled'
   | 'unknown';
 type Translate = (de: string, en: string) => string;
@@ -45,6 +47,7 @@ export function describeGitFailure(raw: string, tr: Translate, explicitGit = fal
   const looksGit =
     explicitGit ||
     isGitCancellation(output) ||
+    isMissingRemoteBranchError(output) ||
     /Git Output:|\bCommand failed:\s*git\b|\bfatal:|\[REPO_UNAVAILABLE\]|Git operation was aborted|CONFLICT \(|could not read (?:Username|Password|from remote repository)|Authentication failed for|\[remote rejected\]|\[rejected\]/i.test(
       raw,
     );
@@ -64,6 +67,12 @@ export function describeGitFailure(raw: string, tr: Translate, explicitGit = fal
       'cancelled',
       'Der Git-Vorgang wurde abgebrochen. Du kannst ihn bei Bedarf erneut starten.',
       'The Git operation was cancelled. You can start it again when needed.',
+    );
+  if (isMissingRemoteBranchError(output))
+    return result(
+      'remote-branch-missing',
+      'Der gewählte Branch ist auf dem Remote nicht mehr vorhanden. Er wurde möglicherweise nach einem Pull Request gelöscht oder umbenannt. Dein lokaler Branch und deine Commits bleiben erhalten. Wechsle zum Standardbranch und führe dort Pull aus.',
+      'The selected branch no longer exists on the remote. It may have been deleted after a pull request or renamed. Your local branch and commits are preserved. Switch to the default branch and pull there.',
     );
   if (/CONFLICT \(|merge conflict in|unmerged (?:files|paths)|you have unmerged|resolve (?:your|all).*conflicts|merging is not possible because/i.test(output))
     return result(

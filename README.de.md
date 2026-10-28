@@ -235,6 +235,7 @@ Tests und Builds als strukturiertes Protokoll lesen, Probleme prüfen und genann
 - Ausgewaehlten Branch mit waehlbarem Merge-Modus mergen.
 - Normaler Pull verwendet die gespeicherte Repository-Strategie: Git-Standard, Rebase, Merge oder Nur Fast-forward.
 - Ausdrückliche Pull-Dropdown-Auswahlen gelten nur für diese Operation, einschließlich eines No-fast-forward-Merge (`--no-rebase --no-ff`).
+- Wurde die Pull-Quelle nach dem Merge eines Pull Requests gelöscht, bietet die Wiederherstellung einen abgesicherten Wechsel zum geprüften Standardbranch des Remotes an. Lokaler Feature-Branch, Commits und Arbeitsänderungen bleiben erhalten; ein weiterer Pull auf dem Standardbranch aktualisiert ihn.
 - Direkt zu einem eindeutigen oder gespeicherten Remote-Ziel pushen; bei mehreren Remotes die Ziele beim ersten Aufruf auswählen.
 - Auswahlmodi für Fetch, Pull und Push unabhängig auf der Repository-Seite Remote-Konfiguration einstellen.
 - **Remote-Konfiguration** aus dem Pull- oder Push-Dropdown öffnen.

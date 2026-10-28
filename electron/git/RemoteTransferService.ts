@@ -1,9 +1,10 @@
 import { createPushPlan } from './createPushPlan';
 import { randomUUID } from 'crypto';
 import { readPushSecretScanScope, type PushSecretScanScope } from './PushSecretScanScope';
-import { pullStrategyArguments, readGitPullConfiguration } from './GitPullConfiguration';
+import { readGitPullConfiguration } from './GitPullConfiguration';
+import { inspectPullRecovery, preparePullRecovery, pullRemoteBranch } from './RemotePull';
 import * as remoteSnapshot from './remoteSnapshot';
-import { lfsEndpoint, lfsTransferEnvironment, uploadLfsObjects } from './GitLfsTransfers';
+import { lfsTransferEnvironment, uploadLfsObjects } from './GitLfsTransfers';
 import { gitPushProgress } from './GitLfsTransferProgress';
 import { fetchRemoteReferences, type FetchOptions } from './RemoteFetch';
 import type {
@@ -200,30 +201,23 @@ export class RemoteTransferService {
 
   async pull(repoPath: string, input: RemoteTransferOperations['pull']['input'], context: RemoteTransferContext): Promise<{ output: string }> {
     const remote = await this.selectedRemote(repoPath, input.remote);
-    await this.git.run(repoPath, ['check-ref-format', `refs/heads/${refName(input.branch)}`]);
-    const flags = pullStrategyArguments(input.mode, input.autostash);
-    const endpoint = await lfsEndpoint(repoPath, input.remote, this.git).catch(() => '');
-    const base = { ...(endpoint ? lfsTransferEnvironment({}, input.remote, endpoint, remote.fetchUrls[0]) : {}), GIT_MERGE_AUTOEDIT: 'no' };
-    const output = await this.withCredentials(
-      repoPath,
-      input.remote,
-      remoteUrl(remote.fetchUrls[0]),
-      context,
-      base,
-      (envOverrides, signal) =>
-        this.git.streamOutput(
-          repoPath,
-          ['pull', ...flags, '--no-recurse-submodules', '--', input.remote, input.branch],
-          context.onProgress ?? (() => {}),
-          signal,
-          { envOverrides },
-        ),
-      undefined,
-      undefined,
-      endpoint ? [endpoint] : [],
+    return pullRemoteBranch(repoPath, input, remote, context, this.git, (environment, work, lfsUrls) =>
+      this.withCredentials(repoPath, input.remote, remoteUrl(remote.fetchUrls[0]), context, environment, work, undefined, undefined, lfsUrls),
     );
-    context.ensureActive();
-    return { output: redactGitSensitiveText(output) };
+  }
+
+  async getPullRecovery(repoPath: string, input: RemoteTransferOperations['getPullRecovery']['input'], context: RemoteTransferContext) {
+    const remote = await this.selectedRemote(repoPath, input.remote);
+    return this.withCredentials(repoPath, input.remote, remoteUrl(remote.fetchUrls[0]), context, {}, (envOverrides, signal) =>
+      inspectPullRecovery(repoPath, input, context, this.git, envOverrides, signal),
+    );
+  }
+
+  async preparePullRecovery(repoPath: string, input: RemoteTransferOperations['preparePullRecovery']['input'], context: RemoteTransferContext) {
+    const remote = await this.selectedRemote(repoPath, input.remote);
+    return this.withCredentials(repoPath, input.remote, remoteUrl(remote.fetchUrls[0]), context, {}, (envOverrides, signal) =>
+      preparePullRecovery(repoPath, input, context, this.git, envOverrides, signal),
+    );
   }
 
   async setUpstream(repoPath: string, name: string, branch: string, context: RemoteTransferContext): Promise<true> {

@@ -235,6 +235,7 @@ Read test and build output as a structured transcript, inspect Problems and open
 - Merge selected branch with selectable merge mode.
 - Normal Pull uses the repository's saved strategy: Git default, Rebase, Merge or Fast-forward only.
 - Pull dropdown choices override the strategy for that operation only, including an explicit no-fast-forward merge (`--no-rebase --no-ff`).
+- If a pull source was deleted after merging a pull request, recovery offers a guarded switch to the remote's verified default branch. The local feature branch, commits and working changes are preserved; pull again on the default branch to update it.
 - Push directly to an unambiguous or remembered selection of remotes; choose destinations on first use when several remotes exist.
 - Configure independent Fetch, Pull and Push selection modes on the repository's Remote configuration page.
 - Open **Remote configuration** from either the Pull or Push dropdown.

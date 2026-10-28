@@ -19,6 +19,7 @@ export function RemoteTransferPanel({
   openAllowlist,
   retryPush,
   retryPull,
+  switchPullToDefault,
   openWorkspace,
   openConfiguration,
 }: {
@@ -31,6 +32,7 @@ export function RemoteTransferPanel({
   openAllowlist?: () => void;
   retryPush: () => void;
   retryPull: () => void;
+  switchPullToDefault: () => void;
   openWorkspace: () => void;
   openConfiguration: () => void;
 }) {
@@ -65,7 +67,14 @@ export function RemoteTransferPanel({
         />
       )}
       {state.phase === 'result' && state.failedPull && (
-        <PullTransferRecovery failedPull={state.failedPull} busy={state.busy} retry={retryPull} openWorkspace={openWorkspace} />
+        <PullTransferRecovery
+          failedPull={state.failedPull}
+          busy={state.busy}
+          retry={retryPull}
+          openWorkspace={openWorkspace}
+          recovery={state.pullRecovery}
+          switchToDefault={switchPullToDefault}
+        />
       )}
       {state.error && <GitFailureMessage message={state.error} context={transferFailureContext(state)} />}
       <button onClick={openConfiguration}>{tr('Remote-Konfiguration öffnen', 'Open remote configuration')}</button>

@@ -10,12 +10,14 @@ import { NotificationProvider } from '@/contexts/NotificationContext';
 import { ActionToastViewport } from '@/components/ActionToastViewport';
 import { useToastQueue } from '@/hooks/useToastQueue';
 import type { GitJobEventDto } from '@/types/aiDtos';
+import type * as GitClientModule from '@/services/gitClient';
 
 const mocked = vi.hoisted(() => ({
   request: vi.fn(),
   refresh: vi.fn(),
   toast: vi.fn(),
   command: vi.fn(),
+  runGit: vi.fn(),
   scan: vi.fn(),
   approve: vi.fn(),
   scanEnabled: false,
@@ -24,15 +26,21 @@ const mocked = vi.hoisted(() => ({
   connections: [],
 }));
 vi.mock('@/services/hostingClient', () => ({ transferClient: { request: mocked.request } }));
-vi.mock('@/services/gitClient', () => ({
-  gitClient: { cancelSecretScan: vi.fn(), runGitCommandForRepo: mocked.command, scanPushSecrets: mocked.scan, approveSecretScanPush: mocked.approve },
+vi.mock('@/services/gitClient', async (importOriginal) => ({
+  gitClient: {
+    ...(await importOriginal<typeof GitClientModule>()).gitClient,
+    cancelSecretScan: vi.fn(),
+    runGitCommandForRepo: mocked.command,
+    scanPushSecrets: mocked.scan,
+    approveSecretScanPush: mocked.approve,
+  },
 }));
 vi.mock('@/i18n', () => ({ useI18n: () => ({ tr: (_de: string, en: string) => en, t: (key: string) => key }) }));
 vi.mock('@/contexts/AppStateContext', () => ({
   useGitStore: (select: (state: unknown) => unknown) => select(repository),
   useSettingsStore: (select: (state: unknown) => unknown) => select({ settings: { secretScanBeforePushEnabled: mocked.scanEnabled } }),
   useUIStore: (select: (state: unknown) => unknown) => select({ setActiveTab: mocked.setTab }),
-  useWorkflowStore: (select: (state: unknown) => unknown) => select({ jobs }),
+  useWorkflowStore: (select: (state: unknown) => unknown) => select({ jobs, runGitCommand: mocked.runGit }),
 }));
 vi.mock('./hostingState', () => ({ useHostingState: (select: (state: unknown) => unknown) => select({ connections: mocked.connections }) }));
 let root: Root;
@@ -329,6 +337,30 @@ describe('remote transfer host and selection UI', () => {
     ]);
     expect(container.textContent).not.toContain('Resume pull');
     expect(container.querySelector('.action-toast.success')?.textContent).toContain('Pull from forgejo/tracking-main completed.');
+  });
+  it('opens branch recovery immediately and routes a default switch through the guarded Git workflow', async () => {
+    snapshot.remotes = [snapshot.remotes[0]];
+    repository.currentBranch = snapshot.branch = 'test-branch';
+    snapshot.upstream = { remote: 'forgejo', branch: 'test-branch' };
+    const original = mocked.request.getMockImplementation()!;
+    mocked.runGit.mockResolvedValue(true);
+    mocked.request.mockImplementation(async (operation, input) => {
+      if (operation === 'pull') throw new Error("fatal: couldn't find remote ref test-branch");
+      if (operation === 'getPullRecovery' || operation === 'preparePullRecovery')
+        return { branchExists: false, defaultBranch: { name: 'main', localExists: true } };
+      return original(operation, input);
+    });
+    await render();
+    await start('pull');
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(container.textContent).toContain('Remote branch not found: forgejo/test-branch');
+    expect(container.textContent).not.toContain('Retry this pull source');
+    await click('Switch to main');
+    expect(mocked.runGit).toHaveBeenCalledWith(['checkout', 'main'], expect.stringContaining('Pull there'), 'Switching branch …', {
+      expectedRepoPath: '/repo',
+    });
+    expect(mocked.request.mock.calls.filter(([operation]) => operation === 'pull')).toHaveLength(1);
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
   it('explains a detached checkout and provides a way back to the workspace', async () => {
     snapshot.branch = '';
