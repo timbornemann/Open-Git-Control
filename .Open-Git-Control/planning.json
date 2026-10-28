@@ -227,9 +227,24 @@
       "description": "",
       "priority": "medium",
       "status": "planned",
-      "tags": ["Planned"],
+      "tags": [
+        "Planned"
+      ],
       "createdAt": 1793053833086,
       "updatedAt": 1793053833086
+    },
+    {
+      "id": "f85c99b9-35d4-48a2-9014-1bbe3245f707",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "branch wechsel",
+      "description": "beim welches zu einem anderen branch dauert es sehr lange bis es oben angezeigt wrid auch in der commit liste dauert es lange",
+      "priority": "medium",
+      "status": "bug",
+      "tags": [
+        "Bug"
+      ],
+      "createdAt": 1793218330070,
+      "updatedAt": 1793218330070
     }
   ]
 }

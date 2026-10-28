@@ -21,6 +21,7 @@ Open-Git-Control ist fuer dich interessant, wenn dir ein sehr kleiner Git-Client
 - Frei und open source unter der GNU-GPL-Lizenz
 - Git-Operationen laufen lokal gegen deine Repositories
 - Visueller Commit-Graph mit Branch-, Tag-, Merge-, Reset-, Rebase-, Cherry-Pick-, Revert- und Recovery-Aktionen
+- Main/Master bleiben bei geladenen GitHub-Merges und nach Pull auf einer geraden First-Parent-Linie. Verschobene Branch-Verweise verwerfen alte Spaltenpositionen; das Nachladen älterer Seiten erhält weiterhin gültige Positionen.
 - Staging, Stash, Hunk-Diffs, Datei-Historie, Blame und Konfliktloesung in einem Workflow
 - Offline-Repository-Analysen: Aktivität, Sprachverteilung, Änderungsschwerpunkte, Code Churn, Dateikopplungsnetz, Release-Vergleiche und Timeline-Wiedergabe
 - Konten von GitHub, Forgejo, GitLab, Bitbucket Cloud und Data Center, Repository-Kataloge, Klonen/Forken, PRs/MRs, CI und anbieterspezifische Veröffentlichungen

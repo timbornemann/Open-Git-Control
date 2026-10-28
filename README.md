@@ -21,6 +21,7 @@ Use Open-Git-Control when you want more than a minimal Git GUI, but still want a
 - Free and open source under the GNU GPL license
 - Git operations run locally against your repositories
 - Visual commit graph with branch, tag, merge, reset, rebase, cherry-pick, revert, and recovery actions
+- Main/master history stays on one straight first-parent lane across fetched GitHub merges and pull; updated branch refs invalidate old lane positions while loading older pages preserves valid positions.
 - Staging, stash, hunk-based diffs, file history, blame, and conflict resolution in one workflow
 - Offline repository analytics: activity, language distribution, change hotspots, code churn, file-coupling networks, release comparisons and timeline playback
 - GitHub, Forgejo, GitLab, Bitbucket Cloud and Data Center accounts, repository catalogs, cloning/forking, PRs/MRs, CI and provider-specific publishing

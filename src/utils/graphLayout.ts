@@ -43,13 +43,18 @@ export interface GraphLayout {
 
 export type GraphLayoutSeed = { anchorHash: string; lanes: number[] };
 
-/** A seed is valid only for an unchanged prefix, never a rewrite or reorder. */
+/** Preserve pagination positions only while commit topology and trunk/HEAD refs stay unchanged. */
 export function graphLayoutSeed(commits: GitCommit[], previous?: GraphLayout): GraphLayoutSeed | undefined {
   if (!previous?.nodes.length || previous.nodes.length > commits.length) return;
   for (let row = 0; row < previous.nodes.length; row++) {
     const old = previous.nodes[row].commit;
     const next = commits[row];
-    if (old.hash !== next.hash || old.parentHashes.length !== next.parentHashes.length || old.parentHashes.some((hash, i) => hash !== next.parentHashes[i]))
+    if (
+      old.hash !== next.hash ||
+      old.parentHashes.length !== next.parentHashes.length ||
+      old.parentHashes.some((hash, i) => hash !== next.parentHashes[i]) ||
+      graphAnchorRefs(old.refs) !== graphAnchorRefs(next.refs)
+    )
       return;
   }
   const anchor = previous.nodes.find((node) => node.lane === 0) ?? previous.nodes[0];
@@ -58,6 +63,14 @@ export function graphLayoutSeed(commits: GitCommit[], previous?: GraphLayout): G
 
 const LANE_REUSE_COOLDOWN_ROWS = 40;
 const DEFAULT_TRUNK_REFS = ['main', 'master', 'origin/main', 'origin/master'];
+
+/** Tags and merged feature labels do not choose the trunk; moving main or HEAD does. */
+function graphAnchorRefs(refs: string[]): string {
+  return refs
+    .filter((ref) => ref === 'HEAD' || ref.startsWith('HEAD ->') || DEFAULT_TRUNK_REFS.includes(ref))
+    .sort()
+    .join('\0');
+}
 
 function refMatchesTarget(ref: string, target: string): boolean {
   const normalizedRef = ref.trim();
@@ -85,7 +98,26 @@ function* graphLayoutMetadata(commits: GitCommit[], seed?: GraphLayoutSeed) {
     if (row % 256 === 255) yield;
   }
   const anchorRef = DEFAULT_TRUNK_REFS.find((ref) => refCandidates.has(ref));
-  const trunkStartCommit = (seed && commitByHash.get(seed.anchorHash)) || (anchorRef && refCandidates.get(anchorRef)) || headCommitCandidate || commits[0];
+  let trunkStartCommit = (seed && commitByHash.get(seed.anchorHash)) || (anchorRef && refCandidates.get(anchorRef)) || headCommitCandidate || commits[0];
+  // A fetched origin/main can be ahead of local main without creating another
+  // line of development. Extend the same first-parent trunk through that tip.
+  if (!seed && anchorRef && trunkStartCommit) {
+    const branch = anchorRef.split('/').at(-1);
+    for (const ref of DEFAULT_TRUNK_REFS) {
+      if (ref.split('/').at(-1) !== branch) continue;
+      const candidate = refCandidates.get(ref);
+      if (!candidate || candidate.hash === trunkStartCommit.hash) continue;
+      const visited = new Set<string>();
+      for (let cursor: GitCommit | undefined = candidate; cursor && !visited.has(cursor.hash); cursor = commitByHash.get(cursor.parentHashes[0])) {
+        if (cursor.hash === trunkStartCommit.hash) {
+          trunkStartCommit = candidate;
+          break;
+        }
+        visited.add(cursor.hash);
+        if (visited.size % 256 === 0) yield;
+      }
+    }
+  }
   return { visibleHashes, commitByHash, trunkStartCommit };
 }
 

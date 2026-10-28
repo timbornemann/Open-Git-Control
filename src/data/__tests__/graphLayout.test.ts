@@ -4,6 +4,7 @@ import type { GitCommit } from '@/utils/gitParsing';
 import { computeGraphLayout, graphLayoutSeed, type GraphLayout, type GraphLayoutSeed } from '@/utils/graphLayout';
 import { prepareGraphLayout } from '../graphLayout';
 import { queryClient } from '../queryClient';
+import { githubMergeHistory, MERGED_MAIN_HASHES } from '@/utils/__tests__/graphMergeFixture';
 
 class LayoutWorker {
   static instances: LayoutWorker[] = [];
@@ -43,6 +44,19 @@ afterEach(() => {
 });
 
 describe('graph layout worker ownership', () => {
+  it.each(['worker', 'fallback'] as const)('refreshes a pulled main ref without preserving stale lane positions through the %s', async (mode) => {
+    const before = computeGraphLayout(githubMergeHistory());
+    if (mode === 'fallback') LayoutWorker.failCreation = true;
+    const result = prepareGraphLayout('/pulled-main', githubMergeHistory(true), before);
+    const seed = LayoutWorker.instances[0]?.messages[0].seed;
+    if (mode === 'worker') {
+      LayoutWorker.instances[0].finish(0);
+    }
+    const after = await result;
+    if (mode === 'worker') expect(seed).toBeUndefined();
+    expect(after.nodes.filter((node) => MERGED_MAIN_HASHES.includes(node.commit.hash)).every((node) => node.lane === 0)).toBe(true);
+    expect(after).toEqual(computeGraphLayout(githubMergeHistory(true)));
+  });
   it.each(['worker', 'fallback'] as const)('preserves page positions through the %s and separates differently seeded cache entries', async (mode) => {
     const rows = commits('a');
     rows[0].parentHashes = ['c'];
