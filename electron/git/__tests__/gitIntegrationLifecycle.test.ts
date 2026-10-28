@@ -11,16 +11,31 @@ vi.mock('../../system-tools/toolRuntime', () => ({
   toolExecutable: () => process.execPath,
   toolEnvironment: (env: NodeJS.ProcessEnv) => ({ ...process.env, ...env }),
 }));
+const fixtureParent = fs.realpathSync.native(os.tmpdir());
 let root: string;
 let lifecycle: GitIntegrationLifecycle;
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-git-lifecycle-'));
+  root = fs.mkdtempSync(path.join(fixtureParent, 'ogc-git-lifecycle-'));
   lifecycle = new GitIntegrationLifecycle();
 });
+const removeFixture = async () => {
+  if (path.dirname(root) !== fixtureParent || !path.basename(root).startsWith('ogc-git-lifecycle-')) throw new Error('Unsafe test cleanup');
+  await fs.promises.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+};
+
+const processIsRunning = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false;
+    throw error;
+  }
+};
+
 afterEach(async () => {
   await lifecycle.close();
-  if (path.dirname(root) !== os.tmpdir() || !path.basename(root).startsWith('ogc-git-lifecycle-')) throw new Error('Unsafe test cleanup');
-  fs.rmSync(root, { recursive: true, force: true });
+  await removeFixture();
 });
 
 describe('Git integration fixture teardown', () => {
@@ -58,8 +73,9 @@ describe('Git integration fixture teardown', () => {
   });
 
   it('aborts a running process and its filter and drains the test continuation before cleanup', async () => {
-    const filter = "process.stdout.write('filter ready\\n'); setInterval(() => {}, 1000);";
-    const script = `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(filter)}], { cwd: process.cwd(), stdio: ['ignore', 'inherit', 'inherit'] }); setInterval(() => {}, 1000);`;
+    const filter = "console.log('filter ready ' + process.pid); setInterval(() => {}, 1000);";
+    const script = `console.log('git ready ' + process.pid); require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(filter)}], { cwd: process.cwd(), stdio: ['ignore', 'inherit', 'inherit'] }); setInterval(() => {}, 1000);`;
+    const pids = new Set<number>();
     let ready!: () => void;
     const started = new Promise<void>((resolve) => {
       ready = resolve;
@@ -69,7 +85,9 @@ describe('Git integration fixture teardown', () => {
       (async () => {
         try {
           await lifecycle.runner.streamOutput(root, ['-e', script], (line) => {
-            if (line === 'filter ready') ready();
+            const match = /^(?:git|filter) ready (\d+)$/.exec(line);
+            if (match) pids.add(Number(match[1]));
+            if (pids.size === 2) ready();
           });
         } finally {
           await Promise.resolve();
@@ -89,8 +107,13 @@ describe('Git integration fixture teardown', () => {
 
     expect(await outcome).toMatchObject({ name: 'AbortError' });
     expect(unwound).toBe(true);
-    // A live Windows child with this cwd would make this fail with EBUSY.
-    fs.rmSync(root, { recursive: true, force: true });
+    expect(pids.size).toBe(2);
+    if (process.platform === 'win32') {
+      // Check process termination independently: filesystem retries must not hide a live filter.
+      await expect.poll(() => [...pids].filter(processIsRunning), { timeout: 5000, interval: 25 }).toEqual([]);
+    }
+    // Windows can release cwd/I/O handles shortly after the processes exit.
+    await removeFixture();
     expect(fs.existsSync(root)).toBe(false);
     await expect(lifecycle.runner.streamOutput(os.tmpdir(), ['-e', "throw new Error('must not run')"], vi.fn())).rejects.toMatchObject({ name: 'AbortError' });
   }, 15000);
