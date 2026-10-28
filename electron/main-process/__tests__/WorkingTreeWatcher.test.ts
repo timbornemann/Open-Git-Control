@@ -192,13 +192,48 @@ describe('native working tree change hints', () => {
     expect(changed).not.toHaveBeenCalled();
   });
 
-  it('observes a real edit below a tracked directory with the platform filesystem watcher', async () => {
-    vi.useRealTimers();
-    const git = { run: async () => `${gitDir}\n${commonDir}\n`, runBuffer: async () => Buffer.from('src/file.txt\0') };
-    const monitor = new WorkingTreeWatcher(repo, git as any, changed);
-    monitors.push(monitor);
-    await monitor.start();
-    fs.writeFileSync(path.join(repo, 'src', 'file.txt'), 'changed\n');
-    await vi.waitFor(() => expect(changed).toHaveBeenCalled(), { timeout: 3000, interval: 25 });
-  });
+  it.each([
+    ['the platform default', undefined, 0],
+    ['the tracked-directory fallback', false, 0],
+    ['delayed native notifications', undefined, 250],
+  ] as const)(
+    'observes real edits below a tracked directory using %s',
+    async (_strategy, nativeRecursive, startupDelay) => {
+      vi.useRealTimers();
+      const file = path.join(repo, 'src', 'file.txt');
+      fs.writeFileSync(file, 'initial\n');
+      const nativeSourceChanged = vi.fn();
+      let deliverAfter = startupDelay ? Infinity : 0;
+      const createWatcher: WatchDirectory = (directory, options, listener) =>
+        fs.watch(directory, options, (event, name) => {
+          // Reproduce missed startup notifications even on a host that arms watches synchronously.
+          if (performance.now() < deliverAfter) return;
+          const gitPath = name
+            ?.toString()
+            .replace(/\\/g, '/')
+            .split('/')
+            .some((part) => part.toLowerCase() === '.git');
+          if (directory === path.dirname(file) || (directory === repo && !gitPath)) nativeSourceChanged();
+          listener(event, name);
+        });
+      const git = { run: async () => `${gitDir}\n${commonDir}\n`, runBuffer: async () => Buffer.from('src/file.txt\0') };
+      const monitor = new WorkingTreeWatcher(repo, git as any, changed, createWatcher, nativeRecursive);
+      monitors.push(monitor);
+      await monitor.start();
+      deliverAfter = performance.now() + startupDelay;
+      let revision = 0;
+      // macOS can return fs.watch before its FSEvents stream is active. Repeat
+      // real edits until it delivers, as Node's own test/sequential/test-fs-watch.js does.
+      await vi.waitFor(
+        () => {
+          fs.writeFileSync(file, `changed ${++revision}\n`);
+          // A startup-error rescan alone must never make this native test pass.
+          expect(nativeSourceChanged).toHaveBeenCalled();
+          expect(changed).toHaveBeenCalled();
+        },
+        { timeout: 5000, interval: 100 },
+      );
+    },
+    10_000,
+  );
 });
