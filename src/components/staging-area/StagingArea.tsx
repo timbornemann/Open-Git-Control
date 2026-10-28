@@ -12,13 +12,12 @@ import { useUntrackFiles } from './useUntrackFiles';
 import { StagingFileSections } from './StagingFileSections';
 import { StagingToolbar } from './StagingToolbar';
 import { StashPanel } from './StashPanel';
-import type { StagingAreaProps } from './types';
+import type { GitStatusWithConflicts, StagingAreaProps } from './types';
 import { useAiCommit } from './useAiCommit';
 import { useAiCommitMessageDialog } from './useAiCommitMessageDialog';
 import { useCommitForm } from './useCommitForm';
 import { useConflictResolver } from './useConflictResolver';
 import { useFileOperations } from './useFileOperations';
-import { useVisibleStagingFiles } from './useVisibleStagingFiles';
 import type { SequencerOperation } from './sequencerState';
 
 type SequencerActionProps = {
@@ -51,6 +50,9 @@ const sharedWorkingTreeMatchesRepository = ({
     workingTreeStatus !== undefined && (!workingTreeSnapshot || normalizeRepoPathKey(workingTreeSnapshot.repoPath) === normalizeRepoPathKey(repoPath)),
   );
 };
+
+const canStageAllChanges = (status: GitStatusWithConflicts, isBareRepository: boolean, isCommitInputDisabled: boolean): boolean =>
+  !isBareRepository && !isCommitInputDisabled && status.unstaged.length + status.untracked.length > 0;
 
 export const StagingArea: React.FC<StagingAreaProps> = ({
   repoPath,
@@ -154,10 +156,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     setInputDialog,
   });
 
-  const { visibleFiles } = useVisibleStagingFiles({
-    status: fileOps.status,
-    searchQuery: fileOps.searchQuery,
-  });
+  const { visibleFiles } = fileOps;
 
   useEffect(() => {
     if (!isConflictOnly || !fileOps.status) return;
@@ -249,7 +248,15 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
 
   return (
     <div className={`staging-container${isConflictOnly ? ' staging-container--conflict' : ''}`}>
-      {!isConflictOnly && <StagingToolbar searchQuery={fileOps.searchQuery} setSearchQuery={fileOps.setSearchQuery} />}
+      {!isConflictOnly && (
+        <StagingToolbar
+          searchQuery={fileOps.searchQuery}
+          setSearchQuery={fileOps.setSearchQuery}
+          onStageAll={fileOps.stageAll}
+          canStageAll={canStageAllChanges(status, isBareRepository, isCommitInputDisabled)}
+          hasConflicts={hasOpenConflicts}
+        />
+      )}
 
       <div className="staging-files">
         {isBareRepository ? (

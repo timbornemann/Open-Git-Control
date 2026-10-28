@@ -13,6 +13,7 @@ import { useIgnoreRule } from './useIgnoreRule';
 import { useStagingLfs } from './useStagingLfs';
 import type { TrackWithGitLfsRequest } from '@/shared/ipc/gitLfs';
 import { useWorkingTreeSnapshot } from '@/hooks/useWorkingTreeSnapshot';
+import { useVisibleStagingFiles } from './useVisibleStagingFiles';
 
 type Params = {
   repoPath: string | null;
@@ -59,6 +60,8 @@ export const useFileOperations = ({
   const [stagedStats, setStagedStats] = useState<DiffStats>(EMPTY_DIFF_STATS);
   const [unstagedStats, setUnstagedStats] = useState<DiffStats>(EMPTY_DIFF_STATS);
   const [searchQuery, setSearchQuery] = useState('');
+  const { visibleFiles, isFiltering } = useVisibleStagingFiles({ status, searchQuery });
+  const bulkFiles = isFiltering ? visibleFiles : status;
   const [contextMenu, setContextMenu] = useState<StagingContextMenuState | null>(null);
   const [mutationStartedAt, setMutationStartedAt] = useState<number | null>(null);
   const [mutationElapsedMs, setMutationElapsedMs] = useState(0);
@@ -365,23 +368,27 @@ export const useFileOperations = ({
     },
     [unstagePathsForCurrentRepo],
   );
-  const stageAll = useCallback(() => {
-    const paths = [...(status?.unstaged || []), ...(status?.untracked || [])].map((entry) => entry.path);
+  const stageAll = useCallback(async () => {
+    if (!status || status.conflicts.length > 0) return false;
+    return git(['add', '-A'], tr('Alle Änderungen hinzugefügt', 'Staged all changes'));
+  }, [status, git, tr]);
+  const stageAllUnstaged = useCallback(() => {
+    const paths = (bulkFiles?.unstaged || []).map((entry) => entry.path);
     return stagePathsForCurrentRepo([...new Set(paths)]);
-  }, [stagePathsForCurrentRepo, status?.unstaged, status?.untracked]);
+  }, [stagePathsForCurrentRepo, bulkFiles?.unstaged]);
   const unstageAll = useCallback(
     () =>
       unstagePathsForCurrentRepo(
-        (status?.staged || []).flatMap((entry) => [entry.originalPath || '', entry.path]),
-        true,
+        (bulkFiles?.staged || []).flatMap((entry) => [entry.originalPath || '', entry.path]),
+        !isFiltering,
       ),
-    [status?.staged, unstagePathsForCurrentRepo],
+    [bulkFiles?.staged, isFiltering, unstagePathsForCurrentRepo],
   );
 
   const stageAllUntracked = useCallback(() => {
-    const paths = status?.untracked.map((entry) => entry.path) || [];
+    const paths = bulkFiles?.untracked.map((entry) => entry.path) || [];
     return stagePathsForCurrentRepo(paths);
-  }, [stagePathsForCurrentRepo, status?.untracked]);
+  }, [stagePathsForCurrentRepo, bulkFiles?.untracked]);
 
   const discardFile = useCallback(
     (f: string) => {
@@ -544,6 +551,8 @@ export const useFileOperations = ({
     unstagedStats,
     searchQuery,
     setSearchQuery,
+    visibleFiles,
+    isFiltering,
     contextMenu,
     setContextMenu,
     openFileContextMenu,
@@ -554,6 +563,7 @@ export const useFileOperations = ({
     stageFile,
     unstageFile,
     stageAll,
+    stageAllUnstaged,
     stageAllUntracked,
     unstageAll,
     discardFile,

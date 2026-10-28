@@ -24,5 +24,6 @@ export const useVisibleStagingFiles = ({ status, searchQuery }: UseVisibleStagin
 
   return {
     visibleFiles,
+    isFiltering: searchQuery.trim().length > 0,
   };
 };

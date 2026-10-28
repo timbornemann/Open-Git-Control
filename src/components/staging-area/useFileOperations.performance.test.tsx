@@ -18,7 +18,12 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-it.each([1, 400])('finishes staging %i files and updates their status while line statistics remain pending', async (count) => {
+it.each([
+  [1, 'file'],
+  [11, 'filtered'],
+  [400, 'section'],
+  [400, 'repository'],
+] as const)('finishes staging %i files through %s and updates their status while line statistics remain pending', async (count, mode) => {
   const repo = 'C:/repo';
   const paths = Array.from({ length: 400 }, (_, index) => `large/file-${index}.txt`);
   let staged = new Set<string>();
@@ -38,7 +43,10 @@ it.each([1, 400])('finishes staging %i files and updates their status while line
     };
   });
   const raw = () => paths.map((path) => `${staged.has(path) ? 'M ' : ' M'} ${path}`).join('\n');
-  vi.spyOn(gitClient, 'runGitCommandForRepo').mockImplementation(async () => ({ success: true, data: raw() }));
+  const commands = vi.spyOn(gitClient, 'runGitCommandForRepo').mockImplementation(async (_repo, command) => {
+    if (command === 'add') staged = new Set(paths);
+    return { success: true, data: raw() };
+  });
   vi.spyOn(gitClient, 'getWorkingTreeSnapshot').mockImplementation(async () => ({
     success: true,
     data: {
@@ -67,9 +75,11 @@ it.each([1, 400])('finishes staging %i files and updates their status while line
     await act(async () => root.render(<Harness />));
     await act(async () => vi.advanceTimersByTimeAsync(300));
     expect(stats).toHaveBeenCalledOnce();
+    if (mode === 'filtered') await act(async () => current.setSearchQuery('large/file-39'));
     let completed = false;
     await act(async () => {
-      void (count === 1 ? current.stageFile(paths[0]) : current.stageAll()).then(() => {
+      const action = mode === 'file' ? current.stageFile(paths[0]) : mode === 'repository' ? current.stageAll() : current.stageAllUnstaged();
+      void action.then(() => {
         completed = true;
       });
     });
@@ -77,7 +87,12 @@ it.each([1, 400])('finishes staging %i files and updates their status while line
     expect(current.isMutating).toBe(false);
     expect(current.status?.staged).toHaveLength(count);
     expect(current.status?.unstaged).toHaveLength(400 - count);
-    expect(stage).toHaveBeenCalledExactlyOnceWith(paths.slice(0, count), repo);
+    if (mode === 'repository') {
+      expect(stage).not.toHaveBeenCalled();
+      expect(commands.mock.calls.filter(([, command]) => command === 'add')).toEqual([[repo, 'add', '-A']]);
+    } else {
+      expect(stage).toHaveBeenCalledExactlyOnceWith(mode === 'filtered' ? paths.filter((path) => path.includes('large/file-39')) : paths.slice(0, count), repo);
+    }
     expect(stats).toHaveBeenCalledOnce();
     await act(async () =>
       finishStats({

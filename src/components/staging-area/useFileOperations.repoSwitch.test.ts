@@ -82,6 +82,7 @@ describe('useFileOperations repository switch isolation', () => {
     await act(async () => {
       await current!.stageFile(stalePath);
       await current!.stageAll();
+      await current!.stageAllUnstaged();
       await current!.stageAllUntracked();
     });
 

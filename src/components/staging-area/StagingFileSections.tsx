@@ -45,7 +45,8 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
   onSelectFileInspect,
   selectedFile,
 }) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
+  const allLabel = fileOps.isFiltering ? tr('Alle Treffer', 'All matches') : t('generated.components.layout.sidebar.githubconnectedcontent.all_2ba206ff');
 
   // Render markup directly: defining a component type here would remount every
   // visible row on each progress tick, losing hover, focus and pending clicks.
@@ -181,9 +182,13 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
                 className="staging-btn-sm"
                 disabled={fileOps.isMutating}
                 onClick={fileOps.unstageAll}
-                title={t('generated.components.staging_area.stagingfilesections.unstage_all_13421edd')}
+                title={
+                  fileOps.isFiltering
+                    ? tr('Angezeigte Dateien aus dem Staging entfernen', 'Unstage displayed files')
+                    : t('generated.components.staging_area.stagingfilesections.unstage_all_13421edd')
+                }
               >
-                - {t('generated.components.layout.sidebar.githubconnectedcontent.all_2ba206ff')}
+                - {allLabel}
               </button>
             }
           />
@@ -210,16 +215,19 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
                 <button
                   className="staging-btn-sm"
                   disabled={fileOps.isMutating}
-                  onClick={fileOps.stageAll}
-                  title={t('generated.components.staging_area.stagingfilesections.stage_all_e40e6a84')}
+                  onClick={fileOps.stageAllUnstaged}
+                  title={tr('Alle angezeigten Änderungen dieses Bereichs hinzufügen', 'Stage all displayed changes in this section')}
                 >
-                  + {t('generated.components.layout.sidebar.githubconnectedcontent.all_2ba206ff')}
+                  + {allLabel}
                 </button>
                 <button
                   className="staging-btn-sm danger"
                   disabled={fileOps.isMutating}
                   onClick={fileOps.discardAll}
-                  title={t('generated.components.staging_area.stagingfilesections.discard_all_327bcdfe')}
+                  title={tr(
+                    'Alle ungestagten Änderungen im gesamten Repository verwerfen, auch ausgeblendete Dateien',
+                    'Discard all unstaged changes in the whole repository, including hidden files',
+                  )}
                 >
                   x {t('generated.components.layout.sidebar.githubconnectedcontent.all_2ba206ff')}
                 </button>
@@ -248,9 +256,9 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
                 className="staging-btn-sm"
                 disabled={fileOps.isMutating}
                 onClick={fileOps.stageAllUntracked}
-                title={t('generated.components.staging_area.stagingfilesections.stage_all_untracked_0db34fdb')}
+                title={tr('Alle angezeigten neuen Dateien hinzufügen', 'Stage all displayed untracked files')}
               >
-                + {t('generated.components.layout.sidebar.githubconnectedcontent.all_2ba206ff')}
+                + {allLabel}
               </button>
             }
           />
