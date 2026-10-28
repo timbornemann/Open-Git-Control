@@ -5,6 +5,7 @@ import { queryClient, readResource, updateResource, refreshVisibleResources } fr
 import { isMutation, isReadCommand, readPolicies } from './clientPolicies';
 import { gitMutationAffects, gitMutationScope, githubMutationAffects, isImmutableGitRead } from './mutationEffects';
 import { readGithubBranches, supportsBranchPages } from './githubBranches';
+import { notifyGitHistoryRefresh } from './gitHistoryRefresh';
 import type { ProjectPlannerData, PlannerItem, PlannerProject } from '@/types/projectPlanner';
 
 let repositorySelection = 0;
@@ -124,6 +125,13 @@ export function invalidateResources(domain: ResourceDomain, scope?: string, oper
     void queryClient.cancelQueries({ predicate: release });
     void queryClient.invalidateQueries({ predicate: release, refetchType: 'none' });
   }
+  if (
+    domain === 'git' &&
+    ['getCommitLogPage', 'graph'].some(
+      (operation) => (!operations || operations.includes(operation)) && (!affects || affects(['resource', 'git', scope, operation])),
+    )
+  )
+    notifyGitHistoryRefresh(scope);
 }
 
 function plannerWrite(name: string, args: unknown[], result: unknown) {

@@ -6,6 +6,9 @@ import type { AiAutoCommitGroupDto, AiAutoCommitResultDto } from '@/types/aiDtos
 import { useI18n } from '@/i18n';
 import { aiClient } from '@/services/aiClient';
 import { gitClient } from '@/services/gitClient';
+import { invalidateResources } from '@/data/clientCache';
+import { gitMutationAffects } from '@/data/mutationEffects';
+import { normalizeRepoPathKey } from '@/utils/repoPath';
 import type { GitStatusWithConflicts } from './types';
 
 const AI_STATE_POLL_INTERVAL_MS = 500;
@@ -77,11 +80,14 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
 
   const refreshHistory = useCallback(
     (count: number | null) => {
-      if (!count || count === lastNotifiedCommitCountRef.current) return;
+      if (!repoPath || !count || count === lastNotifiedCommitCountRef.current) return;
       lastNotifiedCommitCountRef.current = count;
+      // Auto-commit progress bypasses gitClient's mutation adapter. Invalidate
+      // the repository that produced the commits before notifying its views.
+      invalidateResources('git', normalizeRepoPathKey(repoPath), undefined, (key) => gitMutationAffects('createCommit', [], key));
       (onCommitsCreated || onRepoChanged)?.();
     },
-    [onCommitsCreated, onRepoChanged],
+    [repoPath, onCommitsCreated, onRepoChanged],
   );
 
   const clearTerminalClearTimer = useCallback(() => {

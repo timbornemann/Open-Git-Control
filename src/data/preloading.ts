@@ -10,6 +10,7 @@ import type { PreviewSnapshot } from '@/shared/cache/resource';
 import type { IpcResult } from '@/types/ipc';
 import type { CommitLogPageDto } from '@/types/gitDtos';
 import { historyRevision } from './historyRevision';
+import { gitHistoryVersion } from './gitHistoryRefresh';
 import { reconcileCommitRefs } from '@/components/commit-graph/reconcileCommitRefs';
 
 /** Disk previews can prepare a graph while the first live Git request is still
@@ -18,6 +19,7 @@ export async function prepareRestoredGraphs(snapshots: PreviewSnapshot[]) {
   for (const snapshot of snapshots) {
     if (snapshot.key[1] !== 'git' || snapshot.key[3] !== 'getCommitLogPage') continue;
     const revision = historyRevision(snapshot.key[2]);
+    const version = gitHistoryVersion(snapshot.key[2]);
     const result = queryClient.getQueryData<IpcResult<CommitLogPageDto>>(snapshot.key);
     if (!result?.success) continue;
     const mode = (snapshot.key[4] as { scope?: string })?.scope === 'all';
@@ -26,13 +28,19 @@ export async function prepareRestoredGraphs(snapshots: PreviewSnapshot[]) {
     const commits = reconcileCommitRefs(applyCachedStats(parseGitLog(result.data.raw), result.data.stats || {}), result.data.refs);
     const layout = await prepareGraphLayout(snapshot.key[2], commits);
     const after = queryClient.getQueryState(['resource', 'git', snapshot.key[2], 'graph', mode ? 'all' : 'head'])?.dataUpdatedAt || 0;
-    if (revision === historyRevision(snapshot.key[2]) && after === before && queryClient.getQueryData(snapshot.key) === result)
+    if (
+      revision === historyRevision(snapshot.key[2]) &&
+      version === gitHistoryVersion(snapshot.key[2]) &&
+      after === before &&
+      queryClient.getQueryData(snapshot.key) === result
+    )
       storeGraphCache(key, commits, result.data.hasMore, layout);
   }
 }
 
 export async function preloadRepositoryGraph(repoPath: string, showSecondaryHistory: boolean) {
   const revision = historyRevision(repoPath);
+  const version = gitHistoryVersion(repoPath);
   const params = { repoPath, limit: 100, offset: 0, scope: showSecondaryHistory ? ('all' as const) : ('head' as const) };
   const result = await gitClient.getCommitLogPage(params);
   if (!result.success) return;
@@ -46,6 +54,7 @@ export async function preloadRepositoryGraph(repoPath: string, showSecondaryHist
   if (
     getActiveResourceRepository() !== normalizeRepoPathKey(repoPath) ||
     historyRevision(repoPath) !== revision ||
+    gitHistoryVersion(repoPath) !== version ||
     !current ||
     current.isInvalidated ||
     current.data !== source ||

@@ -10,6 +10,8 @@ import { gitClient } from '@/services/gitClient';
 import type { GitStatusWithConflicts } from './types';
 import { explainGitNotification } from '@/utils/gitFailure';
 import { NotificationProvider } from '@/contexts/NotificationContext';
+import { resourceKey, setActiveResourceRepository } from '@/data/clientCache';
+import { queryClient } from '@/data/queryClient';
 
 const mocks = vi.hoisted(() => ({ run: vi.fn(), cancel: vi.fn(), state: vi.fn(), subscribe: vi.fn() }));
 vi.mock('@/services/aiClient', () => ({
@@ -87,6 +89,10 @@ describe('AI commit plan and run controls', () => {
   });
 
   it('prevents duplicate starts, deduplicates file counters and retains partial results', async () => {
+    const historyKey = resourceKey('git', 'getCommitLogPage', [{ repoPath: '/repo' }]);
+    const otherHistoryKey = resourceKey('git', 'getCommitLogPage', [{ repoPath: '/other' }]);
+    for (const key of [historyKey, otherHistoryKey]) queryClient.setQueryData(key, { success: true, data: 'old history' });
+    setActiveResourceRepository('/other');
     let resolve!: (value: unknown) => void;
     mocks.run.mockImplementation(
       () =>
@@ -127,6 +133,8 @@ describe('AI commit plan and run controls', () => {
     expect(controls.aiRemainingFiles).toBe(1);
     expect(toast).toHaveBeenLastCalledWith({ msg: 'One commit created; hook rejected the next.', isError: true, errorExplained: true });
     expect(updated).toHaveBeenCalled();
+    expect(queryClient.getQueryState(historyKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(otherHistoryKey)?.isInvalidated).toBe(false);
   });
 
   it.each([

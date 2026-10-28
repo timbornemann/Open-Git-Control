@@ -2,6 +2,7 @@ import { errorMessage, isGitOperationAborted, requestDeferredFrame, cancelDeferr
 import { useCachedResult } from '@/data/resourceHooks';
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { historyRevision, subscribeHistoryRevision } from '@/data/historyRevision';
+import { gitHistoryVersion, subscribeGitHistoryRefresh } from '@/data/gitHistoryRefresh';
 import type { GraphLayout } from '@/utils/graphLayout';
 import { isRepoUnavailableError, parseGitLog, type GitStatusDetailed } from '@/utils/gitParsing';
 import { gitClient } from '@/services/gitClient';
@@ -48,6 +49,9 @@ export const useCommitGraphData = ({
 }: Params) => {
   const graphScopeKey = getGraphCacheKey(repoPath || '', showSecondaryHistory);
   const revision = useSyncExternalStore(subscribeHistoryRevision, () => historyRevision(repoPath || ''));
+  const historyVersion = useSyncExternalStore(subscribeGitHistoryRefresh, () => gitHistoryVersion(repoPath || ''));
+  const lastHistoryVersionRef = useRef(historyVersion);
+  const lastCommitHistoryVersionRef = useRef(historyVersion);
   const lastRevisionRef = useRef(revision);
   useCachedResult(graphQueryKey(graphScopeKey));
   const cachedAtMount = repoPath ? getGraphCacheEntry(repoPath, showSecondaryHistory) : undefined;
@@ -78,7 +82,7 @@ export const useCommitGraphData = ({
   const requestGenerationRef = useRef(0);
   const abortRetryTimeoutRef = useRef<number | null>(null);
   const scrollRestoreFrameRef = useRef<number | null>(null);
-  const updateLayout = useGraphLayoutEngine(setLayout, repoPath || '', `${graphScopeKey}\0${revision}`);
+  const updateLayout = useGraphLayoutEngine(setLayout, repoPath || '', `${graphScopeKey}\0${revision}\0${historyVersion}`);
   const { workingTreeStatus, refreshWorkingTreeStatus, clearWorkingTreeStatus } = useCommitGraphWorkingTreeStatus({
     repoPath,
     externalWorkingTreeStatus,
@@ -122,6 +126,11 @@ export const useCommitGraphData = ({
       const requestedLimit = Math.max(1, Math.min(requestedLimitRaw, LOG_MAX_LIMIT));
       const requestGeneration = ++requestGenerationRef.current;
       const requestRevision = historyRevision(repoPath);
+      const requestHistoryVersion = gitHistoryVersion(repoPath);
+      const isCurrent = () =>
+        requestGeneration === requestGenerationRef.current &&
+        requestRevision === historyRevision(repoPath) &&
+        requestHistoryVersion === gitHistoryVersion(repoPath);
       let retryScheduled = false;
       cancelDeferredRetry(abortRetryTimeoutRef);
       setLoadError(null);
@@ -150,7 +159,7 @@ export const useCommitGraphData = ({
           abortRetryTimeoutRef.current = window.setTimeout(
             () => {
               abortRetryTimeoutRef.current = null;
-              if (requestGeneration === requestGenerationRef.current) void refreshCommits(mode, retryAttempt + 1);
+              if (isCurrent()) void refreshCommits(mode, retryAttempt + 1);
             },
             100 * (retryAttempt + 1),
           );
@@ -177,7 +186,7 @@ export const useCommitGraphData = ({
           offset,
           scope,
         });
-        if (requestGeneration !== requestGenerationRef.current || requestRevision !== historyRevision(repoPath)) return;
+        if (!isCurrent()) return;
         if (result.success) {
           const data = result.data;
           const parsedChunk = parseGitLog(data.raw || '').slice(0, requestedLimit);
@@ -213,10 +222,10 @@ export const useCommitGraphData = ({
           handleFailure(result.error);
         }
       } catch (e: unknown) {
-        if (requestGeneration !== requestGenerationRef.current) return;
+        if (!isCurrent()) return;
         handleFailure(e);
       } finally {
-        if (requestGeneration === requestGenerationRef.current) {
+        if (isCurrent()) {
           if (isAppend) {
             appendInFlightRef.current = false;
             setLoadingMore(false);
@@ -224,7 +233,7 @@ export const useCommitGraphData = ({
               const pendingMode = pendingRefreshAfterAppendRef.current;
               pendingRefreshAfterAppendRef.current = null;
               queueMicrotask(() => {
-                if (requestGeneration === requestGenerationRef.current) void refreshCommits(pendingMode);
+                if (isCurrent()) void refreshCommits(pendingMode);
               });
             }
           } else if (!retryScheduled) {
@@ -267,6 +276,17 @@ export const useCommitGraphData = ({
     }
 
     const repoChanged = lastRepoPathRef.current !== repoPath;
+    if (repoChanged) lastCommitHistoryVersionRef.current = historyVersion;
+    const historyInvalidated = lastHistoryVersionRef.current !== historyVersion;
+    lastHistoryVersionRef.current = historyVersion;
+    if (historyInvalidated) {
+      // A confirmed write takes priority over an older pagination request.
+      // Keep the displayed layout, but prevent that request from publishing.
+      requestGenerationRef.current += 1;
+      appendInFlightRef.current = false;
+      pendingRefreshAfterAppendRef.current = null;
+      setLoadingMore(false);
+    }
     const historyRewritten = lastRevisionRef.current !== revision;
     lastRevisionRef.current = revision;
     const historyModeChanged = lastSecondaryHistoryRef.current !== showSecondaryHistory;
@@ -312,7 +332,17 @@ export const useCommitGraphData = ({
 
     void refreshCommits(mode);
     void refreshWorkingTreeStatus();
-  }, [refreshCommits, refreshWorkingTreeStatus, refreshTrigger, repoPath, showSecondaryHistory, updateLayout, clearWorkingTreeStatus, revision]);
+  }, [
+    refreshCommits,
+    refreshWorkingTreeStatus,
+    refreshTrigger,
+    repoPath,
+    showSecondaryHistory,
+    updateLayout,
+    clearWorkingTreeStatus,
+    revision,
+    historyVersion,
+  ]);
 
   useLayoutEffect(() => {
     if (layoutRef.current || !cachedAtMount?.layout) return;
@@ -325,10 +355,22 @@ export const useCommitGraphData = ({
   useEffect(() => {
     if (commitRefreshTrigger === lastCommitRefreshTriggerRef.current) return;
     lastCommitRefreshTriggerRef.current = commitRefreshTrigger;
+    const historyInvalidated = lastCommitHistoryVersionRef.current !== historyVersion;
+    lastCommitHistoryVersionRef.current = historyVersion;
     if (!repoPath) return;
+    if (historyInvalidated) {
+      // The mutation already scheduled fresh history. Preserve the commit
+      // action's scroll-to-head behavior without starting a second log read.
+      const scrollContainer = logContainerRef.current?.parentElement;
+      if (scrollContainer) scrollContainer.scrollTop = 0;
+      pendingScrollTopRef.current = 0;
+      pendingScrollHeightRef.current = null;
+      pendingScrollModeRef.current = 'quick';
+      return;
+    }
     void refreshCommits('quick');
     void refreshWorkingTreeStatus();
-  }, [commitRefreshTrigger, refreshCommits, refreshWorkingTreeStatus, repoPath]);
+  }, [commitRefreshTrigger, refreshCommits, refreshWorkingTreeStatus, repoPath, historyVersion, logContainerRef]);
 
   useEffect(() => {
     if (!layoutBelongsToRepository) return;

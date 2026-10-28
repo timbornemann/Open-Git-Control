@@ -1,7 +1,8 @@
 import { useCachedResult } from '@/data/resourceHooks';
 import { resourceKey, withReadPriority } from '@/data/clientCache';
 import type { IpcResult } from '@/types/ipc';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
+import { gitHistoryVersion, subscribeGitHistoryRefresh } from '@/data/gitHistoryRefresh';
 import type { BranchInfo } from '@/types/git';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { validateBranchName } from '@/utils/gitRefValidation';
@@ -38,6 +39,7 @@ export const useRepositoryBranches = ({
   setConfirmDialog,
   setInputDialog,
 }: Params) => {
+  const historyVersion = useSyncExternalStore(subscribeGitHistoryRefresh, () => gitHistoryVersion(activeRepo || ''));
   const [loadedBranches, setBranches] = useState<BranchInfo[]>([]);
   const [protectedBranchNames, setProtectedBranchNames] = useState<ReadonlySet<string>>(() => new Set(PRIMARY_BRANCH_NAMES));
   const activeRepoRef = useRef(activeRepo);
@@ -89,7 +91,7 @@ export const useRepositoryBranches = ({
       try {
         const [{ success, data }, protection] = await withReadPriority(
           () => Promise.all([gitClient.runGitCommandForRepo(activeRepo, 'branch', '-a'), gitClient.runGitCommandForRepo(activeRepo, 'protectedBranches')]),
-          'repository',
+          'visible',
         );
         if (cancelled) return;
         if (protection.success)
@@ -130,7 +132,7 @@ export const useRepositoryBranches = ({
     return () => {
       cancelled = true;
     };
-  }, [activeRepo, refreshTrigger]);
+  }, [activeRepo, refreshTrigger, historyVersion]);
 
   useEffect(() => {
     if (!branchContextMenu) return;

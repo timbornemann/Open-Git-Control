@@ -1,5 +1,6 @@
 import { prepareGraphLayout } from '@/data/graphLayout';
 import { historyRevision } from '@/data/historyRevision';
+import { gitHistoryVersion } from '@/data/gitHistoryRefresh';
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import { type GraphLayout } from '@/utils/graphLayout';
 import type { GitCommit } from '@/utils/gitParsing';
@@ -23,11 +24,13 @@ export const useGraphLayoutEngine = (setLayout: Dispatch<SetStateAction<GraphLay
       if (currentScope.current !== scopeKey) return;
       const request = ++generation.current;
       const revision = historyRevision(repoPath);
+      const version = gitHistoryVersion(repoPath);
+      const isCurrent = () => generation.current === request && historyRevision(repoPath) === revision && gitHistoryVersion(repoPath) === version;
       try {
         const layout = await prepareGraphLayout(repoPath, commits, previous);
-        if (generation.current !== request || historyRevision(repoPath) !== revision) return;
+        if (!isCurrent()) return;
         setLayout((current) => {
-          if (generation.current !== request || historyRevision(repoPath) !== revision) return current;
+          if (!isCurrent()) return current;
           if (!current) return layout;
           const currentByHash = new Map(current.nodes.map((node) => [node.commit.hash, node.commit]));
           const nodes = layout.nodes.map((node) => {
@@ -40,7 +43,7 @@ export const useGraphLayoutEngine = (setLayout: Dispatch<SetStateAction<GraphLay
       } catch (error) {
         // The owner handles current failures alongside history-read errors.
         // Results from a previous repository/view no longer own any UI state.
-        if (generation.current === request) throw error;
+        if (isCurrent()) throw error;
       }
     },
     [repoPath, scopeKey, setLayout],

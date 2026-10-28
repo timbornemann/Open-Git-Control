@@ -1,4 +1,6 @@
-import { cachedClient } from '@/data/clientCache';
+import { cachedClient, invalidateResources } from '@/data/clientCache';
+import { gitMutationAffects } from '@/data/mutationEffects';
+import { normalizeRepoPathKey } from '@/utils/repoPath';
 import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
 import { getElectronApi, requireElectronPlannerApi } from './electronApi';
 
@@ -9,8 +11,14 @@ export const plannerClient = cachedClient('planner', {
   inspectWork(request: Parameters<ElectronAPI['plannerInspectWork']>[0]) {
     return requireElectronPlannerApi().plannerInspectWork(request);
   },
-  startWork(request: Parameters<ElectronAPI['plannerStartWork']>[0]) {
-    return requireElectronPlannerApi().plannerStartWork(request);
+  async startWork(request: Parameters<ElectronAPI['plannerStartWork']>[0]) {
+    try {
+      return await requireElectronPlannerApi().plannerStartWork(request);
+    } finally {
+      // Task setup can switch/create a branch, including before a recoverable
+      // failure. Its planner IPC bypasses the Git mutation adapter.
+      invalidateResources('git', normalizeRepoPathKey(request.repoPath), undefined, (key) => gitMutationAffects('checkout', [], key));
+    }
   },
   getWork(request: Parameters<ElectronAPI['plannerGetWork']>[0]) {
     return requireElectronPlannerApi().plannerGetWork(request);
