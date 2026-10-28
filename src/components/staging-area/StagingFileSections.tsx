@@ -224,12 +224,9 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
                   className="staging-btn-sm danger"
                   disabled={fileOps.isMutating}
                   onClick={fileOps.discardAll}
-                  title={tr(
-                    'Alle ungestagten Änderungen im gesamten Repository verwerfen, auch ausgeblendete Dateien',
-                    'Discard all unstaged changes in the whole repository, including hidden files',
-                  )}
+                  title={tr('Alle angezeigten ungestagten Änderungen verwerfen', 'Discard all displayed unstaged changes')}
                 >
-                  x {t('generated.components.layout.sidebar.githubconnectedcontent.all_2ba206ff')}
+                  x {allLabel}
                 </button>
               </>
             }

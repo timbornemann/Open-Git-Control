@@ -14,6 +14,7 @@ import { useStagingLfs } from './useStagingLfs';
 import type { TrackWithGitLfsRequest } from '@/shared/ipc/gitLfs';
 import { useWorkingTreeSnapshot } from '@/hooks/useWorkingTreeSnapshot';
 import { useVisibleStagingFiles } from './useVisibleStagingFiles';
+import { buildDiscardCommands } from './stagingDiscardCommands';
 
 type Params = {
   repoPath: string | null;
@@ -150,13 +151,15 @@ export const useFileOperations = ({
   }, [contextMenu]);
 
   const git = useCallback(
-    async (args: string[], msg: string, notify = false) => {
+    async (args: string[] | string[][], msg: string, notify = false) => {
       const repoAtStart = repoPath;
       const generation = repoGenerationRef.current;
+      const isBatch = Array.isArray(args[0]);
+      const commands = (isBatch ? (args as string[][]) : [args as string[]]).filter((command) => command.length > 0);
       if (
         !repoAtStart ||
         !gitClient.isAvailable() ||
-        args.length === 0 ||
+        commands.length === 0 ||
         !isCurrentRepoGeneration(generation, repoAtStart) ||
         !hasCurrentStatusForRepo(repoAtStart)
       ) {
@@ -166,19 +169,31 @@ export const useFileOperations = ({
       mutationInFlightRef.current = true;
       setMutationStartedAt(Date.now());
       try {
-        const r = await gitClient.runGitCommandForRepo(repoAtStart, args[0] as GitCommandNameDto, ...args.slice(1));
-        if (!isCurrentRepoGeneration(generation, repoAtStart)) return false;
-        if (r.success) {
-          setToast({ msg, isError: false });
+        let failure: string | null = null;
+        let changed = false;
+        for (const command of commands) {
+          if (!isCurrentRepoGeneration(generation, repoAtStart)) return false;
+          const result = await gitClient.runGitCommandForRepo(repoAtStart, command[0] as GitCommandNameDto, ...command.slice(1)).catch((error: unknown) => ({
+            success: false as const,
+            error: error instanceof Error ? error.message : String(error),
+          }));
+          if (!isCurrentRepoGeneration(generation, repoAtStart)) return false;
+          if (!result.success) {
+            failure = result.error || t('generated.components.layout.cloneprogressmodal.error_7d62310f');
+            break;
+          }
+          changed = true;
+        }
+        setToast({ msg: failure ?? msg, isError: failure !== null });
+        // A failed checkout can already have restored some selected files.
+        // Reconcile the status once, while retaining the shared mutation lock.
+        if (changed || isBatch) {
           if (notify && onRepoChanged) onRepoChanged();
           await refresh();
-          return true;
-        } else {
-          setToast({ msg: r.error || t('generated.components.layout.cloneprogressmodal.error_7d62310f'), isError: true });
-          return false;
         }
+        return failure === null;
       } catch (e: any) {
-        setToast({ msg: e.message, isError: true });
+        if (isCurrentRepoGeneration(generation, repoAtStart)) setToast({ msg: e.message, isError: true });
         return false;
       } finally {
         mutationInFlightRef.current = false;
@@ -415,15 +430,28 @@ export const useFileOperations = ({
   );
 
   const discardAll = useCallback(() => {
+    const repoAtStart = repoPath;
+    const generation = repoGenerationRef.current;
+    const paths = [...new Set((bulkFiles?.unstaged || []).map((file) => file.path))];
+    if (!repoAtStart || !paths.length || mutationInFlightRef.current || !hasCurrentStatusForRepo(repoAtStart)) return;
+    const commands = buildDiscardCommands(paths, !isFiltering && !status?.conflicts.length);
+    let confirmed = false;
     setConfirmDialog({
       variant: 'danger',
-      title: t('generated.components.staging_area.usefileoperations.discard_all_unstaged_changes_aa3f4f05'),
-      message: t('generated.components.staging_area.usefileoperations.all_local_unstaged_changes_will_be_reset_to_the_last_com_2a16eed6'),
+      title: isFiltering
+        ? tr('Angezeigte Änderungen verwerfen', 'Discard displayed changes')
+        : t('generated.components.staging_area.usefileoperations.discard_all_unstaged_changes_aa3f4f05'),
+      message: tr(
+        'Die ungestagten Änderungen der ausgewählten Dateien werden auf den Stand im Staging zurückgesetzt.',
+        'The unstaged changes in the selected files will be restored from the index.',
+      ),
       contextItems: [
         {
           label: t('generated.components.staging_area.usefileoperations.scope_7d90ed9d'),
-          value: t('generated.components.staging_area.usefileoperations.entire_repository_3b268641'),
+          value: isFiltering ? tr('Angezeigte ungestagte Dateien', 'Displayed unstaged files') : tr('Alle ungestagten Dateien', 'All unstaged files'),
         },
+        { label: tr('Dateien', 'Files'), value: String(paths.length) },
+        ...(isFiltering ? [{ label: tr('Suchfilter', 'Search filter'), value: searchQuery.trim() }] : []),
         {
           label: t('generated.components.staging_area.usefileoperations.affects_80a8b1b0'),
           value: t('generated.components.staging_area.usefileoperations.only_unstaged_files_edd96f1c'),
@@ -431,12 +459,26 @@ export const useFileOperations = ({
       ],
       irreversible: true,
       consequences: t('generated.components.staging_area.usefileoperations.unsaved_changes_will_be_permanently_lost_7fed012c'),
-      confirmLabel: t('generated.components.staging_area.usefileoperations.discard_all_5a080ac9'),
+      confirmLabel: isFiltering ? tr('Treffer verwerfen', 'Discard matches') : t('generated.components.staging_area.usefileoperations.discard_all_5a080ac9'),
       onConfirm: async () => {
-        await git(['checkout', '--', '.'], t('generated.components.staging_area.usefileoperations.discarded_all_changes_f85f8117'), true);
+        if (confirmed || !isCurrentRepoGeneration(generation, repoAtStart)) return;
+        confirmed = true;
+        await git(commands, tr('Ausgewählte Änderungen verworfen', 'Discarded selected changes'), true);
       },
     });
-  }, [setConfirmDialog, t, git]);
+  }, [
+    repoPath,
+    bulkFiles?.unstaged,
+    hasCurrentStatusForRepo,
+    isFiltering,
+    status?.conflicts.length,
+    searchQuery,
+    setConfirmDialog,
+    t,
+    tr,
+    isCurrentRepoGeneration,
+    git,
+  ]);
 
   const deleteUntracked = useCallback(
     (f: string) => {

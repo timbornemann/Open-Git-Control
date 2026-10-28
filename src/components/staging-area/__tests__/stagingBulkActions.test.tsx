@@ -7,6 +7,7 @@ import { gitClient } from '@/services/gitClient';
 import { StagingFileSections } from '../StagingFileSections';
 import { StagingToolbar } from '../StagingToolbar';
 import { useFileOperations } from '../useFileOperations';
+import { MAX_ARGS_BY_GIT_COMMAND } from '@/shared/ipc/gitCommands';
 
 const repo = 'C:/staging-filter';
 type Params = Parameters<typeof useFileOperations>[0];
@@ -58,10 +59,11 @@ describe('staging bulk actions and search scope', () => {
   const search = async (query: string) => {
     await act(async () => fileOps.setSearchQuery(query));
   };
-  const clickSection = async (section: number) => {
-    const button = host.querySelectorAll('.staging-section')[section].querySelector<HTMLButtonElement>('.staging-section-header button')!;
+  const clickSection = async (section: number, action = 0) => {
+    const button = host.querySelectorAll('.staging-section')[section].querySelectorAll<HTMLButtonElement>('.staging-section-header button')[action];
     await act(async () => button.click());
   };
+  const confirmation = () => vi.mocked(params.setConfirmDialog).mock.calls.at(-1)![0]!;
   beforeEach(async () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
@@ -129,9 +131,11 @@ describe('staging bulk actions and search scope', () => {
       await fileOps.stageAllUnstaged();
       await fileOps.stageAllUntracked();
       await fileOps.unstageAll();
+      fileOps.discardAll();
     });
     expect(gitClient.stagePaths).not.toHaveBeenCalled();
     expect(gitClient.runGitCommandForRepo).not.toHaveBeenCalled();
+    expect(params.setConfirmDialog).not.toHaveBeenCalled();
   });
 
   it.each(['', 'feature', 'missing/file.txt'])('stages the whole repository with one command using the explicit global button (search %j)', async (query) => {
@@ -194,5 +198,141 @@ describe('staging bulk actions and search scope', () => {
     await clickSection(0);
     expect(gitClient.runGitCommandForRepo).toHaveBeenCalledWith(repo, 'reset', '--', 'old/renamed.ts', 'feature/renamed.ts');
     expect(gitClient.runGitCommandForRepo).not.toHaveBeenCalledWith(repo, 'reset', 'HEAD');
+  });
+
+  it.each(['feature', '  FEATURE  ', 'src/feature/'])('discards only the displayed tracked files after confirmation for search %j', async (query) => {
+    await search(query);
+    const selected = fileOps.visibleFiles.unstaged.map((file) => file.path);
+    const section = selected.length === 1 ? 0 : 1;
+    await clickSection(section, 1);
+    const dialog = confirmation();
+    expect(dialog.title).toBe('Discard displayed changes');
+    expect(dialog.contextItems).toContainEqual({ label: 'Files', value: String(selected.length) });
+    expect(dialog.contextItems).toContainEqual({ label: 'Search filter', value: query.trim() });
+    expect(gitClient.runGitCommandForRepo).not.toHaveBeenCalled();
+    await act(async () => {
+      await dialog.onConfirm();
+    });
+    expect(gitClient.runGitCommandForRepo).toHaveBeenCalledExactlyOnceWith(repo, 'checkout', '--', ...selected);
+    expect(params.externalRefresh).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the confirmed file selection when the search changes before confirmation', async () => {
+    await search('feature');
+    await clickSection(1, 1);
+    const dialog = confirmation();
+    await search('');
+    await act(async () => {
+      await dialog.onConfirm();
+    });
+    expect(gitClient.runGitCommandForRepo).toHaveBeenCalledExactlyOnceWith(repo, 'checkout', '--', 'docs/feature notes.md', 'src/feature/edit.ts');
+  });
+
+  it('invalidates an old discard confirmation after leaving and reopening the repository', async () => {
+    await search('feature');
+    await clickSection(1, 1);
+    const dialog = confirmation();
+    params = { ...params, repoPath: 'C:/other', externalRepoPath: 'C:/other' };
+    await render();
+    params = { ...params, repoPath: repo, externalRepoPath: repo };
+    await render();
+    await act(async () => {
+      await dialog.onConfirm();
+    });
+    expect(gitClient.runGitCommandForRepo).not.toHaveBeenCalled();
+  });
+
+  it('executes a discard confirmation only once, even if its callback is repeated', async () => {
+    await search('feature');
+    await clickSection(1, 1);
+    const dialog = confirmation();
+    await act(async () => {
+      await dialog.onConfirm();
+      await dialog.onConfirm();
+    });
+    expect(gitClient.runGitCommandForRepo).toHaveBeenCalledOnce();
+  });
+
+  const manyUnstaged = () => [...Array.from({ length: 11 }, (_, i) => entry(`feature/file [${i}].txt`)), entry('hidden/keep.txt')];
+  it('batches a large filtered selection within the IPC argument limit and refreshes once', async () => {
+    params = { ...params, externalStatus: { ...status, unstaged: manyUnstaged() }, onRepoChanged: vi.fn() };
+    await render();
+    await search('feature');
+    const selected = fileOps.visibleFiles.unstaged.map((file) => file.path);
+    await clickSection(1, 1);
+    await act(async () => {
+      await confirmation().onConfirm();
+    });
+    const calls = vi.mocked(gitClient.runGitCommandForRepo).mock.calls;
+    expect(calls.length).toBeGreaterThan(1);
+    for (const call of calls) {
+      expect(call.slice(0, 3)).toEqual([repo, 'checkout', '--']);
+      expect(call.length - 2).toBeLessThanOrEqual(MAX_ARGS_BY_GIT_COMMAND.checkout!);
+    }
+    expect(calls.flatMap((call) => call.slice(3))).toEqual(selected);
+    expect(params.externalRefresh).toHaveBeenCalledOnce();
+    expect(params.onRepoChanged).toHaveBeenCalledOnce();
+  });
+
+  it('does not continue a discard batch after switching repositories during its first command', async () => {
+    params = { ...params, externalStatus: { ...status, unstaged: manyUnstaged() } };
+    await render();
+    await search('feature');
+    await clickSection(1, 1);
+    let finish!: (value: { success: true; data: string }) => void;
+    vi.mocked(gitClient.runGitCommandForRepo).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    let pending!: void | Promise<void>;
+    await act(async () => {
+      pending = confirmation().onConfirm();
+    });
+    params = { ...params, repoPath: 'C:/other', externalRepoPath: 'C:/other' };
+    await render();
+    await act(async () => {
+      finish({ success: true, data: '' });
+      await pending;
+    });
+    expect(gitClient.runGitCommandForRepo).toHaveBeenCalledTimes(1);
+    expect(params.externalRefresh).not.toHaveBeenCalled();
+    expect(params.setToast).not.toHaveBeenCalled();
+  });
+
+  it.each(['failure', 'rejection'])('stops after a batch %s and refreshes already discarded files', async (failure) => {
+    params = { ...params, externalStatus: { ...status, unstaged: manyUnstaged() } };
+    await render();
+    await search('feature');
+    await clickSection(1, 1);
+    const command = vi.mocked(gitClient.runGitCommandForRepo).mockResolvedValueOnce({ success: true, data: '' });
+    if (failure === 'failure') command.mockResolvedValueOnce({ success: false, error: 'Discard denied' });
+    else command.mockRejectedValueOnce(new Error('Discard denied'));
+    await act(async () => {
+      await confirmation().onConfirm();
+    });
+    expect(command).toHaveBeenCalledTimes(2);
+    expect(params.externalRefresh).toHaveBeenCalledOnce();
+    expect(params.setToast).toHaveBeenLastCalledWith({ msg: 'Discard denied', isError: true });
+    expect(fileOps.isMutating).toBe(false);
+  });
+
+  it('preserves the fast unfiltered discard path', async () => {
+    await search('   ');
+    await clickSection(1, 1);
+    await act(async () => {
+      await confirmation().onConfirm();
+    });
+    expect(gitClient.runGitCommandForRepo).toHaveBeenCalledExactlyOnceWith(repo, 'checkout', '--', '.');
+  });
+
+  it('excludes conflict files from a bulk discard even without a search', async () => {
+    params = { ...params, externalStatusRaw: 'UU hidden/conflict.ts\n' };
+    await render();
+    await clickSection(1, 1);
+    await act(async () => {
+      await confirmation().onConfirm();
+    });
+    expect(gitClient.runGitCommandForRepo).toHaveBeenCalledExactlyOnceWith(repo, 'checkout', '--', ...status.unstaged.map((file) => file.path));
   });
 });
