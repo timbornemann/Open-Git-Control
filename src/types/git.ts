@@ -5,6 +5,7 @@ export type BranchInfo = {
   name: string;
   isHead: boolean;
   scope: 'local' | 'remote';
+  isProtected?: boolean;
 };
 
 export type RemoteSyncState = {

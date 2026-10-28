@@ -201,6 +201,7 @@ Tests und Builds als strukturiertes Protokoll lesen, Probleme prüfen und genann
 - Lokale und Remote-Branches mit Suche/Filter anzeigen.
 - Branches erstellen, lokale Branches auschecken, umbenennen und loeschen.
 - Unmerged Branches nur nach expliziter Bestaetigung force-loeschen.
+- Lokale `main`-, `master`- und konfigurierte Standardbranches sowie lokal bekannte Remote-Standardbranches sind auch vor Force-Löschen geschützt. Das Kontextmenü erklärt den Schutz; die Prüfung im Git-Backend funktioniert auch offline.
 - Über **Branch-Aktionen (⋯) → Branches aufräumen …** neben dem Plus-Button zusammengeführte und verwaiste lokale beziehungsweise Server-Branches gemeinsam prüfen. Worktrees, geschützte Branches und offene Pull-/Merge-Requests werden berücksichtigt; nicht übernommene Arbeit verlangt eine Zusatzbestätigung. Siehe [Branch-Aufräumassistent](Docs/BRANCH_CLEANUP.md).
 - Branches aus dem Graphen und von ausgewaehlten Commits erstellen.
 - Branches aus Topbar oder Kontextmenu mergen mit:

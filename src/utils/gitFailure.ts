@@ -2,6 +2,7 @@ import { redactGitCredentials } from '@/shared/git/redaction';
 import type { NotificationMessage } from '@/types/notifications';
 import { isGitCancellation } from './gitCancellation';
 import { isMissingRemoteBranchError } from '@/shared/git/pullErrors';
+import { PROTECTED_BRANCH_ERROR } from '@/shared/git/branchProtection';
 
 export type GitFailureKind =
   | 'git-missing'
@@ -16,6 +17,7 @@ export type GitFailureKind =
   | 'repository'
   | 'configuration'
   | 'remote-branch-missing'
+  | 'protected-branch'
   | 'cancelled'
   | 'unknown';
 type Translate = (de: string, en: string) => string;
@@ -24,6 +26,12 @@ type Translate = (de: string, en: string) => string;
 export function describeGitFailure(raw: string, tr: Translate, explicitGit = false): { kind: GitFailureKind; explanation: string } | null {
   const output = raw.includes('Git Output:') ? raw.slice(raw.lastIndexOf('Git Output:') + 11) : raw.replace(/^Command failed:\s*[^\r\n]+\r?\n/i, '');
   const result = (kind: GitFailureKind, de: string, en: string) => ({ kind, explanation: tr(de, en) });
+  if (output.startsWith(PROTECTED_BRANCH_ERROR))
+    return result(
+      'protected-branch',
+      'Dieser Hauptbranch ist vor dem lokalen Löschen geschützt. Du kannst weiterhin auf ihn wechseln und ihn aktualisieren.',
+      'This primary branch is protected from local deletion. You can still switch to it and update it.',
+    );
   if (
     /spawn\s+.*\bgit(?:\.exe)?\s+ENOENT|\bgit(?:\.exe)?\b.*(?:command not found|not recognized|nicht .*erkannt)|(?:command not found|not recognized).*\bgit\b|Git is (?:not installed|not available|not executable)|Git executable.*(?:not found|not available)/i.test(
       output,

@@ -67,6 +67,7 @@ export function isReadCommand(command: unknown, args: unknown[]): boolean {
       'submoduleStatus',
       'commitDetails',
       'branches',
+      'protectedBranches',
       'forensicHistory',
     ].includes(String(command))
   )

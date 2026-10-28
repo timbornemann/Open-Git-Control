@@ -22,7 +22,7 @@ const workingTree = new Set([
 ]);
 const history = new Set(['getCommitLogPage', 'graph', 'getFileHistory', 'getFileTimelineData', 'getStashes']);
 const treeCommands = new Set(['status', 'statusPorcelain', 'diff', 'ls-files']);
-const historyCommands = new Set(['log', 'reflog', 'forEachRef', 'branch', 'branches', 'tag', 'show-ref', 'rev-parse', 'forensicHistory']);
+const historyCommands = new Set(['log', 'reflog', 'forEachRef', 'branch', 'branches', 'protectedBranches', 'tag', 'show-ref', 'rev-parse', 'forensicHistory']);
 
 export function gitMutationScope(method: string, args: unknown[], active: string): string {
   if (method === 'runGitCommandForRepo') return normalizeRepoPathKey(String(args[0]));

@@ -20,6 +20,11 @@ describe('gitCommandPolicy', () => {
     expect(() => assertAllowedGitCommand('status')).not.toThrow();
     expect(() => assertAllowedGitCommand('forensicHistory')).not.toThrow();
   });
+  it('exposes the protected-branch list as a read without user-controlled Git arguments', () => {
+    expect(() => assertAllowedGitCommand('protectedBranches')).not.toThrow();
+    expect(() => normalizeCommandArgs('protectedBranches', [])).not.toThrow();
+    expect(() => normalizeCommandArgs('protectedBranches', ['-D', 'master'])).toThrow();
+  });
 
   it('rejects unknown command names', () => {
     expect(() => assertAllowedGitCommand('rev-parse')).toThrow('Git command not allowed.');

@@ -22,6 +22,7 @@ describe('Git failure explanations', () => {
     ["fatal: Unable to create '/repo/.git/index.lock': File exists", 'locked'],
     ['[REPO_UNAVAILABLE] fatal: not a git repository', 'repository'],
     ['Git operation was aborted.', 'cancelled'],
+    ['[PROTECTED_BRANCH] Local primary branch "master" cannot be deleted.', 'protected-branch'],
     ["fatal: couldn't find remote ref test-branch", 'remote-branch-missing'],
     ["Your configuration specifies to merge with the ref 'refs/heads/test-branch'\nfrom the remote, but no such ref was fetched.", 'remote-branch-missing'],
   ])('explains %s', (raw, kind) => {

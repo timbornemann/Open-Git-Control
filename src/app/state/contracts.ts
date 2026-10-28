@@ -18,7 +18,7 @@ export type RemoteStatus = {
   borderColor: string;
 };
 
-export type BranchContextMenuState = { x: number; y: number; branch: string; isHead: boolean } | null;
+export type BranchContextMenuState = { x: number; y: number; branch: string; isHead: boolean; isProtected?: boolean } | null;
 
 export interface DialogContextItem {
   label: string;

@@ -20,6 +20,7 @@ export default defineConfig({
       include: [
         'src/utils/**/*.ts',
         'src/shared/git/remoteTransferSelection.ts',
+        'src/shared/git/branchProtection.ts',
         'src/hooks/**/*.{ts,tsx}',
         'src/contexts/**/*.{ts,tsx}',
         'src/components/layout/hooks/**/*.{ts,tsx}',
@@ -33,6 +34,7 @@ export default defineConfig({
         'electron/hosting/**/*.ts',
         'electron/git/Remote*.ts',
         'electron/git/GitPullConfiguration.ts',
+        'electron/git/LocalBranchProtection.ts',
         'electron/git/GitPush*.ts',
         'electron/git/GitNodeHelper.ts',
         'electron/git/RebaseService.ts',

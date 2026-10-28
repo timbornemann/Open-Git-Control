@@ -5,7 +5,7 @@ import { useI18n } from '@/i18n';
 import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardToolbar } from './RepoCard';
 import { SidebarActionsMenu } from './SidebarActionsMenu';
 
-type ContextMenuState = { x: number; y: number; branch: string; isHead: boolean } | null;
+type ContextMenuState = { x: number; y: number; branch: string; isHead: boolean; isProtected?: boolean } | null;
 
 type Props = {
   branches: BranchInfo[];
@@ -67,7 +67,13 @@ export const BranchPanel: React.FC<Props> = ({
         onClick={() => !branch.isHead && isLocal && onCheckoutBranch(branch.name)}
         onContextMenu={(event) => {
           event.preventDefault();
-          onSetBranchContextMenu({ x: event.clientX, y: event.clientY, branch: branch.name, isHead: branch.isHead });
+          onSetBranchContextMenu({
+            x: event.clientX,
+            y: event.clientY,
+            branch: branch.name,
+            isHead: branch.isHead,
+            ...(branch.isProtected ? { isProtected: true } : {}),
+          });
         }}
       >
         <GitBranch size={13} className="branch-row-icon" />

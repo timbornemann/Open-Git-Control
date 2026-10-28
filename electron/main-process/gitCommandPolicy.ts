@@ -391,6 +391,7 @@ const validateCommandSpecificArgs = (commandName: GitCommandName, args: string[]
     case 'log':
       return validateLogArgs(args);
     case 'branches':
+    case 'protectedBranches':
     case 'statusPorcelain':
     case 'mergeContinue':
     case 'mergeAbort':

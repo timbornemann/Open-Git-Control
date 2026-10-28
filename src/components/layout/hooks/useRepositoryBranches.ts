@@ -14,6 +14,7 @@ import type { GitActionToast } from './repositoryDomainTypes';
 import type { RunGitCommandOptions } from '@/app/state/contracts';
 import { transferClient } from '@/services/hostingClient';
 import { requestRemoteTransfer } from '@/components/hosting/remoteTransferDialogState';
+import { PRIMARY_BRANCH_NAMES, PROTECTED_BRANCH_ERROR, isPrimaryBranchName } from '@/shared/git/branchProtection';
 
 type Params = {
   activeRepo: string | null;
@@ -38,10 +39,11 @@ export const useRepositoryBranches = ({
   setInputDialog,
 }: Params) => {
   const [loadedBranches, setBranches] = useState<BranchInfo[]>([]);
+  const [protectedBranchNames, setProtectedBranchNames] = useState<ReadonlySet<string>>(() => new Set(PRIMARY_BRANCH_NAMES));
   const activeRepoRef = useRef(activeRepo);
   const [loadedCurrentBranch, setCurrentBranch] = useState('');
   const cached = useCachedResult<IpcResult<string>>(resourceKey('git', 'runGitCommandForRepo', [activeRepo, 'branch', '-a']));
-  const branches = useMemo<BranchInfo[]>(
+  const listedBranches = useMemo<BranchInfo[]>(
     () =>
       cached.data?.success
         ? cached.data.data
@@ -53,6 +55,10 @@ export const useRepositoryBranches = ({
             })
         : loadedBranches,
     [cached.data, loadedBranches],
+  );
+  const branches = useMemo(
+    () => listedBranches.map((branch) => (branch.scope === 'local' && protectedBranchNames.has(branch.name) ? { ...branch, isProtected: true } : branch)),
+    [listedBranches, protectedBranchNames],
   );
   const cachedHead = branches.find((branch) => branch.isHead)?.name || '';
   const currentBranch = cached.data?.success ? (/^\((HEAD detached|no branch)/i.test(cachedHead) ? '' : cachedHead) : loadedCurrentBranch;
@@ -68,6 +74,7 @@ export const useRepositoryBranches = ({
     setCurrentBranch('');
     setIsCreatingBranch(false);
     setBranchContextMenu(null);
+    setProtectedBranchNames(new Set(PRIMARY_BRANCH_NAMES));
   }, [activeRepo]);
 
   useEffect(() => {
@@ -80,8 +87,21 @@ export const useRepositoryBranches = ({
     let cancelled = false;
     const fetchBranches = async () => {
       try {
-        const { success, data } = await withReadPriority(() => gitClient.runGitCommandForRepo(activeRepo, 'branch', '-a'), 'repository');
+        const [{ success, data }, protection] = await withReadPriority(
+          () => Promise.all([gitClient.runGitCommandForRepo(activeRepo, 'branch', '-a'), gitClient.runGitCommandForRepo(activeRepo, 'protectedBranches')]),
+          'repository',
+        );
         if (cancelled) return;
+        if (protection.success)
+          setProtectedBranchNames(
+            new Set([
+              ...PRIMARY_BRANCH_NAMES,
+              ...String(protection.data || '')
+                .split('\n')
+                .map((name) => name.trim())
+                .filter(Boolean),
+            ]),
+          );
         if (!success || !data) return;
 
         const parsedBranches = data
@@ -172,6 +192,14 @@ export const useRepositoryBranches = ({
   const handleDeleteBranch = async (branchName: string) => {
     const repoAtStart = activeRepo;
     if (!repoAtStart) return;
+    const protectedMessage = tr(
+      `Der Hauptbranch „${branchName}“ ist vor dem lokalen Löschen geschützt.`,
+      `The primary branch "${branchName}" is protected from local deletion.`,
+    );
+    if (isPrimaryBranchName(branchName) || protectedBranchNames.has(branchName)) {
+      setGitActionToast({ msg: protectedMessage, isError: false });
+      return;
+    }
     setConfirmDialog(
       buildDeleteBranchDialog({
         branchName,
@@ -179,15 +207,22 @@ export const useRepositoryBranches = ({
         t,
         tr,
         onDelete: async () => {
-          if (!gitClient.isAvailable()) return;
+          if (!gitClient.isAvailable() || activeRepoRef.current !== repoAtStart) return;
           const deleteArgs = gitClient.buildDeleteBranchArgs(branchName);
           const [command, ...rest] = deleteArgs;
           const result = await gitClient.runGitCommandForRepo(repoAtStart, command, ...rest);
+          if (activeRepoRef.current !== repoAtStart) return;
           if (result.success) {
             setGitActionToast({
               msg: tr(`Branch "${branchName}" gelöscht.`, `Deleted branch "${branchName}".`),
               isError: false,
             });
+            triggerRefresh();
+            return;
+          }
+
+          if (result.error.includes(PROTECTED_BRANCH_ERROR)) {
+            setGitActionToast({ msg: protectedMessage, isError: false });
             triggerRefresh();
             return;
           }

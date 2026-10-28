@@ -19,6 +19,19 @@ const tick = () =>
   });
 
 describe('shared resource cache', () => {
+  it('reads primary-branch protection without invalidating workspace data and refreshes it after a rename', async () => {
+    const status = resourceKey('git', 'runGitCommandForRepo', ['/protection-repo', 'status']);
+    const protection = resourceKey('git', 'runGitCommandForRepo', ['/protection-repo', 'protectedBranches']);
+    updateResource(status, { success: true, data: 'clean' });
+    const request = vi.fn(async (_repo: string, _command: string, ..._args: string[]) => ({ success: true, data: 'main\nmaster' }));
+    const client = cachedClient('git', { runGitCommandForRepo: request });
+    await client.runGitCommandForRepo('/protection-repo', 'protectedBranches');
+    await client.runGitCommandForRepo('/protection-repo', 'protectedBranches');
+    expect(request).toHaveBeenCalledOnce();
+    expect(queryClient.getQueryState(status)?.isInvalidated).toBe(false);
+    await client.runGitCommandForRepo('/protection-repo', 'branch', '-m', 'old', 'new');
+    expect(queryClient.getQueryState(protection)?.isInvalidated).toBe(true);
+  });
   it('deduplicates a preload and a view request, including a successfully empty list', async () => {
     const pending = deferred<string[]>();
     const read = vi.fn(() => pending.promise);

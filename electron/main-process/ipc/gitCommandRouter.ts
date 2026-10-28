@@ -11,6 +11,8 @@ import { protectGitReadArgs } from '../gitCommandArguments';
 import { assertGitWorkingTreePaths } from '../../git/GitWorkingTreePathGuard';
 import { explicitPushArguments, prepareForcePushArguments } from '../../git/GitPushArguments';
 import { gitConfigurationEnvironment } from '../../git/remoteTransferValidation';
+import { assertLocalBranchDeletionAllowed, readProtectedLocalBranches } from '../../git/LocalBranchProtection';
+import { PRIMARY_BRANCH_NAMES } from '../../../src/shared/git/branchProtection';
 
 type GitCommandRouterEvent = {
   sender: any;
@@ -202,6 +204,14 @@ const COMMAND_EXECUTORS: Partial<Record<GitCommandName, GitCommandExecutor>> = {
   },
   show: (context) => runInContext(context, ['show', ...context.args]),
   branches: async (context) => runInContext(context, ['branch', '-a']),
+  protectedBranches: async (context) =>
+    [
+      ...(await readProtectedLocalBranches(context.repoPath || context.gitService.requireActiveRepoPath(), {
+        run: (_repo, args) => runInContext(context, args),
+      })),
+    ]
+      .sort()
+      .join('\n'),
   commitDetails: executeCommitDetails,
   conflictTakeOurs: async (context) => runInContext(context, ['checkout', '--ours', '--', toLiteralPathspec(context.args[0])]),
   conflictTakeTheirs: async (context) => runInContext(context, ['checkout', '--theirs', '--', toLiteralPathspec(context.args[0])]),
@@ -250,6 +260,17 @@ const COMMAND_EXECUTORS: Partial<Record<GitCommandName, GitCommandExecutor>> = {
 };
 
 const executeGitCommand = async (context: GitCommandExecutionContext): Promise<string> => {
+  if (context.commandName === 'branch' && ['-d', '-D'].includes(context.args[0])) {
+    const name = context.args[1];
+    assertLocalBranchDeletionAllowed(name, new Set(PRIMARY_BRANCH_NAMES));
+    const repo = context.repoPath || context.gitService.requireActiveRepoPath();
+    return context.gitService.runner.withExclusiveWrite(repo, 'delete-local-branch', async (git) => {
+      const protectedNames = await readProtectedLocalBranches(repo, git);
+      assertLocalBranchDeletionAllowed(name, protectedNames);
+      requireActiveRepositoryPath(repo, context.gitService.getRepoPath(), 'git:branch');
+      return git.run(repo, ['branch', ...context.args]);
+    });
+  }
   if (context.commandName === 'branch' && ['-m', '-M', '--move'].includes(context.args[0]) && observesPlannerBranchRename()) {
     const names = context.args.slice(1);
     const before = names.length === 1 ? (await runInContext(context, ['symbolic-ref', '--short', 'HEAD'])).trim() : names[0];

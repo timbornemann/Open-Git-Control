@@ -1,8 +1,9 @@
 import React from 'react';
 import type { GitMergeMode } from '@/types/git';
 import { useI18n } from '@/i18n';
+import { isPrimaryBranchName } from '@/shared/git/branchProtection';
 
-type BranchContextMenuState = { x: number; y: number; branch: string; isHead: boolean } | null;
+type BranchContextMenuState = { x: number; y: number; branch: string; isHead: boolean; isProtected?: boolean } | null;
 
 type Props = {
   branchContextMenu: BranchContextMenuState;
@@ -26,10 +27,11 @@ const MenuLabel: React.FC<MenuLabelProps> = ({ label, help }) => (
 );
 
 export const BranchContextMenu: React.FC<Props> = ({ branchContextMenu, setBranchContextMenu, onCheckout, onMerge, onRename, onDelete }) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
 
   if (!branchContextMenu) return null;
   const isRemoteBranch = branchContextMenu.branch.startsWith('remotes/');
+  const protectedBranch = branchContextMenu.isProtected || isPrimaryBranchName(branchContextMenu.branch);
 
   return (
     <div
@@ -155,7 +157,12 @@ export const BranchContextMenu: React.FC<Props> = ({ branchContextMenu, setBranc
         {!branchContextMenu.isHead && !branchContextMenu.branch.startsWith('remotes/') && (
           <button
             className="ctx-menu-item danger"
-            title={t('generated.components.layout.branchcontextmenu.deletes_this_local_branch_04f13ca4')}
+            disabled={protectedBranch}
+            title={
+              protectedBranch
+                ? tr('Der Hauptbranch ist vor dem lokalen Löschen geschützt.', 'The primary branch is protected from local deletion.')
+                : t('generated.components.layout.branchcontextmenu.deletes_this_local_branch_04f13ca4')
+            }
             onClick={() => {
               const b = branchContextMenu.branch;
               setBranchContextMenu(null);
@@ -165,7 +172,11 @@ export const BranchContextMenu: React.FC<Props> = ({ branchContextMenu, setBranc
             <span className="ctx-menu-icon">DEL</span>
             <MenuLabel
               label={t('generated.components.layout.branchcontextmenu.delete_branch_a5055577')}
-              help={t('generated.components.layout.branchcontextmenu.removes_the_local_branch_remote_branches_are_untouched_e5d04caa')}
+              help={
+                protectedBranch
+                  ? tr('Geschützter Hauptbranch', 'Protected primary branch')
+                  : t('generated.components.layout.branchcontextmenu.removes_the_local_branch_remote_branches_are_untouched_e5d04caa')
+              }
             />
           </button>
         )}
