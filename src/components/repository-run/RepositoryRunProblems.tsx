@@ -1,34 +1,13 @@
-import { AlertCircle, AlertTriangle, Bug } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Bug, Copy } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import type { RepositoryRunProblem } from '@/utils/repositoryRunOutput';
+import { getRepositoryRunProblemHint } from '@/utils/repositoryRunBugInfo';
 import { resolveRepositoryRunFile } from '@/utils/repositoryRunFileLinks';
 import { RepositoryRunFileLink, RepositoryRunLinkedText, type RepositoryRunFileLinkProps } from './RepositoryRunLinkedText';
 
 export function RepositoryRunProblemHint({ problem }: { problem: RepositoryRunProblem }) {
-  const { tr } = useI18n();
-  const port = problem.message.match(/\bport\s+(\d+)/i)?.[1];
-  const hint =
-    problem.hint === 'port-in-use'
-      ? tr(
-          `Beende den anderen Entwicklungsserver${port ? ` auf Port ${port}` : ''} oder wähle in deiner Projektkonfiguration einen freien Port.`,
-          `Stop the other development server${port ? ` on port ${port}` : ''} or choose a free port in your project configuration.`,
-        )
-      : problem.hint === 'engine-mismatch'
-        ? tr(
-            'Verwende eine vom Projekt unterstützte Node.js-Version. Die erwartete und die verwendete Version stehen in der Meldung.',
-            'Use a Node.js version supported by the project. The message lists the expected and current versions.',
-          )
-        : problem.hint === 'missing-command'
-          ? tr(
-              'Installiere das benötigte Werkzeug und prüfe, ob es über den PATH erreichbar ist. Starte den Schritt danach erneut.',
-              'Install the required tool and check that it is available on PATH, then run the step again.',
-            )
-          : problem.hint === 'missing-dependency'
-            ? tr(
-                'Installiere die Projektabhängigkeiten mit dem Paketmanager des Projekts und starte den Schritt erneut.',
-                'Install the project dependencies using its package manager, then run the step again.',
-              )
-            : '';
+  const { language } = useI18n();
+  const hint = getRepositoryRunProblemHint(problem, language);
   return hint ? <p className="repository-run-console__hint">{hint}</p> : null;
 }
 
@@ -36,12 +15,14 @@ export function RepositoryRunProblems({
   problems,
   onShowOutput,
   onCreateBug,
+  onCopyBugInfo,
   repoPath,
   onOpenFile,
 }: {
   problems: RepositoryRunProblem[];
   onShowOutput: (sequence: number) => void;
   onCreateBug: (problem: RepositoryRunProblem) => void;
+  onCopyBugInfo: (problem: RepositoryRunProblem) => void;
 } & RepositoryRunFileLinkProps) {
   const { tr } = useI18n();
   if (!problems.length) return <p className="repository-run-console__empty">{tr('Keine auswertbaren Probleme gefunden.', 'No parseable problems found.')}</p>;
@@ -91,6 +72,10 @@ export function RepositoryRunProblems({
                 <button type="button" className="staging-tool-btn" onClick={() => onCreateBug(problem)}>
                   <Bug size={13} />
                   {tr('Als Bug aufnehmen', 'Add as bug')}
+                </button>
+                <button type="button" className="staging-tool-btn" onClick={() => onCopyBugInfo(problem)}>
+                  <Copy size={13} aria-hidden="true" />
+                  {tr('Bug-Infos kopieren', 'Copy bug info')}
                 </button>
               </div>
             </div>

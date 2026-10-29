@@ -2,7 +2,8 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { I18nProvider } from '@/i18n';
+import { I18nProvider, type AppLanguage } from '@/i18n';
+import { useRepositoryTodoDraftState } from '@/components/project-planner/repositoryTodoDraftState';
 import { sampleRun } from '@/utils/__tests__/repositoryRunFixture';
 import { RepositoryRunConsole } from './RepositoryRunConsole';
 import type { RepositoryRunFileLinkProps } from './RepositoryRunLinkedText';
@@ -11,10 +12,10 @@ const mocks = vi.hoisted(() => ({ copy: vi.fn(), toast: vi.fn(), stop: vi.fn(), 
 vi.mock('@/utils/clipboard', () => ({ copyTextToClipboard: mocks.copy }));
 vi.mock('@/contexts/AppStateContext', () => ({ useRepositoryContext: () => ({ onToast: mocks.toast }) }));
 let host: HTMLDivElement, root: Root;
-const render = (run = sampleRun(), onOpenFile?: RepositoryRunFileLinkProps['onOpenFile']) =>
+const render = (run = sampleRun(), onOpenFile?: RepositoryRunFileLinkProps['onOpenFile'], language: AppLanguage = 'en') =>
   act(async () =>
     root.render(
-      <I18nProvider language="en">
+      <I18nProvider language={language}>
         <RepositoryRunConsole run={run} onStop={mocks.stop} onBack={mocks.back} onOpenFile={onOpenFile} />
       </I18nProvider>,
     ),
@@ -28,6 +29,7 @@ const click = (label: string) =>
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
+  useRepositoryTodoDraftState.setState({ request: null });
   mocks.copy.mockResolvedValue(true);
   host = document.createElement('div');
   document.body.append(host);
@@ -36,9 +38,60 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
+  useRepositoryTodoDraftState.setState({ request: null });
 });
 
 describe('repository run console presentation', () => {
+  it.each(['de', 'en'] as const)('copies the selected problem with folded details and run context in %s without creating a bug', async (language) => {
+    const run = sampleRun();
+    run.steps[0].command = 'pnpm --filter @a3/desktop tauri dev';
+    run.steps[0].shell = 'powershell';
+    await render(run, undefined, language);
+    await click(language === 'de' ? 'Probleme (2)' : 'Problems (2)');
+    const error = host.querySelector('.repository-run-console__problem.error')!;
+    const buttons = [...error.querySelectorAll('button')];
+    const label = language === 'de' ? 'Bug-Infos kopieren' : 'Copy bug info';
+    const copyButton = buttons.find((button) => button.textContent?.trim() === label)!;
+    expect(copyButton.previousElementSibling?.textContent?.trim()).toBe(language === 'de' ? 'Als Bug aufnehmen' : 'Add as bug');
+    expect(error.querySelector('details')?.open).toBe(false);
+    await act(async () => copyButton.click());
+
+    expect(mocks.copy).toHaveBeenCalledOnce();
+    const report = mocks.copy.mock.calls[0][0];
+    expect(report).toContain(language === 'de' ? 'Meldung:\nError: Port 5173 is already in use' : 'Message:\nError: Port 5173 is already in use');
+    expect(report).toContain('httpServerStart');
+    expect(report).toContain('ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL');
+    expect(report).toContain('pnpm --filter @a3/desktop tauri dev');
+    expect(report).toContain(run.repoPath);
+    expect(report).toContain('5173');
+    expect(report).not.toContain('\u001b');
+    expect(mocks.toast).toHaveBeenCalledExactlyOnceWith(language === 'de' ? 'Bug-Infos kopiert.' : 'Bug info copied.', false);
+    expect(useRepositoryTodoDraftState.getState().request).toBeNull();
+    expect(host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain(language === 'de' ? 'Probleme' : 'Problems');
+  });
+
+  it('copies a warning with its occurrence count and reports a clipboard failure', async () => {
+    mocks.copy.mockResolvedValue(false);
+    await render();
+    await click('Problems (2)');
+    const warning = host.querySelector('.repository-run-console__problem.warning')!;
+    const copyButton = [...warning.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Copy bug info')!;
+    await act(async () => copyButton.click());
+
+    expect(mocks.copy).toHaveBeenCalledWith(expect.stringContaining('Severity: Warning'));
+    expect(mocks.copy).toHaveBeenCalledWith(expect.stringContaining('Occurrences: 3'));
+    expect(mocks.toast).toHaveBeenCalledExactlyOnceWith('Could not copy to the clipboard.', true);
+    expect(useRepositoryTodoDraftState.getState().request).toBeNull();
+  });
+
+  it('also offers the problem copy action in the run summary', async () => {
+    await render();
+    await click('Summary');
+    await click('Copy bug info');
+    expect(mocks.copy).toHaveBeenCalledWith(expect.stringContaining('Unsupported engine'));
+    expect(mocks.toast).toHaveBeenCalledWith('Bug info copied.', false);
+  });
+
   it('opens working files from structured output, plain output, diagnostic locations and technical details', async () => {
     const run = sampleRun();
     run.steps[0].parser = 'typescript';

@@ -9,6 +9,7 @@ import { useI18n } from '@/i18n';
 import { useRepositoryContext } from '@/contexts/AppStateContext';
 import { requestRepositoryTodoDraft } from '@/components/project-planner/repositoryTodoDraftState';
 import { buildRepositoryRunBugDraft } from '@/utils/repositoryRunBugDraft';
+import { buildRepositoryRunBugInfo } from '@/utils/repositoryRunBugInfo';
 import { RepositoryRunOutputPane } from './RepositoryRunOutputPane';
 import { RepositoryRunProblemHint, RepositoryRunProblems } from './RepositoryRunProblems';
 import { RepositoryRunLinkedText, type RepositoryRunFileLinkProps } from './RepositoryRunLinkedText';
@@ -69,6 +70,8 @@ export const RepositoryRunConsole: React.FC<Props> = ({ run, onStop, onBack, onO
   };
   const createBug = (problem: RepositoryRunProblem) =>
     requestRepositoryTodoDraft({ repoPath: run.repoPath, input: buildRepositoryRunBugDraft(run, problem, language) });
+  const copyBugInfo = (problem: RepositoryRunProblem) =>
+    void copy(buildRepositoryRunBugInfo(run, problem, language), tr('Bug-Infos kopiert.', 'Bug info copied.'));
   return (
     <section className="repository-run-console">
       <header className="repository-run-console__header">
@@ -165,7 +168,14 @@ export const RepositoryRunConsole: React.FC<Props> = ({ run, onStop, onBack, onO
           />
         )}
         {tab === 'problems' && (
-          <RepositoryRunProblems problems={problems} onShowOutput={showOutput} onCreateBug={createBug} repoPath={run.repoPath} onOpenFile={onOpenFile} />
+          <RepositoryRunProblems
+            problems={problems}
+            onShowOutput={showOutput}
+            onCreateBug={createBug}
+            onCopyBugInfo={copyBugInfo}
+            repoPath={run.repoPath}
+            onOpenFile={onOpenFile}
+          />
         )}
         {tab === 'summary' && (
           <div className="repository-run-console__summary">
@@ -201,7 +211,14 @@ export const RepositoryRunConsole: React.FC<Props> = ({ run, onStop, onBack, onO
             </dl>
             {run.message && <p>{run.message}</p>}
             <h3>{tr('Erkannte Probleme', 'Detected problems')}</h3>
-            <RepositoryRunProblems problems={problems} onShowOutput={showOutput} onCreateBug={createBug} repoPath={run.repoPath} onOpenFile={onOpenFile} />
+            <RepositoryRunProblems
+              problems={problems}
+              onShowOutput={showOutput}
+              onCreateBug={createBug}
+              onCopyBugInfo={copyBugInfo}
+              repoPath={run.repoPath}
+              onOpenFile={onOpenFile}
+            />
           </div>
         )}
       </div>
