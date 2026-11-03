@@ -13,6 +13,7 @@ import { createDemoApi } from './demoApi';
 import { resetTutorialUi } from './resetTutorialUi';
 import { TutorialSpotlight } from './TutorialSpotlight';
 import { useTutorialTarget } from './useTutorialTarget';
+import { useTutorialAutoAdvance } from './useTutorialAutoAdvance';
 import './tutorial.css';
 
 type Demo = ReturnType<typeof createDemoApi>;
@@ -31,6 +32,7 @@ export function TutorialApp({ context, initial }: { context: TutorialLaunchConte
   const [choosing, setChoosing] = useState(false);
   const [finished, setFinished] = useState(false);
   const transition = useRef(false);
+  const advancing = useRef(false);
   const acknowledgedSteps = useRef(new Map<string, Set<string>>());
   const mounted = useRef(true);
   useEffect(
@@ -84,21 +86,30 @@ export function TutorialApp({ context, initial }: { context: TutorialLaunchConte
   });
   const chapter = TUTORIAL_CHAPTERS[checkpoint.chapterIndex];
   const next = async (skipped = false) => {
-    const acknowledged = acknowledgedSteps.current.get(chapter.id) || new Set<string>();
-    if (!skipped) acknowledged.add(chapter.steps[checkpoint.stepIndex].id);
-    acknowledgedSteps.current.set(chapter.id, acknowledged);
-    if (checkpoint.stepIndex < chapter.steps.length - 1) return enter(checkpoint.chapterIndex, checkpoint.stepIndex + 1);
-    if (!skipped && acknowledged.size === chapter.steps.length) {
-      try {
-        const progress = await window.tutorialHost!.completeChapter(chapter.id);
-        setCompleted(progress.completedChapters);
-      } catch {
-        setError(tr('Der Abschluss konnte nicht gespeichert werden. Du kannst es erneut versuchen.', 'Completion could not be saved. You can try again.'));
+    if (advancing.current || transition.current) return;
+    advancing.current = true;
+    try {
+      const acknowledged = acknowledgedSteps.current.get(chapter.id) || new Set<string>();
+      if (!skipped) acknowledged.add(chapter.steps[checkpoint.stepIndex].id);
+      acknowledgedSteps.current.set(chapter.id, acknowledged);
+      if (checkpoint.stepIndex < chapter.steps.length - 1) {
+        await enter(checkpoint.chapterIndex, checkpoint.stepIndex + 1);
         return;
       }
+      if (!skipped && acknowledged.size === chapter.steps.length) {
+        try {
+          const progress = await window.tutorialHost!.completeChapter(chapter.id);
+          setCompleted(progress.completedChapters);
+        } catch {
+          setError(tr('Der Abschluss konnte nicht gespeichert werden. Du kannst es erneut versuchen.', 'Completion could not be saved. You can try again.'));
+          return;
+        }
+      }
+      setFinished(true);
+      setChoosing(true);
+    } finally {
+      advancing.current = false;
     }
-    setFinished(true);
-    setChoosing(true);
   };
   return (
     <div className="tutorial-session">
@@ -125,6 +136,7 @@ export function TutorialApp({ context, initial }: { context: TutorialLaunchConte
               index={checkpoint.stepIndex}
               total={chapter.steps.length}
               demo={checkpoint.demo}
+              autoAdvanceEnabled={!choosing && !finished && !error}
               onNext={() => void next()}
               onSkip={() => void next(true)}
               onBack={() => void enter(checkpoint.chapterIndex, checkpoint.stepIndex - 1)}
@@ -162,6 +174,7 @@ function TutorialCoach({
   index,
   total,
   demo,
+  autoAdvanceEnabled,
   onNext,
   onSkip,
   onBack,
@@ -173,6 +186,7 @@ function TutorialCoach({
   index: number;
   total: number;
   demo: Demo;
+  autoAdvanceEnabled: boolean;
   onNext: () => void;
   onSkip: () => void;
   onBack: () => void;
@@ -244,6 +258,7 @@ function TutorialCoach({
           : step.action === 'analytics-filtered'
             ? analyticsChanged
             : demo.repo.events.has(step.action));
+  useTutorialAutoAdvance(step.id, done, Boolean(step.action) && autoAdvanceEnabled, onNext);
   const controls = document.getElementById('tutorial-controls');
   useEffect(() => {
     if (controls) heading.current?.focus();
@@ -269,7 +284,9 @@ function TutorialCoach({
                   done ? (
                     <>
                       <CheckCircle2 size={14} aria-hidden="true" />
-                      {tr('Geschafft! Du kannst weitergehen.', 'Done! You can continue.')}
+                      {autoAdvanceEnabled
+                        ? tr('Geschafft! Es geht gleich automatisch weiter.', 'Done! Continuing automatically in a moment.')
+                        : tr('Geschafft! Du kannst weitergehen.', 'Done! You can continue.')}
                     </>
                   ) : (
                     tr('Probiere die beschriebene Aktion aus.', 'Try the action described above.')

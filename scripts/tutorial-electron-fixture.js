@@ -28,10 +28,12 @@ let tutorial;
 let verified = false;
 const errors = [];
 let regularIpcFromTutorial = 0;
+let chapterCompletions = 0;
 const originalHandle = ipcMain.handle.bind(ipcMain);
 ipcMain.handle = (channel, listener) =>
   originalHandle(channel, (event, ...args) => {
     if (tutorial && event.sender.id === tutorial.id && !channel.startsWith('tutorial:')) regularIpcFromTutorial++;
+    if (channel === 'tutorial:complete') chapterCompletions++;
     return listener(event, ...args);
   });
 const timeout = setTimeout(() => fail(new Error('Tutorial smoke test timed out.')), 150_000);
@@ -155,6 +157,8 @@ app
       'localStorage.setItem("tutorial-isolation-sentinel","private workspace"); window.unsavedTutorialTestDraft = "my unfinished draft"',
     );
     await launch({ chapterId: 'basics' });
+    await tutorial.executeJavaScript('new Promise(resolve => setTimeout(resolve, 1200))');
+    assert.equal(await tutorial.executeJavaScript('document.querySelector(".tutorial-coach").dataset.step'), 'orientation', 'Information steps wait for Next.');
     await next();
     await stepReady('repositories');
     await waitFor(tutorial, 'document.querySelector(".tutorial-target-arrow") && document.querySelector(".tutorial-focus-shade")');
@@ -182,14 +186,21 @@ app
     );
     fs.writeFileSync(path.join(root, 'build/tutorial-pointer-smoke.png'), (await tutorial.capturePage()).toPNG());
     await click('[data-tutorial="nav-localRepos"]');
-    await next();
+    await waitFor(tutorial, 'document.querySelector(".tutorial-status.completed")');
+    await click('.tutorial-coach .tutorial-link:last-child');
+    await waitFor(tutorial, 'document.querySelector(".tutorial-chapter-chooser")');
+    await tutorial.executeJavaScript('new Promise(resolve => setTimeout(resolve, 1200))');
+    assert.equal(
+      await tutorial.executeJavaScript('document.querySelector(".tutorial-coach").dataset.step'),
+      'repositories',
+      'Chapter selection pauses progression.',
+    );
+    await click('[aria-label="Kapitelwahl schließen"]');
     await stepReady('workspace');
     await click('.local-repositories-view__row-main');
-    await next();
     await stepReady('changes');
     await click('.staging-file-row');
     await waitFor(tutorial, 'document.querySelector(".tutorial-status.completed")');
-    await next();
     await stepReady('stage');
     assert.equal(await tutorial.executeJavaScript('localStorage.getItem("tutorial-isolation-sentinel")'), null);
     await click('.staging-stage-all:not(:disabled)');
@@ -198,7 +209,6 @@ app
       'Promise.race([new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))), new Promise(resolve => setTimeout(resolve, 250))])',
     );
     fs.writeFileSync(path.join(root, 'build/tutorial-smoke.png'), (await tutorial.capturePage()).toPNG());
-    await next();
     await stepReady('commit');
     await waitFor(tutorial, 'document.querySelector(".staging-commit-area input")');
     await tutorial.executeJavaScript(
@@ -206,7 +216,6 @@ app
     );
     await click('.staging-commit-btn:not(:disabled)');
     await waitFor(tutorial, 'document.querySelector(".tutorial-status.completed")');
-    await next();
     await stepReady('branch');
     await click('[data-tutorial="create-branch"]');
     await waitFor(tutorial, 'document.querySelector("input[placeholder=branch-name]")');
@@ -217,15 +226,13 @@ app
       'document.querySelector("input[placeholder=branch-name]").dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true}))',
     );
     await waitFor(tutorial, 'document.querySelector(".tutorial-status.completed")');
-    await next();
     await stepReady('sync');
     await click('[data-tutorial="fetch"]:not(:disabled)');
     await waitFor(tutorial, 'document.querySelector(".tutorial-status.completed")');
-    await next();
     await stepReady('help');
     await click('[data-tutorial="nav-settings"]');
-    await next();
     await waitFor(tutorial, 'document.querySelector(".tutorial-chapter-chooser")');
+    assert.equal(chapterCompletions, 1, 'The basic tour advances and completes automatically exactly once.');
     await close();
     assert.equal(await parent.webContents.executeJavaScript('window.unsavedTutorialTestDraft'), 'my unfinished draft');
     assert.equal(await parent.webContents.executeJavaScript('localStorage.getItem("tutorial-isolation-sentinel")'), 'private workspace');
@@ -304,7 +311,7 @@ app
     assert.equal(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'), settings, 'Tutorial settings must not affect the real profile.');
     assert.deepEqual(errors, [], 'The tutorial must render without errors.');
     clearTimeout(timeout);
-    console.log('Native tutorial isolation, staging, commit and chapter entry smoke tests passed.');
+    console.log('Native tutorial automatic progression, isolation, staging, commit and chapter entry smoke tests passed.');
     verified = true;
     fs.writeFileSync(path.join(profile, 'tutorial-verified'), 'yes');
     app.quit();
