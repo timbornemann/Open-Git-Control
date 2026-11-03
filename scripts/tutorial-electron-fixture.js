@@ -140,6 +140,30 @@ app
     await launch({ chapterId: 'basics' });
     await next();
     await stepReady('repositories');
+    await waitFor(tutorial, 'document.querySelector(".tutorial-target-arrow") && document.querySelector(".tutorial-focus-shade")');
+    assert.deepEqual(
+      await tutorial.executeJavaScript(`(() => {
+        const target = document.querySelector('[data-tutorial="nav-localRepos"]');
+        const rect = target.getBoundingClientRect();
+        const spotlight = document.querySelector('.tutorial-spotlight');
+        const shade = document.querySelector('.tutorial-focus-shade');
+        const area = document.querySelector('.tutorial-workspace').getBoundingClientRect();
+        const bounds = spotlight.getBoundingClientRect();
+        return {
+          clickable: target.contains(document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)),
+          shaded: Number(getComputedStyle(shade).fillOpacity) > 0,
+          pointer: document.querySelector('.tutorial-target-arrow').dataset.direction,
+          withinWorkspace: bounds.top === area.top && bounds.bottom === area.bottom,
+          controlsClear: bounds.bottom <= document.querySelector('.tutorial-coach').getBoundingClientRect().top,
+        };
+      })()`),
+      { clickable: true, shaded: true, pointer: 'right', withinWorkspace: true, controlsClear: true },
+      'The spotlight dims the workspace, points to the small navigation target and keeps it clickable.',
+    );
+    await tutorial.executeJavaScript(
+      'Promise.race([new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))), new Promise(resolve => setTimeout(resolve, 250))])',
+    );
+    fs.writeFileSync(path.join(root, 'build/tutorial-pointer-smoke.png'), (await tutorial.capturePage()).toPNG());
     await click('[data-tutorial="nav-localRepos"]');
     await next();
     await stepReady('workspace');
@@ -217,12 +241,33 @@ app
       tutorial,
       'Array.from(document.querySelectorAll(".topbar-dropdown-item-label")).some(label => label.textContent.trim() === "Test" && !label.closest("button").disabled)',
     );
+    await waitFor(
+      tutorial,
+      `(() => {
+      const menu = document.querySelector('.topbar-dropdown');
+      const highlight = document.querySelector('.tutorial-highlight');
+      if (!menu || !highlight) return false;
+      const bounds = menu.getBoundingClientRect();
+      const focused = highlight.getBoundingClientRect();
+      return focused.left <= bounds.left && focused.right >= bounds.right && focused.top <= bounds.top;
+    })()`,
+      'Opened menus stay clear inside the spotlight',
+    );
     await tutorial.executeJavaScript(
       'Array.from(document.querySelectorAll(".topbar-dropdown-item-label")).find(label => label.textContent.trim() === "Test").closest("button").click()',
     );
     await waitFor(tutorial, 'document.querySelector(".tutorial-status.completed")');
     parent.setSize(900, 640);
     await waitFor(tutorial, 'window.innerWidth <= 900 && document.querySelector(".tutorial-coach").getBoundingClientRect().bottom <= window.innerHeight');
+    await waitFor(
+      tutorial,
+      `(() => {
+      const area = document.querySelector('.tutorial-workspace').getBoundingClientRect();
+      const bounds = document.querySelector('.tutorial-spotlight')?.getBoundingClientRect();
+      return bounds && bounds.width === area.width && bounds.top === area.top && bounds.bottom === area.bottom;
+    })()`,
+      'The spotlight follows a smaller window',
+    );
     await tutorial.executeJavaScript('document.querySelector(".tutorial-coach button").focus()');
     tutorial.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' });
     tutorial.sendInputEvent({ type: 'keyUp', keyCode: 'Tab' });

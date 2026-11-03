@@ -11,6 +11,8 @@ import { queryClient } from '@/data/queryClient';
 import { useAnalyticsWorkspace } from '@/components/repository-analytics/analyticsWorkspaceState';
 import { createDemoApi } from './demoApi';
 import { resetTutorialUi } from './resetTutorialUi';
+import { TutorialSpotlight } from './TutorialSpotlight';
+import { useTutorialTarget } from './useTutorialTarget';
 import './tutorial.css';
 
 type Demo = ReturnType<typeof createDemoApi>;
@@ -154,66 +156,6 @@ export function TutorialApp({ context, initial }: { context: TutorialLaunchConte
   );
 }
 
-function useTarget(target: string) {
-  const [rect, setRect] = useState<DOMRect | null>(null);
-  const [missing, setMissing] = useState(false);
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let frame = 0;
-    let element: HTMLElement | null = null;
-    let previousDescription: string | null = null;
-    const update = () => {
-      frame = 0;
-      const next = [...document.querySelectorAll<HTMLElement>(target)].find((candidate) => candidate.getClientRects().length > 0) || null;
-      if (next !== element) {
-        if (element) previousDescription === null ? element.removeAttribute('aria-describedby') : element.setAttribute('aria-describedby', previousDescription);
-        element = next;
-        if (element) {
-          previousDescription = element.getAttribute('aria-describedby');
-          element.setAttribute('aria-describedby', 'tutorial-step-description');
-          element.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
-        }
-      }
-      const value = element?.getBoundingClientRect();
-      const visible = value && value.width > 0 && value.height > 0;
-      setRect((current) =>
-        visible
-          ? current && ['x', 'y', 'width', 'height'].every((key) => current[key as keyof DOMRect] === value[key as keyof DOMRect])
-            ? current
-            : value
-          : null,
-      );
-      if (visible) {
-        setMissing(false);
-        clearTimeout(timer);
-        timer = undefined;
-      } else if (!timer) {
-        timer = setTimeout(() => setMissing(true), 5000);
-      }
-    };
-    const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(update);
-    };
-    setMissing(false);
-    setRect(null);
-    const observer = new MutationObserver(schedule);
-    const workspace = document.querySelector('.tutorial-workspace');
-    if (workspace) observer.observe(workspace, { childList: true, subtree: true });
-    window.addEventListener('resize', schedule);
-    document.addEventListener('scroll', schedule, true);
-    schedule();
-    return () => {
-      observer.disconnect();
-      clearTimeout(timer);
-      cancelAnimationFrame(frame);
-      window.removeEventListener('resize', schedule);
-      document.removeEventListener('scroll', schedule, true);
-      if (element) previousDescription === null ? element.removeAttribute('aria-describedby') : element.setAttribute('aria-describedby', previousDescription);
-    };
-  }, [target]);
-  return { rect, missing };
-}
-
 function TutorialCoach({
   step,
   chapterTitle,
@@ -243,7 +185,7 @@ function TutorialCoach({
   const selectedCommit = useGitStore((state) => state.selectedCommit);
   const revision = useSyncExternalStore(demo.repo.subscribe, () => demo.repo.revision);
   const analyticsChanged = useAnalyticsWorkspace((state) => Object.keys(state.filters).length > 0);
-  const { rect, missing } = useTarget(step.target);
+  const { rect, workspace, missing } = useTutorialTarget(step.target);
   const heading = useRef<HTMLHeadingElement>(null);
   const [inspect, setInspect] = useState(false);
   useEffect(() => {
@@ -308,18 +250,7 @@ function TutorialCoach({
   }, [controls, step.id]);
   return (
     <>
-      {rect && (
-        <div
-          className="tutorial-highlight"
-          aria-hidden="true"
-          style={{
-            left: Math.max(0, rect.left - 3),
-            top: Math.max(0, rect.top - 3),
-            width: Math.min(rect.width + 6, window.innerWidth - Math.max(0, rect.left - 3)),
-            height: rect.height + 6,
-          }}
-        />
-      )}
+      {rect && workspace && <TutorialSpotlight target={rect} workspace={workspace} />}
       {controls &&
         createPortal(
           <section className="tutorial-coach" aria-labelledby="tutorial-step-title" data-step={step.id} data-revision={revision}>

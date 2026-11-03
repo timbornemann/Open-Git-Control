@@ -94,7 +94,7 @@ export const TUTORIAL_CHAPTERS: readonly TutorialChapter[] = [
           'Fetch reads the server state, Pull integrates changes, and Push publishes local commits. Try Fetch in the top bar. This server is simulated too.',
         ],
         'repo',
-        '[data-tutorial="topbar"]',
+        '[data-tutorial="fetch"]',
         { scenario: 'clean', action: 'fetched' },
       ),
       step(

@@ -68,6 +68,29 @@
   box-sizing: border-box;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary, #d99a6c) 20%, transparent);
 }
+.tutorial-spotlight {
+  position: fixed;
+  pointer-events: none;
+  z-index: 11999;
+  overflow: hidden;
+}
+.tutorial-focus-shade {
+  fill: #05080c;
+  fill-opacity: 0.62;
+}
+.tutorial-target-arrow {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.tutorial-arrow-outline {
+  stroke: #ffffff;
+  stroke-width: 6;
+}
+.tutorial-arrow-stroke {
+  stroke: var(--accent-primary, #d99a6c);
+  stroke-width: 3;
+}
 #tutorial-controls {
   flex: 0 0 auto;
   position: relative;
