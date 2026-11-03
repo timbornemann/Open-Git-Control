@@ -1,5 +1,6 @@
 import { usePreloadIntent } from '@/data/usePreloadIntent';
 import { peekResource } from '@/data/clientCache';
+import { readCurrentResource } from '@/data/readCurrentResource';
 import type { IpcResult } from '@/types/ipc';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ClipboardPaste, Copy, ExternalLink, File, FilePlus, Folder, FolderOpen, FolderPlus, Info, Pencil, Scissors, Search, Trash2, X } from 'lucide-react';
@@ -94,12 +95,20 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(() => new Set());
   const activeRepoPathRef = useRef(repoPath);
+  const directoryReadGenerationRef = useRef(0);
   const loadedDirectoryPathsRef = useRef(new Set<string>());
   const initializedRepoPathRef = useRef<string | null>(null);
   const expandedPathsRef = useRef(expandedPaths);
   const selectionAnchorPathRef = useRef<string | null>(null);
   activeRepoPathRef.current = repoPath;
   expandedPathsRef.current = expandedPaths;
+  useLayoutEffect(() => {
+    const generation = directoryReadGenerationRef.current + 1;
+    directoryReadGenerationRef.current = generation;
+    return () => {
+      directoryReadGenerationRef.current = generation + 1;
+    };
+  }, [repoPath]);
   const clearSelectedPaths = useCallback((paths: string[]) => {
     if (paths.length === 0) return;
     setSelectedPaths((current) => {
@@ -123,10 +132,12 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
     async (parentPath = '', options?: { silent?: boolean }): Promise<WorkingDirectoryEntryDto[]> => {
       if (!repoPath || !gitClient.isAvailable()) return [];
       const repoAtStart = repoPath;
+      const generation = directoryReadGenerationRef.current;
+      const isCurrent = () => generation === directoryReadGenerationRef.current && activeRepoPathRef.current === repoAtStart;
       setLoadingDirectories((current) => new Set(current).add(parentPath));
       try {
-        const result = await gitClient.listWorkingDirectory(repoAtStart, parentPath);
-        if (activeRepoPathRef.current !== repoAtStart) return [];
+        const result = await readCurrentResource(() => gitClient.listWorkingDirectory(repoAtStart, parentPath), isCurrent);
+        if (!result || !isCurrent()) return [];
         if (!result.success) {
           if (parentPath && /\bENOENT\b/.test(result.error || '')) {
             removeDirectoryFromTreeCache(parentPath);
@@ -140,12 +151,18 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
         loadedDirectoryPathsRef.current.add(parentPath);
         setEntriesByParent((current) => ({ ...current, [parentPath]: entries }));
         return entries;
+      } catch (error) {
+        if (!isCurrent()) return [];
+        loadedDirectoryPathsRef.current.delete(parentPath);
+        if (!options?.silent) setToast({ msg: error instanceof Error ? error.message : 'Could not load working directory.', isError: true });
+        return [];
       } finally {
-        setLoadingDirectories((current) => {
-          const next = new Set(current);
-          next.delete(parentPath);
-          return next;
-        });
+        if (isCurrent())
+          setLoadingDirectories((current) => {
+            const next = new Set(current);
+            next.delete(parentPath);
+            return next;
+          });
       }
     },
     [removeDirectoryFromTreeCache, repoPath, setToast],

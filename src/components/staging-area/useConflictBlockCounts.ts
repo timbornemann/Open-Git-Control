@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { normalizeMergeConflictFileContent } from '@/utils/conflictLineGutter';
 import { gitClient } from '@/services/gitClient';
+import { readCurrentResource } from '@/data/readCurrentResource';
 import { parseConflictBlocks } from './utils';
 import type { GitStatusWithConflicts } from './types';
 
@@ -30,15 +31,19 @@ export const useConflictBlockCounts = ({ repoPath, status }: Params) => {
       setIsConflictBlockCountPending(true);
     }
 
-    (async () => {
+    void (async () => {
       const next: Record<string, number> = {};
       try {
         for (const path of paths) {
-          const result = await gitClient.readRepoFile(path, repoPath);
-          if (cancelled) return;
+          const result = await readCurrentResource(
+            () => gitClient.readRepoFile(path, repoPath),
+            () => !cancelled,
+          );
+          if (!result || cancelled) return;
           next[path] = result.success && typeof result.data === 'string' ? parseConflictBlocks(normalizeMergeConflictFileContent(result.data)).length : 0;
         }
         if (!cancelled) {
+          countedConflictPathsKeyRef.current = pathsKey;
           setConflictBlockCountsByPath((prev) => {
             const normalized: Record<string, number> = {};
             let changed = Object.keys(prev).length !== paths.length;
@@ -50,9 +55,11 @@ export const useConflictBlockCounts = ({ repoPath, status }: Params) => {
             return changed ? normalized : prev;
           });
         }
+      } catch {
+        // Counts are optional hints. Keep the last known counts on a read
+        // failure and try again on the next status update.
       } finally {
         if (!cancelled) {
-          countedConflictPathsKeyRef.current = pathsKey;
           setIsConflictBlockCountPending(false);
         }
       }
