@@ -14,6 +14,8 @@ import { resetTutorialUi } from './resetTutorialUi';
 import { TutorialSpotlight } from './TutorialSpotlight';
 import { useTutorialTarget } from './useTutorialTarget';
 import { useTutorialAutoAdvance } from './useTutorialAutoAdvance';
+import { useTutorialViewCompletion } from './useTutorialViewCompletion';
+import { useTutorialKeyboardNavigation } from './useTutorialKeyboardNavigation';
 import './tutorial.css';
 
 type Demo = ReturnType<typeof createDemoApi>;
@@ -201,7 +203,7 @@ function TutorialCoach({
   const analyticsChanged = useAnalyticsWorkspace((state) => Object.keys(state.filters).length > 0);
   const { rect, workspace, missing } = useTutorialTarget(step.target);
   const heading = useRef<HTMLHeadingElement>(null);
-  const [inspect, setInspect] = useState(false);
+  const inspect = useTutorialViewCompletion(step.action);
   useEffect(() => {
     ui.setActiveTab(step.area);
     if (step.settingsTab) settings.onSelectSettingsTab(step.settingsTab);
@@ -212,14 +214,21 @@ function TutorialCoach({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step.id]);
   useEffect(() => {
-    const selector = step.openView === 'recovery' ? '[data-tutorial="open-recovery"]' : step.openView === 'files' ? '[data-tutorial="open-files"]' : null;
+    const selector =
+      step.openView === 'recovery'
+        ? '[data-tutorial="open-recovery"]'
+        : step.openView === 'files'
+          ? '[data-tutorial="open-files"]'
+          : step.openView === 'diff'
+            ? '[data-tutorial="staging"] .staging-file-row[aria-label="README.md"]'
+            : null;
     if (!selector) return;
     let opened = false;
     const open = () => {
-      const button = document.querySelector<HTMLButtonElement>(selector);
-      if (!opened && button && !button.disabled) {
+      const control = document.querySelector<HTMLElement>(selector);
+      if (!opened && control && !(control instanceof HTMLButtonElement && control.disabled)) {
         opened = true;
-        button.click();
+        control.click();
       }
     };
     const observer = new MutationObserver(open);
@@ -227,38 +236,19 @@ function TutorialCoach({
     open();
     return () => observer.disconnect();
   }, [step.openView]);
-  useEffect(() => {
-    if (step.action !== 'inspect:diff' && step.action !== 'inspect:recovery') return;
-    const check = () =>
-      setInspect(
-        Boolean(
-          document.querySelector(
-            `[data-tutorial-route="${step.action === 'inspect:recovery' ? 'recovery' : 'diff'}"], [data-tutorial-route="file"]${step.action === 'inspect:diff' ? ', .working-tree-inspector.has-selection' : ''}`,
-          ),
-        ),
-      );
-    const observer = new MutationObserver(check);
-    observer.observe(document.querySelector('.tutorial-workspace')!, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['data-tutorial-route'],
-    });
-    check();
-    return () => observer.disconnect();
-  }, [step.action]);
   const done =
     !step.action ||
     (step.action.startsWith('navigate:')
       ? ui.activeTab === step.action.slice(9)
       : step.action === 'inspect:commit'
         ? Boolean(selectedCommit)
-        : step.action.startsWith('inspect:')
+        : step.action.startsWith('inspect:') || step.action === 'diff-closed'
           ? inspect
           : step.action === 'analytics-filtered'
             ? analyticsChanged
             : demo.repo.events.has(step.action));
   useTutorialAutoAdvance(step.id, done, Boolean(step.action) && autoAdvanceEnabled, onNext);
+  useTutorialKeyboardNavigation({ canGoBack: index > 0, canGoNext: done, onBack, onNext });
   const controls = document.getElementById('tutorial-controls');
   useEffect(() => {
     if (controls) heading.current?.focus();
@@ -298,11 +288,25 @@ function TutorialCoach({
             </div>
             <div className="tutorial-coach-actions">
               <div className="tutorial-action-row">
-                <button type="button" className="tutorial-button" disabled={index === 0} onClick={onBack}>
+                <button
+                  type="button"
+                  className="tutorial-button"
+                  disabled={index === 0}
+                  onClick={onBack}
+                  aria-keyshortcuts="ArrowLeft"
+                  title={tr('Zurück mit ←', 'Go back with ←')}
+                >
                   <ChevronLeft size={14} aria-hidden="true" />
                   {tr('Zurück', 'Back')}
                 </button>
-                <button type="button" className="tutorial-button primary" disabled={!done} onClick={onNext}>
+                <button
+                  type="button"
+                  className="tutorial-button primary"
+                  disabled={!done}
+                  onClick={onNext}
+                  aria-keyshortcuts="ArrowRight"
+                  title={tr('Weiter mit →', 'Continue with →')}
+                >
                   {index === total - 1 ? tr('Kapitel abschließen', 'Complete chapter') : tr('Weiter', 'Next')}
                   <ChevronRight size={14} aria-hidden="true" />
                 </button>

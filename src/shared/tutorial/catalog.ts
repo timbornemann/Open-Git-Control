@@ -46,12 +46,23 @@ export const TUTORIAL_CHAPTERS: readonly TutorialChapter[] = [
         'changes',
         ['Änderungen ansehen', 'Inspect changes'],
         [
-          'Rechts zeigt Staging die geänderten Dateien. Klicke README.md an: Im Vergleich siehst du entfernte und hinzugefügte Zeilen.',
-          'Staging on the right lists changed files. Click README.md: the comparison shows removed and added lines.',
+          'Rechts zeigt Staging die geänderten Dateien. Klicke README.md an, um die Änderungen im Diff-Viewer zu öffnen.',
+          'Staging on the right lists changed files. Click README.md to open its changes in the diff viewer.',
         ],
         'repo',
         '[data-tutorial="staging"]',
         { action: 'inspect:diff' },
+      ),
+      step(
+        'diff-viewer',
+        ['Den Diff-Viewer verstehen', 'Understand the diff viewer'],
+        [
+          'Der Diff-Viewer vergleicht den bisherigen und den geänderten Dateistand. Rot (−) zeigt entfernte, Grün (+) hinzugefügte Zeilen. In der Werkzeugleiste wechselst du zwischen einer gemeinsamen und einer geteilten Ansicht. Schließe den Viewer mit dem X oben rechts, um zum Staging zurückzukehren.',
+          'The diff viewer compares the previous and changed file contents. Red (−) marks removed lines, green (+) marks added lines. Use the toolbar to switch between unified and side-by-side views. Close the viewer with the X in the top right to return to staging.',
+        ],
+        'repo',
+        '.file-viewer',
+        { openView: 'diff', action: 'diff-closed' },
       ),
       step(
         'stage',

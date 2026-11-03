@@ -106,6 +106,10 @@ async function stepReady(id) {
 async function next() {
   await click('.tutorial-coach .tutorial-button.primary:not(:disabled)');
 }
+function pressKey(keyCode) {
+  tutorial.sendInputEvent({ type: 'keyDown', keyCode });
+  tutorial.sendInputEvent({ type: 'keyUp', keyCode });
+}
 async function launch(request) {
   console.log('Tutorial checkpoint:', request.chapterId, request.stepId);
   const result = await parent.webContents.executeJavaScript('window.electronAPI.app.startTutorial(' + JSON.stringify(request) + ')');
@@ -159,6 +163,10 @@ app
     await launch({ chapterId: 'basics' });
     await tutorial.executeJavaScript('new Promise(resolve => setTimeout(resolve, 1200))');
     assert.equal(await tutorial.executeJavaScript('document.querySelector(".tutorial-coach").dataset.step'), 'orientation', 'Information steps wait for Next.');
+    pressKey('Right');
+    await stepReady('repositories');
+    pressKey('Left');
+    await stepReady('orientation');
     await next();
     await stepReady('repositories');
     await waitFor(tutorial, 'document.querySelector(".tutorial-target-arrow") && document.querySelector(".tutorial-focus-shade")');
@@ -189,6 +197,8 @@ app
     await waitFor(tutorial, 'document.querySelector(".tutorial-status.completed")');
     await click('.tutorial-coach .tutorial-link:last-child');
     await waitFor(tutorial, 'document.querySelector(".tutorial-chapter-chooser")');
+    pressKey('Left');
+    pressKey('Right');
     await tutorial.executeJavaScript('new Promise(resolve => setTimeout(resolve, 1200))');
     assert.equal(
       await tutorial.executeJavaScript('document.querySelector(".tutorial-coach").dataset.step'),
@@ -201,6 +211,27 @@ app
     await stepReady('changes');
     await click('.staging-file-row');
     await waitFor(tutorial, 'document.querySelector(".tutorial-status.completed")');
+    await stepReady('diff-viewer');
+    await waitFor(
+      tutorial,
+      'document.querySelector(".file-viewer-diff") && document.querySelector(".file-viewer .working-file-viewer__path")?.textContent.includes("README.md")',
+    );
+    await tutorial.executeJavaScript('new Promise(resolve => setTimeout(resolve, 1200))');
+    assert.equal(
+      await tutorial.executeJavaScript('document.querySelector(".tutorial-coach").dataset.step'),
+      'diff-viewer',
+      'Explaining the diff waits until the viewer is closed.',
+    );
+    assert.equal(await tutorial.executeJavaScript('document.querySelector(".tutorial-coach .primary").disabled'), true);
+    await tutorial.executeJavaScript('document.querySelector("#tutorial-step-title").focus()');
+    pressKey('Right');
+    await tutorial.executeJavaScript('new Promise(resolve => setTimeout(resolve, 150))');
+    assert.equal(
+      await tutorial.executeJavaScript('document.querySelector(".tutorial-coach").dataset.step'),
+      'diff-viewer',
+      'Arrow keys cannot skip an incomplete exercise.',
+    );
+    await click('.file-viewer [aria-label="Datei schließen"]');
     await stepReady('stage');
     assert.equal(await tutorial.executeJavaScript('localStorage.getItem("tutorial-isolation-sentinel")'), null);
     await click('.staging-stage-all:not(:disabled)');
@@ -213,6 +244,18 @@ app
     await waitFor(tutorial, 'document.querySelector(".staging-commit-area input")');
     await tutorial.executeJavaScript(
       '(() => { const input=document.querySelector(".staging-commit-area input"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(input,"docs: My practice commit"); input.dispatchEvent(new Event("input",{bubbles:true})); })()',
+    );
+    await tutorial.executeJavaScript(
+      '(() => { const input=document.querySelector(".staging-commit-area input"); input.focus(); input.setSelectionRange(1,1); })()',
+    );
+    pressKey('Left');
+    await waitFor(tutorial, 'document.querySelector(".staging-commit-area input").selectionStart === 0');
+    pressKey('Right');
+    await waitFor(tutorial, 'document.querySelector(".staging-commit-area input").selectionStart === 1');
+    assert.equal(
+      await tutorial.executeJavaScript('document.querySelector(".tutorial-coach").dataset.step'),
+      'commit',
+      'Arrow keys in commit inputs move the caret.',
     );
     await click('.staging-commit-btn:not(:disabled)');
     await waitFor(tutorial, 'document.querySelector(".tutorial-status.completed")');

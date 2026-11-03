@@ -11,7 +11,7 @@ export type TutorialStep = {
   settingsTab?: 'general' | 'shortcuts' | 'integrations' | 'api' | 'security' | 'system' | 'help';
   scenario?: 'staged' | 'clean' | 'conflict' | 'stash';
   action?: string;
-  openView?: 'recovery' | 'files' | 'runConfig';
+  openView?: 'recovery' | 'files' | 'runConfig' | 'diff';
 };
 export type TutorialChapter = {
   id: string;
