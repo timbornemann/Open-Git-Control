@@ -6,6 +6,7 @@ import type { FeedbackReportCapabilityDto, FeedbackReportInputDto, FeedbackRepor
 import type { InstallSystemToolRequest, SystemToolInstallEvent, SystemToolsStatus } from '../systemTools';
 import type { ElectronUserNotesAPI } from './userNotes';
 import type { JsonSchemaValidationRequest } from '../jsonSchemaValidation';
+import type { TutorialControlApi } from '../../tutorial/types';
 
 export type DirectoryOpenResultDto = {
   path: string;
@@ -17,7 +18,7 @@ export type BasicActionResultDto = {
   error?: string;
 };
 
-export interface ElectronAppAPI extends ElectronStorageAPI, ElectronUserNotesAPI {
+export interface ElectronAppAPI extends ElectronStorageAPI, ElectronUserNotesAPI, TutorialControlApi {
   validateJsonSchema: (request: JsonSchemaValidationRequest) => Promise<IpcResult<string[]>>;
   getSystemToolsStatus: () => Promise<SystemToolsStatus>;
   recheckSystemTools: () => Promise<SystemToolsStatus>;

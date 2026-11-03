@@ -84,7 +84,7 @@ export const BranchPanel: React.FC<Props> = ({
   };
 
   return (
-    <RepoCard>
+    <RepoCard tutorialTarget="branches">
       <RepoCardHeader
         title={t('generated.components.sidebar.branchpanel.branches_4d013a68')}
         collapsed={collapsed}
@@ -114,6 +114,7 @@ export const BranchPanel: React.FC<Props> = ({
                 onSetCreatingBranch(true);
               }}
               title={t('generated.components.sidebar.branchpanel.create_new_branch_7f015dbf')}
+              data-tutorial="create-branch"
             >
               <Plus size={13} />
             </button>

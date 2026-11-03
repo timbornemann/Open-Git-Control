@@ -40,6 +40,7 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({ activeTa
       </button>
       <button
         {...tabPreloadHandlers('repo')}
+        data-tutorial="nav-repo"
         className={`icon-btn ${activeTab === 'repo' ? 'active' : ''}`}
         onClick={() => activateTab('repo')}
         title={t('sidebar.currentRepository')}
@@ -48,6 +49,7 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({ activeTa
       </button>
       <button
         {...tabPreloadHandlers('analytics')}
+        data-tutorial="nav-analytics"
         className={`icon-btn ${activeTab === 'analytics' ? 'active' : ''}`}
         onClick={() => activateTab('analytics')}
         title={tr('Statistik & Analyse', 'Statistics & analytics')}
@@ -58,17 +60,24 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({ activeTa
       </button>
       <button
         {...tabPreloadHandlers('planner')}
+        data-tutorial="nav-planner"
         className={`icon-btn ${activeTab === 'planner' ? 'active' : ''}`}
         onClick={() => activateTab('planner')}
         title={t('sidebar.planner')}
       >
         <ListTodo size={22} />
       </button>
-      <button className={`icon-btn ${activeTab === 'localRepos' ? 'active' : ''}`} onClick={() => activateTab('localRepos')} title={t('sidebar.localRepos')}>
+      <button
+        data-tutorial="nav-localRepos"
+        className={`icon-btn ${activeTab === 'localRepos' ? 'active' : ''}`}
+        onClick={() => activateTab('localRepos')}
+        title={t('sidebar.localRepos')}
+      >
         <FolderOpen size={22} />
       </button>
       <button
         {...tabPreloadHandlers('hosting')}
+        data-tutorial="nav-hosting"
         className={`icon-btn ${activeTab === 'hosting' || activeTab === 'github' ? 'active' : ''}`}
         onClick={() => activateTab('hosting')}
         title="Hosting"
@@ -83,6 +92,7 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({ activeTa
       <SystemToolsWarning />
       <button
         {...tabPreloadHandlers('settings')}
+        data-tutorial="nav-settings"
         className={`icon-btn ${activeTab === 'settings' ? 'active' : ''}`}
         onClick={() => activateTab('settings')}
         title={t('sidebar.settings')}

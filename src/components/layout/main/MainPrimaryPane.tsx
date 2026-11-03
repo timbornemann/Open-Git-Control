@@ -135,6 +135,8 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   return (
     <div
       className="pane"
+      data-tutorial="primary"
+      data-tutorial-route={route}
       style={
         isSettingsView ||
         isPlannerView ||
@@ -187,7 +189,11 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
         </div>
       )}
 
-      <div className="pane-content" style={{ padding: 0, ...(isAnalyticsView ? { overflow: 'hidden' } : {}) }}>
+      <div
+        data-tutorial={route === 'graph' || route === 'recovery' ? 'graph' : undefined}
+        className="pane-content"
+        style={{ padding: 0, ...(isAnalyticsView ? { overflow: 'hidden' } : {}) }}
+      >
         {isAnalyticsView ? (
           <React.Suspense fallback={lazyPaneFallback}>
             <RepositoryAnalyticsView

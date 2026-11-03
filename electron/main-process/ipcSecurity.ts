@@ -1,5 +1,6 @@
 import { ipcMain, type IpcMain, type IpcMainInvokeEvent } from 'electron';
 import { isAllowedAppNavigation } from './security';
+import { assertTutorialChannel } from './tutorialAuthorization';
 
 type IpcSecurityOptions = { isDev: boolean; mainProcessDir: string };
 const protectedRegistries = new WeakSet<object>();
@@ -24,6 +25,7 @@ export function installIpcSenderValidation(options: IpcSecurityOptions, registry
   registry.handle = (channel, listener) => {
     register(channel, (event, ...args) => {
       requireTrustedIpcSender(event, options);
+      assertTutorialChannel(event.sender.id, channel);
       return listener(event, ...args);
     });
   };

@@ -8,9 +8,16 @@ import type {
   ElectronSettingsAPI,
 } from '@/shared/ipc/contracts/electronApi';
 
+let isolatedProvider: ElectronAPI | undefined;
+/** Set only by the standalone tutorial entry, before mounting the application. */
+export function setIsolatedElectronApi(api: ElectronAPI): void {
+  if (typeof window !== 'undefined' && window.electronAPI) throw new Error('Cannot replace the native application bridge.');
+  isolatedProvider = api;
+}
+
 export const getElectronApi = (): ElectronAPI | null => {
   if (typeof window === 'undefined') return null;
-  return window.electronAPI ?? null;
+  return isolatedProvider ?? window.electronAPI ?? null;
 };
 
 export const requireElectronApi = (): ElectronAPI => {

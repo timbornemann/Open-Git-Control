@@ -6,7 +6,7 @@ import { SystemToolsDialog } from './SystemToolsDialog';
 import { toolName, toolPhaseLabel } from './toolLabels';
 import type { NotificationMessage } from '@/types/notifications';
 
-export function SystemToolsRuntime() {
+export function SystemToolsRuntime({ suspendAutomaticPrompt = false }: { suspendAutomaticPrompt?: boolean }) {
   const { tr } = useI18n();
   const notifications = useNotifications();
   const state = useSystemTools();
@@ -16,11 +16,11 @@ export function SystemToolsRuntime() {
   useEffect(startSystemToolsRuntime, []);
   const gitState = state.status?.tools.find((tool) => tool.id === 'git')?.state;
   useEffect(() => {
-    if (!state.startupShown && (gitState === 'missing' || gitState === 'unusable')) {
+    if (!suspendAutomaticPrompt && !state.startupShown && (gitState === 'missing' || gitState === 'unusable')) {
       useSystemTools.setState({ startupShown: true });
       openSystemTools();
     }
-  }, [gitState, state.startupShown]);
+  }, [gitState, state.startupShown, suspendAutomaticPrompt]);
   const event = state.status?.installation;
   useEffect(() => {
     if (!event) return;

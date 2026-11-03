@@ -21,10 +21,22 @@ export const getSettingsCategories = (tr: Translate) => [
     label: tr('App & Diagnose', 'App & diagnostics'),
     description: tr('Updates, Feedback und Vorgänge', 'Updates, feedback and operations'),
   },
+  {
+    id: 'help' as const,
+    label: tr('Einführung & Hilfe', 'Introduction & help'),
+    description: tr('Interaktive Übungen und Antworten auf häufige Fragen', 'Interactive exercises and answers to common questions'),
+  },
 ];
 
 export const getSettingsGroups = (tr: Translate) =>
   [
+    {
+      id: 'tutorial',
+      tab: 'help',
+      title: tr('Interaktive Einführung', 'Interactive introduction'),
+      description: tr('Mit Beispieldaten üben und gezielt Hilfe finden.', 'Practice with sample data and find help for a specific topic.'),
+      keywords: 'tutorial onboarding tour einführung einfuehrung hilfe help lernen learning grundtour',
+    },
     {
       id: 'keyboard-shortcuts',
       tab: 'shortcuts',

@@ -28,6 +28,8 @@ import { configureBrowserCacheSwitches, configureCodeCache } from './main-proces
 import { isHttpCacheWorker } from './main-process/httpCacheWorker';
 import { finishBeforeQuit } from './main-process/finishBeforeQuit';
 import { initializeStartupDiagnostics, recordStartup, flushStartupDiagnostics } from './main-process/startupDiagnostics';
+import { TutorialProgressStore } from './main-process/tutorialProgress';
+import { registerTutorialHandlers } from './main-process/tutorialHost';
 
 // A packaged app in "dev mode" would load the localhost dev server, open
 // DevTools and apply the relaxed dev CSP; isDevelopmentRuntime() gates on
@@ -45,10 +47,13 @@ const openMainWindowIfReady = () => {
 const isPrimaryInstance = !isHttpCacheWorker && acquireSingleInstanceLock(app, BrowserWindow, openMainWindowIfReady);
 
 if (isPrimaryInstance) {
+  // Classify the profile before diagnostics, caches or services create files.
+  const tutorialProgress = new TutorialProgressStore(app.getPath('userData'));
   const stopStartupDiagnostics = initializeStartupDiagnostics();
   configureBrowserCacheSwitches(isDev);
   registerHtmlPreviewScheme();
   installIpcSenderValidation({ isDev, mainProcessDir: __dirname });
+  registerTutorialHandlers(tutorialProgress, isDev, __dirname);
   const updaterManager = new UpdaterManager(isDev);
   let userNotesManager: UserNotesManager | null = null;
   let planningApiServer: PlanningApiServerHandle | null = null;

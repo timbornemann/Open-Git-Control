@@ -58,4 +58,7 @@ contextBridge.exposeInMainWorld('api', api);
 `;
 
 fs.writeFileSync(outputPath, bundledPreload, 'utf8');
+const tutorialPreloadPath = path.join(distElectronDir, 'tutorial-preload.js');
+const tutorialSource = fs.readFileSync(tutorialPreloadPath, 'utf8');
+fs.writeFileSync(tutorialPreloadPath, inlineRelativeRequires(tutorialSource, distElectronDir), 'utf8');
 console.log(`Bundled sandbox preload: ${path.relative(process.cwd(), outputPath)}`);

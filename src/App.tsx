@@ -1,5 +1,5 @@
 import { useAppPreloading } from './data/useAppPreloading';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { MainView } from './components/layout/MainView';
 import { OverlayManager } from './components/layout/OverlayManager';
@@ -22,8 +22,11 @@ import { PlannerWorkRuntime } from './components/project-planner/PlannerWorkRunt
 import { BranchChangeRuntime } from './components/branch-change/BranchChangeRuntime';
 import { openStagingCommitArea } from './utils/layoutPreferences';
 import { createAppRepositoryActions } from './app/createAppRepositoryActions';
+import { TutorialWelcome, useTutorialWelcome } from './components/onboarding/TutorialWelcome';
+import { getElectronApi } from './services/electronApi';
 
-const App: React.FC = () => {
+const App: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
+  const welcome = useTutorialWelcome();
   const state = useAppState();
   useAppPreloading(state.activeRepo, state.openRepos, state.activeTab, state.settings.showSecondaryHistory);
   const tr = useCallback((deText: string, enText: string) => (state.settings.language === 'en' ? enText : deText), [state.settings.language]);
@@ -32,6 +35,21 @@ const App: React.FC = () => {
     [state.settings.language],
   );
   const [settingsTab, setSettingsTab] = useState<SettingsTabId>('general');
+  const showTutorialError = state.setGitActionToast;
+  useEffect(
+    () =>
+      getElectronApi()?.app?.onTutorialClosed?.((failed) => {
+        if (failed)
+          showTutorialError({
+            msg: tr(
+              'Die Einführung konnte nicht fortgesetzt werden. Dein Arbeitsbereich ist erhalten. Du kannst sie in den Einstellungen erneut starten.',
+              'The introduction could not continue. Your workspace is preserved. You can restart it from Settings.',
+            ),
+            isError: true,
+          });
+      }),
+    [showTutorialError, tr],
+  );
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [quickTodoRequestId, setQuickTodoRequestId] = useState(0);
   const { sidebarWidth, isSidebarCollapsed, isSidebarResizing, resetLayout, handleToggleSidebar, handleSidebarResizeStart } = useResizableSidebar();
@@ -137,7 +155,8 @@ const App: React.FC = () => {
     <I18nProvider language={state.settings.language}>
       <AppStateSlicesProvider value={appStateSlices}>
         <NotificationProvider value={state.notifications}>
-          <SystemToolsRuntime />
+          <SystemToolsRuntime suspendAutomaticPrompt={welcome.pending || welcome.visible} />
+          {welcome.visible && <TutorialWelcome onClose={welcome.dismiss} />}
           <FeedbackReportProvider>
             <ProjectPlannerProvider
               activeRepo={state.activeRepo}
@@ -184,6 +203,7 @@ const App: React.FC = () => {
                 )}
 
                 <MainView />
+                {children}
 
                 <OverlayManager
                   repoSwitcher={{

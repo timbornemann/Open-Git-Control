@@ -171,6 +171,12 @@ Read test and build output as a structured transcript, inspect Problems and open
 
 ## Feature Reference
 
+### Interactive introduction
+
+New user profiles receive a skippable introduction on first launch. **Settings → Introduction & help** lets you replay the basic tour, select a topic, or jump to help for a specific question. Completed chapters are recorded locally; each replay starts with fresh sample data.
+
+The bundled **OGC-Lernprojekt** runs in a separate, temporary practice environment. Git operations, planning, hosting, AI and run output are simulated and work without Git, sign-in or internet access. The introduction preserves your repositories, accounts, settings and open drafts. Existing profiles do not receive an automatic introduction after an update.
+
 ### Repository and Workspace Management
 
 - Open local repositories and set the active working session.

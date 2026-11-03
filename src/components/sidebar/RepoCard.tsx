@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 type RepoCardProps = {
   children: React.ReactNode;
   className?: string;
+  tutorialTarget?: string;
 };
 
 type RepoCardHeaderProps = {
@@ -21,8 +22,10 @@ type RepoCardStatusProps = {
   actions?: React.ReactNode;
 };
 
-export const RepoCard: React.FC<RepoCardProps> = ({ children, className }) => (
-  <section className={`repo-card${className ? ` ${className}` : ''}`}>{children}</section>
+export const RepoCard: React.FC<RepoCardProps> = ({ children, className, tutorialTarget }) => (
+  <section data-tutorial={tutorialTarget} className={`repo-card${className ? ` ${className}` : ''}`}>
+    {children}
+  </section>
 );
 
 export const RepoCardHeader: React.FC<RepoCardHeaderProps> = ({ title, collapsed, onToggleCollapsed, toggleTitle, actions }) => (

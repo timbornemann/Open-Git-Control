@@ -184,6 +184,7 @@ export const TopbarActions: React.FC<Props> = ({
       <button
         className="icon-btn topbar-action-btn topbar-action-btn-sync"
         onClick={onFetch}
+        data-tutorial="fetch"
         disabled={!activeRepo || isGitActionRunning || isFetching}
         title={t('generated.components.sidebar.remotepanel.refresh_remote_e97c388d')}
       >

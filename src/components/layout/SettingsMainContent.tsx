@@ -26,6 +26,11 @@ import { SettingsUserNotesSection } from './settings/SettingsUserNotesSection';
 import { SettingsKeyboardShortcutsSection } from './settings/SettingsKeyboardShortcutsSection';
 import { getSettingsCategories, searchSettingsGroups } from './settings/settingsNavigation';
 import { clearSettingsDestination, useSettingsNavigation } from '@/app/state/settingsNavigationStore';
+import { SettingsTutorialSection } from './settings/SettingsTutorialSection';
+import { TUTORIAL_CHAPTERS } from '@/shared/tutorial/catalog';
+import { TUTORIAL_QUESTION_STEPS } from '@/shared/tutorial/catalogSteps';
+import { tutorialText } from '@/shared/tutorial/types';
+import { launchTutorial } from '@/tutorial/entryApi';
 
 type SettingsMainContentProps = {
   settings: AppSettingsDto;
@@ -47,7 +52,8 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
   onResetLayout,
 }) => {
   const { locale, sortedJobs, aiUpdater } = useSettingsPanelModel({ settings, onUpdateSettings, jobs });
-  const { tr } = useI18n();
+  const { tr, language } = useI18n();
+  const [tutorialError, setTutorialError] = useState('');
   const [query, setQuery] = useState('');
   const contentRef = useRef<HTMLDivElement>(null);
   const pendingGroupRef = useRef<{ id: string; tab: SettingsTabId } | null>(null);
@@ -56,6 +62,15 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
   const category = categories.find((item) => item.id === activeTab)!;
   const searching = Boolean(query.trim());
   const matches = searchSettingsGroups(query, tr);
+  const helpMatches = searching
+    ? TUTORIAL_CHAPTERS.filter((chapter) =>
+        query
+          .trim()
+          .toLowerCase()
+          .split(/\s+/)
+          .every((term) => `${chapter.title.join(' ')} ${chapter.question.join(' ')} ${chapter.keywords}`.toLowerCase().includes(term)),
+      )
+    : [];
   const destination = useSettingsNavigation((state) => state.destination);
 
   useEffect(() => {
@@ -92,9 +107,12 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
           <h2 id="settings-page-title">{searching ? tr('Suchergebnisse', 'Search results') : category.label}</h2>
           <p>
             {searching
-              ? matches.length === 1
-                ? tr('1 passende Einstellungsgruppe', '1 matching settings group')
-                : tr(`${matches.length} passende Einstellungsgruppen`, `${matches.length} matching settings groups`)
+              ? matches.length + helpMatches.length === 1
+                ? tr('1 passende Einstellung oder Hilfe', '1 matching setting or help topic')
+                : tr(
+                    `${matches.length + helpMatches.length} passende Einstellungen und Hilfen`,
+                    `${matches.length + helpMatches.length} matching settings and help topics`,
+                  )
               : category.description}
           </p>
         </div>
@@ -130,7 +148,8 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
       <div className="settings-content" ref={contentRef} aria-labelledby="settings-page-title">
         {searching && (
           <div className="settings-search-results">
-            {matches.length === 0 && (
+            {tutorialError && <p role="alert">{tutorialError}</p>}
+            {matches.length === 0 && helpMatches.length === 0 && (
               <p className="settings-empty">
                 {tr('Keine passenden Einstellungen gefunden. Suche nach einem anderen Begriff.', 'No matching settings found. Try another search term.')}
               </p>
@@ -154,9 +173,30 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                 <ChevronRight size={15} aria-hidden="true" />
               </button>
             ))}
+            {helpMatches.map((chapter) => (
+              <button
+                type="button"
+                className="settings-search-result"
+                key={`help-${chapter.id}`}
+                onClick={() => {
+                  setTutorialError('');
+                  void launchTutorial({ chapterId: chapter.id, stepId: TUTORIAL_QUESTION_STEPS[chapter.id] }).catch(() =>
+                    setTutorialError(tr('Die Einführung konnte nicht geöffnet werden.', 'The introduction could not be opened.')),
+                  );
+                }}
+              >
+                <span>
+                  <small>{tr('Einführung & Hilfe', 'Introduction & help')}</small>
+                  <strong>{tutorialText(chapter.question, language)}</strong>
+                  <span>{tutorialText(chapter.description, language)}</span>
+                </span>
+                <ChevronRight size={15} aria-hidden="true" />
+              </button>
+            ))}
           </div>
         )}
         <div hidden={searching} className="settings-category-content">
+          {activeTab === 'help' && <SettingsTutorialSection />}
           {activeTab === 'general' && (
             <SettingsGeneralSection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" onResetLayout={onResetLayout} />
           )}

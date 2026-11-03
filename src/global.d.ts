@@ -1,4 +1,5 @@
 import type { ElectronAPI } from './shared/ipc/contracts/electronApi';
+import type { TutorialHostApi } from './shared/tutorial/types';
 
 export type {
   ElectronAPI,
@@ -15,6 +16,7 @@ export type {
 
 declare global {
   interface Window {
+    tutorialHost?: TutorialHostApi;
     electronAPI: ElectronAPI;
     api: ElectronAPI;
   }

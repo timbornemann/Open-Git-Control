@@ -19,6 +19,7 @@ export default defineConfig({
     emptyOutDir: true,
     manifest: 'build-manifest.json',
     rollupOptions: {
+      input: { app: path.resolve(__dirname, 'index.html'), tutorial: path.resolve(__dirname, 'tutorial.html') },
       output: {
         manualChunks(id) {
           const normalizedId = toChunkPath(id);

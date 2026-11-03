@@ -171,6 +171,12 @@ Tests und Builds als strukturiertes Protokoll lesen, Probleme prüfen und genann
 
 ## Feature-Referenz
 
+### Interaktive Einführung
+
+Neue Benutzerprofile erhalten beim ersten Start eine überspringbare Einführung. Unter **Einstellungen → Einführung & Hilfe** lassen sich die Grundtour, einzelne Themenkapitel und Antworten auf typische Fragen jederzeit erneut öffnen. Abgeschlossene Kapitel werden lokal markiert; jede Wiederholung beginnt mit frischen Beispieldaten.
+
+Das integrierte **OGC-Lernprojekt** läuft in einer eigenen, temporären Übungsumgebung. Git-Aktionen, Planung, Hosting, KI und Run-Ausgaben sind simuliert und funktionieren ohne Git-Installation, Anmeldung oder Internet. Eigene Repositories, Konten, Einstellungen und offene Entwürfe werden von der Einführung nicht verändert. Bestehende Benutzerprofile erhalten nach einem Update keine automatische Einführung.
+
 ### Repository- und Workspace-Management
 
 - Lokale Repositories oeffnen und als aktive Working Session setzen.

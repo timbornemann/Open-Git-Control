@@ -105,6 +105,7 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
               <button
                 className={`directory-mode-switch__option${directoryMode === 'tree' ? ' is-active' : ''}`}
                 onClick={() => onDirectoryModeChange('tree')}
+                data-tutorial="open-files"
                 aria-pressed={directoryMode === 'tree'}
               >
                 Working Directory

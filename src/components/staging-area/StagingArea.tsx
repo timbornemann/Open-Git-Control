@@ -247,7 +247,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   );
 
   return (
-    <div className={`staging-container${isConflictOnly ? ' staging-container--conflict' : ''}`}>
+    <div data-tutorial="staging" className={`staging-container${isConflictOnly ? ' staging-container--conflict' : ''}`}>
       {!isConflictOnly && (
         <StagingToolbar
           searchQuery={fileOps.searchQuery}

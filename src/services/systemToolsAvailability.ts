@@ -1,4 +1,5 @@
 import type { SystemToolId, SystemToolState } from '@/shared/ipc/systemTools';
+import { getElectronApi } from './electronApi';
 
 let states = new Map<SystemToolId, SystemToolState>();
 export function updateSystemToolsAvailability(tools: { id: SystemToolId; state: SystemToolState }[]) {
@@ -6,7 +7,7 @@ export function updateSystemToolsAvailability(tools: { id: SystemToolId; state: 
 }
 export function isSystemToolAvailable(id: SystemToolId): boolean {
   // Older bridges and component fixtures do not expose system tool management.
-  if (typeof window === 'undefined' || !window.electronAPI?.app?.getSystemToolsStatus) return true;
+  if (!getElectronApi()?.app?.getSystemToolsStatus) return true;
   return states.get(id) === 'available';
 }
 export function requestSystemTools(id: SystemToolId = 'git') {

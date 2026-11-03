@@ -114,6 +114,7 @@ export const CommitSearchToolbar: React.FC<CommitSearchToolbarProps> = ({
               type="button"
               className="commit-search-toolbar__recovery"
               onClick={toggleRecoveryCenter}
+              data-tutorial="open-recovery"
               onMouseEnter={() => intent.hover(preloadRecovery)}
               onMouseLeave={intent.cancel}
               onFocus={() => intent.focus(preloadRecovery)}

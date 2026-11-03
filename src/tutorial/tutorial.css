@@ -1,0 +1,241 @@
+@import '../components/onboarding/tutorialEntry.css';
+.tutorial-session {
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+}
+.tutorial-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 44px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color, #3b444b);
+  font-size: 12px;
+}
+.tutorial-banner > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent-primary, #d99a6c);
+  font-weight: 600;
+}
+.tutorial-banner .tutorial-button {
+  padding: 5px 8px;
+  font-size: 11px;
+}
+.tutorial-workspace {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.tutorial-workspace .app-container {
+  height: 100%;
+}
+.tutorial-workspace .staging-container {
+  overflow: auto;
+}
+.tutorial-workspace .staging-files {
+  flex: 1 0 150px;
+  min-height: 150px;
+}
+.tutorial-workspace .staging-commit-area {
+  flex-shrink: 0;
+}
+.tutorial-workspace .toast-container {
+  bottom: calc(36dvh + 16px);
+}
+.tutorial-loading {
+  display: grid;
+  place-content: center;
+  height: 100%;
+  margin: 0;
+  color: var(--text-secondary);
+}
+.tutorial-highlight {
+  position: fixed;
+  pointer-events: none;
+  z-index: 12000;
+  border: 2px solid var(--accent-primary, #d99a6c);
+  border-radius: 7px;
+  box-sizing: border-box;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary, #d99a6c) 20%, transparent);
+}
+#tutorial-controls {
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 13000;
+}
+.tutorial-coach {
+  display: flex;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 18px 24px;
+  max-height: 36dvh;
+  min-height: 160px;
+  overflow: auto;
+  box-sizing: border-box;
+  border-top: 1px solid var(--accent-primary, #d99a6c);
+  background: var(--bg-panel);
+}
+.tutorial-coach-copy {
+  flex: 1;
+  max-width: 880px;
+}
+.tutorial-coach-progress {
+  margin: 0 0 8px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  letter-spacing: 0.025em;
+}
+.tutorial-coach h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  outline: none;
+}
+.tutorial-coach-copy > p:last-of-type {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 0 10px;
+}
+.tutorial-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.tutorial-status.completed {
+  color: var(--status-success, #68ba9d);
+}
+.tutorial-coach-actions {
+  flex: 0 0 auto;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+.tutorial-action-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+.tutorial-link {
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.tutorial-link:focus-visible {
+  outline: 2px solid var(--accent-primary, #d99a6c);
+  outline-offset: 3px;
+}
+.tutorial-failure {
+  margin: 0;
+  padding: 8px 24px;
+  color: var(--danger, #e97f7f);
+}
+.tutorial-chapter-chooser {
+  width: min(760px, 100%);
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid var(--border-color, #3b444b);
+  border-radius: 16px;
+  background: var(--bg-panel);
+}
+.tutorial-chapter-chooser header {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: start;
+}
+.tutorial-chapter-chooser .tutorial-eyebrow {
+  margin: 0;
+}
+.tutorial-chapter-chooser h2 {
+  font-size: 22px;
+  margin: 8px 0 20px;
+}
+.tutorial-chapter-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.tutorial-chapter-list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color, #3b444b);
+  padding: 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.tutorial-chapter-list strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.tutorial-chapter-list small {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.tutorial-chapter-list button:focus-visible {
+  outline: 2px solid var(--accent-primary, #d99a6c);
+}
+@media (max-width: 940px) {
+  .tutorial-coach {
+    gap: 14px;
+    padding: 12px 16px;
+  }
+  .tutorial-coach-actions {
+    max-width: 245px;
+  }
+}
+@media (max-width: 640px) {
+  .tutorial-coach {
+    flex-direction: column;
+    min-height: 0;
+    max-height: 42dvh;
+  }
+  .tutorial-coach-actions {
+    max-width: none;
+    width: 100%;
+    gap: 8px;
+  }
+  .tutorial-coach-copy > p:last-of-type {
+    font-size: 12px;
+  }
+  .tutorial-chapter-list {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tutorial-session *,
+  .tutorial-highlight {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

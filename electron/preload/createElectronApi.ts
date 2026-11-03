@@ -2,6 +2,7 @@ import { createRepositorySecretScanAllowlistApi } from './createRepositorySecret
 import { createWorkingTreeWatchApi } from './createWorkingTreeWatchApi';
 import { createRepositoryAnalyticsApi } from './createRepositoryAnalyticsApi';
 import { createBranchCleanupApi } from './createBranchCleanupApi';
+import { createTutorialApi } from './createTutorialApi';
 import { createBranchChangeApi } from './createBranchChangeApi';
 import { createUntrackFilesApi } from './createUntrackFilesApi';
 import type { ApplyDiffLineSelectionRequest } from '../../src/shared/ipc/diffLineSelection';
@@ -92,6 +93,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
   };
 
   const flatApi = {
+    ...createTutorialApi(ipcRenderer),
     ...createBranchCleanupApi(ipcRenderer),
     ...createBranchChangeApi(ipcRenderer),
     ...createUntrackFilesApi(ipcRenderer),
@@ -474,6 +476,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       clearOpenAiApiKey: flatApi.clearOpenAiApiKey,
     },
     app: {
+      ...createTutorialApi(ipcRenderer),
       ...createStorageApi(ipcRenderer),
       ...createSystemToolsApi(ipcRenderer),
       cancelReadRequest: flatApi.cancelReadRequest,

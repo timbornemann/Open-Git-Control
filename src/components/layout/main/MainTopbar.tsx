@@ -60,7 +60,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({ canShowInspectorPane, sh
 
   return (
     <>
-      <div className={`topbar${isAnalyticsView ? ' topbar--analytics' : ''}`}>
+      <div data-tutorial="topbar" className={`topbar${isAnalyticsView ? ' topbar--analytics' : ''}`}>
         <div className="topbar-left">
           <div
             aria-hidden="true"
