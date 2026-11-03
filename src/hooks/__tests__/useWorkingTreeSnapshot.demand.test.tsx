@@ -64,6 +64,10 @@ beforeEach(() => {
   });
   api.app.cancelReadRequest.mockResolvedValue(undefined);
   vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+  vi.spyOn(gitClient, 'getWorkingTreeStatus').mockImplementation(async () => ({
+    success: true,
+    data: { repoPath: repo, statusRaw: ' M file.txt', changeCount: 1, checkedAt: Date.now() },
+  }));
   vi.spyOn(gitClient, 'getWorkingTreeSnapshot').mockImplementation(async () => snapshot());
   vi.spyOn(gitClient, 'getWorkingTreeStats').mockImplementation(async (id) => stats(id));
   vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: ' M file.txt' });
@@ -113,13 +117,14 @@ describe('working tree refresh demand', () => {
     expect(queryClient.getQueryData(repositoryActivityKey(repo))).toMatchObject({ data: { changeCount: 1 } });
     detailed = true;
     await render();
-    expect(gitClient.getWorkingTreeSnapshot).toHaveBeenCalledTimes(1);
+    expect(gitClient.getWorkingTreeStatus).toHaveBeenCalledTimes(1);
     await advance(300);
     expect(current.stats).toMatchObject({ snapshotId: 'a' });
   });
 
   it('loads once at mount, preserves unchanged identities and coalesces repository-filtered file events', async () => {
     await render();
+    await advance(300);
     const previousSnapshot = current.snapshot,
       previousStatus = current.status;
     expect(gitClient.getWorkingTreeSnapshot).toHaveBeenCalledTimes(1);
@@ -133,6 +138,8 @@ describe('working tree refresh demand', () => {
     await advance(199);
     expect(gitClient.getWorkingTreeSnapshot).toHaveBeenCalledTimes(1);
     await advance(1);
+    expect(gitClient.getWorkingTreeStatus).toHaveBeenCalledTimes(2);
+    await advance(300);
     expect(gitClient.getWorkingTreeSnapshot).toHaveBeenCalledTimes(2);
     expect(current.snapshot).toBe(previousSnapshot);
     expect(current.status).toBe(previousStatus);
@@ -155,7 +162,7 @@ describe('working tree refresh demand', () => {
     expect(request).toMatchObject({ priority: 'speculative' });
     detailed = false;
     await render();
-    expect(api.app.cancelReadRequest).toHaveBeenCalledExactlyOnceWith(request.requestId);
+    expect(api.app.cancelReadRequest).toHaveBeenCalledWith(request.requestId);
     await act(async () => finish(stats('a')));
     expect(current.stats).toBeNull();
     expect(gitClient.getWorkingTreeSnapshot).toHaveBeenCalledTimes(1);
@@ -172,13 +179,13 @@ describe('working tree refresh demand', () => {
     trigger++;
     await render();
     await advance(120000);
-    expect(gitClient.getWorkingTreeSnapshot).toHaveBeenCalledTimes(1);
+    expect(gitClient.getWorkingTreeSnapshot).not.toHaveBeenCalled();
     expect(gitClient.getWorkingTreeStats).not.toHaveBeenCalled();
     expect(api.git.watchWorkingTree).toHaveBeenLastCalledWith(expect.objectContaining({ repoPath: repo, enabled: false }));
     visible('visible');
     await advance(0);
     await advance(300);
-    expect(gitClient.getWorkingTreeSnapshot).toHaveBeenCalledTimes(2);
+    expect(gitClient.getWorkingTreeSnapshot).toHaveBeenCalledTimes(1);
     expect(gitClient.getWorkingTreeStats).toHaveBeenCalledTimes(1);
     expect(api.git.watchWorkingTree).toHaveBeenLastCalledWith(expect.objectContaining({ repoPath: repo, enabled: true }));
   });
@@ -186,12 +193,12 @@ describe('working tree refresh demand', () => {
   it('falls back to bounded short polling after an uncertain watch event', async () => {
     await render();
     await advance(5000 + 10000 + 20000);
-    expect(gitClient.getWorkingTreeSnapshot).toHaveBeenCalledTimes(4);
+    expect(gitClient.getWorkingTreeStatus).toHaveBeenCalledTimes(4);
     act(() => changed({ repoPath: repo, rescan: true }));
     await advance(500);
     await advance(10000);
     await advance(15000);
-    expect(gitClient.getWorkingTreeSnapshot).toHaveBeenCalledTimes(7);
+    expect(gitClient.getWorkingTreeStatus).toHaveBeenCalledTimes(7);
   });
 
   it('retains the last activity count on a lightweight read failure and recovers without detailed reads', async () => {

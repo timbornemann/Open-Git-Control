@@ -10,6 +10,7 @@ export type GitSchedulerDiagnostic = {
   kind: GitJobKind;
   command: string;
   durationMs: number;
+  queueWaitMs: number;
   resultBytes: number;
   aborted: boolean;
   timestamp: number;
@@ -24,6 +25,7 @@ type QueueEntry<T> = {
   resolve: (value: T) => void;
   reject: (error: unknown) => void;
   promise: Promise<T>;
+  enqueuedAt: number;
 };
 
 type RepoState = {
@@ -98,6 +100,7 @@ export class GitScheduler {
       resolve: resolveEntry,
       reject: rejectEntry,
       promise,
+      enqueuedAt: Date.now(),
     };
 
     if (options.signal) {
@@ -296,6 +299,7 @@ export class GitScheduler {
         kind: entry.kind,
         command: entry.command,
         durationMs: Date.now() - startedAt,
+        queueWaitMs: startedAt - entry.enqueuedAt,
         resultBytes,
         aborted,
         timestamp: Date.now(),

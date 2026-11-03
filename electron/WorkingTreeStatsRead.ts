@@ -1,11 +1,11 @@
 import type { WorkingTreeStats } from './WorkingTreeService';
 
 /** Each reader may detach independently. Expensive shared work stops when its last reader leaves. */
-export class WorkingTreeStatsRead {
+export class SharedWorkingTreeRead<T> {
   private readers = 0;
   private settled = false;
   constructor(
-    readonly promise: Promise<WorkingTreeStats>,
+    readonly promise: Promise<T>,
     readonly controller: AbortController,
   ) {
     void promise.then(
@@ -17,10 +17,10 @@ export class WorkingTreeStatsRead {
       },
     );
   }
-  observe(signal?: AbortSignal): Promise<WorkingTreeStats> {
+  observe(signal?: AbortSignal): Promise<T> {
     signal?.throwIfAborted();
     this.readers++;
-    return new Promise<WorkingTreeStats>((resolve, reject) => {
+    return new Promise<T>((resolve, reject) => {
       let done = false;
       const finish = () => {
         if (done) return false;
@@ -45,3 +45,5 @@ export class WorkingTreeStatsRead {
     });
   }
 }
+
+export class WorkingTreeStatsRead extends SharedWorkingTreeRead<WorkingTreeStats> {}

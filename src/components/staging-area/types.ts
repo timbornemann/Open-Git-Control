@@ -21,6 +21,7 @@ export interface StagingAreaProps {
   /** Repository that owns the shared working-tree data, if it is current. */
   workingTreeRepoPath?: string | null;
   workingTreeSnapshot?: WorkingTreeSnapshotDto | null;
+  workingTreeStatusRaw?: string;
   workingTreeStatus?: GitStatusDetailed | null;
   workingTreeStats?: WorkingTreeStatsDto | null;
   onRefreshWorkingTree?: () => Promise<void>;

@@ -64,6 +64,13 @@ export interface CommitStatsUpdateDto {
   state: 'loading' | 'ready' | 'error';
 }
 
+export interface WorkingTreeStatusDto {
+  repoPath: string;
+  statusRaw: string;
+  changeCount: number;
+  checkedAt: number;
+}
+
 export interface WorkingTreeSnapshotDto {
   snapshotId: string;
   repoPath: string;

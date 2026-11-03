@@ -29,6 +29,7 @@ type Params = {
   externalStatus?: GitStatusDetailed | null;
   externalStatusRaw?: string;
   externalStats?: WorkingTreeStatsDto | null;
+  externalSnapshotId?: string | null;
   externalRefresh?: () => Promise<void>;
 };
 
@@ -47,6 +48,7 @@ export const useFileOperations = ({
   externalStatus,
   externalStatusRaw,
   externalStats,
+  externalSnapshotId,
   externalRefresh,
 }: Params) => {
   const { t, tr } = useI18n();
@@ -100,12 +102,30 @@ export const useFileOperations = ({
     return () => window.clearInterval(timer);
   }, [mutationStartedAt]);
 
-  const refresh = useCallback(async () => {
+  const readFreshStatus = useCallback(async () => {
     const repoAtStart = repoPath;
     const generation = repoGenerationRef.current;
     if (!repoAtStart || !gitClient.isAvailable() || !isCurrentRepoGeneration(generation, repoAtStart)) return;
     await (externalRefresh || localWorkingTree.refresh)();
   }, [externalRefresh, isCurrentRepoGeneration, localWorkingTree.refresh, repoPath]);
+
+  // Post-write refresh failures must not turn a confirmed commit, unstage or
+  // LFS operation into a reported write failure in their existing workflows.
+  const refresh = useCallback(async () => {
+    const generation = repoGenerationRef.current;
+    try {
+      await readFreshStatus();
+    } catch (error) {
+      if (repoPath && isCurrentRepoGeneration(generation, repoPath))
+        setToast({
+          msg:
+            tr('Der Dateistatus konnte nicht aktualisiert werden.', 'The file status could not be refreshed.') +
+            ' ' +
+            (error instanceof Error ? error.message : String(error)),
+          isError: true,
+        });
+    }
+  }, [isCurrentRepoGeneration, readFreshStatus, repoPath, setToast, tr]);
 
   useLayoutEffect(() => {
     if (!repoPath || sourceRepo === null || (sourceRepo !== undefined && !isSameRepoPath(sourceRepo, repoPath)) || !sourceStatus) {
@@ -150,6 +170,24 @@ export const useFileOperations = ({
     };
   }, [contextMenu]);
 
+  const reconcileMutation = useCallback(
+    async (generation: number, repo: string, succeeded: boolean) => {
+      try {
+        await readFreshStatus();
+      } catch (error) {
+        if (succeeded && isCurrentRepoGeneration(generation, repo))
+          setToast({
+            msg:
+              tr('Git wurde ausgeführt, aber der Dateistatus konnte nicht aktualisiert werden.', 'Git completed, but the file status could not be refreshed.') +
+              ' ' +
+              (error instanceof Error ? error.message : String(error)),
+            isError: true,
+          });
+      }
+    },
+    [isCurrentRepoGeneration, readFreshStatus, setToast, tr],
+  );
+
   const git = useCallback(
     async (args: string[] | string[][], msg: string, notify = false) => {
       const repoAtStart = repoPath;
@@ -187,9 +225,9 @@ export const useFileOperations = ({
         setToast({ msg: failure ?? msg, isError: failure !== null });
         // A failed checkout can already have restored some selected files.
         // Reconcile the status once, while retaining the shared mutation lock.
-        if (changed || isBatch) {
+        if (changed || isBatch || commands.some((command) => command[0] === 'add')) {
           if (notify && onRepoChanged) onRepoChanged();
-          await refresh();
+          await reconcileMutation(generation, repoAtStart, failure === null);
         }
         return failure === null;
       } catch (e: any) {
@@ -200,7 +238,7 @@ export const useFileOperations = ({
         setMutationStartedAt(null);
       }
     },
-    [hasCurrentStatusForRepo, isCurrentRepoGeneration, onRepoChanged, refresh, repoPath, setToast, t],
+    [hasCurrentStatusForRepo, isCurrentRepoGeneration, onRepoChanged, reconcileMutation, repoPath, setToast, t],
   );
 
   const stagePathsForCurrentRepo = useCallback(
@@ -220,13 +258,16 @@ export const useFileOperations = ({
       mutationInFlightRef.current = true;
       setMutationStartedAt(Date.now());
       try {
-        const result = await gitClient.stagePaths(paths, repoAtStart);
+        const result = await gitClient
+          .stagePaths(paths, repoAtStart)
+          .catch((error: unknown) => ({ success: false as const, error: error instanceof Error ? error.message : String(error) }));
         if (!isCurrentRepoGeneration(generation, repoAtStart)) return false;
         if (!result.success) {
           setToast({ msg: result.error || t('generated.components.layout.cloneprogressmodal.error_7d62310f'), isError: true });
+          await reconcileMutation(generation, repoAtStart, false);
           return false;
         }
-        await refresh();
+        await reconcileMutation(generation, repoAtStart, true);
         return true;
       } catch (e: any) {
         if (isCurrentRepoGeneration(generation, repoAtStart)) {
@@ -238,7 +279,7 @@ export const useFileOperations = ({
         setMutationStartedAt(null);
       }
     },
-    [hasCurrentStatusForRepo, isCurrentRepoGeneration, refresh, repoPath, setToast, t],
+    [hasCurrentStatusForRepo, isCurrentRepoGeneration, reconcileMutation, repoPath, setToast, t],
   );
 
   const unstagePathsForCurrentRepo = useCallback(
@@ -370,7 +411,10 @@ export const useFileOperations = ({
     },
     [hasCurrentStatusForRepo, isCurrentRepoGeneration, onRepoChanged, refresh, setToast, tr],
   );
-  const lfs = useStagingLfs(repoPath, status, trackLfs, setInputDialog);
+  const lfs = useStagingLfs(repoPath, status, trackLfs, setInputDialog, {
+    revision: externalSnapshotId === undefined && externalStatus === undefined ? (localWorkingTree.snapshot?.snapshotId ?? null) : externalSnapshotId,
+    busy: mutationStartedAt !== null,
+  });
   const trackFileTypeWithLfs = (entry: FileEntry, section: FileSection) => {
     lfs.configure(entry, section, 'extension');
   };

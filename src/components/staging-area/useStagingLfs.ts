@@ -5,7 +5,9 @@ import type { GitLfsFileState, GitLfsStagingMode, GitLfsStatus, TrackWithGitLfsR
 import type { FileEntry } from '@/utils/gitParsing';
 import type { FileSection, InputDialogState } from './types';
 import { useSystemTools } from '@/app/state/systemToolsStore';
-import { freshRead } from '@/data/clientCache';
+import { freshRead, withReadPriority } from '@/data/clientCache';
+import { cancellableRead } from '@/data/ipcRead';
+import { isReadCancellation } from '@/data/readCancellation';
 
 type Status = { staged: FileEntry[]; unstaged: FileEntry[]; untracked: FileEntry[] } | null;
 export function useStagingLfs(
@@ -13,28 +15,30 @@ export function useStagingLfs(
   status: Status,
   track: (request: TrackWithGitLfsRequest) => Promise<boolean>,
   setInputDialog?: (dialog: InputDialogState | null) => void,
+  { revision, busy = false }: { revision?: string | null; busy?: boolean } = {},
 ) {
   const lfsAvailability = useSystemTools((state) => {
     const tool = state.status?.tools.find((tool) => tool.id === 'git-lfs');
     return `${tool?.state}:${tool?.version}:${tool?.executable}`;
   });
   const { tr } = useI18n();
-  const [snapshot, setSnapshot] = useState<{ repo: string; status: GitLfsStatus } | null>(null);
-  const inFlight = useRef<{ repo: string; promise: Promise<void> } | null>(null);
+  const [snapshot, setSnapshot] = useState<{ repo: string; revision?: string; status: GitLfsStatus } | null>(null);
+  const [retry, setRetry] = useState(0);
+  const attempts = useRef(0);
   useEffect(() => {
     let active = true;
-    if (!repoPath || !status || typeof gitClient.getGitLfsStatus !== 'function') return;
+    if (!repoPath || !status || busy || revision === null || typeof gitClient.getGitLfsStatus !== 'function') return;
+    const controller = new AbortController();
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     const files = [
       ...status.staged.map((entry) => ({ path: entry.path, source: 'staged' as const })),
       ...[...status.unstaged, ...status.untracked].map((entry) => ({ path: entry.path, source: 'unstaged' as const })),
     ];
     const unique = [...new Map(files.map((file) => [`${file.source}:${file.path}`, file])).values()];
-    const previous = inFlight.current?.repo === repoPath ? inFlight.current.promise : null;
-    const request = (async () => {
+    void (async () => {
       // Keep only the newest queued status while a preview is being read.
       // The status includes no blob IDs or file timestamps: membership alone
       // cannot prove that an unchanged-looking entry still has the same content.
-      if (previous) await previous;
       if (!active) return;
       const states: GitLfsFileState[] = [];
       let available = true;
@@ -43,13 +47,17 @@ export function useStagingLfs(
       // otherwise reread the entire index and repository configuration each time.
       for (let offset = 0; offset < unique.length; offset += 10_000) {
         if (!active) return;
-        const result = await freshRead(() => gitClient.getGitLfsStatus({ repoPath, files: unique.slice(offset, offset + 10_000) }));
+        const input = { repoPath, files: unique.slice(offset, offset + 10_000) };
+        const result = await cancellableRead(controller.signal, 'speculative', (request) =>
+          withReadPriority(() => freshRead(() => (request ? gitClient.getGitLfsStatus(input, request) : gitClient.getGitLfsStatus(input))), 'speculative'),
+        );
         if (!result.success || !result.data) throw new Error(result.error || 'Git LFS inspection failed.');
         states.push(...result.data.files);
         available = result.data.available;
         error = result.data.error;
       }
-      if (active)
+      if (active) {
+        attempts.current = 0;
         setSnapshot((current) => {
           const old = new Map(current?.repo === repoPath ? current.status.files.map((file) => [`${file.source}:${file.path}`, file]) : []);
           const files = states.map((file) => {
@@ -58,23 +66,28 @@ export function useStagingLfs(
           });
           if (
             current?.repo === repoPath &&
+            current.revision === revision &&
             current.status.available === available &&
             current.status.error === error &&
             current.status.files.length === files.length &&
             files.every((file, index) => file === current.status.files[index])
           )
             return current;
-          return { repo: repoPath, status: { available, error, files } };
+          return { repo: repoPath, revision, status: { available, error, files } };
         });
+      }
     })().catch((error: unknown) => {
-      if (active) setSnapshot({ repo: repoPath, status: { available: false, files: [], error: error instanceof Error ? error.message : String(error) } });
+      if (!active) return;
+      if (isReadCancellation(error)) retryTimer = setTimeout(() => setRetry((value) => value + 1), Math.min(300 * 2 ** attempts.current++, 5000));
+      else setSnapshot({ repo: repoPath, revision, status: { available: false, files: [], error: error instanceof Error ? error.message : String(error) } });
     });
-    inFlight.current = { repo: repoPath, promise: request };
     return () => {
       active = false;
+      controller.abort();
+      clearTimeout(retryTimer);
     };
-  }, [repoPath, status, lfsAvailability]);
-  const data = snapshot?.repo === repoPath ? snapshot.status : null;
+  }, [repoPath, status, lfsAvailability, revision, busy, retry]);
+  const data = !busy && revision !== null && snapshot?.repo === repoPath && snapshot.revision === revision ? snapshot.status : null;
   const filesBySource = useMemo(() => new Map(data?.files.map((file) => [`${file.source}:${file.path}`, file]) ?? []), [data]);
   const stateFor = (filePath: string, section: FileSection) => filesBySource.get(`${section === 'staged' ? 'staged' : 'unstaged'}:${filePath}`);
   const recommendationTitle = (file: GitLfsFileState): string => {

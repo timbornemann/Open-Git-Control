@@ -262,6 +262,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
             settings={settingsState.settings}
             workingTreeRepoPath={workingTree.dataRepoPath}
             workingTreeSnapshot={workingTree.snapshot}
+            workingTreeStatusRaw={workingTree.statusRaw}
             workingTreeStatus={workingTree.status}
             workingTreeStats={workingTree.stats}
             onRefreshWorkingTree={workingTree.refresh}

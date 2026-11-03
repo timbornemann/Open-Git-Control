@@ -1,5 +1,5 @@
-import { cancellableRead } from './ipcRead';
-import type { ReadPriority, ResourceDomain, ResourceKey } from '@/shared/cache/resource';
+import { cancellableRead, readRequestSignal } from './ipcRead';
+import type { ReadRequest, ReadPriority, ResourceDomain, ResourceKey } from '@/shared/cache/resource';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { queryClient, readResource, updateResource, refreshVisibleResources } from './queryClient';
 import { isMutation, isReadCommand, readPolicies } from './clientPolicies';
@@ -69,6 +69,8 @@ export function resourceKey(domain: ResourceDomain, method: string, input: reado
   if (method === 'listWorkingDirectory' && !args[1]) args = [scope, ''];
   if (method === 'getCommitLogPage') args[0] = { limit: 100, offset: 0, scope: 'head', ...(args[0] as object) };
   if (method === 'getDiffPreview') args = args.slice(0, 3);
+  if (['getWorkingTreeStatus', 'getWorkingTreeSnapshot', 'getGitLfsStatus'].includes(method)) args = args.slice(0, 1);
+  if (method === 'getWorkingTreeStats') args = args.slice(0, 2);
   if (method === 'getWorkflowRunsPage') args[0] = { page: 1, perPage: 30, ...(args[0] as object) };
   return ['resource', domain, scope, method, ...args];
 }
@@ -186,12 +188,24 @@ export function cachedClient<T extends object>(domain: ResourceDomain, client: T
                   )
                 : property === 'getDiffPreview'
                   ? cancellableRead(signal, requestedPriority, (request) => original.apply(client, request ? [args[0], args[1], args[2], request] : args))
-                  : original.apply(client, args),
+                  : ['getWorkingTreeStatus', 'getWorkingTreeSnapshot', 'getWorkingTreeStats', 'getGitLfsStatus'].includes(property)
+                    ? cancellableRead(
+                        signal,
+                        requestedPriority,
+                        (request) =>
+                          original.apply(client, request ? (property === 'getWorkingTreeStats' ? [args[0], args[1], request] : [args[0], request]) : args),
+                        args[property === 'getWorkingTreeStats' ? 2 : 1] as ReadRequest | undefined,
+                      )
+                    : original.apply(client, args),
           {
             staleTime: immutable && !localLfsSnapshot(key, queryClient.getQueryData(key)) ? Infinity : (policy?.staleTime ?? 15_000),
             priority,
             force: force || (policy?.refreshOnRead && !immutable),
             scheduled: !branchPages,
+            automaticRefresh: policy?.automaticRefresh,
+            signal: ['getWorkingTreeStatus', 'getWorkingTreeSnapshot', 'getWorkingTreeStats', 'getGitLfsStatus'].includes(property)
+              ? readRequestSignal(args[property === 'getWorkingTreeStats' ? 2 : 1] as ReadRequest | undefined)
+              : undefined,
           },
         );
       }

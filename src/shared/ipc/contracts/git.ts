@@ -25,6 +25,7 @@ import type {
   RepositoryChangeSummaryDto,
   SecretScanResultDto,
   WorkingTreeSnapshotDto,
+  WorkingTreeStatusDto,
   WorkingTreeStatsDto,
 } from '../../../types/gitDtos';
 import type { GitCommandName } from '../gitCommands';
@@ -259,7 +260,8 @@ export interface ElectronGitAPI
   getCommitLogPage: (params: CommitLogPageRequestDto) => Promise<IpcResult<CommitLogPageDto>>;
   requestCommitStats: (hashes: string[], priority?: CommitStatsPriorityDto, repoPath?: string) => Promise<IpcResult<CommitStatsRequestResultDto>>;
   onCommitStats: (callback: (update: CommitStatsUpdateDto) => void) => () => void;
-  getWorkingTreeSnapshot: (repoPath?: string) => Promise<IpcResult<WorkingTreeSnapshotDto>>;
+  getWorkingTreeStatus: (repoPath?: string, readRequest?: ReadRequest) => Promise<IpcResult<WorkingTreeStatusDto>>;
+  getWorkingTreeSnapshot: (repoPath?: string, readRequest?: ReadRequest) => Promise<IpcResult<WorkingTreeSnapshotDto>>;
   getRepositoryChangeSummary: (repoPath: string, readRequest?: ReadRequest) => Promise<IpcResult<RepositoryChangeSummaryDto>>;
   getWorkingTreeStats: (snapshotId: string, repoPath?: string, readRequest?: ReadRequest) => Promise<IpcResult<WorkingTreeStatsDto>>;
   getSequencerState: (repoPath?: string) => Promise<IpcResult<GitSequencerStateDto>>;

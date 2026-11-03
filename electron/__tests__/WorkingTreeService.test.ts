@@ -18,7 +18,9 @@ describe('WorkingTreeService', () => {
   it('coalesces overlapping status polls and caches stats by snapshot', async () => {
     const status = deferred<string>();
     const getStatusPorcelainAtPath = vi.fn(() => status.promise);
-    const runPollingCommandAtPath = vi.fn(async (_repo: string, args: string[]) => (args.includes('--cached') ? '3\t1\ta.ts' : '2\t4\tb.ts'));
+    const runPollingCommandAtPath = vi.fn(async (_repo: string, args: string[]) =>
+      args[0] === 'ls-files' ? '100644 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 0\ta.ts\0' : args.includes('--cached') ? '3\t1\ta.ts' : '2\t4\tb.ts',
+    );
     const service = new WorkingTreeService({
       getRepoPath: () => 'C:/repo',
       getStatusPorcelainAtPath,
@@ -27,6 +29,7 @@ describe('WorkingTreeService', () => {
 
     const first = service.getSnapshot();
     const second = service.getSnapshot();
+    await Promise.resolve();
     expect(getStatusPorcelainAtPath).toHaveBeenCalledTimes(1);
     status.resolve('M  a.ts\n?? b.ts');
     const [firstSnapshot, secondSnapshot] = await Promise.all([first, second]);
@@ -257,6 +260,8 @@ describe('WorkingTreeService', () => {
     } as any);
 
     const oldARequest = service.getSnapshot();
+    const cancelled = expect(oldARequest).rejects.toMatchObject({ name: 'AbortError' });
+    await Promise.resolve();
     repoPath = 'C:/B';
     service.setActiveRepo();
     await service.getSnapshot();
@@ -264,11 +269,10 @@ describe('WorkingTreeService', () => {
     service.setActiveRepo();
     const currentARequest = service.getSnapshot();
     oldAStatus.resolve('M  stale-a.ts');
-    const [currentA, staleA] = await Promise.all([currentARequest, oldARequest]);
+    const currentA = await currentARequest;
+    await cancelled;
 
     expect(currentA.statusRaw).toContain('current-a.ts');
-    expect(staleA.statusRaw).toContain('current-a.ts');
-    expect(staleA.snapshotId).toBe(currentA.snapshotId);
     await expect(service.getStats(currentA.snapshotId)).resolves.toMatchObject({ snapshotId: currentA.snapshotId });
   });
 

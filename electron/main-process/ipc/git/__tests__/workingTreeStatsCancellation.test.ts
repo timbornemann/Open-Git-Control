@@ -8,6 +8,31 @@ const handlers = vi.hoisted(() => new Map<string, (...args: any[]) => Promise<an
 vi.mock('electron', () => ({ ipcMain: { handle: (name: string, handler: (...args: any[]) => Promise<any>) => handlers.set(name, handler) } }));
 
 describe('working tree line count request lifetime', () => {
+  it.each([IpcChannel.GitWorkingTreeStatus, IpcChannel.GitWorkingTreeSnapshot])('binds %s cancellation to the requesting renderer', async (channel) => {
+    const sender = Object.assign(new EventEmitter(), { id: 20, isDestroyed: () => false });
+    let signal!: AbortSignal;
+    const read = vi.fn(
+      (_repo: string, active: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          signal = active;
+          signal.addEventListener('abort', () => reject(new Error('Read cancelled.')), { once: true });
+        }),
+    );
+    registerReadCancellation();
+    const reset = registerGitHistoryHandlers({
+      gitService: { getRepoPath: () => 'C:/repo' },
+      commitStatsService: { onUpdate: vi.fn() },
+      workingTreeService: { getStatus: read, getSnapshot: read },
+    } as any);
+    const pending = handlers.get(channel)!({ sender }, 'C:/repo', { requestId: 'read', priority: 'speculative' });
+    await handlers.get(IpcChannel.AppCancelRead)!({ sender: { id: 21 } }, 'read');
+    expect(signal.aborted).toBe(false);
+    await handlers.get(IpcChannel.AppCancelRead)!({ sender }, 'read');
+    expect(await pending).toEqual({ success: false, error: 'Read cancelled.' });
+    expect(sender.listenerCount('destroyed')).toBe(0);
+    reset();
+  });
+
   it('only lets the requesting window cancel a count and releases cancellation state when it completes', async () => {
     const sender = Object.assign(new EventEmitter(), { id: 17, isDestroyed: () => false });
     let signal!: AbortSignal;

@@ -27,8 +27,9 @@ const statusFor = (...paths: string[]): { staged: FileEntry[]; unstaged: FileEnt
 });
 const response = (...files: GitLfsFileState[]) => ({ success: true as const, data: { available: true, files } });
 let status: ReturnType<typeof statusFor>;
+let revision: string | null | undefined;
 function Harness() {
-  current = useStagingLfs(repo, status, async () => true);
+  current = useStagingLfs(repo, status, async () => true, undefined, { revision });
   return null;
 }
 const render = () => act(async () => root.render(createElement(Harness)));
@@ -36,6 +37,7 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   repo = 'C:/incremental';
   status = statusFor('one', 'two');
+  revision = undefined;
   root = createRoot(document.createElement('div'));
   useSystemTools.setState({ status: null });
 });
@@ -46,6 +48,25 @@ afterEach(() => {
 });
 
 describe('incremental LFS renderer refreshes', () => {
+  it('retries a preempted preview without requiring a new status or marking LFS unavailable', async () => {
+    vi.useFakeTimers();
+    try {
+      const inspect = vi
+        .spyOn(gitClient, 'getGitLfsStatus')
+        .mockResolvedValueOnce({ success: false, error: 'Git operation was aborted.' })
+        .mockResolvedValue(response(file('one'), file('two')));
+      await render();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      expect(inspect).toHaveBeenCalledTimes(2);
+      expect(current.stateFor('one', 'staged')).toBeDefined();
+      expect(current.available).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('retains individual state identities and updates only changed results without skipping fresh validation', async () => {
     const inspect = vi.spyOn(gitClient, 'getGitLfsStatus').mockResolvedValue(response(file('one'), file('two')));
     await render();
@@ -63,7 +84,7 @@ describe('incremental LFS renderer refreshes', () => {
     expect(current.stateFor('two', 'staged')).toBe(second);
   });
 
-  it('coalesces rapid status changes behind one in-flight read and uses only the latest requested list', async () => {
+  it('waits for the latest confirmed snapshot and ignores the superseded in-flight preview', async () => {
     let finish!: (result: { success: true; data: GitLfsStatus }) => void;
     const pending = new Promise<{ success: true; data: GitLfsStatus }>((resolve) => {
       finish = resolve;
@@ -73,11 +94,14 @@ describe('incremental LFS renderer refreshes', () => {
       .mockReturnValueOnce(pending)
       .mockResolvedValue(response(file('latest')));
     await render();
+    revision = null;
     for (const name of ['intermediate', 'older', 'latest']) {
       status = statusFor(name);
       await render();
     }
     expect(inspect).toHaveBeenCalledTimes(1);
+    revision = 'latest-snapshot';
+    await render();
     await act(async () => finish(response(file('one'), file('two'))));
     expect(inspect).toHaveBeenCalledTimes(2);
     expect(inspect.mock.calls[1][0].files).toEqual([{ path: 'latest', source: 'staged' }]);

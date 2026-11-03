@@ -60,6 +60,11 @@ describe('working tree invalidation during cold file reads', () => {
     const client = cachedClient('git', { listWorkingDirectory: read });
     vi.spyOn(gitClient, 'listWorkingDirectory').mockImplementation(client.listWorkingDirectory);
     let snapshotId = 'before';
+    let quickRaw = '';
+    vi.spyOn(gitClient, 'getWorkingTreeStatus').mockImplementation(async () => ({
+      success: true,
+      data: { repoPath: repo, statusRaw: quickRaw, changeCount: quickRaw ? 1 : 0, checkedAt: Date.now() },
+    }));
     vi.spyOn(gitClient, 'getWorkingTreeSnapshot').mockImplementation(async () => ({
       success: true,
       data: { repoPath: repo, snapshotId, statusRaw: '', changeCount: 0, durationMs: 1, largeMode: false, isBare: false },
@@ -76,9 +81,10 @@ describe('working tree invalidation during cold file reads', () => {
     }
     try {
       await act(async () => root.render(strict ? createElement(StrictMode, null, createElement(Harness)) : createElement(Harness)));
-      expect(workingTree.snapshot?.snapshotId).toBe('before');
+      expect(workingTree.statusRaw).toBe('');
       expect(read).toHaveBeenCalledOnce();
       snapshotId = 'after';
+      quickRaw = ' M current.txt';
       await act(async () => workingTree.refresh());
       expect(read).toHaveBeenCalledTimes(2);
       expect(document.querySelector('.working-tree-row__label')?.textContent).toBe('current.txt');

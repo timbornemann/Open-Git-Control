@@ -400,8 +400,8 @@ describe('renderer service clients', () => {
     await expectDelegation(() => gitClient.getCommitLogPage({ limit: 10 } as any), api.git.getCommitLogPage, [{ limit: 10, readRequest: visibleReadRequest }]);
     await expectDelegation(() => gitClient.requestCommitStats(['a'] as any), api.git.requestCommitStats, [['a']]);
     await expectDelegation(() => gitClient.onCommitStats(vi.fn()), api.git.onCommitStats, [expect.any(Function)]);
-    await expectDelegation(() => gitClient.getWorkingTreeSnapshot(), api.git.getWorkingTreeSnapshot, []);
-    await expectDelegation(() => gitClient.getWorkingTreeStats(), api.git.getWorkingTreeStats, []);
+    await expectDelegation(() => gitClient.getWorkingTreeSnapshot(), api.git.getWorkingTreeSnapshot, [undefined, visibleReadRequest]);
+    await expectDelegation(() => gitClient.getWorkingTreeStats(), api.git.getWorkingTreeStats, [undefined, undefined, visibleReadRequest]);
     await expectDelegation(() => gitClient.listWorkingDirectory('C:/repo', 'src'), api.git.listWorkingDirectory, ['C:/repo', 'src']);
     await expectDelegation(() => gitClient.createWorkingDirectoryFile('src/new-file.ts', 'C:/repo'), api.git.createWorkingDirectoryFile, [
       'src/new-file.ts',

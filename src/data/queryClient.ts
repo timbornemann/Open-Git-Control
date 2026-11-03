@@ -87,6 +87,7 @@ export async function readResource<T>(
     force?: boolean;
     scheduled?: boolean;
     automaticRefresh?: boolean;
+    signal?: AbortSignal;
   } = {},
 ): Promise<T> {
   const state = queryClient.getQueryState<T>(key);
@@ -114,10 +115,12 @@ export async function readResource<T>(
         !(error instanceof ResourceReadError && (error.response.status === 401 || error.response.status === 403 || error.response.status === 429)),
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
       queryFn: ({ signal }) => {
+        const readSignal = options.signal ? AbortSignal.any([signal, options.signal]) : signal;
         const run = async () => {
           const started = performance.now();
           try {
-            return checked(await read(signal));
+            readSignal.throwIfAborted();
+            return checked(await read(readSignal));
           } catch (error) {
             if (error instanceof ResourceReadError && error.response.retryAt) backgroundQueue.deferGithub(error.response.retryAt);
             throw error;
@@ -126,7 +129,9 @@ export async function readResource<T>(
             cacheDiagnostics.durationMs += performance.now() - started;
           }
         };
-        return options.scheduled === false ? run() : backgroundQueue.schedule(run, options.priority ?? 'visible', key[1] === 'github', signal, hashKey(key));
+        return options.scheduled === false
+          ? run()
+          : backgroundQueue.schedule(run, options.priority ?? 'visible', key[1] === 'github', readSignal, hashKey(key));
       },
     });
   } catch (error) {

@@ -38,6 +38,37 @@ function fixture() {
 }
 
 describe('cancellable working tree counts', () => {
+  it('reads the immediate NUL status without starting snapshot fingerprints or line counts', async () => {
+    const f = fixture();
+    f.getStatus.mockResolvedValueOnce('MM line\nname.txt\0?? new.txt\0');
+    const result = await f.service.getStatus(f.repo);
+    expect(result).toMatchObject({ repoPath: f.repo, changeCount: 2, checkedAt: expect.any(Number) });
+    expect(result.statusRaw).toContain('new.txt');
+    expect(f.getStatus).toHaveBeenCalledTimes(1);
+    expect(f.run).not.toHaveBeenCalled();
+  });
+
+  it('lets a snapshot observer detach without aborting the other observer and stops when both detach', async () => {
+    const f = fixture();
+    const waiting = deferred();
+    f.getStatus.mockImplementation(() => waiting.promise);
+    const first = new AbortController(),
+      second = new AbortController();
+    const abandoned = expect(f.service.getSnapshot(f.repo, first.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    const remaining = expect(f.service.getSnapshot(f.repo, second.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    await Promise.resolve();
+    const underlying = (f.getStatus.mock.calls[0] as unknown as [string, AbortSignal])[1];
+    first.abort();
+    await abandoned;
+    expect(underlying.aborted).toBe(false);
+    second.abort();
+    await remaining;
+    expect(underlying.aborted).toBe(true);
+    waiting.resolve(' M file.txt\0');
+    f.getStatus.mockResolvedValue(' M file.txt\0');
+    await expect(f.service.getSnapshot(f.repo)).resolves.toMatchObject({ changeCount: 1 });
+  });
+
   it('cancels both background diffs when their last consumer leaves and can immediately retry the same snapshot', async () => {
     const f = fixture();
     const snapshot = await f.service.getSnapshot();

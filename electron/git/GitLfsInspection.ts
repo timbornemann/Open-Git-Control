@@ -11,7 +11,7 @@ import { lfsContentRecommendation } from './GitLfsRules';
 import { readLfsWorkingContent, summarizeLfsContent, type LfsContent } from './GitLfsContent';
 import type { GitLfsInspectionCache } from './GitLfsInspectionCache';
 
-export type LfsReader = Pick<CommitEditGit, 'run' | 'input'> & { prefix: NonNullable<CommitEditGit['prefix']> };
+export type LfsReader = Pick<CommitEditGit, 'run' | 'input' | 'signal'> & { prefix: NonNullable<CommitEditGit['prefix']> };
 export type LfsInspection = { state: GitLfsFileState; contentVersion: string; oid?: string; mode: string; flags?: string; diskPath?: string };
 type IndexRecord = { flags: string; mode: string; oid: string; stage: string };
 const EMPTY_CONTENT = summarizeLfsContent(0, Buffer.alloc(0));
@@ -57,6 +57,7 @@ function attributePaths(filePath: string): string[] {
 }
 
 export async function inspectLfsFiles(repoPath: string, input: GitLfsFileRequest[], git: LfsReader, preview?: GitLfsInspectionCache): Promise<LfsInspection[]> {
+  git.signal?.throwIfAborted();
   const files = input.map(validateLfsFile);
   const unique = [...new Set(files.map((file) => file.path))];
   const [working, cached, entries, head, branch, config] = await Promise.all([
@@ -114,6 +115,7 @@ export async function inspectLfsFiles(repoPath: string, input: GitLfsFileRequest
   const result: LfsInspection[] = [];
   const contentContext = { stagedSamples, resolver, config, preview };
   for (const [index, file] of files.entries()) {
+    git.signal?.throwIfAborted();
     // Cached attribute reads resolve as microtasks. Yield during staged-only
     // batches too, so they cannot monopolize the event loop with hashing.
     if (index > 0 && index % 64 === 0) await setImmediate();

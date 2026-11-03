@@ -5,6 +5,7 @@ const workingTree = new Set([
   'getGitLfsStatus',
   'getRepositoryChangeSummary',
   'getWorkingTreeSnapshot',
+  'getWorkingTreeStatus',
   'getWorkingTreeStats',
   'getSequencerState',
   'getDiffPreview',

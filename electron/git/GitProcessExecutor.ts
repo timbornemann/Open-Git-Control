@@ -29,10 +29,11 @@ export class GitProcessExecutor {
     }
   }
 
-  async run(repoPath: string, args: string[], execOptions: GitExecFileOptions): Promise<string> {
+  async run(repoPath: string, args: string[], execOptions: GitExecFileOptions, beforeAttempt?: () => void): Promise<string> {
     let retryAttempt = 0;
 
     while (true) {
+      beforeAttempt?.();
       try {
         // A windowed Electron parent has no console to inherit. Keep polling,
         // interactive reads and retries from briefly opening a native console.

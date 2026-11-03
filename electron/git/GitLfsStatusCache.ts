@@ -14,14 +14,25 @@ type Repository = {
 /** Bounded per-worktree previews. Serialize refreshes so consecutive IPC batches share their work. */
 export class GitLfsStatusCache {
   private readonly repositories = new Map<string, Repository>();
-  read<T>(repoPath: string, probe: () => Promise<unknown>, inspect: (cache: GitLfsInspectionCache, availability: Availability) => Promise<T>): Promise<T> {
+  read<T>(
+    repoPath: string,
+    probe: () => Promise<unknown>,
+    inspect: (cache: GitLfsInspectionCache, availability: Availability) => Promise<T>,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    signal?.throwIfAborted();
     const resolved = path.resolve(repoPath);
     const key = process.platform === 'win32' ? resolved.toLowerCase() : resolved;
     const repo = this.repositories.get(key) ?? { cache: new GitLfsInspectionCache(), pending: Promise.resolve(), users: 0 };
     this.repositories.delete(key);
     this.repositories.set(key, repo);
     repo.users++;
-    const work = repo.pending.then(async () => inspect(repo.cache, await this.availability(repo, probe)));
+    const work = repo.pending.then(async () => {
+      signal?.throwIfAborted();
+      const availability = await this.availability(repo, probe);
+      signal?.throwIfAborted();
+      return inspect(repo.cache, availability);
+    });
     repo.pending = work
       .then(
         () => undefined,

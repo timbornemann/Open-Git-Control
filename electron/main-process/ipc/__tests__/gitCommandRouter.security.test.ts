@@ -38,6 +38,7 @@ async function fixture() {
   write('tracked.txt', 'original\n');
   await run(['add', '.']);
   await run(['commit', '-m', 'initial']);
+  await service.setRepoPathAsync(repo);
   const command = (name: GitCommandName, ...args: string[]) => handleGitCommand({ sender: { send: vi.fn() } }, service, name, args, repo);
   const link = (target = outside) => fs.symlinkSync(target, path.join(repo, 'redirected'), process.platform === 'win32' ? 'junction' : 'dir');
   return { root, repo, outside, service, run, write, command, link };

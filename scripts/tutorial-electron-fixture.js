@@ -72,7 +72,24 @@ async function waitFor(contents, expression, label = expression) {
       return;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
-  throw new Error('Timed out: ' + label + '\n' + (await contents.executeJavaScript('document.body.innerText.slice(-5000)')) + '\n' + errors.join('\n'));
+  const targetDiagnostics = await contents.executeJavaScript(`JSON.stringify({
+    visibility: document.visibilityState,
+    target: document.querySelector('[data-tutorial="nav-localRepos"]')?.getBoundingClientRect().toJSON(),
+    workspace: document.querySelector('.tutorial-workspace')?.getBoundingClientRect().toJSON(),
+    spotlight: document.querySelector('.tutorial-spotlight')?.outerHTML,
+    surfaces: [...document.querySelectorAll('.tutorial-workspace [role="dialog"], .tutorial-workspace [role="menu"], .tutorial-workspace .topbar-dropdown, .tutorial-workspace .commit-search-toolbar__more-menu')]
+      .map(element => ({ classes: element.className, rect: element.getBoundingClientRect().toJSON(), display: getComputedStyle(element).display }))
+  })`);
+  throw new Error(
+    'Timed out: ' +
+      label +
+      '\n' +
+      targetDiagnostics +
+      '\n' +
+      (await contents.executeJavaScript('document.body.innerText.slice(-5000)')) +
+      '\n' +
+      errors.join('\n'),
+  );
 }
 async function click(selector) {
   await waitFor(tutorial, 'document.querySelector(' + JSON.stringify(selector) + ')');

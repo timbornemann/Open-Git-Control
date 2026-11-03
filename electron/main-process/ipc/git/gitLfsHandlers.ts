@@ -8,15 +8,20 @@ import { requireActiveRepositoryPath } from '../../activeRepositoryAuthorization
 import { repoJobRegistry } from '../../repoJobRegistry';
 import { emitJobEvent } from '../jobEvents';
 import { redactGitSensitiveText } from '../../../git/GitErrorFormatter';
+import { beginReadRequest } from '../../readRequests';
+import type { ReadRequest } from '../../../../src/shared/cache/resource';
 
 export function registerGitLfsHandlers(gitService: GitService, ensureWriteAllowed: (repoPath: string) => void): void {
   const service = new GitLfsService(gitService.runner);
-  ipcMain.handle(IpcChannel.GitGetLfsStatus, async (_event, input: GitLfsStatusRequest) => {
+  ipcMain.handle(IpcChannel.GitGetLfsStatus, async (event, input: GitLfsStatusRequest, readRequest?: ReadRequest) => {
+    const request = beginReadRequest(event, readRequest);
     try {
       const repoPath = requireActiveRepositoryPath(input?.repoPath, gitService.getRepoPath(), IpcChannel.GitGetLfsStatus);
-      return { success: true, data: await service.getStatus({ ...input, repoPath }) };
+      return { success: true, data: await service.getStatus({ ...input, repoPath }, request.signal) };
     } catch (error) {
       return { success: false, error: redactGitSensitiveText(String(error instanceof Error ? error.message : error)) };
+    } finally {
+      request.finish();
     }
   });
   ipcMain.handle(IpcChannel.GitTrackWithLfs, async (event, input: TrackWithGitLfsRequest) => {

@@ -1,6 +1,6 @@
 import type { ResourceDomain } from '@/shared/cache/resource';
 
-export type ReadPolicy = { staleTime: number; repoArgument?: number; repoProperty?: boolean; refreshOnRead?: boolean };
+export type ReadPolicy = { staleTime: number; repoArgument?: number; repoProperty?: boolean; refreshOnRead?: boolean; automaticRefresh?: boolean };
 const read = (staleTime: number, repoArgument?: number): ReadPolicy => ({ staleTime, repoArgument });
 export const readPolicies: Record<ResourceDomain, Record<string, ReadPolicy>> = {
   app: {
@@ -23,10 +23,11 @@ export const readPolicies: Record<ResourceDomain, Record<string, ReadPolicy>> = 
     getReleaseContext: read(300_000),
   },
   git: {
-    getGitLfsStatus: { staleTime: 2000, repoProperty: true },
+    getGitLfsStatus: { staleTime: 2000, repoProperty: true, automaticRefresh: false },
     getCommitLogPage: { staleTime: 30_000, repoProperty: true },
-    getWorkingTreeSnapshot: read(4000, 0),
-    getWorkingTreeStats: read(4000, 1),
+    getWorkingTreeStatus: { ...read(0, 0), automaticRefresh: false },
+    getWorkingTreeSnapshot: { ...read(4000, 0), automaticRefresh: false },
+    getWorkingTreeStats: { ...read(4000, 1), automaticRefresh: false },
     getSequencerState: read(4000, 0),
     getRepoOriginUrl: read(300_000, 0),
     listWorkingDirectory: read(30_000, 0),

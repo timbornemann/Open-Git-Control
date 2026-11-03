@@ -157,10 +157,16 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       return () => ipcRenderer.removeListener(IpcChannel.GitCommitStats, handler);
     },
     ...createWorkingTreeWatchApi(ipcRenderer),
-    getWorkingTreeSnapshot: (repoPath?: string) =>
+    getWorkingTreeStatus: (repoPath?: string, readRequest?: ReadRequest) =>
       repoPath
-        ? invokeGitOperationForRepo(repoPath, 'status', IpcChannel.GitWorkingTreeSnapshot, repoPath)
-        : invokeGitOperation('status', IpcChannel.GitWorkingTreeSnapshot),
+        ? invokeGitOperationForRepo(repoPath, 'status', IpcChannel.GitWorkingTreeStatus, repoPath, readRequest)
+        : invokeGitOperation('status', IpcChannel.GitWorkingTreeStatus, repoPath, readRequest),
+    getWorkingTreeSnapshot: (repoPath?: string, readRequest?: ReadRequest) =>
+      readRequest
+        ? ipcRenderer.invoke(IpcChannel.GitWorkingTreeSnapshot, repoPath, readRequest)
+        : repoPath
+          ? invokeGitOperationForRepo(repoPath, 'status', IpcChannel.GitWorkingTreeSnapshot, repoPath)
+          : invokeGitOperation('status', IpcChannel.GitWorkingTreeSnapshot),
     getWorkingTreeStats: (snapshotId: string, repoPath?: string, readRequest?: ReadRequest) =>
       readRequest
         ? repoPath
@@ -389,6 +395,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       requestCommitStats: flatApi.requestCommitStats,
       onCommitStats: flatApi.onCommitStats,
       getWorkingTreeSnapshot: flatApi.getWorkingTreeSnapshot,
+      getWorkingTreeStatus: flatApi.getWorkingTreeStatus,
       getRepositoryChangeSummary: flatApi.getRepositoryChangeSummary,
       getWorkingTreeStats: flatApi.getWorkingTreeStats,
       watchWorkingTree: flatApi.watchWorkingTree,

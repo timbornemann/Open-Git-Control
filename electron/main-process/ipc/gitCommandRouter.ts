@@ -13,6 +13,7 @@ import { explicitPushArguments, prepareForcePushArguments } from '../../git/GitP
 import { gitConfigurationEnvironment } from '../../git/remoteTransferValidation';
 import { assertLocalBranchDeletionAllowed, readProtectedLocalBranches } from '../../git/LocalBranchProtection';
 import { PRIMARY_BRANCH_NAMES } from '../../../src/shared/git/branchProtection';
+import { ensureCommitProtectionIsIdle } from '../RepositoryCommitProtection';
 
 type GitCommandRouterEvent = {
   sender: any;
@@ -59,6 +60,13 @@ const executeStreamingCommand: GitCommandExecutor = async ({ gitService, event, 
 const STRUCTURED_LOG_FORMAT = '%H%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%P%x1f%(decorate:prefix=,suffix=,separator=%x1d)%x00';
 
 const runInContext = async (context: GitCommandExecutionContext, args: string[]): Promise<string> => {
+  if (args[0] === 'add') {
+    const repo = context.repoPath || context.gitService.requireActiveRepoPath();
+    return context.gitService.staging.stageCommandAtPath(repo, args, () => {
+      requireActiveRepositoryPath(repo, context.gitService.getRepoPath(), 'git:add');
+      ensureCommitProtectionIsIdle(repo);
+    });
+  }
   const read = (query: string[]) => (context.repoPath ? context.gitService.runCommandAtPath(context.repoPath, query) : context.gitService.runCommand(query));
   await assertGitWorkingTreePaths(context.repoPath || context.gitService.requireActiveRepoPath(), args, read);
   return read(protectGitReadArgs(args));

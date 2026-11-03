@@ -3,6 +3,7 @@ import { GitScheduler } from './GitScheduler';
 import { shouldSuppressBareWorkTreeCommand } from './git/BareRepositoryPolicy';
 import { CloneService, type CloneRepositoryResult } from './git/CloneService';
 import { CommitService, type CommitMessageInput } from './git/CommitService';
+import { StagingService } from './git/StagingService';
 import { isMissingOriginGitError } from './git/GitErrorFormatter';
 import { GitRunner, defaultExecFileAsyncRunner, type DiffPreviewResult, type ExecFileAsyncRunner } from './git/GitRunner';
 import { HistoryService, type CommitStats, type FileTimelineCommit, type HistoryReadKind } from './git/HistoryService';
@@ -24,6 +25,15 @@ const statusPorcelainArgs = (): string[] => ['-c', 'core.quotepath=false', 'stat
 const statusPorcelainZArgs = (): string[] => [...statusPorcelainArgs(), '-z'];
 
 export class GitService {
+  private workingTreeDiagnostics: { repoPath: string; phase: 'status' | 'snapshot'; durationMs: number; timestamp: number }[] = [];
+  recordWorkingTreeRead(repoPath: string, phase: 'status' | 'snapshot', durationMs: number) {
+    this.workingTreeDiagnostics.push({ repoPath, phase, durationMs, timestamp: Date.now() });
+    if (this.workingTreeDiagnostics.length > 100) this.workingTreeDiagnostics.shift();
+  }
+  getWorkingTreeReadDiagnostics() {
+    return [...this.workingTreeDiagnostics];
+  }
+  readonly staging: StagingService;
   private repoPath: string | null = null;
   private repoSelectionGeneration = 0;
   private readonly bareState = new RepositoryBareState((repoPath) => this.gitRunner.detectIsBareRepositorySync(repoPath));
@@ -40,6 +50,7 @@ export class GitService {
 
   constructor(execFileAsyncRunner: ExecFileAsyncRunner = defaultExecFileAsyncRunner, scheduler: GitScheduler = new GitScheduler()) {
     this.gitRunner = new GitRunner(execFileAsyncRunner, scheduler);
+    this.staging = new StagingService(this.gitRunner);
     this.commitService = new CommitService((repoPath, args, envOverrides) => this.gitRunner.run(repoPath, args, { envOverrides }));
     this.historyService = new HistoryService(
       (args) => this.runCommand(args),

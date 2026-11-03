@@ -13,6 +13,7 @@ import { createPrivateTempDir, cleanupPrivateTempDir } from './PrivateTempFiles'
 import { resolveRepositoryPathForCreateWithoutSymlinks } from './RepositoryPathSafety';
 import { inspectLfsTrackingTargets } from './GitLfsTracking';
 import { GitLfsStatusCache } from './GitLfsStatusCache';
+import { SharedWorkingTreeRead } from '../WorkingTreeStatsRead';
 
 function readAttributes(target: string): Buffer | null {
   try {
@@ -44,24 +45,41 @@ function replaceAttributes(target: string, data: Buffer, mode: number): void {
 export class GitLfsService {
   private readonly previews = new GitLfsStatusCache();
   constructor(private readonly runner: GitRunner) {}
-  private reader(): LfsReader {
+  private reader(signal?: AbortSignal): LfsReader {
     return {
-      run: (cwd, args, options) => this.runner.run(cwd, args, options),
-      input: (cwd, args, input, _ignoreAbort, envOverrides) => this.runner.runWithInput(cwd, args, input, { envOverrides }),
+      signal,
+      run: (cwd, args, options) => this.runner.run(cwd, args, { ...options, signal, requestedKind: 'background' }),
+      input: (cwd, args, input, _ignoreAbort, envOverrides) =>
+        this.runner.runWithInput(cwd, args, input, { envOverrides, signal, requestedKind: 'background' }),
       prefix: (cwd, args, maxBytes, input) =>
-        this.runner.runBuffer(cwd, args, { maxBytes, input, allowTruncation: true, tooLargeMessage: 'Git sample is too large.' }),
+        this.runner.runBuffer(cwd, args, {
+          maxBytes,
+          input,
+          signal,
+          requestedKind: 'background',
+          allowTruncation: true,
+          tooLargeMessage: 'Git sample is too large.',
+        }),
     };
   }
-  async getStatus(request: GitLfsStatusRequest): Promise<GitLfsStatus> {
+  async getStatus(request: GitLfsStatusRequest, signal?: AbortSignal): Promise<GitLfsStatus> {
+    signal?.throwIfAborted();
     if (!request || !Array.isArray(request.files) || request.files.length > 10000) throw new Error('Invalid Git LFS status request.');
-    return this.previews.read(
+    const controller = new AbortController();
+    const work = this.previews.read(
       request.repoPath,
-      () => this.runner.run(request.repoPath, ['lfs', 'version']),
+      () => this.runner.run(request.repoPath, ['lfs', 'version'], { signal: controller.signal, requestedKind: 'background' }),
       async (cache, availability) => {
-        const files = request.files.length ? await inspectLfsFiles(request.repoPath, request.files, this.reader(), cache) : [];
+        const files = request.files.length ? await inspectLfsFiles(request.repoPath, request.files, this.reader(controller.signal), cache) : [];
         return { ...availability, files: files.map((file) => file.state) };
       },
+      controller.signal,
     );
+    try {
+      return await new SharedWorkingTreeRead(work, controller).observe(signal);
+    } finally {
+      controller.abort();
+    }
   }
   private async initialize(repoPath: string, git: CommitEditGit): Promise<void> {
     await git.run(repoPath, ['lfs', 'version']);

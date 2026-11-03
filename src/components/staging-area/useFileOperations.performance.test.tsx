@@ -43,6 +43,10 @@ it.each([
     };
   });
   const raw = () => paths.map((path) => `${staged.has(path) ? 'M ' : ' M'} ${path}`).join('\n');
+  vi.spyOn(gitClient, 'getWorkingTreeStatus').mockImplementation(async () => ({
+    success: true,
+    data: { repoPath: repo, statusRaw: raw(), changeCount: 400, checkedAt: Date.now() },
+  }));
   const commands = vi.spyOn(gitClient, 'runGitCommandForRepo').mockImplementation(async (_repo, command) => {
     if (command === 'add') staged = new Set(paths);
     return { success: true, data: raw() };
@@ -119,6 +123,10 @@ it.each([
 });
 
 it('retains conflict safeguards from quick status while the full snapshot is still loading', async () => {
+  vi.spyOn(gitClient, 'getWorkingTreeStatus').mockResolvedValue({
+    success: true,
+    data: { repoPath: 'C:/repo', statusRaw: 'UU merge.txt', changeCount: 1, checkedAt: Date.now() },
+  });
   vi.spyOn(gitClient, 'getWorkingTreeSnapshot').mockReturnValue(new Promise(() => {}));
   vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: 'UU merge.txt' });
   let current!: ReturnType<typeof useFileOperations>;
@@ -133,6 +141,46 @@ it('retains conflict safeguards from quick status while the full snapshot is sti
     expect(current.status?.conflicts.map((file) => file.path)).toEqual(['merge.txt']);
     expect(current.status?.staged).toEqual([]);
     expect(current.status?.unstaged).toEqual([]);
+  } finally {
+    act(() => root.unmount());
+  }
+});
+
+it.each([true, false])('reconciles partial failures and keeps the Git outcome separate from a status error (Git success: %s)', async (succeeded) => {
+  const repo = 'C:/repo';
+  vi.spyOn(gitClient, 'stagePaths').mockResolvedValue(succeeded ? { success: true, data: '' } : { success: false, error: 'Index operation failed.' });
+  const externalRefresh = vi.fn().mockRejectedValue(new Error('Status unavailable.'));
+  const setToast = vi.fn();
+  let current!: ReturnType<typeof useFileOperations>;
+  const params = {
+    repoPath: repo,
+    externalRepoPath: repo,
+    externalRefresh,
+    externalStatusRaw: ' M file.txt',
+    externalStatus: { staged: [], unstaged: [{ path: 'file.txt', x: ' ', y: 'M' }], untracked: [] },
+    setToast,
+    setConfirmDialog: vi.fn(),
+    setInputDialog: vi.fn(),
+  };
+  const Harness = () => {
+    current = useFileOperations(params);
+    return null;
+  };
+  const root = createRoot(document.createElement('div'));
+  try {
+    await act(async () => root.render(<Harness />));
+    await act(async () => {
+      expect(await current.stageFile('file.txt')).toBe(succeeded);
+    });
+    expect(externalRefresh).toHaveBeenCalledOnce();
+    expect(current.isMutating).toBe(false);
+    expect(setToast).toHaveBeenLastCalledWith({ isError: true, msg: succeeded ? expect.stringMatching(/Dateistatus|file status/) : 'Index operation failed.' });
+    // Existing commit/unstage workflows await refresh after their own confirmed
+    // write. A status outage must not make those workflows retry the write.
+    await act(async () => {
+      await expect(current.refresh()).resolves.toBeUndefined();
+    });
+    expect(externalRefresh).toHaveBeenCalledTimes(2);
   } finally {
     act(() => root.unmount());
   }

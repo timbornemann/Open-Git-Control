@@ -37,14 +37,16 @@ afterEach(() => {
 
 describe('active repository activity publication', () => {
   it('reuses snapshot counts, retains them on failure, and clears the error on recovery', async () => {
-    vi.spyOn(gitClient, 'getWorkingTreeSnapshot')
-      .mockResolvedValueOnce(snapshot(4))
+    vi.spyOn(gitClient, 'getWorkingTreeStatus')
+      .mockResolvedValueOnce({ success: true, data: { ...snapshot(4).data, checkedAt: Date.now() } })
       .mockResolvedValueOnce({ success: false, error: 'unavailable' })
-      .mockResolvedValue(snapshot(0));
+      .mockResolvedValue({ success: true, data: { ...snapshot(0).data, checkedAt: Date.now() } });
     const extraRead = vi.spyOn(gitClient, 'getRepositoryChangeSummary');
     await act(async () => root.render(createElement(Harness)));
     expect(queryClient.getQueryData(repositoryActivityKey(repo))).toMatchObject({ data: { changeCount: 4 } });
-    await act(async () => current.refresh());
+    await act(async () => {
+      await expect(current.refresh()).rejects.toThrow('unavailable');
+    });
     expect(queryClient.getQueryState(repositoryActivityKey(repo))?.status).toBe('error');
     expect(queryClient.getQueryData(repositoryActivityKey(repo))).toMatchObject({ data: { changeCount: 4 } });
     await act(async () => current.refresh());
@@ -55,6 +57,10 @@ describe('active repository activity publication', () => {
 
   it('publishes a deduplicated fallback count when the full snapshot rejects', async () => {
     vi.spyOn(gitClient, 'getWorkingTreeSnapshot').mockRejectedValue(new Error('snapshot failed'));
+    vi.spyOn(gitClient, 'getWorkingTreeStatus').mockResolvedValue({
+      success: true,
+      data: { repoPath: repo, statusRaw: 'MM shared.ts\n?? new.ts', changeCount: 2, checkedAt: Date.now() },
+    });
     vi.mocked(gitClient.runGitCommandForRepo).mockResolvedValue({ success: true, data: 'MM shared.ts\n?? new.ts' });
     await act(async () => root.render(createElement(Harness)));
     expect(queryClient.getQueryData(repositoryActivityKey(repo))).toMatchObject({ data: { changeCount: 2 } });
@@ -62,7 +68,7 @@ describe('active repository activity publication', () => {
 
   it('does not publish late snapshots after unmount', async () => {
     let resolve!: (value: ReturnType<typeof snapshot>) => void;
-    vi.spyOn(gitClient, 'getWorkingTreeSnapshot').mockReturnValue(
+    vi.spyOn(gitClient, 'getWorkingTreeStatus').mockReturnValue(
       new Promise((done) => {
         resolve = done;
       }),

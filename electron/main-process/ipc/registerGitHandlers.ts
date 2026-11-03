@@ -14,6 +14,7 @@ import { registerUntrackFilesHandlers } from './git/registerUntrackFilesHandlers
 import { repoJobRegistry as defaultRepoJobRegistry } from '../repoJobRegistry';
 import type { RepoJobRegistry } from '../repoJobRegistry';
 import { handleGitCommand } from './gitCommandRouter';
+import { registerGitStagingHandler } from './git/registerGitStagingHandler';
 import { registerGitFileHandlers } from './git/registerGitFileHandlers';
 import { registerGitHistoryHandlers } from './git/registerGitHistoryHandlers';
 import { registerGitOperationStateHandler } from './git/registerGitOperationStateHandler';
@@ -214,39 +215,7 @@ export function registerGitHandlers({
     return secretScanCommitGuard.approveSecretScanCommit(event, requestedRepoPath);
   });
 
-  ipcMain.handle(IpcChannel.GitStagePaths, async (event: any, paths: unknown, requestedRepoPath?: unknown) => {
-    const jobId = createJobId('git-stage-paths');
-    emitJobEvent(event.sender, {
-      id: jobId,
-      operation: 'git:add',
-      status: 'start',
-      timestamp: Date.now(),
-    });
-    try {
-      const normalizedPaths = Array.isArray(paths) ? paths.map((filePath) => String(filePath || '')).slice(0, 100_000) : [];
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitStagePaths);
-      ensureCommitProtectionIsIdle(repoPath);
-      commitStatsService.interruptBackgroundWork();
-      const data = await gitService.commits.stagePathsAtPath(repoPath, normalizedPaths);
-      emitJobEvent(event.sender, {
-        id: jobId,
-        operation: 'git:add',
-        status: 'done',
-        details: { pathCount: normalizedPaths.length },
-        timestamp: Date.now(),
-      });
-      return { success: true, data };
-    } catch (error: any) {
-      emitJobEvent(event.sender, {
-        id: jobId,
-        operation: 'git:add',
-        status: 'failed',
-        message: error.message,
-        timestamp: Date.now(),
-      });
-      return { success: false, error: error.message };
-    }
-  });
+  registerGitStagingHandler(gitService, commitStatsService);
 
   registerGitDiffPreviewHandler({ gitService, commitStatsService });
 

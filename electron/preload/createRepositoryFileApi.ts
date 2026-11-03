@@ -6,7 +6,10 @@ export function createRepositoryFileApi(
   invoke: Invoke,
 ): Pick<ElectronGitAPI, 'getRepositoryFilePreview' | 'getRepositoryFileInfo' | 'saveRepositoryFile' | 'getGitLfsStatus' | 'trackWithGitLfs'> {
   return {
-    getGitLfsStatus: (request) => invoke(request.repoPath, 'LFS status', IpcChannel.GitGetLfsStatus, request) as ReturnType<ElectronGitAPI['getGitLfsStatus']>,
+    getGitLfsStatus: (request, readRequest) =>
+      (readRequest
+        ? invoke(request.repoPath, 'LFS status', IpcChannel.GitGetLfsStatus, request, readRequest)
+        : invoke(request.repoPath, 'LFS status', IpcChannel.GitGetLfsStatus, request)) as ReturnType<ElectronGitAPI['getGitLfsStatus']>,
     trackWithGitLfs: (request) => invoke(request.repoPath, 'LFS track', IpcChannel.GitTrackWithLfs, request) as ReturnType<ElectronGitAPI['trackWithGitLfs']>,
     getRepositoryFilePreview: (request) =>
       invoke(request.repoPath, 'preview file', IpcChannel.GitGetRepositoryFilePreview, request) as ReturnType<ElectronGitAPI['getRepositoryFilePreview']>,

@@ -98,6 +98,7 @@ export const enum IpcChannel {
   GitStashes = 'git:stashes',
   GitStashBranch = 'git:stashBranch',
   GitWorkingTreeSnapshot = 'git:workingTreeSnapshot',
+  GitWorkingTreeStatus = 'git:workingTreeStatus',
   GitRepositoryChangeSummary = 'git:repositoryChangeSummary',
   GitWorkingTreeStats = 'git:workingTreeStats',
   GitWorkingTreeWatch = 'git:workingTreeWatch',

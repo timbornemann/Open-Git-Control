@@ -122,12 +122,34 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
     },
   );
 
-  ipcMain.handle(IpcChannel.GitWorkingTreeSnapshot, async (_event: unknown, requestedRepoPath?: unknown) => {
+  ipcMain.handle(IpcChannel.GitWorkingTreeStatus, async (event: IpcMainInvokeEvent, requestedRepoPath?: unknown, readRequest?: ReadRequest) => {
+    const request = beginReadRequest(event, readRequest);
     try {
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitWorkingTreeSnapshot);
-      return { success: true, data: await workingTreeService.getSnapshot(repoPath) };
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitWorkingTreeStatus);
+      return {
+        success: true,
+        data: await workingTreeService.getStatus(
+          repoPath,
+          request.signal,
+          readRequest?.priority && readRequest.priority !== 'visible' ? 'background' : 'interactive',
+        ),
+      };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      request.finish();
+    }
+  });
+
+  ipcMain.handle(IpcChannel.GitWorkingTreeSnapshot, async (event: IpcMainInvokeEvent, requestedRepoPath?: unknown, readRequest?: ReadRequest) => {
+    const request = beginReadRequest(event, readRequest);
+    try {
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitWorkingTreeSnapshot);
+      return { success: true, data: await workingTreeService.getSnapshot(repoPath, request.signal) };
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      request.finish();
     }
   });
 

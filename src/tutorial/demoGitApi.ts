@@ -32,6 +32,8 @@ export function createDemoGitApi(repo: DemoRepository): Partial<ElectronGitAPI> 
       }),
     requestCommitStats: async (hashes) =>
       ok(Object.fromEntries(hashes.map((hash) => [hash, { state: 'ready' as const, stats: { files: 1, additions: 3, deletions: 1 } }]))),
+    getWorkingTreeStatus: async () =>
+      ok({ repoPath: repo.activeRepo, statusRaw: repo.status(), changeCount: new Set([...repo.modified, ...repo.staged]).size, checkedAt: DEMO_TIME }),
     getWorkingTreeSnapshot: async () =>
       ok({
         snapshotId: `demo-${repo.revision}`,

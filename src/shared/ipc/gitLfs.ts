@@ -1,4 +1,5 @@
 import type { IpcResult } from '../../types/ipc';
+import type { ReadRequest } from '../cache/resource';
 
 export type GitLfsSource = 'staged' | 'unstaged';
 export type GitLfsFileRequest = { path: string; source: GitLfsSource };
@@ -25,7 +26,7 @@ export type TrackWithGitLfsRequest = GitLfsFileRequest & {
 };
 export type TrackWithGitLfsResult = { path: string; attributesPath: string; oid?: string; bytes: number; stagedFiles: number };
 export type GitLfsApi = {
-  getGitLfsStatus: (request: GitLfsStatusRequest) => Promise<IpcResult<GitLfsStatus>>;
+  getGitLfsStatus: (request: GitLfsStatusRequest, readRequest?: ReadRequest) => Promise<IpcResult<GitLfsStatus>>;
   trackWithGitLfs: (request: TrackWithGitLfsRequest) => Promise<IpcResult<TrackWithGitLfsResult>>;
 };
 export type GitLfsPointer = { oid: string; size: number };

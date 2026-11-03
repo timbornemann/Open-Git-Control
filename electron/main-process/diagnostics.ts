@@ -85,9 +85,20 @@ export function buildDiagnosticsReportFactory(deps: BuildDiagnosticsReportDepend
     lines.push(`entries=${gitDiagnostics.length}`);
     for (const entry of gitDiagnostics) {
       lines.push(
-        `${new Date(entry.timestamp).toISOString()} repoPath=${JSON.stringify(entry.repoPath)} kind=${entry.kind} command=${entry.command} durationMs=${entry.durationMs} resultBytes=${entry.resultBytes} aborted=${entry.aborted}`,
+        `${new Date(entry.timestamp).toISOString()} repoPath=${JSON.stringify(entry.repoPath)} kind=${entry.kind} command=${entry.command} durationMs=${entry.durationMs} queueWaitMs=${entry.queueWaitMs ?? 0} resultBytes=${entry.resultBytes} aborted=${entry.aborted}`,
       );
     }
+
+    lines.push('', '[Staging]');
+    for (const entry of (gitService.staging?.getDiagnostics() || [])
+      .filter((entry) => activeRepoKey && repositoryPathKey(entry.repoPath) === activeRepoKey)
+      .slice(-20))
+      lines.push(JSON.stringify(entry));
+    lines.push('', '[Working Tree Reads]');
+    for (const entry of (gitService.getWorkingTreeReadDiagnostics?.() || [])
+      .filter((entry) => activeRepoKey && repositoryPathKey(entry.repoPath) === activeRepoKey)
+      .slice(-20))
+      lines.push(JSON.stringify(entry));
 
     const statsDiagnostics = getCommitStatsDiagnostics?.().slice(-20) || [];
     lines.push('');

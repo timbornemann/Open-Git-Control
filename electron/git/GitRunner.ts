@@ -218,7 +218,13 @@ export class GitRunner {
   }
 
   /** Keep inspection, isolated rewriting and ref publication in one write lane. */
-  withExclusiveWrite<T>(repoPath: string, command: string, work: (git: CommitEditGit) => Promise<T>, signal?: AbortSignal): Promise<T> {
+  withExclusiveWrite<T>(
+    repoPath: string,
+    command: string,
+    work: (git: CommitEditGit) => Promise<T>,
+    signal?: AbortSignal,
+    { standardCommands = false, beforeCommand }: { standardCommands?: boolean; beforeCommand?: () => void } = {},
+  ): Promise<T> {
     return this.schedule(
       repoPath,
       'write',
@@ -232,7 +238,21 @@ export class GitRunner {
           run: (cwd, args, options = {}) => {
             const commandSignal = options.ignoreAbort ? undefined : (options.signal ?? activeSignal);
             commandSignal?.throwIfAborted();
-            return runCommitEditProcess(cwd, args, commandSignal, options.envOverrides);
+            // Ordinary staging keeps the normal executor's lock recovery,
+            // environment and error handling while owning this write lane.
+            return standardCommands
+              ? this.processExecutor.run(
+                  cwd,
+                  args,
+                  {
+                    cwd,
+                    maxBuffer: 8 * 1024 * 1024,
+                    signal: commandSignal,
+                    env: { ...process.env, ...options.envOverrides },
+                  },
+                  beforeCommand,
+                )
+              : runCommitEditProcess(cwd, args, commandSignal, options.envOverrides);
           },
           buffer: (cwd, args) => {
             activeSignal.throwIfAborted();

@@ -54,6 +54,11 @@ const sharedWorkingTreeMatchesRepository = ({
 const canStageAllChanges = (status: GitStatusWithConflicts, isBareRepository: boolean, isCommitInputDisabled: boolean): boolean =>
   !isBareRepository && !isCommitInputDisabled && status.unstaged.length + status.untracked.length > 0;
 
+const sharedDetailInputs = (shared: boolean, snapshot: StagingAreaProps['workingTreeSnapshot'], raw?: string) => ({
+  externalStatusRaw: shared ? (raw ?? snapshot?.statusRaw) : undefined,
+  externalSnapshotId: shared ? (snapshot?.snapshotId ?? null) : undefined,
+});
+
 export const StagingArea: React.FC<StagingAreaProps> = ({
   repoPath,
   onRepoChanged,
@@ -70,6 +75,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   workingTreeSnapshot,
   workingTreeStatus,
   workingTreeStats,
+  workingTreeStatusRaw,
   onRefreshWorkingTree,
 }) => {
   const { t } = useI18n();
@@ -98,7 +104,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     onOpenDiff,
     externalRepoPath: hasSharedWorkingTree ? (sharedWorkingTreeMatchesRepo ? repoPath : null) : undefined,
     externalStatus: hasSharedWorkingTree ? sharedStatus : undefined,
-    externalStatusRaw: sharedSnapshot?.statusRaw,
+    ...sharedDetailInputs(hasSharedWorkingTree, sharedSnapshot, workingTreeStatusRaw),
     externalStats: hasSharedWorkingTree ? (sharedWorkingTreeMatchesRepo ? (workingTreeStats ?? null) : null) : undefined,
     externalRefresh: onRefreshWorkingTree,
   });
@@ -247,7 +253,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   );
 
   return (
-    <div data-tutorial="staging" className={`staging-container${isConflictOnly ? ' staging-container--conflict' : ''}`}>
+    <div data-tutorial="staging" aria-busy={fileOps.isMutating} className={`staging-container${isConflictOnly ? ' staging-container--conflict' : ''}`}>
       {!isConflictOnly && (
         <StagingToolbar
           searchQuery={fileOps.searchQuery}

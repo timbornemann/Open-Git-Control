@@ -10,7 +10,31 @@ const missing = (error: unknown): boolean => ['ENOENT', 'ENOTDIR'].includes((err
 /** Check existing ancestors without requiring deleted or historical files to exist. */
 export async function createGitPathChecker(repo: string): Promise<(file: string) => Promise<void>> {
   const root = await fs.realpath(repo);
-  const checked = new Set<string>();
+  const checked = new Map<string, Promise<boolean>>();
+  const inspect = async (current: string, leaf: boolean, segment: string): Promise<boolean> => {
+    let entry;
+    try {
+      entry = await fs.lstat(current);
+    } catch (error) {
+      if (missing(error)) return true;
+      throw error;
+    }
+    if (entry.isSymbolicLink() && leaf) {
+      if (process.platform !== 'win32') return false;
+      try {
+        if (!(await fs.stat(current)).isDirectory()) return false;
+      } catch (error) {
+        if (missing(error)) return false;
+        throw error;
+      }
+    }
+    if (entry.isFile() && leaf && !(process.platform === 'win32' && segment.includes('~'))) return false;
+    const physical = await fs.realpath(current);
+    const resolved = path.relative(root, physical);
+    if (resolved === '..' || resolved.startsWith(`..${path.sep}`) || path.isAbsolute(resolved)) throw new Error('Git path is outside the current repository.');
+    assertOutsideGitMetadata(resolved, 'Git path');
+    return false;
+  };
   return async (file) => {
     if (process.platform === 'win32' && /^[a-z]:/i.test(file)) throw new Error('Git path must be repository-relative.');
     const relative = normalizeRepositoryRelativePath(file, 'Git path');
@@ -19,34 +43,26 @@ export async function createGitPathChecker(repo: string): Promise<(file: string)
     let current = root;
     for (let index = 0; index < parts.length; index++) {
       current = path.join(current, parts[index]);
-      if (checked.has(current)) continue;
-      let entry;
-      try {
-        entry = await fs.lstat(current);
-      } catch (error) {
-        if (missing(error)) return;
-        throw error;
-      }
       // Git stores leaf symlinks as links. Windows junction directories, in
       // contrast, are traversed by Git and must remain inside the worktree.
-      if (entry.isSymbolicLink() && index === parts.length - 1) {
-        if (process.platform !== 'win32') continue;
-        try {
-          if (!(await fs.stat(current)).isDirectory()) continue;
-        } catch (error) {
-          if (missing(error)) continue;
-          throw error;
-        }
+      const leaf = index === parts.length - 1;
+      let pending = leaf ? undefined : checked.get(current);
+      if (!pending) {
+        pending = inspect(current, leaf, parts[index]);
+        if (!leaf) checked.set(current, pending);
       }
-      if (entry.isFile() && index === parts.length - 1 && !(process.platform === 'win32' && parts[index].includes('~'))) continue;
-      const physical = await fs.realpath(current);
-      const resolved = path.relative(root, physical);
-      if (resolved === '..' || resolved.startsWith(`..${path.sep}`) || path.isAbsolute(resolved))
-        throw new Error('Git path is outside the current repository.');
-      assertOutsideGitMetadata(resolved, 'Git path');
-      if (entry.isDirectory() || entry.isSymbolicLink()) checked.add(current);
+      if (await pending) return;
     }
   };
+}
+
+async function checkPaths(files: string[], check: (file: string) => Promise<void>) {
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(16, files.length) }, async () => {
+      while (next < files.length) await check(files[next++]);
+    }),
+  );
 }
 
 async function optionalTree(read: ReadGit, revision: string): Promise<string | undefined> {
@@ -135,16 +151,16 @@ export async function assertGitWorkingTreePaths(repo: string, args: string[], re
   if (!usesWorkingTree(command, before, revisions)) return;
 
   const check = await createGitPathChecker(repo);
-  for (const spec of specs) await check(literalPath(spec));
+  await checkPaths(specs.map(literalPath), check);
   // Batch staging uses a NUL-delimited file precisely to avoid OS argv limits.
   // Keep the inspection query bounded as well and select literal names locally.
   const largeSelection = specs.reduce((size, spec) => size + spec.length + 3, 0) > 8000;
   const matches = largeSelection ? literalPathMatcher(specs) : () => true;
   const files = (await read(indexPathArguments(command, before, largeSelection ? [] : specs))).split('\0').filter((file) => file && matches(file));
-  for (const file of files) {
-    if (command === 'clean' && !specs.length && !before.includes('-d') && file.includes('/')) continue;
-    await check(file);
-  }
+  await checkPaths(
+    files.filter((file) => !(command === 'clean' && !specs.length && !before.includes('-d') && file.includes('/'))),
+    check,
+  );
 
   const targets: Array<string | undefined> = [];
   if (command === 'checkout') {
@@ -159,11 +175,11 @@ export async function assertGitWorkingTreePaths(repo: string, args: string[], re
     targets.push(await optionalTree(read, ref), await optionalTree(read, `${ref}^3`));
   } else if (command === 'cherry-pick' || command === 'revert') {
     const affected = await read(['diff-tree', '-m', '--root', '--no-commit-id', '--name-only', '-r', '-z', before.at(-1)!, '--']);
-    for (const file of affected.split('\0').filter(Boolean)) await check(file);
+    await checkPaths(affected.split('\0').filter(Boolean), check);
   }
   for (const tree of targets) {
     if (!tree) continue;
     const paths = await read(['ls-tree', '-r', '-z', '--name-only', tree, '--', ...specs]);
-    for (const file of paths.split('\0').filter(Boolean)) await check(file);
+    await checkPaths(paths.split('\0').filter(Boolean), check);
   }
 }

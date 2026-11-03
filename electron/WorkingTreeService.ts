@@ -3,10 +3,10 @@ import * as fs from 'fs';
 import type { GitService } from './GitService';
 import { parseNulStatus, parseStatusPath, hasStagedChanges, type StatusSample } from './WorkingTreeStatus';
 export { parseStatusPath } from './WorkingTreeStatus';
-import { toLiteralPathspec } from './git/RepositoryPathSafety';
 import { createRepositoryPathResolver } from './git/RepositoryPathSafetyAsync';
-import { gitArgumentBatches } from './git/GitArgumentBatches';
-import { WorkingTreeStatsRead } from './WorkingTreeStatsRead';
+import { fingerprintWorkingTreeIndex } from './WorkingTreeIndexFingerprint';
+import { WorkingTreeStatsRead, SharedWorkingTreeRead } from './WorkingTreeStatsRead';
+import type { WorkingTreeStatusDto } from '../src/types/gitDtos';
 
 export type WorkingTreeSnapshot = {
   snapshotId: string;
@@ -47,7 +47,7 @@ const parseNumstat = (raw: string) => {
 };
 
 export class WorkingTreeService {
-  private snapshotInFlight: { repoPath: string; promise: Promise<WorkingTreeSnapshot> } | null = null;
+  private snapshotInFlight = new Map<string, SharedWorkingTreeRead<WorkingTreeSnapshot>>();
   private latestSnapshot: WorkingTreeSnapshot | null = null;
   private statsCache = new Map<string, WorkingTreeStats>();
   private statsInFlight = new Map<string, WorkingTreeStatsRead>();
@@ -61,36 +61,55 @@ export class WorkingTreeService {
     for (const controller of this.statsControllers.values()) controller.abort();
     this.statsControllers.clear();
     this.repoGeneration += 1;
-    this.snapshotInFlight = null;
+    for (const read of this.snapshotInFlight.values()) read.controller.abort();
+    this.snapshotInFlight.clear();
     this.latestSnapshot = null;
     this.statsCache.clear();
     this.statsInFlight.clear();
   }
 
-  async getSnapshot(requestedRepoPath?: string): Promise<WorkingTreeSnapshot> {
+  private async isBare(repoPath: string): Promise<boolean> {
+    const service = this.gitService;
+    return typeof service.isBareRepositoryAtPathAsync === 'function'
+      ? service.isBareRepositoryAtPathAsync(repoPath)
+      : typeof service.isBareRepositoryAtPath === 'function'
+        ? Boolean(service.isBareRepositoryAtPath(repoPath))
+        : typeof service.isBareRepository === 'function'
+          ? Boolean(service.isBareRepository())
+          : false;
+  }
+
+  async getStatus(requestedRepoPath?: string, signal?: AbortSignal, priority: 'interactive' | 'background' = 'interactive'): Promise<WorkingTreeStatusDto> {
+    const started = performance.now();
+    signal?.throwIfAborted();
     const repoPath = requestedRepoPath || this.gitService.getRepoPath();
     if (!repoPath) throw new Error('No repository path set.');
-    if (this.snapshotInFlight?.repoPath === repoPath) return this.snapshotInFlight.promise;
+    const sample = (await this.isBare(repoPath)) ? { statusRaw: '', changeCount: 0 } : await this.getStatusSample(repoPath, signal, priority);
+    signal?.throwIfAborted();
+    this.gitService.recordWorkingTreeRead?.(repoPath, 'status', performance.now() - started);
+    return { repoPath, statusRaw: sample.statusRaw, changeCount: sample.changeCount, checkedAt: Date.now() };
+  }
+
+  async getSnapshot(requestedRepoPath?: string, signal?: AbortSignal): Promise<WorkingTreeSnapshot> {
+    signal?.throwIfAborted();
+    const repoPath = requestedRepoPath || this.gitService.getRepoPath();
+    if (!repoPath) throw new Error('No repository path set.');
+    const existing = this.snapshotInFlight.get(repoPath);
+    if (existing && !existing.controller.signal.aborted) return existing.observe(signal);
     const repoGeneration = this.repoGeneration;
+    const controller = new AbortController();
+    const started = performance.now();
 
     const promise = (async () => {
       const startedAt = Date.now();
-      const bareChecker = this.gitService as {
-        isBareRepositoryAtPathAsync?: (repoPath: string) => Promise<boolean>;
-        isBareRepositoryAtPath?: (repoPath: string) => boolean;
-        isBareRepository?: () => boolean;
-      };
       // Resolve the bare status of THIS snapshot's repository path, not whatever
       // repository happens to be active when the async work runs.
-      const isBare =
-        typeof bareChecker.isBareRepositoryAtPathAsync === 'function'
-          ? await bareChecker.isBareRepositoryAtPathAsync(repoPath)
-          : typeof bareChecker.isBareRepositoryAtPath === 'function'
-            ? Boolean(bareChecker.isBareRepositoryAtPath(repoPath))
-            : typeof bareChecker.isBareRepository === 'function'
-              ? Boolean(bareChecker.isBareRepository())
-              : false;
-      const state = isBare ? { statusRaw: '', statusIdentity: '', changeCount: 0, contentFingerprint: 'bare' } : await this.captureStableState(repoPath);
+      const isBare = await this.isBare(repoPath);
+      controller.signal.throwIfAborted();
+      const state = isBare
+        ? { statusRaw: '', statusIdentity: '', changeCount: 0, contentFingerprint: 'bare' }
+        : await this.captureStableState(repoPath, controller.signal);
+      controller.signal.throwIfAborted();
       const { statusRaw, statusIdentity, changeCount, contentFingerprint } = state;
       const durationMs = Date.now() - startedAt;
       const snapshotId = this.buildSnapshotId(repoPath, statusIdentity, contentFingerprint);
@@ -109,15 +128,14 @@ export class WorkingTreeService {
       }
       return snapshot;
     })();
-    this.snapshotInFlight = { repoPath, promise };
-
-    try {
-      return await promise;
-    } finally {
-      if (this.snapshotInFlight?.promise === promise) {
-        this.snapshotInFlight = null;
-      }
-    }
+    const read = new SharedWorkingTreeRead(promise, controller);
+    this.snapshotInFlight.set(repoPath, read);
+    const finished = () => {
+      this.gitService.recordWorkingTreeRead?.(repoPath, 'snapshot', performance.now() - started);
+      if (this.snapshotInFlight.get(repoPath) === read) this.snapshotInFlight.delete(repoPath);
+    };
+    void promise.then(finished, finished);
+    return read.observe(signal);
   }
 
   async getStats(snapshotId: string, requestedRepoPath?: string, signal?: AbortSignal): Promise<WorkingTreeStats> {
@@ -229,13 +247,13 @@ export class WorkingTreeService {
     throw new Error('Working tree changed repeatedly while creating a snapshot. Please retry.');
   }
 
-  private async getStatusSample(repoPath: string, signal?: AbortSignal): Promise<StatusSample> {
+  private async getStatusSample(repoPath: string, signal?: AbortSignal, priority: 'interactive' | 'background' = 'background'): Promise<StatusSample> {
     signal?.throwIfAborted();
     const gitCapabilities = this.gitService as GitService & {
-      getStatusPorcelainZAtPath?: (path: string, signal?: AbortSignal, kind?: 'background') => Promise<string>;
+      getStatusPorcelainZAtPath?: (path: string, signal?: AbortSignal, kind?: 'background' | 'interactive') => Promise<string>;
     };
     if (typeof gitCapabilities.getStatusPorcelainZAtPath === 'function') {
-      return parseNulStatus(await gitCapabilities.getStatusPorcelainZAtPath(repoPath, signal, signal ? 'background' : undefined));
+      return parseNulStatus(await gitCapabilities.getStatusPorcelainZAtPath(repoPath, signal, priority));
     }
 
     const statusRaw = await this.gitService.getStatusPorcelainAtPath(repoPath);
@@ -278,16 +296,7 @@ export class WorkingTreeService {
       // `--numstat` is not an index identity: two different staged blobs can
       // have identical line counts. Stage records include the exact blob IDs,
       // modes and conflict stages, and therefore also cover unmerged entries.
-      let batchIndex = 0;
-      for (const batch of gitArgumentBatches(sortedPaths.map((filePath) => toLiteralPathspec(filePath)))) {
-        signal?.throwIfAborted();
-        const args = ['ls-files', '--stage', '-z', '--', ...batch];
-        const stagedEntries =
-          signal && typeof this.gitService.runCommandAtPathWithSignal === 'function'
-            ? await this.gitService.runCommandAtPathWithSignal(repoPath, args, signal, 'background')
-            : await this.gitService.runPollingCommandAtPath(repoPath, args, `working-tree-snapshot:index:${batchIndex++}:${batch.join('\0')}`);
-        hash.update('index-stage').update('\0').update(stagedEntries).update('\0');
-      }
+      await fingerprintWorkingTreeIndex(this.gitService, repoPath, sortedPaths, hash, signal);
     }
 
     for (let offset = 0; offset < sortedPaths.length; offset += batchSize) {

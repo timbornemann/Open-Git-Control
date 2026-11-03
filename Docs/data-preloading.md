@@ -67,6 +67,53 @@ Platzhalter im Seitenaufbau.
   privaten Vorschauen. Der bestehende GitHub-Katalog bleibt lesbar; unvollständige
   Kataloge werden im Hintergrund erneuert.
 
+## Staging und vollständige Arbeitsbaumprüfung
+
+`getWorkingTreeStatus` liest den NUL-getrennten Git-Status einmal und liefert
+Repository, Dateiliste, Änderungsanzahl und Prüfzeitpunkt. `refresh()` bestätigt
+diesen frischen Dateistatus. Eine Stage-Aktion wartet auf den Git-Schreibvorgang
+und diese Aktualisierung; Zeilenzählung, LFS-Vorschauen und vollständige
+Snapshot-Fingerprints gehören nicht zu ihrer Wartezeit.
+
+Nach 300 ms Ruhe erstellt der zuständige Arbeitsbaum-Leser einen vollständigen
+Snapshot. Beide Status-/Metadatenvergleiche bleiben erhalten. Große
+Indexauswahlen verwenden eine gestreamte, NUL-getrennte Indexabfrage, aus der nur
+die relevanten Einträge gespeichert und deterministisch gehasht werden. Der
+schnelle Status erhält keine Snapshot-ID. Statistik und LFS-Vorschauen verwenden
+die bestätigte Revision. Die Besitzer dieser Abfragen steuern ihre Nachladungen
+selbst; Cache-Invalidierungen starten keine zusätzlichen vollständigen Leser.
+
+Staging validiert Pfade und schreibt den Index innerhalb derselben exklusiven
+Git-Warteschlange. Bis zu 16 Pfadprüfungen können parallel laufen; ihre
+Verzeichnisprüfungen werden nur innerhalb derselben Operation geteilt. Vor dem
+Schreiben werden aktives Repository und Commit-Schutz erneut geprüft. Die
+normale Git-Ausführung einschließlich Index-Lock-Recovery bleibt erhalten.
+
+Veraltete Nachladungen werden auch dann abgebrochen, wenn sie noch auf einen
+Vorladeplatz warten. Hintergrundabfragen und LFS-Vorschauen können Schreibaktionen
+weichen. Vorübergehend verdrängte Details werden mit begrenztem Rückstand erneut
+gelesen, ohne einen Git-Erfolg als Fehler zu melden. Sicherheitsprüfungen vor
+Schreibaktionen verwenden weiterhin frische Daten, keine Vorschau-Freigaben.
+
+Reproduzierbare Messungen und der native Oberflächentest:
+
+```sh
+npm run build
+npm run measure:staging -- --label=after
+npm run test:staging:electron
+```
+
+Das Messskript verwendet ausschließlich temporäre Repositories mit 10.000
+versionierten Textdateien und jeweils 400 oder 10.000 Änderungen beziehungsweise
+neuen Dateien. Einzeldatei, gefilterte Auswahl, gesamter Bereich und gesamtes
+Repository werden nach einem Aufwärmlauf siebenmal gemessen. JSON-Berichte unter
+`build/staging-*.json` enthalten Median, Maximum, Rohwerte, direkte Git-Zeiten und
+den getrennten vollständigen Snapshot. Der Electron-Test misst zusätzlich Klick
+bis zum aktualisierten Frame, während vollständige Snapshots absichtlich warten.
+Lokale Diagnosen enthalten Git-Warteschlangenzeit sowie Staging- und Lesedauern.
+
+Die Vorher-/Nachher-Ergebnisse stehen in [Staging-Messung](staging-performance.md).
+
 ## Bedarfsgerechte Aktivitätsprüfungen
 
 Der Aktivitätskoordinator prüft inaktive Repositories seriell über die gemeinsame
