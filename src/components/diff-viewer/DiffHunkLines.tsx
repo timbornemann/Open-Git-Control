@@ -40,6 +40,7 @@ export function DiffHunkLines({ hunk, sideBySide, selection, ...blame }: Props) 
           <button
             type="button"
             className="diff-line-action"
+            data-selection-unit={id}
             aria-pressed={selection.selected.has(id)}
             disabled={selection.disabled}
             aria-label={tr(

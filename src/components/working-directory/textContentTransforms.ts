@@ -1,3 +1,4 @@
+import { BASE64_DECODE_ERROR, URL_DECODE_ERROR } from '@/shared/fileCodecMessages';
 export type TextSelection = { from: number; to: number };
 
 const splitLines = (source: string): { lines: string[]; trailingLineEnding: boolean } => {
@@ -58,7 +59,7 @@ export const decodeBase64 = (source: string): string => {
     const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
     return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {
-    throw new Error('Invalid Base64 or the decoded data is not UTF-8 text.');
+    throw new Error(BASE64_DECODE_ERROR[1]);
   }
 };
 
@@ -68,7 +69,7 @@ export const decodeUrlComponent = (source: string): string => {
   try {
     return decodeURIComponent(source);
   } catch {
-    throw new Error('Invalid URL-encoded text.');
+    throw new Error(URL_DECODE_ERROR[1]);
   }
 };
 

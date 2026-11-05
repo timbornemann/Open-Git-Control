@@ -28,7 +28,7 @@ export function MergeBranchMenu({ branches, currentBranch, onMerge }: Props) {
   const behavior = mergeModePresentation(mode, tr);
 
   return (
-    <div className="merge-branch-menu">
+    <div className="merge-branch-menu" data-tutorial="merge-menu">
       <div className="merge-branch-heading">{tr('Branches zusammenführen', 'Merge branches')}</div>
       <fieldset className="merge-direction">
         <legend>{tr('Welche Richtung?', 'Which direction?')}</legend>
@@ -36,6 +36,7 @@ export function MergeBranchMenu({ branches, currentBranch, onMerge }: Props) {
           <button
             type="button"
             aria-pressed={!outward}
+            data-tutorial="merge-inward"
             onClick={() => {
               setDirection('intoCurrent');
               setSelected('');
@@ -46,6 +47,7 @@ export function MergeBranchMenu({ branches, currentBranch, onMerge }: Props) {
           <button
             type="button"
             aria-pressed={outward}
+            data-tutorial="merge-outward"
             disabled={!currentBranch}
             onClick={() => {
               setDirection('intoSelected');
@@ -81,7 +83,7 @@ export function MergeBranchMenu({ branches, currentBranch, onMerge }: Props) {
             ? tr('Zielbranch · erhält Änderungen', 'Target branch · receives changes')
             : tr('Quellbranch · liefert Änderungen', 'Source branch · provides changes')}
         </span>
-        <select value={selectedBranch?.name || ''} onChange={(event) => setSelected(event.target.value)} autoFocus>
+        <select data-tutorial="merge-source" value={selectedBranch?.name || ''} onChange={(event) => setSelected(event.target.value)} autoFocus>
           <option value="">
             {candidates.length ? tr('Branch auswählen…', 'Choose a branch…') : tr('Keine anderen Branches verfügbar', 'No other branches available')}
           </option>
@@ -99,14 +101,14 @@ export function MergeBranchMenu({ branches, currentBranch, onMerge }: Props) {
           })}
         </select>
       </label>
-      <div className="merge-flow" aria-label={tr('Merge-Richtung', 'Merge direction')}>
+      <div className="merge-flow" data-tutorial="merge-flow" aria-label={tr('Merge-Richtung', 'Merge direction')}>
         <strong title={outward ? activeLabel : otherLabel}>{outward ? activeLabel : otherLabel}</strong>
         <ArrowRight size={16} aria-hidden="true" />
         <strong title={outward ? otherLabel : activeLabel}>{outward ? otherLabel : activeLabel}</strong>
       </div>
       <label className="merge-menu-field">
         <span>{tr('Wie übernehmen?', 'How to combine?')}</span>
-        <select value={mode} onChange={(event) => setMode(event.target.value as GitMergeMode)} aria-describedby={`${id}-behavior`}>
+        <select data-tutorial="merge-mode" value={mode} onChange={(event) => setMode(event.target.value as GitMergeMode)} aria-describedby={`${id}-behavior`}>
           {MERGE_MODES.map((value) => (
             <option key={value} value={value}>
               {mergeModePresentation(value, tr).label}
@@ -114,7 +116,7 @@ export function MergeBranchMenu({ branches, currentBranch, onMerge }: Props) {
           ))}
         </select>
       </label>
-      <p id={`${id}-behavior`} className="merge-menu-explanation">
+      <p id={`${id}-behavior`} className="merge-menu-explanation" data-tutorial="merge-behavior">
         {behavior.description}
       </p>
       <p className="merge-menu-note">
@@ -128,6 +130,7 @@ export function MergeBranchMenu({ branches, currentBranch, onMerge }: Props) {
       <button
         type="button"
         className="dialog-btn dialog-btn-primary merge-menu-continue"
+        data-tutorial="merge-review"
         disabled={!selectedBranch}
         onClick={() => onMerge(selected, mode, direction)}
       >

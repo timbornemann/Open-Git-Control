@@ -180,6 +180,8 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({ canShowInspectorPane, sh
           {canShowInspectorPane && (
             <button
               className="icon-btn topbar-panel-toggle"
+              data-tutorial="inspector-toggle"
+              aria-expanded={showInspectorPane}
               onClick={onToggleInspectorPane}
               title={
                 showInspectorPane

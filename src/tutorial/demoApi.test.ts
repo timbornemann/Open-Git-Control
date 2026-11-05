@@ -12,12 +12,58 @@ const context: TutorialLaunchContext = {
   progress: { version: 1, welcomeSeen: true, completedChapters: [] },
 };
 const create = (id = 'stage') =>
-  createDemoApi(
-    context,
-    TUTORIAL_CHAPTERS[0].steps.find((step) => step.id === id)!,
-  );
+  createDemoApi(context, { ...TUTORIAL_CHAPTERS.find((chapter) => chapter.id === 'changes')!.steps[0], scenario: id === 'branch' ? 'clean' : undefined });
 
 describe('the isolated learning project', () => {
+  it('keeps sidebar preferences within the current practice facade without importing personal preferences', async () => {
+    const { api } = create('branch');
+    const first = await api.app.updateRepositoryUiPreferences({ repoPath: DEMO_REPO, patch: { branchPanelCollapsed: true } });
+    expect(first).toMatchObject({ success: true, data: { [DEMO_REPO]: { branchPanelCollapsed: true } } });
+    const next = await api.app.updateRepositoryUiPreferences({ repoPath: DEMO_REPO, patch: { tagPanelCollapsed: true } });
+    expect(next).toMatchObject({ success: true, data: { [DEMO_REPO]: { branchPanelCollapsed: true, tagPanelCollapsed: true } } });
+    if (first.success) first.data[DEMO_REPO].branchPanelCollapsed = false;
+    expect(await api.app.getRepositoryUiPreferences({ 'C:/personal': { branchPanelCollapsed: true } })).toEqual(next);
+    expect(await api.app.updateRepositoryUiPreferences({ repoPath: 'C:/personal', patch: { branchPanelCollapsed: false } })).toMatchObject({ success: false });
+    expect(await create('branch').api.app.getRepositoryUiPreferences()).toMatchObject({ success: true, data: {} });
+  });
+  it('provides publication context and account destinations without credentials or a network request', async () => {
+    const { api, repo } = create('branch');
+    expect(await api.hosting.hostingRequest('publicationContext', { repoPath: DEMO_REPO })).toMatchObject({
+      success: true,
+      data: { snapshot: { repoPath: DEMO_REPO }, dirtyFiles: 0, publications: [] },
+    });
+    expect(await api.hosting.hostingRequest('creationTargets', { connectionId: 'demo-hosting' })).toMatchObject({
+      success: true,
+      data: { items: [{ namespace: 'alex-beispiel' }] },
+    });
+    expect(await api.hosting.hostingRequest('cancelPublication', { repoPath: DEMO_REPO })).toMatchObject({ success: true, data: true });
+    expect(repo.events.has('pushed')).toBe(false);
+  });
+  it('keeps tracked, new and staged files distinct and unstages only the requested file', async () => {
+    const mixed = TUTORIAL_CHAPTERS.find((chapter) => chapter.id === 'changes')!.steps[0];
+    const { api, repo } = createDemoApi(context, mixed);
+    expect(parseGitStatusDetailed(repo.status()).untracked.map((file) => file.path)).toEqual(['notes.txt']);
+    await api.git.stagePaths(['README.md']);
+    await api.git.runGitCommand('reset', 'HEAD', '--', 'README.md');
+    expect([...repo.staged]).toEqual(['src/app.ts']);
+    await api.git.stagePaths(['notes.txt']);
+    expect(repo.status()).toContain('A  notes.txt');
+    await api.git.runGitCommand('reset', 'HEAD', '--', 'notes.txt');
+    expect(repo.status()).toContain('?? notes.txt');
+  });
+  it('stores the actual commit title, description and signoff and can amend without adding history', async () => {
+    const { api, repo } = create();
+    await api.git.stagePaths(['README.md']);
+    await api.git.createCommit({ title: 'docs(guide): explain setup', description: 'A detailed reason', signoff: true });
+    expect(repo.commits[0].body).toContain('A detailed reason');
+    expect(repo.commits[0].body).toContain('Signed-off-by: Alex Beispiel');
+    const before = repo.commits[0].hash;
+    await api.git.createCommit({ title: 'docs: corrected', amend: true });
+    const history = await api.git.getCommitLogPage({ repoPath: DEMO_REPO, scope: 'head', offset: 0, limit: 200 });
+    expect(history.success && parseGitLog(history.data.raw)).toHaveLength(5);
+    expect(repo.commits.some((commit) => commit.hash === before)).toBe(true);
+    expect(repo.commits[0].hash).not.toBe(before);
+  });
   it('returns coherent Git history, status, staging and commits', async () => {
     const { api, repo } = create();
     const log = await api.git.getCommitLogPage({ limit: 100, offset: 0, scope: 'all' });
@@ -54,7 +100,7 @@ describe('the isolated learning project', () => {
         const boot = await api.app.getBootstrap();
         expect(boot.snapshots).toEqual([]);
         expect(boot.settings.hasOpenAiApiKey).toBe(false);
-        expect(boot.repositories.activeRepo).toBe(DEMO_REPO);
+        expect(boot.repositories.activeRepo).toBe(repo.activeRepo);
         expect(repo.conflicted).toBe(step.scenario === 'conflict');
         expect((await api.app.getTutorialProgress()).welcomeSeen).toBe(true);
       }

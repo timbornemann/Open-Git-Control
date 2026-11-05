@@ -48,36 +48,44 @@ export const BlamePanel: React.FC<BlamePanelProps> = ({
       {lines.length > 0 && (
         <div className="file-blame-panel__frame">
           <div className="file-blame-panel__lines">
-            {lines.map((line) => (
-              <div
-                key={`${line.lineNumber}-${line.commitHash}`}
-                className="file-blame-line"
-                title={isDetailed ? `${line.author} - ${line.summary}` : undefined}
-              >
-                <span className="file-blame-line__number" aria-label={tr(`Zeile ${line.lineNumber}`, `Line ${line.lineNumber}`)}>
-                  {line.lineNumber}
-                </span>
-                <span className="file-blame-line__metadata">
-                  <button
-                    type="button"
-                    className="file-blame-line__commit"
-                    onClick={() => onSelectCommit?.(line.commitHash)}
-                    disabled={!onSelectCommit}
-                    title={tr(`Commit ${line.abbrevHash} öffnen`, `Open commit ${line.abbrevHash}`)}
-                    aria-label={tr(`Commit ${line.abbrevHash} öffnen`, `Open commit ${line.abbrevHash}`)}
-                  >
-                    {line.abbrevHash}
-                  </button>
-                  {isDetailed && (
-                    <>
-                      <span className="file-blame-line__author">{line.author || '-'}</span>
-                      <span className="file-blame-line__date">{formatBlameDate?.(line.authorTime) || '-'}</span>
-                    </>
-                  )}
-                </span>
-                <code className="file-blame-line__content">{line.content || ' '}</code>
-              </div>
-            ))}
+            {lines.map((line) => {
+              const uncommitted = /^0{40}(?:0{24})?$/.test(line.commitHash);
+              const label = uncommitted ? tr('Noch nicht committet', 'Not committed yet') : line.abbrevHash;
+              return (
+                <div
+                  key={`${line.lineNumber}-${line.commitHash}`}
+                  className="file-blame-line"
+                  data-blame-line={line.lineNumber}
+                  data-blame-hash={line.commitHash}
+                  title={isDetailed ? `${line.author} - ${line.summary}` : undefined}
+                >
+                  <span className="file-blame-line__number" aria-label={tr(`Zeile ${line.lineNumber}`, `Line ${line.lineNumber}`)}>
+                    {line.lineNumber}
+                  </span>
+                  <span className="file-blame-line__metadata">
+                    <button
+                      type="button"
+                      className="file-blame-line__commit"
+                      onClick={() => {
+                        if (!uncommitted) onSelectCommit?.(line.commitHash);
+                      }}
+                      disabled={!onSelectCommit || uncommitted}
+                      title={uncommitted ? label : tr(`Commit ${line.abbrevHash} öffnen`, `Open commit ${line.abbrevHash}`)}
+                      aria-label={uncommitted ? label : tr(`Commit ${line.abbrevHash} öffnen`, `Open commit ${line.abbrevHash}`)}
+                    >
+                      {label}
+                    </button>
+                    {isDetailed && (
+                      <>
+                        <span className="file-blame-line__author">{uncommitted ? label : line.author || '-'}</span>
+                        {!uncommitted && <span className="file-blame-line__date">{formatBlameDate?.(line.authorTime) || '-'}</span>}
+                      </>
+                    )}
+                  </span>
+                  <code className="file-blame-line__content">{line.content || ' '}</code>
+                </div>
+              );
+            })}
           </div>
           {hasMore && (
             <button type="button" className="staging-tool-btn file-blame-panel__more" onClick={() => void onLoadMore()} disabled={loading}>

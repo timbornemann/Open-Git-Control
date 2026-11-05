@@ -56,6 +56,8 @@ export const FileHistoryPanel: React.FC<FileHistoryPanelProps> = ({
           <button
             type="button"
             key={`${entry.hash}-${entry.subject}`}
+            data-history-hash={normalizedEntryHash}
+            data-history-path={entry.path}
             className={`file-history-entry${isCurrentCommit ? ' is-current' : ''}`}
             onClick={() => normalizedEntryHash && onSelectCommit?.(normalizedEntryHash, entry.path)}
             title={

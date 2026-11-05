@@ -53,6 +53,7 @@ export const DiffToolbar: React.FC<DiffToolbarProps> = ({
       <div className="diff-toolbar-actions">
         <div className="diff-toggle-group">
           <button
+            data-tutorial="diff-unified"
             className={`diff-toggle-btn ${viewMode === 'unified' ? 'active' : ''}`}
             onClick={() => setViewMode('unified')}
             title={t('generated.components.diff_viewer.difftoolbar.unified_diff_a93333ef')}
@@ -61,6 +62,7 @@ export const DiffToolbar: React.FC<DiffToolbarProps> = ({
             <LayoutList size={14} /> {t('generated.components.diff_viewer.difftoolbar.unified_5b31a911')}
           </button>
           <button
+            data-tutorial="diff-split"
             className={`diff-toggle-btn ${viewMode === 'side-by-side' ? 'active' : ''}`}
             onClick={() => setViewMode('side-by-side')}
             title={t('generated.components.diff_viewer.difftoolbar.side_by_side_diff_69086548')}
@@ -93,13 +95,25 @@ export const DiffToolbar: React.FC<DiffToolbarProps> = ({
 
         {!isMarkdownPreviewMode && (
           <div className="diff-nav-group">
-            <button className="diff-nav-btn" onClick={() => scrollToHunk(activeHunkIndex - 1)} disabled={hunkCount === 0}>
+            <button
+              data-tutorial="previous-hunk"
+              className="diff-nav-btn"
+              onClick={() => scrollToHunk(activeHunkIndex - 1)}
+              disabled={hunkCount === 0}
+              aria-label={tr('Vorheriger Hunk', 'Previous hunk')}
+            >
               <ChevronLeft size={14} />
             </button>
             <span className="diff-nav-label">
               {t('generated.components.diff_viewer.difftoolbar.hunk_f10f3416')} {hunkCount === 0 ? 0 : activeHunkIndex + 1}/{hunkCount}
             </span>
-            <button className="diff-nav-btn" onClick={() => scrollToHunk(activeHunkIndex + 1)} disabled={hunkCount === 0}>
+            <button
+              data-tutorial="next-hunk"
+              className="diff-nav-btn"
+              onClick={() => scrollToHunk(activeHunkIndex + 1)}
+              disabled={hunkCount === 0}
+              aria-label={tr('Nächster Hunk', 'Next hunk')}
+            >
               <ChevronRight size={14} />
             </button>
           </div>

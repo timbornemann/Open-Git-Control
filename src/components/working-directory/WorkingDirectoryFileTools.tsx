@@ -12,6 +12,7 @@ import { compactTextToSingleLine, getJsonPathAtOffset } from './fileContentTrans
 import { validateJsonWithSchema, validateYamlText } from './structuredContentTransforms';
 import { addToLines, replaceTextSelection, selectedTextOrDocument, type TextSelection } from './textContentTransforms';
 import { textEncodingLabel } from './WorkingDirectoryFileStatusBar';
+import { BASE64_DECODE_ERROR, URL_DECODE_ERROR } from '@/shared/fileCodecMessages';
 import { WorkingDirectoryFileToolsMenu } from './WorkingDirectoryFileToolsMenu';
 import { buildWorkingDirectoryFileToolGroups } from './workingDirectoryFileToolGroups';
 import '@/styles/working-directory-file-tools.css';
@@ -130,7 +131,9 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
       onChange(replaceTextSelection(text, target.selection, transform(target.value)));
       showToast(successMessage, false);
     } catch (error: unknown) {
-      showToast(error instanceof Error ? error.message : tr('Text konnte nicht verarbeitet werden.', 'Could not process the text.'), true);
+      const message = error instanceof Error ? error.message : tr('Text konnte nicht verarbeitet werden.', 'Could not process the text.');
+      const known = [BASE64_DECODE_ERROR, URL_DECODE_ERROR].find((entry) => entry[1] === message);
+      showToast(known ? tr(known[0], known[1]) : message, true);
     }
   };
 
@@ -361,6 +364,7 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
       <button
         type="button"
         className={`working-file-viewer__button${open ? ' is-active' : ''}`}
+        data-tutorial="file-tools"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => {

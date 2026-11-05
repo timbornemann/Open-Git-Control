@@ -5,51 +5,31 @@ import type {
   WorkingDirectoryReplaceRequestDto,
   WorkingDirectoryReplaceResultDto,
   WorkingDirectorySearchFileDto,
-  WorkingDirectorySearchMatchDto,
   WorkingDirectorySearchRequestDto,
   WorkingDirectorySearchResultDto,
 } from '../../../../src/shared/ipc/contracts/git';
 import { IpcChannel } from '../../../../src/types/ipcContract';
+import {
+  asSearchQuery,
+  asReplacement,
+  fileName,
+  findLineMatches,
+  searchFileNames,
+  replaceAllLiteral,
+  replaceTarget,
+} from '../../../../src/shared/workingDirectorySearch';
 
 type RegisterWorkingDirectorySearchHandlersDeps = {
   gitService: GitService;
 };
 
-const MAX_QUERY_LENGTH = 1_000;
-const MAX_REPLACEMENT_LENGTH = 100_000;
 const MAX_CANDIDATE_FILES = 20_000;
-const MAX_FILENAME_RESULTS = 500;
 const MAX_CONTENT_RESULTS = 1_000;
 const MAX_MATCHES_PER_FILE = 200;
 const MAX_REPLACE_FILES = 1_000;
 const MAX_REPLACE_SOURCE_CHARACTERS = 50 * 1024 * 1024;
-const PREVIEW_CONTEXT = 70;
 
-const asSearchQuery = (value: unknown): string => {
-  if (typeof value !== 'string' || value.length === 0) throw new Error('Search text is required.');
-  if (value.length > MAX_QUERY_LENGTH) throw new Error(`Search text cannot exceed ${MAX_QUERY_LENGTH} characters.`);
-  if (/[\r\n\0]/.test(value)) throw new Error('Search text must be a single line.');
-  return value;
-};
-
-const asReplacement = (value: unknown): string => {
-  const replacement = typeof value === 'string' ? value : String(value ?? '');
-  if (replacement.length > MAX_REPLACEMENT_LENGTH) {
-    throw new Error(`Replacement text cannot exceed ${MAX_REPLACEMENT_LENGTH} characters.`);
-  }
-  if (replacement.includes('\0')) throw new Error('Replacement text contains an invalid character.');
-  return replacement;
-};
-
-const compareText = (value: string, caseSensitive: boolean): string => (caseSensitive ? value : value.toLowerCase());
 const pathKey = (value: string): string => (process.platform === 'win32' ? value.toLowerCase() : value);
-const fileName = (filePath: string): string => filePath.replace(/\\/g, '/').split('/').pop() || filePath;
-const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const createLiteralRegExp = (query: string, caseSensitive: boolean): RegExp => new RegExp(escapeRegExp(query), caseSensitive ? 'g' : 'gi');
-const isLiteralMatch = (value: string, query: string, caseSensitive: boolean): boolean => {
-  const expression = new RegExp(`^(?:${escapeRegExp(query)})$`, caseSensitive ? '' : 'i');
-  return expression.test(value);
-};
 
 const listCandidateFiles = async (gitService: GitService, repoPath: string): Promise<{ paths: string[]; truncated: boolean }> => {
   const output = await gitService.runCommandAtPath(repoPath, ['-c', 'core.quotepath=false', 'ls-files', '-z', '--cached', '--others', '--exclude-standard']);
@@ -58,72 +38,6 @@ const listCandidateFiles = async (gitService: GitService, repoPath: string): Pro
     .filter(Boolean)
     .sort((left, right) => left.localeCompare(right));
   return { paths: allPaths.slice(0, MAX_CANDIDATE_FILES), truncated: allPaths.length > MAX_CANDIDATE_FILES };
-};
-
-const rankFileNameMatch = (filePath: string, query: string, caseSensitive: boolean): number => {
-  const normalizedPath = compareText(filePath, caseSensitive);
-  const normalizedName = compareText(fileName(filePath), caseSensitive);
-  const normalizedQuery = compareText(query, caseSensitive);
-  if (normalizedName === normalizedQuery) return 0;
-  if (normalizedName.startsWith(normalizedQuery)) return 1;
-  if (normalizedName.includes(normalizedQuery)) return 2;
-  return normalizedPath.includes(normalizedQuery) ? 3 : -1;
-};
-
-const createPreview = (
-  lineText: string,
-  matchIndex: number,
-  queryLength: number,
-): Pick<WorkingDirectorySearchMatchDto, 'preview' | 'previewMatchStart' | 'matchLength'> => {
-  const start = Math.max(0, matchIndex - PREVIEW_CONTEXT);
-  const end = Math.min(lineText.length, matchIndex + queryLength + PREVIEW_CONTEXT);
-  const prefix = start > 0 ? '…' : '';
-  const suffix = end < lineText.length ? '…' : '';
-  return {
-    preview: `${prefix}${lineText.slice(start, end)}${suffix}`,
-    previewMatchStart: prefix.length + matchIndex - start,
-    matchLength: queryLength,
-  };
-};
-
-const findLineMatches = (
-  text: string,
-  query: string,
-  caseSensitive: boolean,
-  displayLimit: number,
-): { matches: WorkingDirectorySearchMatchDto[]; total: number } => {
-  const matches: WorkingDirectorySearchMatchDto[] = [];
-  let total = 0;
-  const lines = text.split(/\r?\n/);
-  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
-    const lineText = lines[lineIndex];
-    for (const match of lineText.matchAll(createLiteralRegExp(query, caseSensitive))) {
-      total += 1;
-      if (matches.length < displayLimit) {
-        const matchIndex = match.index;
-        matches.push({
-          line: lineIndex + 1,
-          column: matchIndex + 1,
-          ...createPreview(lineText, matchIndex, match[0].length),
-        });
-      }
-    }
-  }
-  return { matches, total };
-};
-
-const searchFileNames = (paths: string[], query: string, caseSensitive: boolean, candidatesTruncated: boolean): WorkingDirectorySearchResultDto => {
-  const ranked = paths
-    .map((filePath) => ({ filePath, rank: rankFileNameMatch(filePath, query, caseSensitive) }))
-    .filter(({ rank }) => rank >= 0)
-    .sort((left, right) => left.rank - right.rank || left.filePath.localeCompare(right.filePath));
-  const files = ranked.slice(0, MAX_FILENAME_RESULTS).map(({ filePath }) => ({ path: filePath, name: fileName(filePath), matches: [] }));
-  return {
-    files,
-    totalMatches: ranked.length,
-    scannedFiles: paths.length,
-    truncated: candidatesTruncated || ranked.length > MAX_FILENAME_RESULTS,
-  };
 };
 
 const searchContents = async (
@@ -156,41 +70,6 @@ const searchContents = async (
     }
   }
   return { files, totalMatches, scannedFiles, truncated };
-};
-
-const replaceAllLiteral = (text: string, query: string, replacement: string, caseSensitive: boolean): { text: string; count: number } => {
-  let count = 0;
-  const replaced = text.replace(createLiteralRegExp(query, caseSensitive), () => {
-    count += 1;
-    return replacement;
-  });
-  if (count === 0) return { text, count };
-  return { text: replaced, count };
-};
-
-const replaceTarget = (
-  text: string,
-  query: string,
-  replacement: string,
-  caseSensitive: boolean,
-  line: number,
-  column: number,
-): { text: string; count: number } => {
-  if (!Number.isSafeInteger(line) || line < 1 || !Number.isSafeInteger(column) || column < 1) {
-    throw new Error('The selected search result is invalid.');
-  }
-  const lineOffsets = [0];
-  for (let index = 0; index < text.length; index += 1) {
-    if (text[index] === '\n') lineOffsets.push(index + 1);
-  }
-  if (line > lineOffsets.length) {
-    throw new Error('The selected search result is no longer available. Search again.');
-  }
-  const offset = lineOffsets[line - 1] + column - 1;
-  if (offset < 0 || offset + query.length > text.length || !isLiteralMatch(text.slice(offset, offset + query.length), query, caseSensitive)) {
-    throw new Error('The file changed and the selected result is no longer available. Search again.');
-  }
-  return { text: `${text.slice(0, offset)}${replacement}${text.slice(offset + query.length)}`, count: 1 };
 };
 
 const replaceMatches = async (

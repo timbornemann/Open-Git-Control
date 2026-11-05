@@ -48,7 +48,8 @@ export const formatHtmlText = async (source: string): Promise<string> => {
 };
 
 export const minifyHtmlText = async (source: string): Promise<string> => {
-  const { minify } = await import('html-minifier-terser');
+  // The Node entry imports process-dependent CSS internals into the renderer.
+  const { minify } = await import('html-minifier-terser/dist/htmlminifier.esm.bundle');
   return minify(source, {
     collapseWhitespace: true,
     conservativeCollapse: false,

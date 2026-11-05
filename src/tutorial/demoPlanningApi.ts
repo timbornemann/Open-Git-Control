@@ -61,6 +61,7 @@ export function createDemoPlanningApi(repo: DemoRepository): Partial<ElectronPla
     plannerGetData: async () => ok(structuredClone(data)),
     plannerGetWork: async (request) => ok({ itemId: request.itemId, revision: 'demo', commits: [], requests: [], recoveries: [] }),
     plannerInspectWork: async (request) => {
+      if (!repo.commits.length) return { success: false, error: 'Create a practice commit before starting task work.' };
       const item = data.items.find((entry) => entry.id === request.itemId);
       if (!item) return { success: false, error: 'Task not found.' };
       return ok({
@@ -74,6 +75,7 @@ export function createDemoPlanningApi(repo: DemoRepository): Partial<ElectronPla
       });
     },
     plannerStartWork: async (request) => {
+      if (!repo.commits.length) return { success: false, error: 'Create a practice commit before starting task work.' };
       const item = data.items.find((entry) => entry.id === request.itemId);
       if (!item || request.planId !== 'demo-work') return { success: false, error: 'Reload the task preview.' };
       repo.command('checkout', '-b', request.branchName, request.baseRef);
@@ -97,6 +99,7 @@ export function createDemoPlanningApi(repo: DemoRepository): Partial<ElectronPla
       return ok({ branch: request.branchName, item });
     },
     plannerRefreshWork: async (request) => {
+      if (!repo.commits.length) return { success: false, error: 'Create a practice commit before starting task work.' };
       const item = data.items.find((entry) => entry.id === request.itemId);
       return ok({
         itemId: request.itemId,

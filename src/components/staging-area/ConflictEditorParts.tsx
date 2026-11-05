@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { getConflictLineGutterKinds, splitContentLines, type ConflictGutterKind } from '@/utils/conflictLineGutter';
+import { useI18n } from '@/i18n';
 
 const gutterClassForKind = (kind: ConflictGutterKind): string => {
   switch (kind) {
@@ -56,6 +57,7 @@ export const ConflictManualEditor = React.forwardRef<
     onChange: (next: string) => void;
   }
 >(({ content, disabled, onChange }, ref) => {
+  const { tr } = useI18n();
   const lines = useMemo(() => splitContentLines(content), [content]);
   const gutterKinds = useMemo(() => getConflictLineGutterKinds(lines), [lines]);
   const textareaHeightPx = useMemo(() => {
@@ -66,7 +68,7 @@ export const ConflictManualEditor = React.forwardRef<
   }, [lines.length]);
 
   return (
-    <div className="conflict-manual-edit-scroll" ref={ref}>
+    <div className="conflict-manual-edit-scroll" ref={ref} data-tutorial="conflict-manual">
       <div className="conflict-manual-edit-sync">
         <div className="conflict-manual-gutter-col" aria-hidden>
           {lines.map((_, i) => {
@@ -88,6 +90,8 @@ export const ConflictManualEditor = React.forwardRef<
             })}
           </div>
           <textarea
+            aria-label={tr('Konfliktdatei bearbeiten', 'Edit conflict file')}
+            data-tutorial="conflict-content"
             className="conflict-manual-textarea"
             spellCheck={false}
             style={{ height: `${textareaHeightPx}px` }}

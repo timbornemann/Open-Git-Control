@@ -1,0 +1,24 @@
+{
+  "base": ["{\"z\":2,\"name\":\"OGC\",\"items\":[{\"id\":1,\"active\":true}]}", "{\"z\":2,\"name\":\"OGC\",\"items\":[{\"id\":1,\"active\":true}]}"],
+  "formatted": [
+    "{\n  \"z\": 2,\n  \"name\": \"OGC\",\n  \"items\": [\n    {\n      \"id\": 1,\n      \"active\": true\n    }\n  ]\n}",
+    "{\n  \"z\": 2,\n  \"name\": \"OGC\",\n  \"items\": [\n    {\n      \"id\": 1,\n      \"active\": true\n    }\n  ]\n}"
+  ],
+  "json-invalid": ["{\"name\":", "{\"name\":"],
+  "schema-contract": [
+    "{\n  \"type\": \"object\",\n  \"required\": [\"name\", \"items\", \"z\"],\n  \"additionalProperties\": false,\n  \"properties\": {\n    \"name\": { \"type\": \"string\" },\n    \"z\": { \"type\": \"integer\", \"minimum\": 0 },\n    \"items\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"required\": [\"id\", \"active\"],\n        \"additionalProperties\": false,\n        \"properties\": {\n          \"id\": { \"type\": \"integer\", \"minimum\": 1 },\n          \"active\": { \"type\": \"boolean\" }\n        }\n      }\n    }\n  }\n}",
+    "{\n  \"type\": \"object\",\n  \"required\": [\"name\", \"items\", \"z\"],\n  \"additionalProperties\": false,\n  \"properties\": {\n    \"name\": { \"type\": \"string\" },\n    \"z\": { \"type\": \"integer\", \"minimum\": 0 },\n    \"items\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"required\": [\"id\", \"active\"],\n        \"additionalProperties\": false,\n        \"properties\": {\n          \"id\": { \"type\": \"integer\", \"minimum\": 1 },\n          \"active\": { \"type\": \"boolean\" }\n        }\n      }\n    }\n  }\n}"
+  ],
+  "schema-failure": [
+    "{\"z\":-1,\"name\":42,\"items\":[{\"id\":0,\"active\":\"yes\"}],\"extra\":true}",
+    "{\"z\":-1,\"name\":42,\"items\":[{\"id\":0,\"active\":\"yes\"}],\"extra\":true}"
+  ],
+  "schema-invalid": ["{", "{"],
+  "yaml-base": ["z: 2\nname: OGC\nitems:\n    - id: 1\n      active: true\n", "z: 2\nname: OGC\nitems:\n    - id: 1\n      active: true\n"],
+  "yaml-formatted": ["z: 2\nname: OGC\nitems:\n  - id: 1\n    active: true\n", "z: 2\nname: OGC\nitems:\n  - id: 1\n    active: true\n"],
+  "yaml-invalid": ["name: OGC\nname: Duplicate\n", "name: OGC\nname: Duplicate\n"],
+  "sorted": [
+    "{\n  \"items\": [\n    {\n      \"active\": true,\n      \"id\": 1\n    }\n  ],\n  \"name\": \"OGC\",\n  \"z\": 2\n}",
+    "{\n  \"items\": [\n    {\n      \"active\": true,\n      \"id\": 1\n    }\n  ],\n  \"name\": \"OGC\",\n  \"z\": 2\n}"
+  ]
+}

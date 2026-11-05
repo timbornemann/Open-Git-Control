@@ -49,20 +49,22 @@ export const WorkingDirectoryFileStatusBar: React.FC<Props> = ({ text, encoding,
   const bytes = getEncodedTextByteLength(text, encoding, lineEnding);
   return (
     <div className="working-file-viewer__status" aria-label={tr('Dateiinformationen', 'File information')}>
-      <span title={tr('Größe des aktuellen Editorinhalts', 'Size of the current editor content')}>{formatBytes(bytes)}</span>
-      <span>
+      <span data-file-metric="bytes" title={tr('Größe des aktuellen Editorinhalts', 'Size of the current editor content')}>
+        {formatBytes(bytes)}
+      </span>
+      <span data-file-metric="characters">
         {metrics.characters.toLocaleString()} {tr('Zeichen', 'characters')}
       </span>
-      <span>
+      <span data-file-metric="words">
         {metrics.words.toLocaleString()} {tr('Wörter', 'words')}
       </span>
-      <span>
+      <span data-file-metric="lines">
         {metrics.lines.toLocaleString()} {tr('Zeilen', 'lines')}
       </span>
-      <span>{ENCODING_LABELS[encoding]}</span>
-      <span>{lineEnding === '\r\n' ? 'CRLF' : 'LF'}</span>
+      <span data-file-metric="encoding">{ENCODING_LABELS[encoding]}</span>
+      <span data-file-metric="line-ending">{lineEnding === '\r\n' ? 'CRLF' : 'LF'}</span>
       {modifiedAt && (
-        <span title={tr('Letzte Änderung auf dem Datenträger', 'Last modification on disk')}>
+        <span data-file-metric="modified" title={tr('Letzte Änderung auf dem Datenträger', 'Last modification on disk')}>
           {tr('Geändert', 'Modified')}: {formatDate(modifiedAt)}
         </span>
       )}

@@ -39,20 +39,31 @@ export const ConflictEditorToolbar = ({
                 )
               : t('generated.components.staging_area.conflictresolverpanel.ready_to_save_cfc68801')}
           </span>
-          <Button size="xs" variant="secondary" onClick={reloadActiveConflictEditor} disabled={conflictEditor.isSaving}>
+          <Button data-tutorial="conflict-reload" size="xs" variant="secondary" onClick={reloadActiveConflictEditor} disabled={conflictEditor.isSaving}>
             {t('generated.components.staging_area.conflictresolverpanel.reload_e5199249')}
           </Button>
         </div>
       </div>
       <div className="conflict-editor-toolbar-actions conflict-editor-toolbar-actions--resolver">
-        <Button variant="secondary" onClick={() => applyConflictChoiceToAll('ours')} disabled={conflictEditor.isSaving || conflictBlocksCount === 0}>
+        <Button
+          data-tutorial="conflict-all-ours"
+          variant="secondary"
+          onClick={() => applyConflictChoiceToAll('ours')}
+          disabled={conflictEditor.isSaving || conflictBlocksCount === 0}
+        >
           {t('generated.components.staging_area.conflictresolverpanel.all_current_version_070e33f1')}
         </Button>
-        <Button variant="secondary" onClick={() => applyConflictChoiceToAll('theirs')} disabled={conflictEditor.isSaving || conflictBlocksCount === 0}>
+        <Button
+          data-tutorial="conflict-all-theirs"
+          variant="secondary"
+          onClick={() => applyConflictChoiceToAll('theirs')}
+          disabled={conflictEditor.isSaving || conflictBlocksCount === 0}
+        >
           {t('generated.components.staging_area.conflictresolverpanel.all_incoming_version_24786320')}
         </Button>
         <div className="conflict-toolbar-divider" />
         <Button
+          data-tutorial="conflict-delete"
           variant="danger"
           disabled={conflictEditor.isSaving}
           onClick={() => {
@@ -66,6 +77,7 @@ export const ConflictEditorToolbar = ({
           {tr('Loeschung uebernehmen', 'Take deleted side')}
         </Button>
         <Button
+          data-tutorial="conflict-mark"
           variant="success"
           disabled={conflictEditor.isSaving || hasUnresolvedConflictMarkers}
           onClick={() => {

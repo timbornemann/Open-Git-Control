@@ -32,7 +32,7 @@ export const RepoCardHeader: React.FC<RepoCardHeaderProps> = ({ title, collapsed
   <div className="repo-card-header">
     <div className="repo-card-header-main">
       {typeof collapsed === 'boolean' && onToggleCollapsed ? (
-        <button className="repo-card-toggle" onClick={onToggleCollapsed} title={toggleTitle}>
+        <button className="repo-card-toggle" onClick={onToggleCollapsed} title={toggleTitle} aria-expanded={!collapsed}>
           {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
           <span className="repo-card-title" title={typeof title === 'string' ? title : undefined}>
             {title}

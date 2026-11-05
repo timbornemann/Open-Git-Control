@@ -150,7 +150,12 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
       {parsed.hunks.map((hunk, hunkIndex) => {
         const canStageHunks = !!onRepoChanged && !isTooLarge && (request.source === 'staged' || request.source === 'unstaged');
         return (
-          <div key={hunk.id} className={`diff-hunk ${activeHunkIndex === hunkIndex ? 'active' : ''}`} ref={(element) => setHunkRef(hunkIndex, element)}>
+          <div
+            key={hunk.id}
+            data-hunk={hunk.id}
+            className={`diff-hunk ${activeHunkIndex === hunkIndex ? 'active' : ''}`}
+            ref={(element) => setHunkRef(hunkIndex, element)}
+          >
             <div className="diff-hunk-header-row">
               <button className="diff-hunk-header" onClick={() => scrollToHunk(hunkIndex)}>
                 {hunk.header}
@@ -160,6 +165,7 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
                   {request.source === 'unstaged' && (
                     <>
                       <button
+                        data-tutorial="stage-hunk"
                         className="diff-hunk-action-btn"
                         disabled={isHunkOperationRunning}
                         onClick={() => applyHunk(hunk, parsed.fileHeader, 'stage')}
@@ -168,6 +174,7 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
                         {t('generated.components.diff_viewer.diffcontentpane.stage_a304b800')}
                       </button>
                       <button
+                        data-tutorial="discard-hunk"
                         className="diff-hunk-action-btn diff-hunk-action-btn--danger"
                         disabled={isHunkOperationRunning}
                         onClick={() => applyHunk(hunk, parsed.fileHeader, 'discard')}
@@ -179,6 +186,7 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
                   )}
                   {request.source === 'staged' && (
                     <button
+                      data-tutorial="unstage-hunk"
                       className="diff-hunk-action-btn"
                       disabled={isHunkOperationRunning}
                       onClick={() => applyHunk(hunk, parsed.fileHeader, 'unstage')}

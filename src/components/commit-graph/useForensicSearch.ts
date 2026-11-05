@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { GitCommandNameDto } from '@/types/gitDtos';
 import type { CatalogTranslateFn } from '@/i18n';
 import type { GitStatusDetailed } from '@/utils/gitParsing';
@@ -27,16 +27,19 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t, onError }: U
   const [forensicResults, setForensicResults] = useState<GraphNode[]>([]);
   const [forensicPathHistory, setForensicPathHistory] = useState<string[]>([]);
 
-  // Bumped on every repository change. A search started in repository A must not
-  // display its results in (or persist into) repository B.
+  // Results and their file actions belong to the exact submitted query. Clear
+  // them before painting changed fields, and discard earlier responses.
   const searchGenerationRef = useRef(0);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     searchGenerationRef.current += 1;
     setForensicResults([]);
     setForensicNoMatches(false);
     setForensicLoading(false);
-  }, [repoPath]);
+    return () => {
+      searchGenerationRef.current += 1;
+    };
+  }, [repoPath, forensicType, forensicPath, forensicValue, forensicStartLine, forensicEndLine]);
 
   useEffect(() => {
     try {
@@ -63,6 +66,7 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t, onError }: U
   }, [forensicPathHistory]);
 
   const resetForensicState = useCallback(() => {
+    searchGenerationRef.current += 1;
     setForensicResults([]);
     setForensicNoMatches(false);
     setForensicLoading(false);
@@ -119,7 +123,7 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t, onError }: U
     if (forensicType === 'line') {
       const start = Number(forensicStartLine);
       const end = Number(forensicEndLine);
-      if (!Number.isFinite(start) || !Number.isFinite(end) || start < 1 || end < start) {
+      if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 1 || end < start) {
         reportError(t('generated.components.commit_graph.useforensicsearch.invalid_line_range_please_check_start_end_295dd362'));
         setForensicResults([]);
         return;
@@ -153,7 +157,7 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t, onError }: U
       if (!isCurrent()) return;
       if (!success) {
         const message = String(error || t('generated.components.commit_graph.useforensicsearch.forensic_search_failed_e97e5ca2'));
-        const invalidPattern = /invalid|regex|regular expression|fatal/i.test(message);
+        const invalidPattern = forensicType === 'regex' && /invalid (?:regex|regular expression)\s*:/i.test(message);
         reportError(
           invalidPattern ? t('generated.components.commit_graph.useforensicsearch.invalid_regex_pattern_please_fix_the_expression_1ce435a7') : message,
         );

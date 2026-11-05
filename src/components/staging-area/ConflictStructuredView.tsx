@@ -21,7 +21,7 @@ export const ConflictStructuredView = ({
   const { t, tr } = useI18n();
 
   return (
-    <div className="conflict-structured-view">
+    <div className="conflict-structured-view" data-tutorial="conflict-comparison">
       <div className="conflict-block-header">
         <div className="conflict-block-header-meta">
           <span className="conflict-block-header-title">
@@ -40,13 +40,14 @@ export const ConflictStructuredView = ({
       </div>
 
       <div className="conflict-split-compare">
-        <div className="conflict-version-panel">
+        <div className="conflict-version-panel" data-tutorial="conflict-ours">
           <div className="conflict-version-header conflict-version-header--ours">
             <span className="conflict-version-title conflict-version-title--ours">
               {t('generated.components.staging_area.conflictresolverpanel.current_version_5aeac7d3')}{' '}
               {selectedConflictBlock.oursLabel ? `(${selectedConflictBlock.oursLabel})` : ''}
             </span>
             <Button
+              data-tutorial="conflict-take-ours"
               className="conflict-version-apply--ours"
               size="xs"
               variant="secondary"
@@ -64,13 +65,14 @@ export const ConflictStructuredView = ({
           </div>
         </div>
 
-        <div className="conflict-version-panel">
+        <div className="conflict-version-panel" data-tutorial="conflict-theirs">
           <div className="conflict-version-header conflict-version-header--theirs">
             <span className="conflict-version-title conflict-version-title--theirs">
               {t('generated.components.staging_area.conflictresolverpanel.incoming_version_321cfa46')}{' '}
               {selectedConflictBlock.theirsLabel ? `(${selectedConflictBlock.theirsLabel})` : ''}
             </span>
             <Button
+              data-tutorial="conflict-take-theirs"
               className="conflict-version-apply--theirs"
               size="xs"
               variant="secondary"
@@ -90,7 +92,7 @@ export const ConflictStructuredView = ({
       </div>
 
       <div className="conflict-take-both-row">
-        <Button variant="secondary" onClick={() => applyConflictChoiceToSelected('both')} disabled={isSaving}>
+        <Button data-tutorial="conflict-take-both" variant="secondary" onClick={() => applyConflictChoiceToSelected('both')} disabled={isSaving}>
           {t('generated.components.staging_area.conflictresolverpanel.take_both_versions_current_first_03b23e50')}
         </Button>
       </div>

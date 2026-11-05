@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { BookOpen, CheckCircle2, ChevronLeft, ChevronRight, RotateCcw, X } from 'lucide-react';
 import App from '@/App';
-import { useGitStore, useSettingsContext, useUIContext } from '@/contexts/AppStateContext';
+import { useGitStore, useSettingsContext, useUIContext, useRepositoryContext } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
 import { TUTORIAL_CHAPTERS, resolveTutorialRequest } from '@/shared/tutorial/catalog';
 import { tutorialText, type TutorialLaunchContext, type TutorialLaunchRequest, type TutorialStep } from '@/shared/tutorial/types';
@@ -16,12 +16,22 @@ import { useTutorialTarget } from './useTutorialTarget';
 import { useTutorialAutoAdvance } from './useTutorialAutoAdvance';
 import { useTutorialViewCompletion } from './useTutorialViewCompletion';
 import { useTutorialKeyboardNavigation } from './useTutorialKeyboardNavigation';
+import { useTutorialFocusNavigation } from './useTutorialFocusNavigation';
+import { prepareTutorialUi } from './prepareTutorialUi';
+import { prepareTutorialCache } from './prepareTutorialCache';
+import { useTutorialPreparation } from './useTutorialPreparation';
+import { useTutorialCompletion } from './useTutorialCompletion';
+import { useTutorialStaging } from './useTutorialStaging';
+import { ChapterChooser } from './TutorialLessonChooser';
+import { useTutorialOverlayBounds } from './useTutorialOverlayBounds';
+import { TutorialDirectoryPicker } from './TutorialDirectoryPicker';
 import './tutorial.css';
 
 type Demo = ReturnType<typeof createDemoApi>;
 type Checkpoint = { chapterIndex: number; stepIndex: number; demo: Demo; key: number };
 
 export function TutorialApp({ context, initial }: { context: TutorialLaunchContext; initial: Demo }) {
+  useTutorialOverlayBounds();
   const initialChapter = TUTORIAL_CHAPTERS.findIndex((chapter) => chapter.id === context.request.chapterId);
   const initialStep = Math.max(
     0,
@@ -33,6 +43,7 @@ export function TutorialApp({ context, initial }: { context: TutorialLaunchConte
   const [completed, setCompleted] = useState(context.progress.completedChapters);
   const [choosing, setChoosing] = useState(false);
   const [finished, setFinished] = useState(false);
+  useTutorialFocusNavigation(!choosing && !finished && !error && !loading);
   const transition = useRef(false);
   const advancing = useRef(false);
   const acknowledgedSteps = useRef(new Map<string, Set<string>>());
@@ -44,8 +55,13 @@ export function TutorialApp({ context, initial }: { context: TutorialLaunchConte
     [],
   );
   const tr = (de: string, en: string) => (context.language === 'de' ? de : en);
-  const enter = async (chapterIndex: number, stepIndex = 0) => {
+  const enter = async (chapterIndex: number, stepIndex = 0, forward = false) => {
     if (transition.current) return;
+    const target = TUTORIAL_CHAPTERS[chapterIndex].steps[stepIndex];
+    if (forward && chapterIndex === checkpoint.chapterIndex && stepIndex === checkpoint.stepIndex + 1 && target.continue) {
+      setCheckpoint((current) => ({ ...current, stepIndex }));
+      return;
+    }
     transition.current = true;
     setLoading(true);
     setFinished(false);
@@ -56,11 +72,13 @@ export function TutorialApp({ context, initial }: { context: TutorialLaunchConte
       // These stores and both storage areas belong to this transient renderer.
       // The normal application's JS realm and partition are never touched.
       resetTutorialUi();
+      prepareTutorialUi(target, context.language);
       const demo = createDemoApi(
         { ...context, progress: { ...context.progress, completedChapters: completed } },
         TUTORIAL_CHAPTERS[chapterIndex].steps[stepIndex],
       );
       setIsolatedElectronApi(demo.api);
+      prepareTutorialCache(demo.repo);
       if (mounted.current) setCheckpoint((current) => ({ chapterIndex, stepIndex, demo, key: current.key + 1 }));
     } catch {
       setError(tr('Der Schritt konnte nicht geladen werden. Bitte wiederhole ihn.', 'The step could not be loaded. Please retry.'));
@@ -95,7 +113,7 @@ export function TutorialApp({ context, initial }: { context: TutorialLaunchConte
       if (!skipped) acknowledged.add(chapter.steps[checkpoint.stepIndex].id);
       acknowledgedSteps.current.set(chapter.id, acknowledged);
       if (checkpoint.stepIndex < chapter.steps.length - 1) {
-        await enter(checkpoint.chapterIndex, checkpoint.stepIndex + 1);
+        await enter(checkpoint.chapterIndex, checkpoint.stepIndex + 1, !skipped);
         return;
       }
       if (!skipped && acknowledged.size === chapter.steps.length) {
@@ -125,7 +143,14 @@ export function TutorialApp({ context, initial }: { context: TutorialLaunchConte
           {tr('Einführung beenden', 'End introduction')}
         </button>
       </header>
-      <div className="tutorial-workspace" aria-busy={loading}>
+      <div
+        className="tutorial-workspace"
+        data-overlay-boundary
+        data-tutorial-chapter={chapter.id}
+        data-graph-metadata={/ \.commit-(hash|author|date|refs|stats)$/.test(chapter.steps[checkpoint.stepIndex].target) || undefined}
+        aria-busy={loading}
+      >
+        <TutorialDirectoryPicker sessionKey={checkpoint.key} />
         {loading ? (
           <p role="status" className="tutorial-loading">
             {tr('Übung wird vorbereitet …', 'Preparing the exercise …')}
@@ -133,6 +158,7 @@ export function TutorialApp({ context, initial }: { context: TutorialLaunchConte
         ) : (
           <App key={checkpoint.key}>
             <TutorialCoach
+              language={context.language}
               step={chapter.steps[checkpoint.stepIndex]}
               chapterTitle={tutorialText(chapter.title, context.language)}
               index={checkpoint.stepIndex}
@@ -162,6 +188,7 @@ export function TutorialApp({ context, initial }: { context: TutorialLaunchConte
           language={context.language}
           completed={completed}
           finished={finished}
+          currentChapter={chapter.id}
           onSelect={(index) => void enter(index)}
           onDismiss={() => setChoosing(false)}
         />
@@ -171,6 +198,7 @@ export function TutorialApp({ context, initial }: { context: TutorialLaunchConte
 }
 
 function TutorialCoach({
+  language,
   step,
   chapterTitle,
   index,
@@ -183,6 +211,7 @@ function TutorialCoach({
   onRetry,
   onChoose,
 }: {
+  language: 'de' | 'en';
   step: TutorialStep;
   chapterTitle: string;
   index: number;
@@ -195,48 +224,32 @@ function TutorialCoach({
   onRetry: () => void;
   onChoose: () => void;
 }) {
-  const { tr, language } = useI18n();
+  const { tr } = useI18n();
   const ui = useUIContext();
   const settings = useSettingsContext();
+  const { activeRepo } = useRepositoryContext();
+  useTutorialStaging(step, activeRepo);
   const selectedCommit = useGitStore((state) => state.selectedCommit);
   const revision = useSyncExternalStore(demo.repo.subscribe, () => demo.repo.revision);
   const analyticsChanged = useAnalyticsWorkspace((state) => Object.keys(state.filters).length > 0);
-  const { rect, workspace, missing } = useTutorialTarget(step.target);
+  const prepared = useTutorialPreparation(step, language);
+  const { rect, workspace, missing } = useTutorialTarget(step.target, prepared);
   const heading = useRef<HTMLHeadingElement>(null);
   const inspect = useTutorialViewCompletion(step.action);
+  const completedControl = useTutorialCompletion(step, language, prepared, demo.repo);
   useEffect(() => {
-    ui.setActiveTab(step.area);
+    if (ui.activeTab !== step.area) ui.setActiveTab(step.area);
     if (step.settingsTab) settings.onSelectSettingsTab(step.settingsTab);
     if (step.openView === 'runConfig') ui.onOpenRunConfig();
+    if (step.openView === 'remoteConfig') ui.onOpenRemoteConfig();
+    if (step.openView === 'secretScanAllowlist') ui.onOpenSecretScanAllowlist();
+    if (step.openView === 'repositoryPublication') ui.onOpenRepositoryPublication?.();
     heading.current?.focus();
     void window.tutorialHost!.ready();
     // One entry action per checkpoint, never push the user back after navigation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step.id]);
-  useEffect(() => {
-    const selector =
-      step.openView === 'recovery'
-        ? '[data-tutorial="open-recovery"]'
-        : step.openView === 'files'
-          ? '[data-tutorial="open-files"]'
-          : step.openView === 'diff'
-            ? '[data-tutorial="staging"] .staging-file-row[aria-label="README.md"]'
-            : null;
-    if (!selector) return;
-    let opened = false;
-    const open = () => {
-      const control = document.querySelector<HTMLElement>(selector);
-      if (!opened && control && !(control instanceof HTMLButtonElement && control.disabled)) {
-        opened = true;
-        control.click();
-      }
-    };
-    const observer = new MutationObserver(open);
-    observer.observe(document.querySelector('.tutorial-workspace')!, { childList: true, subtree: true });
-    open();
-    return () => observer.disconnect();
-  }, [step.openView]);
-  const done =
+  const actionDone =
     !step.action ||
     (step.action.startsWith('navigate:')
       ? ui.activeTab === step.action.slice(9)
@@ -247,8 +260,10 @@ function TutorialCoach({
           : step.action === 'analytics-filtered'
             ? analyticsChanged
             : demo.repo.events.has(step.action));
-  useTutorialAutoAdvance(step.id, done, Boolean(step.action) && autoAdvanceEnabled, onNext);
-  useTutorialKeyboardNavigation({ canGoBack: index > 0, canGoNext: done, onBack, onNext });
+  const done = prepared && actionDone && (!step.completion || completedControl);
+  const interactive = Boolean(step.action || step.completion);
+  useTutorialAutoAdvance(step.id, done, interactive && autoAdvanceEnabled, onNext);
+  useTutorialKeyboardNavigation({ enabled: autoAdvanceEnabled, canGoBack: index > 0, canGoNext: done, onBack, onNext });
   const controls = document.getElementById('tutorial-controls');
   useEffect(() => {
     if (controls) heading.current?.focus();
@@ -258,7 +273,17 @@ function TutorialCoach({
       {rect && workspace && <TutorialSpotlight target={rect} workspace={workspace} />}
       {controls &&
         createPortal(
-          <section className="tutorial-coach" aria-labelledby="tutorial-step-title" data-step={step.id} data-revision={revision}>
+          <section
+            className="tutorial-coach"
+            aria-labelledby="tutorial-step-title"
+            aria-busy={!prepared}
+            data-step={step.id}
+            data-target={step.target}
+            data-revision={revision}
+            onClick={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
             <div className="tutorial-coach-copy">
               <p className="tutorial-coach-progress">
                 {chapterTitle} · {index + 1} / {total}
@@ -270,7 +295,7 @@ function TutorialCoach({
               <span role="status" className={done ? 'tutorial-status completed' : 'tutorial-status'}>
                 {missing ? (
                   tr('Das Bedienelement ist gerade nicht sichtbar.', 'The control is currently not visible.')
-                ) : step.action ? (
+                ) : interactive ? (
                   done ? (
                     <>
                       <CheckCircle2 size={14} aria-hidden="true" />
@@ -311,6 +336,7 @@ function TutorialCoach({
                   <ChevronRight size={14} aria-hidden="true" />
                 </button>
               </div>
+              <span className="tutorial-keyboard-hint">{tr('← Zurück · Weiter →', '← Back · Next →')}</span>
               <div className="tutorial-action-row">
                 <button type="button" className="tutorial-link" onClick={onSkip}>
                   {tr('Schritt überspringen', 'Skip step')}
@@ -330,75 +356,5 @@ function TutorialCoach({
           controls,
         )}
     </>
-  );
-}
-
-function ChapterChooser({
-  language,
-  completed,
-  finished,
-  onSelect,
-  onDismiss,
-}: {
-  language: 'de' | 'en';
-  completed: string[];
-  finished: boolean;
-  onSelect: (index: number) => void;
-  onDismiss: () => void;
-}) {
-  const root = useRef<HTMLDivElement>(null);
-  const tr = (de: string, en: string) => (language === 'de' ? de : en);
-  useEffect(() => {
-    const focused = document.activeElement as HTMLElement | null;
-    root.current?.querySelector<HTMLButtonElement>('button')?.focus();
-    return () => focused?.focus();
-  }, []);
-  return (
-    <div
-      className="tutorial-welcome-backdrop"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') onDismiss();
-        if (event.key === 'Tab') {
-          const buttons = [...root.current!.querySelectorAll<HTMLButtonElement>('button')];
-          const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
-          event.preventDefault();
-          buttons[(index + (event.shiftKey ? buttons.length - 1 : 1)) % buttons.length].focus();
-        }
-      }}
-    >
-      <div className="tutorial-chapter-chooser" ref={root} role="dialog" aria-modal="true" aria-labelledby="tutorial-chapters-title">
-        <header>
-          <div>
-            <p className="tutorial-eyebrow">{tr('Dein Lernpfad', 'Your learning path')}</p>
-            <h2 id="tutorial-chapters-title">
-              {finished
-                ? tr('Kapitel beendet. Was möchtest du als Nächstes lernen?', 'Chapter finished. What would you like to learn next?')
-                : tr('Wähle dein Thema', 'Choose your topic')}
-            </h2>
-          </div>
-          <button type="button" className="tutorial-button" aria-label={tr('Kapitelwahl schließen', 'Close chapter selection')} onClick={onDismiss}>
-            <X size={16} />
-          </button>
-        </header>
-        <div className="tutorial-chapter-list">
-          {TUTORIAL_CHAPTERS.map((chapter, index) => (
-            <button type="button" key={chapter.id} onClick={() => onSelect(index)}>
-              <span>
-                <strong>{tutorialText(chapter.title, language)}</strong>
-                <small>{tutorialText(chapter.description, language)}</small>
-              </span>
-              {completed.includes(chapter.id) ? (
-                <CheckCircle2 size={18} aria-label={tr('Abgeschlossen', 'Completed')} />
-              ) : (
-                <ChevronRight size={18} aria-hidden="true" />
-              )}
-            </button>
-          ))}
-        </div>
-        <button type="button" className="tutorial-button" onClick={() => void window.tutorialHost!.close()}>
-          {tr('Zur App zurückkehren', 'Return to the app')}
-        </button>
-      </div>
-    </div>
   );
 }

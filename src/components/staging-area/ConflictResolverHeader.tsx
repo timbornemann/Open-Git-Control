@@ -65,10 +65,16 @@ export const ConflictResolverHeader = ({
         {onMergeContinue && onMergeAbort ? (
           <div className="conflict-action-group">
             <span className="conflict-action-group-label">{t('generated.components.layout.main.mainprimarypane.merge_83b759bf')}</span>
-            <button className="staging-btn-sm conflict-action-btn" onClick={onMergeContinue} disabled={isGitActionRunning || isNavigationBusy}>
+            <button
+              data-tutorial="conflict-continue"
+              className="staging-btn-sm conflict-action-btn"
+              onClick={onMergeContinue}
+              disabled={isGitActionRunning || isNavigationBusy}
+            >
               {t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}
             </button>
             <button
+              data-tutorial="conflict-abort"
               className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger"
               onClick={onMergeAbort}
               disabled={isGitActionRunning || isNavigationBusy}
@@ -78,12 +84,18 @@ export const ConflictResolverHeader = ({
           </div>
         ) : null}
         {onRebaseContinue && onRebaseAbort ? (
-          <div className="conflict-action-group">
+          <div className="conflict-action-group" data-tutorial="rebase-actions">
             <span className="conflict-action-group-label">{t('generated.components.layout.main.mainprimarypane.rebase_26c8effa')}</span>
-            <button className="staging-btn-sm conflict-action-btn" onClick={onRebaseContinue} disabled={isGitActionRunning || isNavigationBusy}>
+            <button
+              data-tutorial="rebase-continue"
+              className="staging-btn-sm conflict-action-btn"
+              onClick={onRebaseContinue}
+              disabled={isGitActionRunning || isNavigationBusy}
+            >
               {t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}
             </button>
             <button
+              data-tutorial="rebase-abort"
               className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger"
               onClick={onRebaseAbort}
               disabled={isGitActionRunning || isNavigationBusy}
@@ -93,14 +105,20 @@ export const ConflictResolverHeader = ({
           </div>
         ) : null}
         {onCherryPickContinue && onCherryPickAbort ? (
-          <div className="conflict-action-group">
+          <div className="conflict-action-group" data-tutorial="cherry-pick-actions">
             <span className="conflict-action-group-label">{t('generated.components.layout.main.mainprimarypane.cherry_pick_7f8a9b0c')}</span>
-            <button className="staging-btn-sm conflict-action-btn" onClick={onCherryPickContinue} disabled={isGitActionRunning || isNavigationBusy}>
+            <button
+              data-tutorial="cherry-pick-continue"
+              className="staging-btn-sm conflict-action-btn"
+              onClick={onCherryPickContinue}
+              disabled={isGitActionRunning || isNavigationBusy}
+            >
               {t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}
             </button>
             <button
               className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger"
               onClick={onCherryPickAbort}
+              data-tutorial="cherry-pick-abort"
               disabled={isGitActionRunning || isNavigationBusy}
             >
               {t('generated.components.confirm.cancel_035b7526')}
@@ -138,6 +156,7 @@ export const ConflictResolverHeader = ({
         aria-label={t('generated.components.staging_area.conflictresolverpanel.conflict_navigation_across_all_files_cfe632bc')}
       >
         <button
+          data-tutorial="conflict-previous"
           className="conflict-global-nav-btn conflict-global-nav-btn--prev"
           onClick={() => {
             void navigateToPreviousConflict();
@@ -146,7 +165,12 @@ export const ConflictResolverHeader = ({
         >
           {'<'} {t('generated.components.layout.main.maininspectorpane.back_c5e2bc76')}
         </button>
-        <div className="conflict-global-nav-meta">
+        <div
+          className="conflict-global-nav-meta"
+          data-tutorial="conflict-position"
+          data-conflict-file-index={activeConflictFileIndex + 1}
+          data-conflict-block-index={conflictBlocksCount ? safeSelectedConflictBlockIndex + 1 : 0}
+        >
           <span className="conflict-global-nav-title">{t('generated.components.staging_area.conflictresolverpanel.conflict_navigation_515daa8f')}</span>
           <span className="conflict-global-nav-state">
             {isStructuredConflictViewLocked
@@ -165,6 +189,7 @@ export const ConflictResolverHeader = ({
           </span>
         </div>
         <button
+          data-tutorial="conflict-next"
           className="conflict-global-nav-btn conflict-global-nav-btn--next"
           onClick={() => {
             void navigateToNextConflict();

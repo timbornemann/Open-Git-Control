@@ -245,5 +245,5 @@ export const WorkingDirectoryCodeEditor: React.FC<Props> = ({
     viewRef.current?.dispatch({ effects: readOnlyCompartmentRef.current.reconfigure([EditorState.readOnly.of(readOnly), EditorView.editable.of(!readOnly)]) });
   }, [readOnly]);
 
-  return <div ref={hostRef} className="working-file-viewer__code-editor" aria-label={`Code editor for ${path}`} />;
+  return <div data-tutorial="file-editor" ref={hostRef} className="working-file-viewer__code-editor" aria-label={`Code editor for ${path}`} />;
 };

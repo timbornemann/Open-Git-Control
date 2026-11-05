@@ -1,0 +1,6 @@
+{
+  "note": ["# Übungsnotiz\n\nOriginal\n", "# Practice note\n\nOriginal\n"],
+  "other": ["# Andere Fassung\n\nVariante\n", "# Other version\n\nVariant\n"],
+  "keep": ["Diese Datei bleibt erhalten.\n", "This file is preserved.\n"],
+  "created": ["# Meine Notiz\n\nErster Entwurf\n", "# My note\n\nFirst draft\n"]
+}

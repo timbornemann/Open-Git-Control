@@ -89,7 +89,7 @@ export function BranchChangeReviewDialog({ dialog, onChanged, onWorktree }: { di
       onSecondaryAction={!result && !busy && !blocked && step === 1 && !restore ? () => void run('park') : undefined}
       secondaryActionLabel={tr('Parken und wechseln', 'Park and switch')}
     >
-      <div className="branch-change" aria-busy={busy}>
+      <div className="branch-change" aria-busy={busy} data-branch-change-mode={restore ? 'restore' : 'switch'}>
         {restore && Boolean(dialog.alternatives && dialog.alternatives.length > 1) && !result && (
           <label>
             {tr('Geparkte Änderungen auswählen', 'Choose parked changes')}
@@ -214,7 +214,7 @@ export function BranchChangeReviewDialog({ dialog, onChanged, onWorktree }: { di
               <>
                 <label>
                   {tr('Stash-Name', 'Stash name')}
-                  <input value={name} maxLength={500} onChange={(event) => setName(event.target.value)} disabled={busy} />
+                  <input data-tutorial="branch-change-name" value={name} maxLength={500} onChange={(event) => setName(event.target.value)} disabled={busy} />
                 </label>
                 <p>
                   {tr(
@@ -222,7 +222,7 @@ export function BranchChangeReviewDialog({ dialog, onChanged, onWorktree }: { di
                     'Carry restores all changes on the target branch. Park keeps the stash for your return.',
                   )}
                 </p>
-                <button type="button" disabled={busy} onClick={() => setStep(0)}>
+                <button type="button" data-tutorial="branch-change-review" disabled={busy} onClick={() => setStep(0)}>
                   {tr('Zurück zur Prüfung', 'Back to review')}
                 </button>
               </>
@@ -233,7 +233,7 @@ export function BranchChangeReviewDialog({ dialog, onChanged, onWorktree }: { di
                 'Staged, unstaged and new files are saved together. Ignored files are excluded.',
               )}
             </p>
-            <button type="button" disabled={busy} onClick={() => void review()}>
+            <button type="button" data-tutorial="branch-change-refresh" disabled={busy} onClick={() => void review()}>
               {tr('Erneut prüfen', 'Review again')}
             </button>
           </>

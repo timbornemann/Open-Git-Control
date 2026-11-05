@@ -48,6 +48,7 @@ export const buildCommitHistoryMenuActions = ({
         "Applies this commit's changes as a new commit on your current branch.",
       ),
       icon: 'CP',
+      tutorialTarget: 'graph-cherry-pick',
       action: () =>
         runGitAction(gitClient.buildCherryPickCommitArgs(hash), tr(`Cherry-Pick von ${shortHash} erfolgreich.`, `Successfully cherry-picked ${shortHash}.`)),
     },
@@ -61,6 +62,7 @@ export const buildCommitHistoryMenuActions = ({
               "Creates a new commit that undoes this commit's changes. The original commit stays in the history.",
             ),
             icon: 'RV',
+            tutorialTarget: 'graph-revert',
             action: () =>
               runGitAction(
                 gitClient.buildRevertCommitArgs(hash, { noEdit: true }),
@@ -81,6 +83,7 @@ export const buildCommitHistoryMenuActions = ({
         'Moves your branch back to this commit. Your files and the changes staged for the next commit stay unchanged.',
       ),
       icon: 'RS',
+      tutorialTarget: 'graph-reset-soft',
       action: () => {
         setConfirmDialog({
           variant: 'confirm',
@@ -109,6 +112,7 @@ export const buildCommitHistoryMenuActions = ({
         'Moves your branch back to this commit and clears the staging selection. Your files stay unchanged; you can stage the changes again.',
       ),
       icon: 'RM',
+      tutorialTarget: 'graph-reset-mixed',
       action: () => {
         setConfirmDialog({
           variant: 'confirm',
@@ -140,6 +144,7 @@ export const buildCommitHistoryMenuActions = ({
         'Resets your branch and tracked files to this commit. Uncommitted changes will be lost.',
       ),
       icon: 'RH',
+      tutorialTarget: 'graph-reset-hard',
       danger: true,
       action: () => {
         setConfirmDialog({
@@ -167,6 +172,7 @@ export const buildCommitHistoryMenuActions = ({
     },
     {
       label: tr(`Interaktiver Rebase bis ${shortHash}`, `Interactive rebase through ${shortHash}`),
+      tutorialTarget: 'graph-interactive-rebase',
       description: tr(
         'Lässt dich diesen und die folgenden Commits umordnen, bearbeiten, zusammenfassen oder entfernen. Dabei wird die Commit-Historie neu geschrieben.',
         'Lets you reorder, edit, combine or remove this commit and the commits after it. This rewrites the commit history.',
@@ -246,14 +252,15 @@ export const buildCommitHistoryMenuActions = ({
 
             if (!repoPath) return;
             const result = await gitClient.startInteractiveRebase(baseHash, lines, repoPath);
+            // A conflict can move HEAD and change the index before Git stops.
+            refreshCommits();
+            refreshWorkingTreeStatus();
             if (!result.success) {
               setToast({ msg: result.error || tr('Interaktiver Rebase fehlgeschlagen.', 'Interactive rebase failed.'), isError: true });
               return;
             }
 
             setToast({ msg: tr('Interaktiver Rebase gestartet.', 'Interactive rebase started.'), isError: false });
-            refreshCommits();
-            refreshWorkingTreeStatus();
           },
         });
       },
@@ -286,6 +293,7 @@ export const buildCommitHistoryMenuActions = ({
         'Creates a new commit that undoes the changes introduced by this merge. The existing commits stay in the history.',
       ),
       icon: 'MR',
+      tutorialTarget: 'graph-revert-merge',
       action: () => {
         setConfirmDialog({
           variant: 'confirm',

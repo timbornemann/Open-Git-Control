@@ -98,6 +98,7 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
         <div className="staging-actions">
           {section === 'staged' && (
             <button
+              data-tutorial="unstage-file"
               className="staging-btn"
               disabled={fileOps.isMutating}
               onClick={(event) => {
@@ -112,6 +113,7 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
           {section === 'unstaged' && (
             <>
               <button
+                data-tutorial="stage-file"
                 className="staging-btn"
                 disabled={fileOps.isMutating}
                 onClick={(event) => {
@@ -130,6 +132,7 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
                   fileOps.discardFile(entry.path);
                 }}
                 title={t('generated.components.diff_viewer.diffcontentpane.discard_23504c1c')}
+                data-tutorial="discard-file"
               >
                 x
               </button>
@@ -138,6 +141,7 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
           {section === 'untracked' && (
             <>
               <button
+                data-tutorial="stage-file"
                 className="staging-btn"
                 disabled={fileOps.isMutating}
                 onClick={(event) => {
@@ -156,6 +160,7 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
                   fileOps.deleteUntracked(entry.path);
                 }}
                 title={t('generated.components.staging_area.stagingfilesections.delete_e5186a63')}
+                data-tutorial="delete-untracked-file"
               >
                 x
               </button>
@@ -171,7 +176,7 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
   return (
     <>
       {visibleStaged.length > 0 && (
-        <div className="staging-section" style={{ flex: getSectionFlex(visibleStaged.length) }}>
+        <div className="staging-section" data-tutorial="staged-files" style={{ flex: getSectionFlex(visibleStaged.length) }}>
           <SectionHeader
             title={t('generated.components.staging_area.stagingfilesections.staged_changes_12b1a849')}
             count={visibleStaged.length}
@@ -182,6 +187,7 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
                 className="staging-btn-sm"
                 disabled={fileOps.isMutating}
                 onClick={fileOps.unstageAll}
+                data-tutorial="unstage-section"
                 title={
                   fileOps.isFiltering
                     ? tr('Angezeigte Dateien aus dem Staging entfernen', 'Unstage displayed files')
@@ -204,7 +210,7 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
       )}
 
       {visibleUnstaged.length > 0 && (
-        <div className="staging-section" style={{ flex: getSectionFlex(visibleUnstaged.length) }}>
+        <div className="staging-section" data-tutorial="unstaged-files" style={{ flex: getSectionFlex(visibleUnstaged.length) }}>
           <SectionHeader
             title={t('generated.components.staging_area.stagingfilesections.changes_69ca4922')}
             count={visibleUnstaged.length}
@@ -213,6 +219,7 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
             actions={
               <>
                 <button
+                  data-tutorial="stage-modified-section"
                   className="staging-btn-sm"
                   disabled={fileOps.isMutating}
                   onClick={fileOps.stageAllUnstaged}
@@ -221,6 +228,7 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
                   + {allLabel}
                 </button>
                 <button
+                  data-tutorial="discard-modified-section"
                   className="staging-btn-sm danger"
                   disabled={fileOps.isMutating}
                   onClick={fileOps.discardAll}
@@ -243,13 +251,14 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
       )}
 
       {visibleUntracked.length > 0 && (
-        <div className="staging-section" style={{ flex: getSectionFlex(visibleUntracked.length) }}>
+        <div className="staging-section" data-tutorial="untracked-files" style={{ flex: getSectionFlex(visibleUntracked.length) }}>
           <SectionHeader
             title={t('generated.components.staging_area.stagingfilesections.untracked_d2518623')}
             count={visibleUntracked.length}
             color="var(--status-untracked)"
             actions={
               <button
+                data-tutorial="stage-untracked-section"
                 className="staging-btn-sm"
                 disabled={fileOps.isMutating}
                 onClick={fileOps.stageAllUntracked}

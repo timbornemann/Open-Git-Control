@@ -1,0 +1,17 @@
+{
+  "base": {
+    "sha256": "ab4ff0780be67e1eef32bd012331f8896311f5fbe326c1d65dc542b99987aca3",
+    "sha1": "7bc66476986592c7f775ed8feb60155a43f50877",
+    "md5": "dc613611c48e661c98f32e14eb3641b5"
+  },
+  "edited": {
+    "sha256": "d31da273034025fc190ca326fa11e4a21214e031f4bc808901770af926f7f5a4",
+    "sha1": "0dad6816b03d718581b914618048b7b4d2ce7869",
+    "md5": "bd7690cbf3eee56dacfc98fc78229ee8"
+  },
+  "bom": {
+    "sha256": "ca7860afe163506f591eb6c672ba8847942647d50faaa6232a66d0a0d8cf69d0",
+    "sha1": "88219b25250ea17d2455b0ff7158d462dcac0713",
+    "md5": "98f2e1ba5a67ad5e885ffd4c9a9c5223"
+  }
+}

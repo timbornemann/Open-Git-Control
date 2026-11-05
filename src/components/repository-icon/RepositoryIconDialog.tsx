@@ -166,25 +166,26 @@ export function RepositoryIconDialog({ repoPath, onClose }: { repoPath: string; 
         </header>
         <fieldset disabled={busy} className="repository-icon-modes">
           <legend>{tr('Anzeige', 'Display')}</legend>
-          <label>
+          <label data-tutorial="repo-icon-auto">
             <input type="radio" name="repository-icon-mode" checked={mode === 'auto'} onChange={() => setMode('auto')} />{' '}
             {tr('Automatisch auswählen', 'Choose automatically')}
           </label>
-          <label>
+          <label data-tutorial="repo-icon-manual">
             <input type="radio" name="repository-icon-mode" checked={mode === 'manual'} onChange={() => setMode('manual')} />{' '}
             {tr('Bilddatei auswählen', 'Choose image')}
           </label>
-          <label>
+          <label data-tutorial="repo-icon-initials">
             <input type="radio" name="repository-icon-mode" checked={mode === 'initials'} onChange={() => setMode('initials')} />{' '}
             {tr('Buchstaben verwenden', 'Use initials')}
           </label>
         </fieldset>
         <div className="repository-icon-dialog__actions">
-          <button type="button" disabled={busy} onClick={() => void browse()}>
+          <button type="button" data-tutorial="repo-icon-browse" disabled={busy} onClick={() => void browse()}>
             <Image size={15} /> {tr('Andere Bilddatei im Repository auswählen', 'Choose another image in the repository')}
           </button>
           <button
             type="button"
+            data-tutorial="repo-icon-rescan"
             disabled={busy}
             onClick={() =>
               void run(async () => {
@@ -243,7 +244,7 @@ export function RepositoryIconDialog({ repoPath, onClose }: { repoPath: string; 
           <button type="button" onClick={close}>
             {tr('Abbrechen', 'Cancel')}
           </button>
-          <button type="button" className="is-primary" disabled={busy || !state} onClick={() => void save()}>
+          <button type="button" data-tutorial="repo-icon-save" className="is-primary" disabled={busy || !state} onClick={() => void save()}>
             {tr('Speichern', 'Save')}
           </button>
         </footer>

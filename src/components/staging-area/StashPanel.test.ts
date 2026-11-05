@@ -3,6 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gitClient } from '@/services/gitClient';
+import { AppStateSlicesProvider, type AppStateSlicesValue } from '@/contexts/AppStateContext';
 import { StashPanel } from './StashPanel';
 
 const deferred = <T>() => {
@@ -62,6 +63,36 @@ const flush = async () => {
 };
 
 describe('StashPanel operation guards', () => {
+  it('finishes an in-flight list without restarting it after unrelated repository state changes', async () => {
+    const pending = deferred<{ success: true; data: ReturnType<typeof stash>[] }>();
+    const getStashes = vi.spyOn(gitClient, 'getStashes').mockImplementation(() => pending.promise);
+    const container = document.getElementById('root')!;
+    const root = createRoot(container);
+    const onToast = vi.fn();
+    const render = (revision: number) =>
+      root.render(
+        createElement(AppStateSlicesProvider, {
+          value: { settings: {}, workflow: {}, ui: {}, repository: { activeRepo: 'C:/repos/a', revision, onToast } } as unknown as AppStateSlicesValue,
+          children: createElement(StashPanel, { repoPath: 'C:/repos/a' }),
+        }),
+      );
+    try {
+      act(() => render(1));
+      act(() => container.querySelector<HTMLButtonElement>('[data-tutorial=stash-panel-toggle]')!.click());
+      await flush();
+      expect(getStashes).toHaveBeenCalledOnce();
+      act(() => render(2));
+      await act(async () => {
+        pending.resolve({ success: true, data: [stash('stash@{0}', 'Saved work')] });
+      });
+      await flush();
+      expect(getStashes).toHaveBeenCalledOnce();
+      expect(container.textContent).toContain('Saved work');
+      expect(container.textContent).not.toContain('Loading stashes');
+    } finally {
+      act(() => root.unmount());
+    }
+  });
   it('runs a confirmed drop only once when the confirmation is clicked twice', async () => {
     vi.spyOn(gitClient, 'getStashes').mockResolvedValue({ success: true, data: [stash('stash@{0}', 'first stash')] });
     const dropResult = deferred<{ success: true; data: string }>();

@@ -54,6 +54,15 @@ export const ForensicSearchPanel: React.FC<ForensicSearchPanelProps> = ({
   t,
 }) => (
   <div
+    className="forensic-search-panel"
+    data-tutorial="forensic-search"
+    data-active={activeSearchPanel === 'forensic'}
+    data-search-mode={forensicType}
+    data-search-path={forensicPath}
+    data-search-query={forensicValue}
+    data-search-count={forensicResults.length}
+    data-search-loading={forensicLoading}
+    data-search-empty={forensicNoMatches}
     style={{
       borderBottom: '1px solid var(--border-color)',
       padding: '8px',
@@ -68,6 +77,7 @@ export const ForensicSearchPanel: React.FC<ForensicSearchPanelProps> = ({
         {t('generated.components.commit_graph.commitsearchtoolbar.search_mode_c1fd11c1')}
         <select
           value={activeSearchPanel}
+          data-tutorial="forensic-view"
           onChange={(e) => {
             const mode = e.target.value as SearchPanel;
             setActiveSearchPanel(mode);
@@ -89,6 +99,7 @@ export const ForensicSearchPanel: React.FC<ForensicSearchPanelProps> = ({
         {t('generated.components.commit_graph.forensicsearchpanel.forensics_mode_9959f7ff')}
         <select
           value={forensicType}
+          data-tutorial="forensic-kind"
           onChange={(e) => {
             setForensicType(e.target.value as ForensicSearchType);
           }}
@@ -113,6 +124,8 @@ export const ForensicSearchPanel: React.FC<ForensicSearchPanelProps> = ({
       <input
         type="text"
         value={forensicPath}
+        data-tutorial="forensic-path"
+        aria-label={t('generated.components.commit_graph.forensicsearchpanel.file_path_e_g_src_components_commit_graph_commitgraph_ts_7f8b3fdd')}
         onChange={(e) => setForensicPath(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') void runForensicSearch();
@@ -141,6 +154,8 @@ export const ForensicSearchPanel: React.FC<ForensicSearchPanelProps> = ({
             type="number"
             min={1}
             value={forensicStartLine}
+            data-tutorial="forensic-start"
+            aria-label={t('generated.components.commit_graph.forensicsearchpanel.start_line_74f7b73e')}
             onChange={(e) => setForensicStartLine(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') void runForensicSearch();
@@ -160,6 +175,8 @@ export const ForensicSearchPanel: React.FC<ForensicSearchPanelProps> = ({
             type="number"
             min={1}
             value={forensicEndLine}
+            data-tutorial="forensic-end"
+            aria-label={t('generated.components.commit_graph.forensicsearchpanel.end_line_99a9732d')}
             onChange={(e) => setForensicEndLine(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') void runForensicSearch();
@@ -180,6 +197,12 @@ export const ForensicSearchPanel: React.FC<ForensicSearchPanelProps> = ({
         <input
           type="text"
           value={forensicValue}
+          data-tutorial="forensic-query"
+          aria-label={
+            forensicType === 'regex'
+              ? t('generated.components.commit_graph.forensicsearchpanel.regex_pattern_git_g_4abed712')
+              : t('generated.components.commit_graph.forensicsearchpanel.search_string_in_file_content_git_s_b3bddb68')
+          }
           onChange={(e) => setForensicValue(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') void runForensicSearch();
@@ -204,6 +227,7 @@ export const ForensicSearchPanel: React.FC<ForensicSearchPanelProps> = ({
       <button
         onClick={() => void runForensicSearch()}
         disabled={forensicLoading}
+        data-tutorial="forensic-run"
         style={{
           border: '1px solid var(--border-color)',
           backgroundColor: 'var(--bg-panel)',
@@ -229,6 +253,7 @@ export const ForensicSearchPanel: React.FC<ForensicSearchPanelProps> = ({
         {forensicResults.map((node) => (
           <div
             key={`forensic-${node.commit.hash}`}
+            data-forensic-hash={node.commit.hash}
             style={{
               border: '1px solid var(--border-color)',
               borderRadius: 6,
@@ -241,6 +266,7 @@ export const ForensicSearchPanel: React.FC<ForensicSearchPanelProps> = ({
           >
             <button
               onClick={() => onSelectCommit?.(node.commit.hash)}
+              data-tutorial="forensic-commit"
               style={{ border: 'none', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontFamily: 'monospace' }}
             >
               {node.commit.abbrevHash}
@@ -249,6 +275,7 @@ export const ForensicSearchPanel: React.FC<ForensicSearchPanelProps> = ({
               {node.commit.subject}
             </span>
             <button
+              data-tutorial="forensic-diff"
               onClick={() =>
                 onOpenDiff?.({
                   source: 'commit',

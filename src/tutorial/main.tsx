@@ -6,6 +6,8 @@ import { setIsolatedElectronApi } from '@/services/electronApi';
 import { TUTORIAL_CHAPTERS, resolveTutorialRequest } from '@/shared/tutorial/catalog';
 import { createDemoApi } from './demoApi';
 import { TutorialApp } from './TutorialApp';
+import { prepareTutorialUi } from './prepareTutorialUi';
+import { prepareTutorialCache } from './prepareTutorialCache';
 import '@/index.css';
 
 async function start() {
@@ -16,8 +18,10 @@ async function start() {
   const chapter = TUTORIAL_CHAPTERS.find((entry) => entry.id === request.chapterId)!;
   const step = chapter.steps.find((entry) => entry.id === request.stepId) || chapter.steps[0];
   const initial = createDemoApi(context, step);
+  prepareTutorialUi(step, context.language);
   setIsolatedElectronApi(initial.api);
   await startDataRuntime();
+  prepareTutorialCache(initial.repo);
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <TutorialApp context={context} initial={initial} />

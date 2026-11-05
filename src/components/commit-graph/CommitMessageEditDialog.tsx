@@ -134,19 +134,20 @@ export function CommitMessageEditDialog({ repoPath, commitHash, onClose, onSaved
       )}
       {inspection && (
         <>
-          <dl className="dialog-context-list">
+          <dl className="dialog-context-list" data-tutorial="reword-context">
             <dt>{tr('Branch', 'Branch')}</dt>
-            <dd>{inspection.expectedBranch.replace(/^refs\/heads\//, '') || '—'}</dd>
+            <dd data-tutorial="reword-branch">{inspection.expectedBranch.replace(/^refs\/heads\//, '') || '—'}</dd>
             <dt>Commit</dt>
-            <dd>{commitHash.slice(0, 12)}</dd>
+            <dd data-tutorial="reword-commit">{commitHash.slice(0, 12)}</dd>
             <dt>{tr('Folgecommits', 'Following commits')}</dt>
-            <dd>{inspection.commitCount ? inspection.commitCount - 1 : '—'}</dd>
+            <dd data-tutorial="reword-following">{inspection.commitCount ? inspection.commitCount - 1 : '—'}</dd>
           </dl>
           <div className="dialog-inputs">
             <label className="dialog-field">
               <span>{tr('Titel', 'Title')}</span>
               <input
                 ref={titleRef}
+                data-tutorial="reword-title"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 disabled={busy || Boolean(inspection.blockReason)}
@@ -157,6 +158,7 @@ export function CommitMessageEditDialog({ repoPath, commitHash, onClose, onSaved
               <span>{tr('Beschreibung', 'Description')}</span>
               <textarea
                 rows={6}
+                data-tutorial="reword-description"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 disabled={busy || Boolean(inspection.blockReason)}
@@ -164,7 +166,7 @@ export function CommitMessageEditDialog({ repoPath, commitHash, onClose, onSaved
               />
             </label>
           </div>
-          <p className="dialog-message">
+          <p className="dialog-message" data-tutorial="reword-impact">
             {tr(
               'Dieser Commit und seine Folgecommits erhalten neue Hashes. Nur ungepushte Historie wird geändert. Eine Sicherung bleibt im Recovery Center erhalten.',
               'This commit and its descendants receive new hashes. Only unpublished history is changed. A backup remains available in the Recovery Center.',
@@ -179,7 +181,7 @@ export function CommitMessageEditDialog({ repoPath, commitHash, onClose, onSaved
             </p>
           )}
           {inspection.blockReason && (
-            <div role="alert" className="dialog-validation">
+            <div role="alert" className="dialog-validation" data-tutorial="reword-block" data-block-reason={inspection.blockReason}>
               {commitEditBlockText(inspection.blockReason, tr)}
               {inspection.blockDetail.includes(': ') && <p>{inspection.blockDetail.split(': ').slice(1).join(': ')}</p>}
             </div>

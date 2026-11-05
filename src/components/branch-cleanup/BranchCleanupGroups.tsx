@@ -29,7 +29,7 @@ export function BranchCleanupGroups({ inspection, selected, disabled, onToggle, 
                 {kind === 'local' ? tr('Lokale Vorschläge', 'Local suggestions') : tr('Server-Vorschläge', 'Server suggestions')} ({candidates.length})
               </h3>
               {candidates.some((candidate) => candidate.classification === 'merged') && (
-                <Button variant="ghost" size="sm" disabled={disabled} onClick={() => onSelectMerged(kind)}>
+                <Button variant="ghost" size="sm" data-cleanup-select-merged={kind} disabled={disabled} onClick={() => onSelectMerged(kind)}>
                   {tr('Zusammengeführte auswählen', 'Select merged')}
                 </Button>
               )}

@@ -120,54 +120,115 @@ export const LocalRepositoryContextMenu: React.FC<Props> = ({
         <div className="repo-list-context-header" title={menu.path}>
           {repoName(menu.path)}
         </div>
-        <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onOpenRepoTab(menu.path))}>
+        <button
+          type="button"
+          role="menuitem"
+          data-tutorial="repo-action-open"
+          className="repo-list-context-action"
+          onClick={() => run(() => onOpenRepoTab(menu.path))}
+        >
           <FolderGit2 size={14} /> {tr('Repo-Tab öffnen', 'Open repository tab')}
         </button>
         {onOpenRepositoryAnalytics && (
-          <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onOpenRepositoryAnalytics(menu.path))}>
+          <button
+            type="button"
+            role="menuitem"
+            data-tutorial="repo-action-analytics"
+            className="repo-list-context-action"
+            onClick={() => run(() => onOpenRepositoryAnalytics(menu.path))}
+          >
             <BarChart3 size={14} /> {tr('Statistik & Analyse', 'Statistics & analytics')}
           </button>
         )}
-        <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onOpenRunConfig(menu.path))}>
+        <button
+          type="button"
+          role="menuitem"
+          data-tutorial="repo-action-run"
+          className="repo-list-context-action"
+          onClick={() => run(() => onOpenRunConfig(menu.path))}
+        >
           <Settings2 size={14} /> {tr('Run-Konfiguration', 'Run configuration')}
         </button>
         <button
           type="button"
           role="menuitem"
+          data-tutorial="repo-action-allowlist"
           className="repo-list-context-action"
           onClick={() => run(() => onOpenSecretScanAllowlist?.(menu.path))}
           disabled={!onOpenSecretScanAllowlist}
         >
           <Settings2 size={14} /> {tr('Secret-Scan-Allowlist', 'Secret-scan allowlist')}
         </button>
-        <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onOpenRemoteConfig(menu.path))}>
+        <button
+          type="button"
+          role="menuitem"
+          data-tutorial="repo-action-remote"
+          className="repo-list-context-action"
+          onClick={() => run(() => onOpenRemoteConfig(menu.path))}
+        >
           <Settings2 size={14} /> {tr('Remote-Konfiguration', 'Remote configuration')}
         </button>
         {onPublishRepository && (
-          <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onPublishRepository(menu.path))}>
+          <button
+            type="button"
+            role="menuitem"
+            data-tutorial="repo-action-publish"
+            className="repo-list-context-action"
+            onClick={() => run(() => onPublishRepository(menu.path))}
+          >
             <ArrowUpRight size={14} /> {tr('Repository veröffentlichen', 'Publish repository')}
           </button>
         )}
-        <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => void openFolder())}>
+        <button
+          type="button"
+          role="menuitem"
+          data-tutorial="repo-action-folder"
+          className="repo-list-context-action"
+          onClick={() => run(() => void openFolder())}
+        >
           <FolderOpen size={14} /> {tr('Im Dateimanager öffnen', 'Open in file manager')}
         </button>
-        <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => void copyPath())}>
+        <button type="button" role="menuitem" data-tutorial="repo-action-copy" className="repo-list-context-action" onClick={() => run(() => void copyPath())}>
           <Copy size={14} /> {tr('Pfad kopieren', 'Copy path')}
         </button>
         {remoteUrl && (
-          <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => void openRemote())}>
+          <button
+            type="button"
+            role="menuitem"
+            data-tutorial="repo-action-browser"
+            className="repo-list-context-action"
+            onClick={() => run(() => void openRemote())}
+          >
             <ArrowUpRight size={14} /> {tr('Remote im Browser öffnen', 'Open remote in browser')}
           </button>
         )}
         <div className="repo-list-context-separator" role="separator" />
-        <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => openRepositoryIconDialog(menu.path))}>
+        <button
+          type="button"
+          role="menuitem"
+          data-tutorial="repo-action-icon"
+          className="repo-list-context-action"
+          onClick={() => run(() => openRepositoryIconDialog(menu.path))}
+        >
           <Image size={14} /> {tr('Repository-Logo …', 'Repository logo …')}
         </button>
-        <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onTogglePin(menu.path))}>
+        <button
+          type="button"
+          role="menuitem"
+          data-tutorial="repo-action-pin"
+          className="repo-list-context-action"
+          onClick={() => run(() => onTogglePin(menu.path))}
+        >
           {pinned ? <PinOff size={14} /> : <Pin size={14} />}
           {pinned ? tr('Pin entfernen', 'Remove pin') : tr('Repo anheften', 'Pin repository')}
         </button>
-        <button type="button" role="menuitem" className="repo-list-context-action danger" onClick={() => run(() => onRemove(menu.path))}>
+        <button
+          type="button"
+          role="menuitem"
+          data-tutorial="repo-action-remove"
+          className="repo-list-context-action danger"
+          onClick={() => run(() => onRemove(menu.path))}
+        >
           <X size={14} /> {tr('Aus Liste entfernen', 'Remove from list')}
         </button>
       </div>

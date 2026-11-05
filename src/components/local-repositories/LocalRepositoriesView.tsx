@@ -70,10 +70,10 @@ export const LocalRepositoriesView: React.FC = () => {
           <p>{tr('Deine gespeicherten Arbeitsverzeichnisse an einem Ort.', 'Your saved working directories in one place.')}</p>
         </div>
         <div className="local-repositories-view__hero-actions">
-          <button type="button" onClick={repository.onOpenFolder}>
+          <button type="button" data-tutorial="repo-add" onClick={repository.onOpenFolder}>
             <FolderPlus size={16} /> {tr('Hinzufügen', 'Add repository')}
           </button>
-          <button type="button" onClick={repository.onCloneByUrl}>
+          <button type="button" data-tutorial="repo-clone" onClick={repository.onCloneByUrl}>
             <Download size={16} /> {tr('Klonen', 'Clone')}
           </button>
         </div>
@@ -83,16 +83,24 @@ export const LocalRepositoriesView: React.FC = () => {
           <Search size={16} />
           <input
             type="search"
+            data-tutorial="repo-search"
             aria-label={tr('Lokale Repositories durchsuchen', 'Search local repositories')}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder={tr('Name oder Pfad suchen …', 'Search name or path …')}
           />
         </label>
-        <button type="button" className={pinnedOnly ? 'is-selected' : ''} aria-pressed={pinnedOnly} onClick={() => setPinnedOnly((value) => !value)}>
+        <button
+          type="button"
+          data-tutorial="repo-pinned-filter"
+          className={pinnedOnly ? 'is-selected' : ''}
+          aria-pressed={pinnedOnly}
+          onClick={() => setPinnedOnly((value) => !value)}
+        >
           <Pin size={14} /> {tr('Angeheftet', 'Pinned')}
         </button>
         <select
+          data-tutorial="repo-sort"
           aria-label={t('generated.components.sidebar.repolist.repository_sort_order_4a096d7e')}
           value={repository.repoSortBy}
           onChange={(event) => repository.onSetRepoSortBy(event.target.value as RepoSortByDto)}
@@ -159,6 +167,7 @@ export const LocalRepositoriesView: React.FC = () => {
                   <button
                     type="button"
                     className={`local-repositories-view__row-action${pinned ? ' is-pinned' : ''}`}
+                    data-tutorial="repo-pin"
                     aria-label={pinned ? tr(`${name}: Pin entfernen`, `${name}: remove pin`) : tr(`${name}: anheften`, `${name}: pin`)}
                     aria-pressed={pinned}
                     onClick={() => repository.onToggleRepoPin(path)}
@@ -168,6 +177,7 @@ export const LocalRepositoriesView: React.FC = () => {
                   <button
                     type="button"
                     className="local-repositories-view__row-action"
+                    data-tutorial="repo-menu"
                     aria-label={tr(`Aktionen für ${name}`, `Actions for ${name}`)}
                     onClick={(event) => {
                       const rect = event.currentTarget.getBoundingClientRect();

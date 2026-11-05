@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gitClient } from '@/services/gitClient';
 import { RepositoryLicensePanel } from './RepositoryLicensePanel';
+import { CancelledError } from '@tanstack/react-query';
 
 const setConfirmDialog = vi.fn();
 const onToast = vi.fn();
@@ -234,5 +235,23 @@ describe('RepositoryLicensePanel', () => {
     await flush();
 
     expect(onToast).toHaveBeenCalledWith('Permission denied', true);
+  });
+  it('retries a cold license read cancelled by a concurrent repository mutation', async () => {
+    vi.mocked(gitClient.readRepoFile)
+      .mockRejectedValueOnce(new CancelledError({ silent: true }))
+      .mockResolvedValueOnce({ success: true, data: 'existing license' });
+    await act(async () => root.render(createElement(RepositoryLicensePanel, { repoPath: 'C:/Repos/Example' })));
+    await flush();
+    expect(gitClient.readRepoFile).toHaveBeenNthCalledWith(2, 'LICENSE', 'C:/Repos/Example');
+    expect(host.querySelector('.repo-card-toggle')?.getAttribute('aria-expanded')).toBe('false');
+    await act(async () => expandLicensePanel());
+    expect(host.textContent).toContain('LICENSE');
+    expect(onToast).not.toHaveBeenCalled();
+  });
+  it('reports a genuine read error whose message is CancelledError', async () => {
+    vi.mocked(gitClient.readRepoFile).mockRejectedValueOnce(new Error('CancelledError'));
+    await act(async () => root.render(createElement(RepositoryLicensePanel, { repoPath: 'C:/Repos/Example' })));
+    await flush();
+    expect(onToast).toHaveBeenCalledWith('CancelledError', true);
   });
 });

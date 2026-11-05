@@ -1,0 +1,26 @@
+{
+  "base": [
+    "# OGC-Lernprojekt\n\nBegrüßung: Hallo!\n\n## Arbeitsweise\nDateien prüfen.\nÄnderungen speichern.\nErgebnisse vergleichen.\n\nAbschluss: Bis bald!\n",
+    "# OGC-Lernprojekt\n\nGreeting: Hello!\n\n## Workflow\nReview files.\nSave changes.\nCompare results.\n\nClosing: See you soon!\n"
+  ],
+  "current": [
+    "# OGC-Lernprojekt\n\nBegrüßung: Hallo Welt!\n\n## Arbeitsweise\nDateien prüfen.\nÄnderungen speichern.\nErgebnisse vergleichen.\n\nAbschluss: Auf Wiedersehen!\n",
+    "# OGC-Lernprojekt\n\nGreeting: Hello world!\n\n## Workflow\nReview files.\nSave changes.\nCompare results.\n\nClosing: Goodbye!\n"
+  ],
+  "incoming": [
+    "# OGC-Lernprojekt\n\nBegrüßung: Hallo Team!\n\n## Arbeitsweise\nDateien prüfen.\nÄnderungen speichern.\nErgebnisse vergleichen.\n\nAbschluss: Bis morgen!\n",
+    "# OGC-Lernprojekt\n\nGreeting: Hello team!\n\n## Workflow\nReview files.\nSave changes.\nCompare results.\n\nClosing: See you tomorrow!\n"
+  ],
+  "first-incoming": [
+    "# OGC-Lernprojekt\n\nBegrüßung: Hallo Team!\n\n## Arbeitsweise\nDateien prüfen.\nÄnderungen speichern.\nErgebnisse vergleichen.\n\n<<<<<<< HEAD\nAbschluss: Auf Wiedersehen!\n=======\nAbschluss: Bis morgen!\n>>>>>>> feature/begruessung\n",
+    "# OGC-Lernprojekt\n\nGreeting: Hello team!\n\n## Workflow\nReview files.\nSave changes.\nCompare results.\n\n<<<<<<< HEAD\nClosing: Goodbye!\n=======\nClosing: See you tomorrow!\n>>>>>>> feature/begruessung\n"
+  ],
+  "mixed": [
+    "# OGC-Lernprojekt\n\nBegrüßung: Hallo Team!\n\n## Arbeitsweise\nDateien prüfen.\nÄnderungen speichern.\nErgebnisse vergleichen.\n\nAbschluss: Auf Wiedersehen!\n",
+    "# OGC-Lernprojekt\n\nGreeting: Hello team!\n\n## Workflow\nReview files.\nSave changes.\nCompare results.\n\nClosing: Goodbye!\n"
+  ],
+  "license-current": [
+    "MIT License\n\nCopyright (c) 2026 OGC-Lernprojekt\n\nBeispieldatei für die interaktive Einführung. / Sample file for the interactive introduction.\n\nProjekthinweis: Änderungen sorgfältig prüfen.\n",
+    "MIT License\n\nCopyright (c) 2026 OGC-Lernprojekt\n\nBeispieldatei für die interaktive Einführung. / Sample file for the interactive introduction.\n\nProject note: Review changes carefully.\n"
+  ]
+}

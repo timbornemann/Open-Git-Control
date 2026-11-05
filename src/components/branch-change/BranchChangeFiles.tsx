@@ -77,7 +77,12 @@ function ChangePreview({ inspection, selection }: { inspection: BranchChangeInsp
   }, [inspection, file, group]);
   const parsed = useMemo(() => parseDiff(data.text), [data.text]);
   return (
-    <div className="branch-change-preview" aria-label={tr('Änderungsvorschau', 'Change preview')}>
+    <div
+      className="branch-change-preview"
+      data-branch-change-source={group}
+      data-branch-change-path={file.path}
+      aria-label={tr('Änderungsvorschau', 'Change preview')}
+    >
       <DiffContentPane
         request={{ path: file.path, source: 'commit' }}
         viewMode="unified"
@@ -112,9 +117,9 @@ export function BranchChangeFiles({ inspection }: { inspection: BranchChangeInsp
   ];
   return (
     <>
-      <div className="branch-change-files">
+      <div className="branch-change-files" data-branch-change-plan={inspection.planId}>
         {groups.map((group) => (
-          <section key={group.id}>
+          <section key={group.id} data-branch-change-group={group.id}>
             <h4>
               {group.label} ({group.files.length})
             </h4>
@@ -124,6 +129,7 @@ export function BranchChangeFiles({ inspection }: { inspection: BranchChangeInsp
                   <li key={file.path}>
                     <button
                       type="button"
+                      data-branch-change-path={file.path}
                       onClick={() => setSelected({ file, group: group.id })}
                       aria-pressed={selected?.file === file && selected?.group === group.id}
                     >

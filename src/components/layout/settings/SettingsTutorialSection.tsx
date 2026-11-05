@@ -3,6 +3,7 @@ import { BookOpen, CheckCircle2 } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { TUTORIAL_CHAPTERS } from '@/shared/tutorial/catalog';
 import { TUTORIAL_QUESTION_STEPS } from '@/shared/tutorial/catalogSteps';
+import { TUTORIAL_SECTIONS, tutorialSection, tutorialSearchText } from '@/shared/tutorial/curriculum';
 import { tutorialText } from '@/shared/tutorial/types';
 import { launchTutorial, tutorialProgress, tutorialAvailable } from '@/tutorial/entryApi';
 import { getElectronApi } from '@/services/electronApi';
@@ -41,11 +42,7 @@ export function SettingsTutorialSection() {
       .finally(() => setBusy(false));
   };
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  const chapters = TUTORIAL_CHAPTERS.filter((chapter) =>
-    terms.every((term) =>
-      `${chapter.title.join(' ')} ${chapter.description.join(' ')} ${chapter.question.join(' ')} ${chapter.keywords}`.toLocaleLowerCase().includes(term),
-    ),
-  );
+  const chapters = TUTORIAL_CHAPTERS.filter((chapter) => terms.every((term) => tutorialSearchText(chapter).includes(term)));
   return (
     <section aria-labelledby="settings-tutorial-title" data-tutorial="help">
       <div className="tutorial-help-intro">
@@ -54,12 +51,12 @@ export function SettingsTutorialSection() {
         </h3>
         <p className="tutorial-entry-muted">
           {tr(
-            'Starte die Grundtour oder springe direkt zu deiner Frage. Jede Übung beginnt mit frischen Beispieldaten. Deine Projekte und Einstellungen bleiben erhalten.',
-            'Start the basic tour or jump straight to your question. Every exercise starts with fresh sample data. Your projects and settings are preserved.',
+            'Beginne mit der Übersicht und wähle anschließend Detaillektionen nach Bereich. Du kannst auch direkt zu einem einzelnen Schritt springen. Neue Einstiege verwenden frische Beispieldaten; innerhalb einer Lektion bleiben deine Übungseingaben erhalten.',
+            'Begin with the overview, then choose detailed lessons by area. You can also jump to an individual step. Each new entry uses fresh sample data; your practice inputs are retained as you progress through a lesson.',
           )}
         </p>
         <label>
-          <span className="tutorial-entry-muted">{tr('Kapitel und Fragen durchsuchen', 'Search chapters and questions')}</span>
+          <span className="tutorial-entry-muted">{tr('Lektionen, Schritte und Fragen durchsuchen', 'Search lessons, steps and questions')}</span>
           <input className="ui-field" type="search" value={query} onChange={(event) => setQuery(event.target.value)} />
         </label>
         {!tutorialAvailable() && (
@@ -73,32 +70,61 @@ export function SettingsTutorialSection() {
           </p>
         )}
       </div>
-      <div className="tutorial-help-grid">
-        {chapters.map((chapter) => (
-          <article className="tutorial-help-card" key={chapter.id}>
-            <BookOpen size={20} aria-hidden="true" />
-            <h3>{tutorialText(chapter.title, language)}</h3>
-            {completed.includes(chapter.id) && (
-              <span className="tutorial-help-completed">
-                <CheckCircle2 size={14} aria-hidden="true" />
-                {tr('Abgeschlossen', 'Completed')}
-              </span>
-            )}
-            <p>{tutorialText(chapter.description, language)}</p>
-            <button
-              type="button"
-              className="tutorial-help-question"
-              disabled={busy || !tutorialAvailable()}
-              onClick={() => start(chapter.id, TUTORIAL_QUESTION_STEPS[chapter.id])}
-            >
-              {tutorialText(chapter.question, language)}
-            </button>
-            <button type="button" className="tutorial-button" disabled={busy || !tutorialAvailable()} onClick={() => start(chapter.id)}>
-              {completed.includes(chapter.id) ? tr('Erneut üben', 'Practice again') : tr('Kapitel starten', 'Start chapter')}
-            </button>
-          </article>
-        ))}
-      </div>
+      {TUTORIAL_SECTIONS.map((section) => {
+        const lessons = chapters.filter((chapter) => tutorialSection(chapter) === section.id);
+        return (
+          lessons.length > 0 && (
+            <section className="tutorial-help-section" key={section.id}>
+              <h3>{tutorialText(section.title, language)}</h3>
+              <div className="tutorial-help-grid">
+                {lessons.map((chapter) => (
+                  <article className="tutorial-help-card" key={chapter.id}>
+                    <BookOpen size={20} aria-hidden="true" />
+                    <h3>{tutorialText(chapter.title, language)}</h3>
+                    {completed.includes(chapter.id) && (
+                      <span className="tutorial-help-completed">
+                        <CheckCircle2 size={14} aria-hidden="true" />
+                        {tr('Abgeschlossen', 'Completed')}
+                      </span>
+                    )}
+                    <p>{tutorialText(chapter.description, language)}</p>
+                    <details className="tutorial-help-steps" open={terms.length > 0}>
+                      <summary>
+                        {chapter.steps.length} {tr('Schritte ansehen oder einzeln starten', 'steps: view or start individually')}
+                      </summary>
+                      <ol>
+                        {chapter.steps.map((step) => (
+                          <li key={step.id}>
+                            <button
+                              type="button"
+                              className="tutorial-help-question"
+                              disabled={busy || !tutorialAvailable()}
+                              onClick={() => start(chapter.id, step.id)}
+                            >
+                              {tutorialText(step.title, language)}
+                            </button>
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                    <button
+                      type="button"
+                      className="tutorial-help-question"
+                      disabled={busy || !tutorialAvailable()}
+                      onClick={() => start(chapter.id, TUTORIAL_QUESTION_STEPS[chapter.id])}
+                    >
+                      {tutorialText(chapter.question, language)}
+                    </button>
+                    <button type="button" className="tutorial-button" disabled={busy || !tutorialAvailable()} onClick={() => start(chapter.id)}>
+                      {completed.includes(chapter.id) ? tr('Erneut üben', 'Practice again') : tr('Lektion starten', 'Start lesson')}
+                    </button>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )
+        );
+      })}
       {!chapters.length && <p>{tr('Keine passende Hilfe gefunden. Versuche einen anderen Begriff.', 'No matching help. Try a different search term.')}</p>}
     </section>
   );

@@ -6,9 +6,7 @@ import { repositorySecretScanAllowlistClient } from '@/services/repositorySecret
 import { SECRET_SCAN_ALLOWLIST_PATH, type RepositorySecretScanAllowlistDto } from '@/types/repositorySecretScanAllowlist';
 import { validateSecretScanAllowlist } from '@/shared/secretScanAllowlistValidation';
 import './repository-security.css';
-
-type Draft = { text: string; version: string; savedText: string };
-const drafts = new Map<string, Draft>();
+import { allowlistDrafts as drafts, type AllowlistDraft as Draft } from './allowlistDrafts';
 
 export function RepositorySecretScanAllowlistView() {
   const { activeRepo, triggerRefresh, onToast } = useRepositoryContext();

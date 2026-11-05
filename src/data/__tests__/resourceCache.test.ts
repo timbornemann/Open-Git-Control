@@ -19,6 +19,30 @@ const tick = () =>
   });
 
 describe('shared resource cache', () => {
+  it.each(['show', 'list'])('reads stash %s without invalidating work or history and refreshes it after a stash write', async (operation) => {
+    const path = '/stash-read-' + operation;
+    const status = resourceKey('git', 'getWorkingTreeSnapshot', [path]);
+    const history = resourceKey('git', 'getCommitLogPage', [{ repoPath: path }]);
+    const stash = resourceKey('git', 'runGitCommandForRepo', [path, 'stash', operation]);
+    updateResource(status, { success: true, data: 'fresh status' });
+    updateResource(history, { success: true, data: 'fresh history' });
+    const request = vi.fn(async (_repo: string, _command: string, ..._args: string[]) => ({ success: true, data: 'saved versions' }));
+    const client = cachedClient('git', { runGitCommandForRepo: request });
+    await Promise.all([client.runGitCommandForRepo(path, 'stash', operation), client.runGitCommandForRepo(path, 'stash', operation)]);
+    expect(request).toHaveBeenCalledOnce();
+    expect(queryClient.getQueryState(status)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(history)?.isInvalidated).toBe(false);
+    // Stack positions can refer to different objects after an external stash
+    // operation. A later read must stay fresh while concurrent reads coalesce.
+    request.mockResolvedValue({ success: true, data: 'New saved versions' });
+    expect((await client.runGitCommandForRepo(path, 'stash', operation)).data).toBe('New saved versions');
+    await client.runGitCommandForRepo(path, 'stash', 'drop', 'stash@{0}');
+    expect(queryClient.getQueryState(stash)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(status)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(history)?.isInvalidated).toBe(true);
+    await client.runGitCommandForRepo(path, 'stash', operation);
+    expect(request).toHaveBeenCalledTimes(4);
+  });
   it('reads primary-branch protection without invalidating workspace data and refreshes it after a rename', async () => {
     const status = resourceKey('git', 'runGitCommandForRepo', ['/protection-repo', 'status']);
     const protection = resourceKey('git', 'runGitCommandForRepo', ['/protection-repo', 'protectedBranches']);

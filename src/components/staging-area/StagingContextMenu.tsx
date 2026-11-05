@@ -23,6 +23,15 @@ export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextM
 
   useLayoutEffect(() => {
     if (!contextMenu) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    menuRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+    return () => {
+      if (previous?.isConnected) previous.focus();
+    };
+  }, [contextMenu]);
+
+  useLayoutEffect(() => {
+    if (!contextMenu) return;
     // A file near the bottom or right edge of the window must not anchor the
     // menu at the raw click point: the number of items varies (ignore rules,
     // stash actions, ...), so an unclamped position can push part of the menu
@@ -170,6 +179,7 @@ export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextM
             closeContextMenu();
             fileOps.stashFile(contextEntry.path, contextSection);
           }}
+          data-tutorial="stash-file"
         >
           <span className="ctx-menu-icon">ST</span>
           {t('generated.components.staging_area.stagingcontextmenu.stash_file_4af4bc1d')}
@@ -181,6 +191,7 @@ export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextM
             closeContextMenu();
             fileOps.stashAll();
           }}
+          data-tutorial="stash-all"
         >
           <span className="ctx-menu-icon">ALL</span>
           {t('generated.components.staging_area.stagingcontextmenu.stash_all_changes_e6f3a2ed')}
@@ -192,6 +203,7 @@ export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextM
             closeContextMenu();
             fileOps.addIgnoreRule(contextEntry, contextSection, escapeGitignoreLiteralPath(toGitPath(contextEntry.path)));
           }}
+          data-tutorial="ignore-file"
         >
           <span className="ctx-menu-icon">IG</span>
           {t('generated.components.staging_area.stagingcontextmenu.add_file_to_gitignore_45f071fe')}
@@ -216,6 +228,7 @@ export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextM
               closeContextMenu();
               fileOps.addIgnoreRule(contextEntry, contextSection, `${escapeGitignoreLiteralPath(contextDir)}/`);
             }}
+            data-tutorial="ignore-folder"
           >
             <span className="ctx-menu-icon">DIR</span>
             {tr(`Ordner ignorieren (${contextDir}/)`, `Ignore folder (${contextDir}/)`)}
@@ -228,6 +241,7 @@ export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextM
               closeContextMenu();
               fileOps.addIgnoreRule(contextEntry, contextSection, `${escapeGitignoreLiteralPath(contextTopDir)}/`);
             }}
+            data-tutorial="ignore-parent"
           >
             <span className="ctx-menu-icon">TOP</span>
             {tr(`Oberordner ignorieren (${contextTopDir}/)`, `Ignore top-level folder (${contextTopDir}/)`)}
@@ -240,6 +254,7 @@ export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextM
               closeContextMenu();
               fileOps.addIgnoreRule(contextEntry, contextSection, contextExtPattern);
             }}
+            data-tutorial="ignore-type"
           >
             <span className="ctx-menu-icon">EXT</span>
             {tr(`Dateityp ignorieren (${contextExtPattern})`, `Ignore file type (${contextExtPattern})`)}

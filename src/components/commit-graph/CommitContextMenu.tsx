@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { CatalogTranslateFn, TranslateFn } from '@/i18n';
 import type { GraphNode } from '@/utils/graphLayout';
@@ -22,6 +22,7 @@ export type MenuAction = {
   icon: string;
   danger?: boolean;
   separator?: boolean;
+  tutorialTarget?: string;
   action: () => void;
 };
 
@@ -69,16 +70,31 @@ export const CommitContextMenu: React.FC<CommitContextMenuProps> = ({
   t,
   tr,
 }) => {
+  useLayoutEffect(() => {
+    if (!contextMenuPlacement?.ready) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    contextMenuRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });
+    return () => {
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, [contextMenu, contextMenuPlacement?.ready, contextMenuRef]);
   const primaryMenu = menuActions.slice(0, 4);
   const tailMenu = menuActions.slice(4);
   const showMergePanel = Boolean(mergeContextPayload && canMergeBranches);
 
   const renderMenuRow = (item: MenuAction, idx: number) => {
     if (item.separator) {
-      return <div key={`sep-${idx}`} className="ctx-menu-sep" />;
+      return <div key={`sep-${idx}`} className="ctx-menu-sep" role="separator" />;
     }
     return (
-      <button key={`act-${idx}`} type="button" className={`ctx-menu-item ${item.danger ? 'danger' : ''}`} onClick={() => onRunMenuAction(item)}>
+      <button
+        key={`act-${idx}`}
+        type="button"
+        role="menuitem"
+        data-tutorial={item.tutorialTarget}
+        className={`ctx-menu-item ${item.danger ? 'danger' : ''}`}
+        onClick={() => onRunMenuAction(item)}
+      >
         <span className="ctx-menu-icon">{item.icon}</span>
         <span className="ctx-menu-label">
           <span>{item.label}</span>
@@ -99,14 +115,34 @@ export const CommitContextMenu: React.FC<CommitContextMenuProps> = ({
       <div
         ref={contextMenuRef}
         className="ctx-menu commit-context-menu"
+        role="menu"
+        aria-label={tr('Commit-Aktionen', 'Commit actions')}
+        tabIndex={-1}
         style={{
           left: contextMenuPlacement?.left ?? contextMenu.x,
           top: contextMenuPlacement?.top ?? contextMenu.y,
-          maxHeight: contextMenuPlacement?.maxHeight,
+          maxHeight: `min(${contextMenuPlacement?.maxHeight ? contextMenuPlacement.maxHeight + 'px' : 'calc(100dvh - 16px)'}, calc(var(--tutorial-overlay-height, 100dvh) - 16px))`,
           overflowY: 'auto',
           visibility: contextMenuPlacement?.ready ? 'visible' : 'hidden',
         }}
         onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            onClose();
+            return;
+          }
+          if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+          const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+          if (!items.length) return;
+          const current = items.indexOf(document.activeElement as HTMLButtonElement);
+          const next =
+            event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (current + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
+          event.preventDefault();
+          event.stopPropagation();
+          items[next].focus();
+        }}
       >
         <div className="ctx-menu-header">
           {contextMenu.node.commit.abbrevHash} - {contextMenu.node.commit.subject.slice(0, 30)}
@@ -117,6 +153,8 @@ export const CommitContextMenu: React.FC<CommitContextMenuProps> = ({
           <div className="ctx-menu-merge-wrap">
             <button
               type="button"
+              role="menuitem"
+              aria-expanded={mergeCtxExpanded}
               className="ctx-menu-merge-toggle"
               onClick={(event) => {
                 event.stopPropagation();
@@ -138,7 +176,12 @@ export const CommitContextMenu: React.FC<CommitContextMenuProps> = ({
               <div className="ctx-menu-merge-body">
                 <div className="ctx-menu-merge-group">
                   <div className="ctx-menu-merge-group-label">{t('generated.components.commit_graph.commitcontextmenu.this_commit_8eae8dbc')}</div>
-                  <button type="button" className="ctx-menu-merge-item" onClick={() => onMergeCommit(mergeContextPayload.hash, mergeContextPayload.shortHash)}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="ctx-menu-merge-item"
+                    onClick={() => onMergeCommit(mergeContextPayload.hash, mergeContextPayload.shortHash)}
+                  >
                     {t('generated.components.layout.main.mainprimarypane.merge_83b759bf')} {mergeContextPayload.shortHash}
                     <span className="ctx-menu-merge-item-hint">{t('generated.components.commit_graph.commitcontextmenu.git_merge_commit_hash_71f2f1a9')}</span>
                     <span className="ctx-menu-help">
@@ -153,7 +196,7 @@ export const CommitContextMenu: React.FC<CommitContextMenuProps> = ({
                   <div className="ctx-menu-merge-group">
                     <div className="ctx-menu-merge-group-label">{t('generated.components.commit_graph.commitcontextmenu.refs_at_this_commit_323b456c')}</div>
                     {mergeContextPayload.refsHere.map((ref) => (
-                      <button key={ref} type="button" className="ctx-menu-merge-item" onClick={() => onMergeBranchRef(ref)}>
+                      <button key={ref} type="button" role="menuitem" className="ctx-menu-merge-item" onClick={() => onMergeBranchRef(ref)}>
                         {ref}
                         <span className="ctx-menu-merge-item-hint">{t('generated.components.commit_graph.commitcontextmenu.merge_branch_ref_a4db347a')}</span>
                         <span className="ctx-menu-help">

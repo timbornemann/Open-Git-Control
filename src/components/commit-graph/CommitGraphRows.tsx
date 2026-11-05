@@ -212,6 +212,26 @@ export const CommitGraphRows = ({
               if (!event.currentTarget.contains(event.relatedTarget)) tooltip.leave();
             }}
             onKeyDown={(event) => {
+              if (
+                event.target === event.currentTarget &&
+                !event.ctrlKey &&
+                !event.altKey &&
+                !event.metaKey &&
+                (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey))
+              ) {
+                event.preventDefault();
+                event.stopPropagation();
+                const bounds = event.currentTarget.getBoundingClientRect();
+                event.currentTarget.dispatchEvent(
+                  new window.MouseEvent('contextmenu', {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: bounds.left + Math.min(20, bounds.width / 2),
+                    clientY: bounds.top + bounds.height / 2,
+                  }),
+                );
+                return;
+              }
               if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
                 event.preventDefault();
                 selectCommit();
@@ -234,6 +254,10 @@ export const CommitGraphRows = ({
             }}
             style={rowStyle}
             data-commit-hash={node.commit.hash}
+            data-commit-head={isHeadCommit || undefined}
+            data-commit-parents={node.commit.parentHashes.join(' ')}
+            data-selected={isSelected || undefined}
+            data-search-match={isSearchMatch || undefined}
           >
             <div className="commit-info">
               <span className="commit-hash">{node.commit.abbrevHash}</span>

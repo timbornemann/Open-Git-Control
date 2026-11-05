@@ -4,24 +4,27 @@ import type { SystemToolsStatus } from '@/shared/ipc/systemTools';
 import type { StoredRepoData } from '@/types/appDtos';
 import { DEFAULT_SETTINGS } from '@/app/state/defaultSettings';
 import { demoAnalytics } from './demoAnalytics';
-import { DEMO_REPO, DEMO_SECOND_REPO, DEMO_TIME, ok, unavailable, type DemoRepository } from './demoRepository';
+import { validateDemoJsonSchema } from './demoSchemaValidation';
+import { reachableDemoCommits } from './demoBranchRefs';
+import { isRepositoryUiPreferences, type RepositoryUiPreferences } from '@/shared/ipc/repositoryUiPreferences';
+import { DEMO_REPO, DEMO_TIME, ok, unavailable, type DemoRepository } from './demoRepository';
 
-export function createDemoSystemApi(repo: DemoRepository, context: TutorialLaunchContext): Partial<ElectronFlatAPI> {
+export function createDemoSystemApi(
+  repo: DemoRepository,
+  context: TutorialLaunchContext & { practiceSignoff?: boolean },
+  stored: StoredRepoData,
+): Partial<ElectronFlatAPI> {
+  let uiPreferences: Record<string, RepositoryUiPreferences> = {};
   let settings = {
     ...DEFAULT_SETTINGS,
     language: context.language,
     theme: context.theme,
+    commitSignoffByDefault: Boolean(context.practiceSignoff),
     autoFetchIntervalMs: 0,
     autoUpdateEnabled: false,
     autoUpdateCheckEnabled: false,
     userNotesCheckEnabled: false,
     ollamaModel: 'tutorial-model',
-  };
-  const stored: StoredRepoData = {
-    revision: 1,
-    repos: [DEMO_REPO, DEMO_SECOND_REPO].map((path) => ({ path, lastOpened: DEMO_TIME, pinned: false, createdAt: DEMO_TIME })),
-    activeRepo: DEMO_REPO,
-    sortBy: 'nameAsc',
   };
   const tools: SystemToolsStatus = {
     platform: 'other',
@@ -49,31 +52,6 @@ export function createDemoSystemApi(repo: DemoRepository, context: TutorialLaunc
     setOpenAiApiKey: async () => updateSettings({ hasOpenAiApiKey: true }),
     clearOpenAiApiKey: async () => updateSettings({ hasOpenAiApiKey: false }),
     getBootstrap: async () => ({ settings, repositories: structuredClone(stored), snapshots: [], systemTools: tools }),
-    getStoredRepos: async () => structuredClone(stored),
-    mutateStoredRepos: async (mutation) => {
-      if (mutation.kind === 'metadata') {
-        const entry = stored.repos.find((item) => item.path === mutation.path);
-        if (entry) Object.assign(entry, mutation);
-        if (mutation.pinned) repo.mark('repo-pinned');
-      }
-      if (mutation.kind === 'activate') stored.activeRepo = mutation.path;
-      if (mutation.kind === 'sort') stored.sortBy = mutation.sortBy;
-      if (mutation.kind === 'remove') stored.repos = stored.repos.filter((entry) => entry.path !== mutation.path);
-      if (mutation.kind === 'add' && !stored.repos.some((entry) => entry.path === mutation.path))
-        stored.repos.push({ path: mutation.path, lastOpened: DEMO_TIME, pinned: false, createdAt: DEMO_TIME });
-      stored.revision = (stored.revision || 0) + 1;
-      return ok(structuredClone(stored));
-    },
-    resolveRepoPath: async (path) => {
-      if (![DEMO_REPO, DEMO_SECOND_REPO].includes(path)) throw new Error('Unknown practice repository.');
-      return path;
-    },
-    openDirectory: async () => {
-      repo.mark('repo-opened');
-      return { path: DEMO_REPO, isRepo: true };
-    },
-    selectDirectory: async () => DEMO_REPO,
-    selectProjectParentDirectory: async () => '/tutorial',
     selectFiles: async () => [],
     getSystemToolsStatus: async () => tools,
     recheckSystemTools: async () => tools,
@@ -83,23 +61,14 @@ export function createDemoSystemApi(repo: DemoRepository, context: TutorialLaunc
       window.dispatchEvent(new CustomEvent('tutorial:launch', { detail: request }));
       return { success: true };
     },
-    getRepositoryUiPreferences: async () => ok({}),
-    updateRepositoryUiPreferences: async () => ok({}),
+    getRepositoryUiPreferences: async () => ok(structuredClone(uiPreferences)),
+    updateRepositoryUiPreferences: async ({ repoPath, patch }) => {
+      if (!repo.hasProject(repoPath) || !isRepositoryUiPreferences(patch)) return unavailable();
+      uiPreferences = { ...uiPreferences, [repoPath]: { ...uiPreferences[repoPath], ...patch } };
+      return ok(structuredClone(uiPreferences));
+    },
     savePreviews: async () => undefined,
     cancelReadRequest: async () => undefined,
-    getRepositoryIcon: async (repoPath) =>
-      ok({
-        repoPath,
-        mode: 'initials',
-        manualPath: null,
-        selectionVersion: 'demo',
-        revision: 1,
-        thumbnail: null,
-        candidates: [],
-        limited: false,
-        status: 'ready',
-        error: null,
-      }),
     getGitLfsStatus: async (request) =>
       ok({
         available: true,
@@ -162,9 +131,9 @@ export function createDemoSystemApi(repo: DemoRepository, context: TutorialLaunc
       const snapshot = demoAnalytics(repo);
       const items =
         request.kind === 'commits'
-          ? repo.commits.map((commit) => ({
+          ? reachableDemoCommits(repo).map((commit) => ({
               hash: commit.hash,
-              parents: commit.parent ? [commit.parent] : [],
+              parents: commit.parent.split(/\s+/).filter(Boolean),
               author: snapshot.authors[0],
               date: Date.parse(commit.date),
               subject: commit.subject,
@@ -189,6 +158,6 @@ export function createDemoSystemApi(repo: DemoRepository, context: TutorialLaunc
     openExternalUrl: async () => unavailable(),
     openRepositoryPath: async () => unavailable(),
     writeClipboardText: async () => ({ success: true }),
-    validateJsonSchema: async () => ok([]),
+    validateJsonSchema: validateDemoJsonSchema,
   };
 }

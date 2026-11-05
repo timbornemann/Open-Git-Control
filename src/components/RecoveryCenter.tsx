@@ -13,11 +13,12 @@ export function RecoveryCenter(props: RecoveryCenterProps) {
   const state = useRecoveryCenter(props);
   const { entries, selected, isLoading, isBusy, isAvailable, loadReflog, loadIssue, dangerAction, setDangerAction } = state;
   return (
-    <section className="recovery-center" aria-label={tr('Recovery Center', 'Recovery Center')}>
+    <section className="recovery-center" data-tutorial="recovery" data-loading={isLoading} aria-label={tr('Recovery Center', 'Recovery Center')}>
       <header className="recovery-center__intro">
         <p>{tr('Frühere Commits wiederfinden und auf einem neuen Branch weiterarbeiten.', 'Find earlier commits and continue working on a new branch.')}</p>
         <div className="recovery-center__intro-actions">
           <Button
+            data-tutorial="recovery-refresh"
             size="xs"
             variant="ghost"
             icon={isLoading ? <Loader2 size={13} className="spin" /> : <RefreshCw size={13} />}

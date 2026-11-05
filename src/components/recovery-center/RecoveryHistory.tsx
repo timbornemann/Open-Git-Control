@@ -36,6 +36,7 @@ export function RecoveryHistory({ state }: { state: RecoveryCenterState }) {
         <div className="recovery-center__search">
           <Search size={14} aria-hidden="true" />
           <TextField
+            data-tutorial="recovery-search"
             value={filter}
             onChange={(event) => setFilter(event.target.value)}
             disabled={isBusy}
@@ -43,13 +44,20 @@ export function RecoveryHistory({ state }: { state: RecoveryCenterState }) {
             placeholder={tr('Nachricht, Commit oder Datum suchen…', 'Search message, commit or date…')}
           />
           {filter && (
-            <button className="recovery-center__clear-search" onClick={() => setFilter('')} disabled={isBusy} aria-label={tr('Suche leeren', 'Clear search')}>
+            <button
+              data-tutorial="recovery-clear-search"
+              className="recovery-center__clear-search"
+              onClick={() => setFilter('')}
+              disabled={isBusy}
+              aria-label={tr('Suche leeren', 'Clear search')}
+            >
               <X size={13} />
             </button>
           )}
         </div>
         {hasBackups && (
           <select
+            data-tutorial="recovery-source"
             className="ui-field"
             aria-label={tr('Art der Wiederherstellungspunkte', 'Recovery point source')}
             value={source}
@@ -64,6 +72,8 @@ export function RecoveryHistory({ state }: { state: RecoveryCenterState }) {
       </div>
       <div
         className="recovery-center__history-list"
+        data-tutorial="recovery-list"
+        data-entry-count={filtered.length}
         aria-busy={isLoading}
         onKeyDown={(event) => {
           if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key) || !(event.target instanceof HTMLButtonElement)) return;
@@ -105,7 +115,7 @@ export function RecoveryHistory({ state }: { state: RecoveryCenterState }) {
                 : tr('Nach Commits und Branch-Wechseln findest du hier frühere Zustände.', 'Earlier states appear here after commits and branch switches.')}
             </p>
             {(filter || source !== 'all') && (
-              <Button size="sm" onClick={clearFilter}>
+              <Button data-tutorial="recovery-show-all" size="sm" onClick={clearFilter}>
                 {tr('Alle Einträge anzeigen', 'Show all entries')}
               </Button>
             )}
@@ -124,6 +134,9 @@ export function RecoveryHistory({ state }: { state: RecoveryCenterState }) {
               <div key={key}>
                 {day !== previousDay && <div className="recovery-center__history-day">{day}</div>}
                 <button
+                  data-recovery-hash={entry.hash}
+                  data-recovery-kind={kind}
+                  data-recovery-selector={entry.selector}
                   className={`recovery-center__history-item${key === selectedKey ? ' is-selected' : ''}`}
                   disabled={isBusy}
                   aria-pressed={key === selectedKey}

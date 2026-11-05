@@ -32,6 +32,8 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({ activeTa
     <div className="activity-bar">
       <button
         className="icon-btn activity-bar-panel-toggle"
+        data-tutorial="sidebar-toggle"
+        aria-expanded={!isSidebarCollapsed}
         onClick={onToggleSidebar}
         title={isSidebarCollapsed ? t('sidebar.open') : t('sidebar.close')}
         aria-label={isSidebarCollapsed ? t('sidebar.open') : t('sidebar.close')}

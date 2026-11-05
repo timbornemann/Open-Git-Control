@@ -4,7 +4,7 @@ type Props = { source: 'staged' | 'unstaged'; count: number; disabled: boolean; 
 export function DiffSelectionBar({ source, count, disabled, onApply, onClear }: Props) {
   const { tr } = useI18n();
   return (
-    <div className="diff-selection-bar" aria-label={tr('Zeilenauswahl', 'Line selection')}>
+    <div className="diff-selection-bar" data-selection-count={count} aria-label={tr('Zeilenauswahl', 'Line selection')}>
       <div className="diff-selection-summary">
         <span role="status">
           {tr(`${count} ${count === 1 ? 'Änderung' : 'Änderungen'} ausgewählt`, `${count} ${count === 1 ? 'change' : 'changes'} selected`)}
@@ -16,10 +16,10 @@ export function DiffSelectionBar({ source, count, disabled, onApply, onClear }: 
           )}
         </small>
       </div>
-      <button className="diff-hunk-action-btn" disabled={disabled || !count} onClick={onApply}>
+      <button data-tutorial="apply-line-selection" className="diff-hunk-action-btn" disabled={disabled || !count} onClick={onApply}>
         {source === 'unstaged' ? tr('Auswahl stagen', 'Stage selection') : tr('Auswahl unstagen', 'Unstage selection')}
       </button>
-      <button className="diff-hunk-action-btn" disabled={disabled || !count} onClick={onClear}>
+      <button data-tutorial="clear-line-selection" className="diff-hunk-action-btn" disabled={disabled || !count} onClick={onClear}>
         {tr('Auswahl aufheben', 'Clear selection')}
       </button>
     </div>

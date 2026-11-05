@@ -64,6 +64,31 @@ export const BranchPanel: React.FC<Props> = ({
         key={branch.name}
         className={`repo-list-row branch-row ${isLocal ? 'branch-row-local' : 'branch-row-remote'} ${branch.isHead ? 'branch-row-current' : ''}`}
         title={branch.name}
+        role="button"
+        tabIndex={0}
+        aria-label={branch.name}
+        aria-haspopup="menu"
+        aria-current={branch.isHead ? 'true' : undefined}
+        data-branch-name={branch.name}
+        data-branch-scope={branch.scope}
+        data-branch-head={branch.isHead}
+        onKeyDown={(event) => {
+          if (event.repeat || event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
+          if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10') || (!isLocal && event.key === 'Enter')) {
+            event.preventDefault();
+            const bounds = event.currentTarget.getBoundingClientRect();
+            onSetBranchContextMenu({
+              x: bounds.left + 12,
+              y: bounds.top + bounds.height / 2,
+              branch: branch.name,
+              isHead: branch.isHead,
+              isProtected: branch.isProtected,
+            });
+          } else if (isLocal && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            if (!branch.isHead) onCheckoutBranch(branch.name);
+          }
+        }}
         onClick={() => !branch.isHead && isLocal && onCheckoutBranch(branch.name)}
         onContextMenu={(event) => {
           event.preventDefault();
@@ -129,6 +154,8 @@ export const BranchPanel: React.FC<Props> = ({
               <Search size={12} className="sidebar-search-icon" />
               <input
                 className="repo-filter-input sidebar-filter-input"
+                data-tutorial="branch-filter"
+                aria-label={t('generated.components.sidebar.branchpanel.filter_branches_d57dded7')}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={t('generated.components.sidebar.branchpanel.filter_branches_d57dded7')}
@@ -142,17 +169,25 @@ export const BranchPanel: React.FC<Props> = ({
                 ref={newBranchInputRef}
                 type="text"
                 placeholder="branch-name"
+                data-tutorial="branch-name"
+                aria-label={tr('Branch-Name', 'Branch name')}
                 value={newBranchName}
                 onChange={(event) => setNewBranchName(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter') onCreateBranch(newBranchName);
+                  if (event.repeat || event.nativeEvent.isComposing) return;
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    onCreateBranch(newBranchName);
+                  }
                   if (event.key === 'Escape') {
                     onSetCreatingBranch(false);
                     setNewBranchName('');
                   }
                 }}
-                onBlur={() => {
-                  if (!newBranchName.trim()) onSetCreatingBranch(false);
+                onBlur={(event) => {
+                  const explaining =
+                    window.tutorialHost && !window.electronAPI && event.relatedTarget instanceof Element && event.relatedTarget.closest('.tutorial-coach');
+                  if (!newBranchName.trim() && !explaining) onSetCreatingBranch(false);
                 }}
                 style={{
                   width: '100%',

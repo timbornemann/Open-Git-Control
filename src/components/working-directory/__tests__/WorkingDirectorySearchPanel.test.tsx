@@ -74,6 +74,67 @@ describe('WorkingDirectorySearchPanel', () => {
     });
   };
 
+  it('marks results current only for the settled query, including empty searches after a case toggle', async () => {
+    const replies: (() => void)[] = [];
+    vi.spyOn(gitClient, 'searchWorkingDirectory').mockImplementation(
+      (request) =>
+        new Promise((resolve) => {
+          replies.push(() =>
+            resolve({
+              success: true,
+              data: {
+                files: [
+                  {
+                    path: request.query + '.txt',
+                    name: request.query + '.txt',
+                    matches: [{ line: 1, column: 1, preview: request.query, previewMatchStart: 0, matchLength: request.query.length }],
+                  },
+                ],
+                totalMatches: 1,
+                scannedFiles: 1,
+                truncated: false,
+              },
+            }),
+          );
+        }),
+    );
+    const { container } = renderPanel();
+    const panel = container.querySelector<HTMLElement>('.working-search')!,
+      field = container.querySelector<HTMLInputElement>('input')!;
+    expect(panel.dataset.searchSettled).toBe('true');
+    act(() => container.querySelector<HTMLButtonElement>('[data-tutorial="file-search-contents"]')!.click());
+    await flushSearch();
+    enterText(field, 'planet');
+    expect(panel.dataset.searchSettled).toBe('false');
+    await flushSearch();
+    enterText(field, 'world');
+    await act(async () => {
+      replies[0]();
+    });
+    expect(panel.dataset.searchCount).toBe('1');
+    expect(panel.dataset.searchSettled).toBe('false');
+    const replaceAll = container.querySelector<HTMLButtonElement>('[data-tutorial="file-search-all"]')!;
+    expect(replaceAll.disabled).toBe(true);
+    expect(container.querySelector<HTMLButtonElement>('.working-search-match__replace')!.disabled).toBe(true);
+    act(() => replaceAll.click());
+    expect(setConfirmDialogMock).not.toHaveBeenCalled();
+    await flushSearch();
+    await act(async () => {
+      replies[1]();
+    });
+    expect(panel.dataset.searchSettled).toBe('true');
+    expect(container.querySelector('[data-search-path="world.txt"]')).not.toBeNull();
+    expect(replaceAll.disabled).toBe(false);
+    enterText(field, '');
+    await flushSearch();
+    expect(panel.dataset.searchCount).toBe('0');
+    expect(panel.dataset.searchSettled).toBe('true');
+    act(() => container.querySelector<HTMLButtonElement>('[aria-label="Match case"]')!.click());
+    expect(panel.dataset.searchSettled).toBe('false');
+    await flushSearch();
+    expect(panel.dataset.searchSettled).toBe('true');
+  });
+
   it('searches file names by default and opens a selected result', async () => {
     vi.spyOn(gitClient, 'searchWorkingDirectory').mockResolvedValue({
       success: true,

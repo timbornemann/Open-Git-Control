@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import type { GitMergeMode } from '@/types/git';
 import { useI18n } from '@/i18n';
 import { isPrimaryBranchName } from '@/shared/git/branchProtection';
@@ -28,6 +28,15 @@ const MenuLabel: React.FC<MenuLabelProps> = ({ label, help }) => (
 
 export const BranchContextMenu: React.FC<Props> = ({ branchContextMenu, setBranchContextMenu, onCheckout, onMerge, onRename, onDelete }) => {
   const { t, tr } = useI18n();
+  const menuRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!branchContextMenu) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    menuRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });
+    return () => {
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, [branchContextMenu]);
 
   if (!branchContextMenu) return null;
   const isRemoteBranch = branchContextMenu.branch.startsWith('remotes/');
@@ -41,10 +50,39 @@ export const BranchContextMenu: React.FC<Props> = ({ branchContextMenu, setBranc
         setBranchContextMenu(null);
       }}
     >
-      <div className="ctx-menu" style={{ left: branchContextMenu.x, top: branchContextMenu.y }} onClick={(e) => e.stopPropagation()}>
+      <div
+        className="ctx-menu"
+        ref={menuRef}
+        tabIndex={-1}
+        role="menu"
+        aria-label={tr('Branch-Aktionen', 'Branch actions')}
+        data-tutorial="branch-menu"
+        data-branch-name={branchContextMenu.branch}
+        style={{ left: branchContextMenu.x, top: branchContextMenu.y }}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            setBranchContextMenu(null);
+            return;
+          }
+          if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+          const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+          if (!items.length) return;
+          const current = items.indexOf(document.activeElement as HTMLButtonElement);
+          const next =
+            event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (current + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
+          event.preventDefault();
+          event.stopPropagation();
+          items[next].focus();
+        }}
+      >
         <div className="ctx-menu-header">{branchContextMenu.branch}</div>
         {!branchContextMenu.isHead && (
           <button
+            role="menuitem"
+            data-branch-action="checkout"
             className="ctx-menu-item"
             title={
               isRemoteBranch
@@ -75,6 +113,8 @@ export const BranchContextMenu: React.FC<Props> = ({ branchContextMenu, setBranc
         {!branchContextMenu.isHead && (
           <>
             <button
+              role="menuitem"
+              data-branch-action="merge-default"
               className="ctx-menu-item"
               title={t('generated.components.layout.branchcontextmenu.merges_this_branch_into_the_currently_checked_out_branch_88f4ab90')}
               onClick={() => {
@@ -90,6 +130,8 @@ export const BranchContextMenu: React.FC<Props> = ({ branchContextMenu, setBranc
               />
             </button>
             <button
+              role="menuitem"
+              data-branch-action="merge-no-ff"
               className="ctx-menu-item"
               title={t('generated.components.layout.branchcontextmenu.forces_a_merge_commit_even_when_fast_forward_would_be_po_06b29673')}
               onClick={() => {
@@ -105,6 +147,8 @@ export const BranchContextMenu: React.FC<Props> = ({ branchContextMenu, setBranc
               />
             </button>
             <button
+              role="menuitem"
+              data-branch-action="merge-squash"
               className="ctx-menu-item"
               title={t('generated.components.layout.branchcontextmenu.squashes_this_branch_into_one_new_commit_d95843c2')}
               onClick={() => {
@@ -120,6 +164,8 @@ export const BranchContextMenu: React.FC<Props> = ({ branchContextMenu, setBranc
               />
             </button>
             <button
+              role="menuitem"
+              data-branch-action="merge-ff-only"
               className="ctx-menu-item"
               title={t('generated.components.layout.branchcontextmenu.runs_only_if_the_current_branch_can_be_fast_forwarded_wi_06ba4fc6')}
               onClick={() => {
@@ -138,6 +184,8 @@ export const BranchContextMenu: React.FC<Props> = ({ branchContextMenu, setBranc
         )}
         {!branchContextMenu.branch.startsWith('remotes/') && (
           <button
+            role="menuitem"
+            data-branch-action="rename"
             className="ctx-menu-item"
             title={t('generated.components.layout.branchcontextmenu.renames_this_local_branch_1c165d74')}
             onClick={() => {
@@ -156,6 +204,8 @@ export const BranchContextMenu: React.FC<Props> = ({ branchContextMenu, setBranc
         <div className="ctx-menu-sep" />
         {!branchContextMenu.isHead && !branchContextMenu.branch.startsWith('remotes/') && (
           <button
+            role="menuitem"
+            data-branch-action="delete"
             className="ctx-menu-item danger"
             disabled={protectedBranch}
             title={

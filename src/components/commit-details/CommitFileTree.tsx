@@ -63,6 +63,8 @@ export function CommitFileTree({ repoPath, files, collapsedPaths, onToggleDirect
               type="button"
               className={`working-tree-row${selected ? ' working-tree-row--selected' : ''}`}
               data-node-key={node.key}
+              data-commit-file={node.kind === 'file' ? node.path : undefined}
+              data-file-status={node.kind === 'file' ? node.file.status : undefined}
               title={title}
               aria-label={node.kind === 'directory' ? node.path : `${title}, ${statusNames[status] || tr('Geändert', 'Changed')}`}
               aria-expanded={node.kind === 'directory' ? open : undefined}

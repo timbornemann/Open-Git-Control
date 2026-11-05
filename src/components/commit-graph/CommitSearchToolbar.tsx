@@ -69,7 +69,13 @@ export const CommitSearchToolbar: React.FC<CommitSearchToolbarProps> = ({
   };
 
   return (
-    <div className="commit-search-toolbar">
+    <div
+      className="commit-search-toolbar"
+      data-tutorial="commit-search"
+      data-search-query={searchQuery}
+      data-search-scope={searchScope}
+      data-search-count={matchCount}
+    >
       {activeSearchPanel === 'commits' && (
         <div className="commit-search-toolbar__row">
           <label className="commit-search-toolbar__control commit-search-toolbar__mode">
@@ -77,6 +83,7 @@ export const CommitSearchToolbar: React.FC<CommitSearchToolbarProps> = ({
             <select
               className="commit-search-toolbar__select"
               aria-label={searchModeLabel}
+              data-tutorial="commit-search-mode"
               value={activeSearchPanel}
               onChange={(event) => selectSearchPanel(event.target.value as SearchPanel)}
             >
@@ -90,6 +97,7 @@ export const CommitSearchToolbar: React.FC<CommitSearchToolbarProps> = ({
             <select
               className="commit-search-toolbar__select"
               aria-label={searchScopeLabel}
+              data-tutorial="commit-search-scope"
               value={searchScope}
               onChange={(event) => selectSearchScope(event.target.value as SearchScope)}
             >
@@ -103,6 +111,7 @@ export const CommitSearchToolbar: React.FC<CommitSearchToolbarProps> = ({
 
           <input
             className="commit-search-input"
+            data-tutorial="commit-search-query"
             type="text"
             value={searchQuery}
             onChange={(event) => onSearchQueryChange(event.target.value)}
@@ -115,6 +124,7 @@ export const CommitSearchToolbar: React.FC<CommitSearchToolbarProps> = ({
               className="commit-search-toolbar__recovery"
               onClick={toggleRecoveryCenter}
               data-tutorial="open-recovery"
+              aria-pressed={showRecoveryCenter}
               onMouseEnter={() => intent.hover(preloadRecovery)}
               onMouseLeave={intent.cancel}
               onFocus={() => intent.focus(preloadRecovery)}
@@ -127,7 +137,7 @@ export const CommitSearchToolbar: React.FC<CommitSearchToolbarProps> = ({
           )}
 
           {normalizedSearch && (
-            <div className="commit-search-meta" aria-label={`${matchCount} ${matchesLabel}`}>
+            <div className="commit-search-meta" data-tutorial="commit-search-results" aria-label={`${matchCount} ${matchesLabel}`}>
               <span className="commit-search-meta__count">
                 {matchCount} {matchesLabel}
               </span>
@@ -135,6 +145,7 @@ export const CommitSearchToolbar: React.FC<CommitSearchToolbarProps> = ({
                 type="button"
                 className="commit-search-nav"
                 onClick={onJumpToPreviousMatch}
+                data-tutorial="commit-search-previous"
                 disabled={matchCount === 0}
                 title={previousLabel}
                 aria-label={previousLabel}
@@ -146,6 +157,7 @@ export const CommitSearchToolbar: React.FC<CommitSearchToolbarProps> = ({
                 type="button"
                 className="commit-search-nav"
                 onClick={onJumpToNextMatch}
+                data-tutorial="commit-search-next"
                 disabled={matchCount === 0}
                 title={nextLabel}
                 aria-label={nextLabel}
@@ -160,6 +172,7 @@ export const CommitSearchToolbar: React.FC<CommitSearchToolbarProps> = ({
             <button
               type="button"
               className="commit-search-toolbar__more-toggle"
+              data-tutorial="commit-search-more"
               onClick={() => setIsCompactMenuOpen((open) => !open)}
               title={moreActionsLabel}
               aria-label={moreActionsLabel}
@@ -195,6 +208,8 @@ export const CommitSearchToolbar: React.FC<CommitSearchToolbarProps> = ({
                   <button
                     type="button"
                     className="commit-search-toolbar__more-action"
+                    data-tutorial="open-recovery"
+                    aria-pressed={showRecoveryCenter}
                     onClick={toggleRecoveryCenter}
                     onMouseEnter={() => intent.hover(preloadRecovery)}
                     onMouseLeave={intent.cancel}

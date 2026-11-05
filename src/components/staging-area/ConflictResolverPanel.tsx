@@ -95,6 +95,9 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
 
   return (
     <div
+      data-tutorial="conflict-section"
+      data-conflict-files={visibleConflicts.length}
+      data-conflict-operation={showOperationActions}
       className={cx('staging-section conflict-section', isConflictOnly && 'conflict-section--resolve', isCompact && 'conflict-section--compact')}
       style={sectionFlex ? { flex: sectionFlex } : undefined}
     >

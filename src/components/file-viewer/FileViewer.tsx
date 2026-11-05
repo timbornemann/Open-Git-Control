@@ -126,14 +126,28 @@ export function FileViewer({
     { id: 'blame', label: 'Blame', available: textFile },
   ];
   return (
-    <div className="working-file-viewer file-viewer" data-source={source}>
+    <div
+      className="working-file-viewer file-viewer"
+      data-source={source}
+      data-commit-hash={source === 'commit' ? commitHash : undefined}
+      data-path={path}
+      data-tab={tab}
+      data-dirty={document.dirty}
+      data-encoding={document.encoding}
+      data-line-ending={document.lineEnding === '\r\n' ? 'crlf' : 'lf'}
+      data-whitespace={showWhitespace}
+      data-selection-from={selection.from}
+      data-selection-to={selection.to}
+    >
       <div className="working-file-viewer__toolbar file-viewer-header">
         <div className="file-viewer-title">
           <strong className="working-file-viewer__path" title={path}>
             {path}
             {document.dirty ? ' *' : ''}
           </strong>
-          <span className="file-viewer-source">{sourceLabel}</span>
+          <span className="file-viewer-source" data-tutorial="file-source">
+            {sourceLabel}
+          </span>
         </div>
         <div className="working-file-viewer__actions">
           {textFile && (
@@ -158,6 +172,7 @@ export function FileViewer({
           )}
           {document.preview?.editable && (
             <button
+              data-tutorial="save-file"
               className="working-file-viewer__button working-file-viewer__button--save"
               disabled={!document.dirty || document.saving}
               onClick={() => void document.save()}
@@ -166,7 +181,12 @@ export function FileViewer({
               {source === 'staged' ? tr('Staging speichern', 'Save staging') : tr('Arbeitsdatei speichern', 'Save working file')}
             </button>
           )}
-          <button className="working-file-viewer__button" aria-label={tr('Datei schließen', 'Close file')} onClick={navigation.close}>
+          <button
+            data-tutorial="close-file"
+            className="working-file-viewer__button"
+            aria-label={tr('Datei schließen', 'Close file')}
+            onClick={navigation.close}
+          >
             <X size={15} />
           </button>
         </div>
@@ -177,6 +197,7 @@ export function FileViewer({
           .map((item) => (
             <button
               key={item.id}
+              data-file-tab={item.id}
               role="tab"
               aria-selected={item.id === tab}
               className={`working-file-viewer__button${item.id === tab ? ' is-active' : ''}`}

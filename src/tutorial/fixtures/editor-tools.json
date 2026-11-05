@@ -1,0 +1,13 @@
+{
+  "encoding": ["Café\n  OGC\tTutor\n", "Café\n  OGC\tTutor\n"],
+  "encoding-crlf": ["Café\r\n  OGC\tTutor\r\n", "Café\r\n  OGC\tTutor\r\n"],
+  "lines": [" beta \n\n alpha \nbeta\n", " beta \n\n alpha \nbeta\n"],
+  "trimmed": ["beta\n\nalpha\nbeta\n", "beta\n\nalpha\nbeta\n"],
+  "nonempty": ["beta\nalpha\nbeta\n", "beta\nalpha\nbeta\n"],
+  "unique": ["beta\nalpha\n", "beta\nalpha\n"],
+  "sorted": ["alpha\nbeta\n", "alpha\nbeta\n"],
+  "upper": ["ALPHA\nBETA\n", "ALPHA\nBETA\n"],
+  "lower": ["alpha\nbeta\n", "alpha\nbeta\n"],
+  "hash-base": ["Café\n", "Café\n"],
+  "hash-edited": ["Café!\n", "Café!\n"]
+}

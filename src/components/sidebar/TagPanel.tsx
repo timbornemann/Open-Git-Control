@@ -25,7 +25,7 @@ export const TagPanel: React.FC<Props> = ({ tags, tagConflicts, onCreateTag, onP
   }, [query, tags]);
 
   return (
-    <RepoCard>
+    <RepoCard tutorialTarget="tags">
       <RepoCardHeader
         title={t('generated.components.project_planner.plannerdialogs.tags_d3c9e52d')}
         collapsed={collapsed}
@@ -35,10 +35,20 @@ export const TagPanel: React.FC<Props> = ({ tags, tagConflicts, onCreateTag, onP
         }
         actions={
           <>
-            <button className="icon-btn sidebar-row-action-icon" onClick={onCreateTag} title={t('generated.components.sidebar.tagpanel.create_tag_9d35faa7')}>
+            <button
+              data-tutorial="tag-create"
+              className="icon-btn sidebar-row-action-icon"
+              onClick={onCreateTag}
+              title={t('generated.components.sidebar.tagpanel.create_tag_9d35faa7')}
+            >
               <Plus size={13} />
             </button>
-            <button className="icon-btn sidebar-row-action-icon" onClick={onPushTags} title={t('generated.components.sidebar.tagpanel.push_tags_13e7b4c8')}>
+            <button
+              data-tutorial="tag-push"
+              className="icon-btn sidebar-row-action-icon"
+              onClick={onPushTags}
+              title={t('generated.components.sidebar.tagpanel.push_tags_13e7b4c8')}
+            >
               <ArrowUpCircle size={13} />
             </button>
           </>
@@ -51,6 +61,8 @@ export const TagPanel: React.FC<Props> = ({ tags, tagConflicts, onCreateTag, onP
             <div className="sidebar-search-wrap tag-search-wrap">
               <Search size={12} className="sidebar-search-icon" />
               <input
+                data-tutorial="tag-filter"
+                aria-label={t('generated.components.sidebar.tagpanel.filter_tags_037bbb8f')}
                 className="repo-filter-input sidebar-filter-input"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -74,11 +86,14 @@ export const TagPanel: React.FC<Props> = ({ tags, tagConflicts, onCreateTag, onP
                   return (
                     <div
                       key={tag}
+                      data-tag-name={tag}
+                      data-tag-conflict={hasConflict}
                       className={`tag-card${hasConflict ? ' tag-card--conflict' : ''}`}
                       role="button"
                       tabIndex={0}
                       onClick={() => onSelectTag(tag)}
                       onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget) return;
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
                           onSelectTag(tag);
@@ -93,6 +108,7 @@ export const TagPanel: React.FC<Props> = ({ tags, tagConflicts, onCreateTag, onP
                       )}
                       <span className="tag-card-name">{tag}</span>
                       <button
+                        data-tutorial="tag-delete"
                         onClick={(event) => {
                           event.stopPropagation();
                           onDeleteTag(tag);

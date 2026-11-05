@@ -22,7 +22,12 @@ export function BranchCleanupCandidates({ candidates, targets, selected, disable
             ...new Map([...candidate.reasons, ...candidate.blocks].map((reason) => [`${reason.code}:${reason.detail ?? ''}`, reason])).values(),
           ];
           return (
-            <article key={candidate.id} className={`branch-cleanup-candidate${candidate.blocks.length ? ' is-blocked' : ''}`}>
+            <article
+              key={candidate.id}
+              data-cleanup-name={candidate.name}
+              data-cleanup-kind={candidate.kind}
+              className={`branch-cleanup-candidate${candidate.blocks.length ? ' is-blocked' : ''}`}
+            >
               <label className="branch-cleanup-choice">
                 <input
                   type="checkbox"

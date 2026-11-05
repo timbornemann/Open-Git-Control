@@ -62,7 +62,13 @@ export const ConflictEditorPanel = ({
   }
 
   return (
-    <div className="conflict-editor-panel">
+    <div
+      className="conflict-editor-panel"
+      data-tutorial="conflict-editor"
+      data-conflict-path={conflictEditor.filePath}
+      data-conflict-dirty={isConflictEditorDirty}
+      data-conflict-blocks={conflictBlocks.length}
+    >
       <div className="conflict-editor-shell">
         <ConflictEditorToolbar
           conflictEditor={conflictEditor}

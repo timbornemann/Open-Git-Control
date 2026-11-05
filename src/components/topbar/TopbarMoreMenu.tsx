@@ -139,7 +139,12 @@ export const TopbarMoreMenu: React.FC<Props> = ({
         <span className="topbar-dropdown-item-label">{t('generated.components.topbar.topbaractions.stage_commit_77275475')}</span>
         <span className="topbar-dropdown-item-hint">{t('generated.components.topbar.topbaractions.open_working_directory_48559e72')}</span>
       </button>
-      <button className="topbar-dropdown-item" onClick={() => setView('moreMerge')} disabled={!activeRepo || isGitActionRunning || branchCount === 0}>
+      <button
+        className="topbar-dropdown-item"
+        data-topbar-more-merge
+        onClick={() => setView('moreMerge')}
+        disabled={!activeRepo || isGitActionRunning || branchCount === 0}
+      >
         <span className="topbar-dropdown-item-label">{t('generated.components.topbar.topbaractions.merge_branch_8c3efbb0')}</span>
         <span className="topbar-dropdown-item-hint">{tr('Quelle, Ziel und Wirkung auswählen', 'Choose source, target and behavior')}</span>
       </button>

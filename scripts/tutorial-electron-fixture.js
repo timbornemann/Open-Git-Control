@@ -4,24 +4,38 @@ const fs = require('node:fs');
 const path = require('node:path');
 const profile = process.env.OGC_TUTORIAL_TEST_PROFILE;
 app.disableHardwareAcceleration();
+// Keep native layout tests painting when another desktop window covers them.
+// WebContentsView otherwise retains stale viewport sizes (electron/electron#44590).
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 if (!profile) throw new Error('A temporary tutorial test profile is required.');
 app.setPath('userData', profile);
 app.setPath('sessionData', path.join(profile, 'session'));
 const root = path.join(__dirname, '..');
 const fresh = process.env.OGC_TUTORIAL_TEST_FRESH === '1';
+const group = process.env.OGC_TUTORIAL_TEST_GROUP || 'all';
+const language = process.env.OGC_TUTORIAL_TEST_LANGUAGE === 'en' ? 'en' : 'de';
+const languageIndex = language === 'de' ? 0 : 1;
+const isolation = group === 'workspace-isolation' ? require('./tutorial-workspace-isolation.cjs') : null;
+const workspace = (() => {
+  try {
+    return isolation?.prepare(profile);
+  } catch (error) {
+    fail(error);
+  }
+})();
 if (fresh) {
   const { TutorialProgressStore } = require(path.join(root, 'dist-electron/electron/main-process/tutorialProgress.js'));
   assert.equal(new TutorialProgressStore(profile).snapshot().welcomeSeen, false, 'A genuinely fresh Electron profile is eligible for the welcome.');
 }
 const settings = JSON.stringify({
-  language: 'de',
+  language,
   autoUpdateEnabled: false,
   autoUpdateCheckEnabled: false,
   userNotesCheckEnabled: false,
   automaticMaintenanceEnabled: false,
 });
 fs.writeFileSync(path.join(profile, 'settings.json'), settings);
-fs.writeFileSync(path.join(profile, 'repos.json'), JSON.stringify({ repos: [], activeRepo: null, sortBy: 'lastOpenedDesc' }));
+fs.writeFileSync(path.join(profile, 'repos.json'), JSON.stringify(workspace?.stored || { repos: [], activeRepo: null, sortBy: 'lastOpenedDesc' }));
 const { TUTORIAL_CHAPTERS } = require(path.join(root, 'dist-electron/src/shared/tutorial/catalog.js'));
 let parent;
 let tutorial;
@@ -77,11 +91,23 @@ async function waitFor(contents, expression, label = expression) {
   const targetDiagnostics = await contents.executeJavaScript(`JSON.stringify({
     visibility: document.visibilityState,
     target: document.querySelector('[data-tutorial="nav-localRepos"]')?.getBoundingClientRect().toJSON(),
+    selected: (()=>{const selector=document.querySelector('.tutorial-coach')?.dataset.target;const element=selector&&document.querySelector(selector);if(!element)return null;const ancestors=[];for(let p=element.parentElement;p&&p!==document.body;p=p.parentElement){const css=getComputedStyle(p);ancestors.push({class:p.className,rect:p.getBoundingClientRect().toJSON(),scrollTop:p.scrollTop,clientHeight:p.clientHeight,scrollHeight:p.scrollHeight,overflowY:css.overflowY,flex:css.flex,minHeight:css.minHeight});}return {selector,rect:element.getBoundingClientRect().toJSON(),display:getComputedStyle(element).display,ancestors};})(),
     workspace: document.querySelector('.tutorial-workspace')?.getBoundingClientRect().toJSON(),
     spotlight: document.querySelector('.tutorial-spotlight')?.outerHTML,
     surfaces: [...document.querySelectorAll('.tutorial-workspace [role="dialog"], .tutorial-workspace [role="menu"], .tutorial-workspace .topbar-dropdown, .tutorial-workspace .commit-search-toolbar__more-menu')]
       .map(element => ({ classes: element.className, rect: element.getBoundingClientRect().toJSON(), display: getComputedStyle(element).display }))
   })`);
+  const nativeDiagnostics =
+    parent && !parent.isDestroyed()
+      ? {
+          bounds: parent.getBounds(),
+          contentBounds: parent.getContentBounds(),
+          visible: parent.isVisible(),
+          minimized: parent.isMinimized(),
+          views: parent.contentView.children.map((view) => ({ bounds: view.getBounds() })),
+        }
+      : null;
+  console.error('Native tutorial geometry:', JSON.stringify(nativeDiagnostics));
   throw new Error(
     'Timed out: ' +
       label +
@@ -100,15 +126,97 @@ async function click(selector) {
 async function stepReady(id) {
   await waitFor(
     tutorial,
-    'document.querySelector(".tutorial-coach")?.dataset.step === ' + JSON.stringify(id) + ' && document.querySelector("[data-tutorial=primary]")',
+    'document.querySelector(".tutorial-coach:not([aria-busy=true])")?.dataset.step === ' +
+      JSON.stringify(id) +
+      ' && document.querySelector("[data-tutorial=primary]")',
   );
 }
 async function next() {
   await click('.tutorial-coach .tutorial-button.primary:not(:disabled)');
 }
+function visibleDialogField(selector) {
+  return `(() => {const target=document.querySelector(${JSON.stringify(selector)});if(!target)return false;
+    const control=target.matches('input,select,textarea')?target:target.querySelector('input,select,textarea')||target;
+    const rect=control.getBoundingClientRect(),workspace=document.querySelector('.tutorial-workspace').getBoundingClientRect();
+    const parent=target.closest('.dialog-content,[role=menu],.diff-content-scroll')?.getBoundingClientRect()||workspace;
+    return rect.width>0&&rect.height>0&&rect.top>=Math.max(workspace.top,parent.top)-1&&rect.bottom<=Math.min(workspace.bottom,parent.bottom)+1;
+  })()`;
+}
+function restoredEditorText(step) {
+  const fields = [...(step.prepare?.fill || []), ...(step.prepare?.actions || []).filter((action) => action.fill).map((action) => action.fill)];
+  const field = fields.find((entry) =>
+    ['editor-readme', 'file-formats', 'editor-tools', 'structured-files', 'markup-files', 'tree-files', 'search-files', 'history-readme'].includes(
+      entry.value?.example,
+    ),
+  );
+  if (!field) return null;
+  const fixture =
+    field.value.example === 'editor-readme'
+      ? 'editor-readme'
+      : field.value.example === 'editor-tools'
+        ? 'editor-tools'
+        : field.value.example === 'structured-files'
+          ? 'structured-files'
+          : field.value.example === 'markup-files'
+            ? 'markup-files'
+            : field.value.example === 'tree-files'
+              ? 'tree-files'
+              : field.value.example === 'search-files'
+                ? 'search-files'
+                : field.value.example === 'history-readme'
+                  ? 'history-readme'
+                  : 'file-formats';
+  const examples = {
+    ...require('../src/tutorial/fixtures/' + fixture + '.json'),
+    ...(fixture === 'editor-tools' ? require('../src/tutorial/fixtures/text-tools.json') : {}),
+  };
+  const text = examples[field.value.version][languageIndex];
+  if (fixture === 'file-formats' && step.prepare?.after?.some((selector) => selector.includes('data-file-tab="table"'))) {
+    return 'document.querySelector(".file-viewer[data-dirty=true] .working-csv-editor")';
+  }
+  if (fixture === 'file-formats' && step.prepare?.after?.some((selector) => selector.includes('data-file-tab="preview"'))) {
+    return 'document.querySelector(".file-viewer[data-dirty=true][data-tab=preview]")';
+  }
+  const status = text.split('\n').find((line) => line.startsWith('Status:')) || text.split('\n')[0];
+  return 'document.querySelector(".cm-content")?.innerText.includes(' + JSON.stringify(status) + ')';
+}
 function pressKey(keyCode) {
   tutorial.sendInputEvent({ type: 'keyDown', keyCode });
   tutorial.sendInputEvent({ type: 'keyUp', keyCode });
+}
+function chapterGroup(chapter) {
+  if (chapter.id.startsWith('rebase-')) return chapter.id;
+  if (chapter.id.startsWith('reset-')) return chapter.id;
+  if (chapter.id === 'cherry-pick' || chapter.id.startsWith('cherry-pick-') || chapter.id === 'revert') return chapter.id;
+  if (chapter.id.startsWith('amend-')) return chapter.id;
+  if (chapter.id === 'reword' || chapter.id.startsWith('reword-')) return chapter.id;
+  if (chapter.id === 'recovery' || chapter.id.startsWith('recovery-')) return chapter.id;
+  if (chapter.id.startsWith('tags-')) return chapter.id;
+  if (chapter.id.startsWith('submodules-')) return chapter.id;
+  if (chapter.id === 'conflicts' || chapter.id.startsWith('conflicts-')) return chapter.id;
+  if (chapter.id.startsWith('merge-')) return chapter.id;
+  if (chapter.id.startsWith('stash-')) return chapter.id;
+  if (chapter.id === 'branches' || chapter.id.startsWith('branches-')) return chapter.id;
+  if (chapter.id === 'history' || chapter.id.startsWith('history-')) return chapter.id;
+  if (chapter.id.startsWith('tree-')) return chapter.id;
+  if (chapter.id.startsWith('search-')) return chapter.id;
+  if (chapter.id === 'json-errors') return 'json-errors';
+  if (chapter.section === 'localRepos') return 'repositories';
+  for (const [prefix, group] of [
+    ['staging-', 'staging'],
+    ['diff-', 'diff'],
+    ['files-', 'files'],
+    ['formats-', 'formats'],
+    ['editor-', 'editor'],
+    ['text-', 'text'],
+    ['codecs-', 'codecs'],
+    ['hashes-', 'hashes'],
+    ['json-', 'json'],
+    ['yaml-', 'yaml'],
+    ['markup-', 'markup'],
+  ])
+    if (chapter.id.startsWith(prefix)) return group;
+  return 'curriculum';
 }
 async function launch(request) {
   console.log('Tutorial checkpoint:', request.chapterId, request.stepId);
@@ -160,145 +268,402 @@ app
     await parent.webContents.executeJavaScript(
       'localStorage.setItem("tutorial-isolation-sentinel","private workspace"); window.unsavedTutorialTestDraft = "my unfinished draft"',
     );
-    await launch({ chapterId: 'basics' });
-    await tutorial.executeJavaScript('new Promise(resolve => setTimeout(resolve, 1200))');
-    assert.equal(await tutorial.executeJavaScript('document.querySelector(".tutorial-coach").dataset.step'), 'orientation', 'Information steps wait for Next.');
-    pressKey('Right');
-    await stepReady('repositories');
-    pressKey('Left');
-    await stepReady('orientation');
-    await next();
-    await stepReady('repositories');
-    await waitFor(tutorial, 'document.querySelector(".tutorial-target-arrow") && document.querySelector(".tutorial-focus-shade")');
-    assert.deepEqual(
-      await tutorial.executeJavaScript(`(() => {
-        const target = document.querySelector('[data-tutorial="nav-localRepos"]');
-        const rect = target.getBoundingClientRect();
-        const spotlight = document.querySelector('.tutorial-spotlight');
-        const shade = document.querySelector('.tutorial-focus-shade');
-        const area = document.querySelector('.tutorial-workspace').getBoundingClientRect();
-        const bounds = spotlight.getBoundingClientRect();
-        return {
-          clickable: target.contains(document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)),
-          shaded: Number(getComputedStyle(shade).fillOpacity) > 0,
-          pointer: document.querySelector('.tutorial-target-arrow').dataset.direction,
-          withinWorkspace: bounds.top === area.top && bounds.bottom === area.bottom,
-          controlsClear: bounds.bottom <= document.querySelector('.tutorial-coach').getBoundingClientRect().top,
-        };
-      })()`),
-      { clickable: true, shaded: true, pointer: 'right', withinWorkspace: true, controlsClear: true },
-      'The spotlight dims the workspace, points to the small navigation target and keeps it clickable.',
-    );
-    await tutorial.executeJavaScript(
-      'Promise.race([new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))), new Promise(resolve => setTimeout(resolve, 250))])',
-    );
-    fs.writeFileSync(path.join(root, 'build/tutorial-pointer-smoke.png'), (await tutorial.capturePage()).toPNG());
-    await click('[data-tutorial="nav-localRepos"]');
-    await waitFor(tutorial, 'document.querySelector(".tutorial-status.completed")');
-    await click('.tutorial-coach .tutorial-link:last-child');
-    await waitFor(tutorial, 'document.querySelector(".tutorial-chapter-chooser")');
-    pressKey('Left');
-    pressKey('Right');
-    await tutorial.executeJavaScript('new Promise(resolve => setTimeout(resolve, 1200))');
-    assert.equal(
-      await tutorial.executeJavaScript('document.querySelector(".tutorial-coach").dataset.step'),
-      'repositories',
-      'Chapter selection pauses progression.',
-    );
-    await click('[aria-label="Kapitelwahl schließen"]');
-    await stepReady('workspace');
-    await click('.local-repositories-view__row-main');
-    await stepReady('changes');
-    await click('.staging-file-row');
-    await waitFor(tutorial, 'document.querySelector(".tutorial-status.completed")');
-    await stepReady('diff-viewer');
-    await waitFor(
-      tutorial,
-      'document.querySelector(".file-viewer-diff") && document.querySelector(".file-viewer .working-file-viewer__path")?.textContent.includes("README.md")',
-    );
-    await tutorial.executeJavaScript('new Promise(resolve => setTimeout(resolve, 1200))');
-    assert.equal(
-      await tutorial.executeJavaScript('document.querySelector(".tutorial-coach").dataset.step'),
-      'diff-viewer',
-      'Explaining the diff waits until the viewer is closed.',
-    );
-    assert.equal(await tutorial.executeJavaScript('document.querySelector(".tutorial-coach .primary").disabled'), true);
-    await tutorial.executeJavaScript('document.querySelector("#tutorial-step-title").focus()');
-    pressKey('Right');
-    await tutorial.executeJavaScript('new Promise(resolve => setTimeout(resolve, 150))');
-    assert.equal(
-      await tutorial.executeJavaScript('document.querySelector(".tutorial-coach").dataset.step'),
-      'diff-viewer',
-      'Arrow keys cannot skip an incomplete exercise.',
-    );
-    await click('.file-viewer [aria-label="Datei schließen"]');
-    await stepReady('stage');
-    assert.equal(await tutorial.executeJavaScript('localStorage.getItem("tutorial-isolation-sentinel")'), null);
-    await click('.staging-stage-all:not(:disabled)');
-    await waitFor(tutorial, 'document.querySelector(".tutorial-status.completed")');
-    await tutorial.executeJavaScript(
-      'Promise.race([new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))), new Promise(resolve => setTimeout(resolve, 250))])',
-    );
-    fs.writeFileSync(path.join(root, 'build/tutorial-smoke.png'), (await tutorial.capturePage()).toPNG());
-    await stepReady('commit');
-    await waitFor(tutorial, 'document.querySelector(".staging-commit-area input")');
-    await tutorial.executeJavaScript(
-      '(() => { const input=document.querySelector(".staging-commit-area input"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(input,"docs: My practice commit"); input.dispatchEvent(new Event("input",{bubbles:true})); })()',
-    );
-    await tutorial.executeJavaScript(
-      '(() => { const input=document.querySelector(".staging-commit-area input"); input.focus(); input.setSelectionRange(1,1); })()',
-    );
-    pressKey('Left');
-    await waitFor(tutorial, 'document.querySelector(".staging-commit-area input").selectionStart === 0');
-    pressKey('Right');
-    await waitFor(tutorial, 'document.querySelector(".staging-commit-area input").selectionStart === 1');
-    assert.equal(
-      await tutorial.executeJavaScript('document.querySelector(".tutorial-coach").dataset.step'),
-      'commit',
-      'Arrow keys in commit inputs move the caret.',
-    );
-    await click('.staging-commit-btn:not(:disabled)');
-    await waitFor(tutorial, 'document.querySelector(".tutorial-status.completed")');
-    await stepReady('branch');
-    await click('[data-tutorial="create-branch"]');
-    await waitFor(tutorial, 'document.querySelector("input[placeholder=branch-name]")');
-    await tutorial.executeJavaScript(
-      '(() => { const input=document.querySelector("input[placeholder=branch-name]"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(input,"feature/practice"); input.dispatchEvent(new Event("input",{bubbles:true})); })()',
-    );
-    await tutorial.executeJavaScript(
-      'document.querySelector("input[placeholder=branch-name]").dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true}))',
-    );
-    await waitFor(tutorial, 'document.querySelector(".tutorial-status.completed")');
-    await stepReady('sync');
-    await click('[data-tutorial="fetch"]:not(:disabled)');
-    await waitFor(tutorial, 'document.querySelector(".tutorial-status.completed")');
-    await stepReady('help');
-    await click('[data-tutorial="nav-settings"]');
-    await waitFor(tutorial, 'document.querySelector(".tutorial-chapter-chooser")');
-    assert.equal(chapterCompletions, 1, 'The basic tour advances and completes automatically exactly once.');
-    await close();
+    if (isolation) {
+      await isolation.verify({ parent, getTutorial: () => tutorial, launch, close, stepReady, click, waitFor, workspace, profile, languageIndex });
+      assert.equal(regularIpcFromTutorial, 0, 'Practice mutations cannot use native repository IPC.');
+      assert.equal(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'), settings);
+      assert.deepEqual(errors, []);
+      await isolation.prepareShutdown(workspace, profile, fail);
+      verified = true;
+      fs.writeFileSync(path.join(profile, 'tutorial-verified'), 'yes');
+      clearTimeout(timeout);
+      app.quit();
+      return;
+    }
+    if (group === 'checkpoint') {
+      const [chapterId, stepId] = process.env.OGC_TUTORIAL_TEST_CHECKPOINT.split('/');
+      parent.setSize(900, 640);
+      await launch({ chapterId, stepId });
+      await waitFor(tutorial, 'document.querySelector(".tutorial-highlight")');
+      const step = TUTORIAL_CHAPTERS.find((chapter) => chapter.id === chapterId).steps.find((step) => step.id === stepId);
+      const restored = restoredEditorText(step);
+      if (restored) await waitFor(tutorial, restored, 'The restored editor uses the launch language.');
+      if (chapterId === 'json-schema' && stepId === 'contract') await require('./tutorial-schema-layout.cjs')(parent, tutorial, waitFor);
+      if (
+        step.target.startsWith('[data-dialog-field=') ||
+        step.target.startsWith('[data-tutorial="ignore-') ||
+        (chapterId.startsWith('diff-') && (step.action || step.completion))
+      )
+        await waitFor(tutorial, visibleDialogField(step.target), 'The restored control is visible inside its compact dialog or menu');
+      assert.equal(await tutorial.executeJavaScript('document.querySelectorAll(".action-toast.error").length'), 0);
+      assert.equal(regularIpcFromTutorial, 0);
+      await close();
+      assert.equal(await parent.webContents.executeJavaScript('window.unsavedTutorialTestDraft'), 'my unfinished draft');
+      assert.equal(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'), settings);
+      clearTimeout(timeout);
+      verified = true;
+      fs.writeFileSync(path.join(profile, 'tutorial-verified'), 'yes');
+      console.log('Native compact checkpoint passed:', chapterId, stepId);
+      app.quit();
+      return;
+    }
+    const completedChapters = [];
+    if (['all', 'curriculum'].includes(group)) {
+      await require('./tutorial-curriculum-smoke.cjs')({
+        getTutorial: () => tutorial,
+        launch,
+        close,
+        click,
+        next,
+        stepReady,
+        waitFor,
+        pressKey,
+        parent,
+        languageIndex,
+      });
+      completedChapters.push('basics', 'changes', 'commit');
+    }
+    if (['all', 'repositories'].includes(group)) {
+      await require('./tutorial-repositories-smoke.cjs')({
+        getTutorial: () => tutorial,
+        launch,
+        close,
+        click,
+        next,
+        stepReady,
+        waitFor,
+        parent,
+        languageIndex,
+      });
+      completedChapters.push(...TUTORIAL_CHAPTERS.filter((chapter) => chapter.section === 'localRepos').map((chapter) => chapter.id));
+    }
+    if (['all', 'staging'].includes(group)) {
+      await require('./tutorial-staging-smoke.cjs')({
+        getTutorial: () => tutorial,
+        launch,
+        close,
+        click,
+        next,
+        stepReady,
+        waitFor,
+        pressKey,
+        parent,
+        languageIndex,
+      });
+      completedChapters.push(...TUTORIAL_CHAPTERS.filter((chapter) => chapter.id.startsWith('staging-')).map((chapter) => chapter.id));
+    }
+    if (['all', 'diff'].includes(group)) {
+      await require('./tutorial-diff-smoke.cjs')({ getTutorial: () => tutorial, launch, close, click, next, stepReady, waitFor, pressKey, parent });
+      completedChapters.push(...TUTORIAL_CHAPTERS.filter((chapter) => chapter.id.startsWith('diff-')).map((chapter) => chapter.id));
+    }
+    if (['all', 'files'].includes(group)) {
+      await require('./tutorial-files-smoke.cjs')({
+        getTutorial: () => tutorial,
+        launch,
+        close,
+        click,
+        next,
+        stepReady,
+        waitFor,
+        pressKey,
+        parent,
+        languageIndex,
+      });
+      completedChapters.push(...TUTORIAL_CHAPTERS.filter((chapter) => chapter.id.startsWith('files-')).map((chapter) => chapter.id));
+    }
+    if (['all', 'formats'].includes(group)) {
+      await require('./tutorial-formats-smoke.cjs')({
+        getTutorial: () => tutorial,
+        launch,
+        close,
+        click,
+        next,
+        stepReady,
+        waitFor,
+        pressKey,
+        parent,
+        languageIndex,
+      });
+      completedChapters.push(...TUTORIAL_CHAPTERS.filter((chapter) => chapter.id.startsWith('formats-')).map((chapter) => chapter.id));
+    }
+    if (['all', 'editor'].includes(group)) {
+      await require('./tutorial-editor-smoke.cjs')({ getTutorial: () => tutorial, launch, close, click, next, stepReady, waitFor, pressKey, parent });
+      completedChapters.push(...TUTORIAL_CHAPTERS.filter((chapter) => chapter.id.startsWith('editor-')).map((chapter) => chapter.id));
+    }
+    for (const family of [
+      'text',
+      'codecs',
+      'hashes',
+      'json',
+      'yaml',
+      'markup',
+      'json-errors',
+      'tree-create',
+      'tree-rename',
+      'tree-copy',
+      'tree-replace',
+      'tree-move',
+      'tree-delete',
+      'search-names',
+      'search-content',
+      'search-one',
+      'search-all',
+      'history',
+      'history-files',
+      'history-blame',
+      'history-sources',
+      'history-search',
+      'history-forensic-string',
+      'history-forensic-lines',
+      'history-forensic-regex',
+      'branches',
+      'branches-switch',
+      'branches-manage',
+      'branches-unmerged',
+      'branches-cleanup',
+      'branches-cleanup-protection',
+      'branches-cleanup-unmerged',
+      'branches-carry-review',
+      'branches-carry',
+      'branches-park',
+      'branches-park-restore',
+      'stash-file',
+      'stash-all',
+      'stash-files',
+      'stash-branch',
+      'merge-review',
+      'merge-fast-forward',
+      'merge-commit',
+      'merge-squash',
+      'merge-outward',
+      'merge-diverged',
+      'merge-ff-guard',
+      'merge-squash-diverged',
+      'merge-revert',
+      'amend-message',
+      'amend-files',
+      'reword',
+      'reword-protected',
+      'reword-referenced',
+      'rebase-review',
+      'rebase-reword',
+      'rebase-squash',
+      'rebase-fixup',
+      'rebase-drop',
+      'rebase-reorder',
+      'rebase-edit',
+      'rebase-staged',
+      'rebase-conflict',
+      'rebase-abort',
+      'rebase-root',
+      'rebase-off-head',
+      'rebase-merge-guard',
+      'cherry-pick',
+      'cherry-pick-conflict',
+      'cherry-pick-abort',
+      'revert',
+      'reset-soft',
+      'reset-mixed',
+      'reset-hard',
+      'recovery',
+      'recovery-message',
+      'recovery-inspect',
+      'recovery-reset',
+      'tags-navigation',
+      'tags-lightweight',
+      'tags-annotated',
+      'tags-delete',
+      'submodules-navigation',
+      'submodules-initialize',
+      'submodules-update',
+      'submodules-sync',
+      'conflicts',
+      'conflicts-choices',
+      'conflicts-manual',
+      'conflicts-abort',
+      'conflicts-multiple',
+      'conflicts-deletion',
+    ])
+      if (['all', family].includes(group)) {
+        await require('./tutorial-text-tools-smoke.cjs')({
+          getTutorial: () => tutorial,
+          launch,
+          close,
+          click,
+          next,
+          stepReady,
+          waitFor,
+          pressKey,
+          parent,
+          languageIndex,
+          family,
+          chapterIds: TUTORIAL_CHAPTERS.filter((chapter) => chapterGroup(chapter) === family).map((chapter) => chapter.id),
+        });
+        completedChapters.push(...TUTORIAL_CHAPTERS.filter((chapter) => chapterGroup(chapter) === family).map((chapter) => chapter.id));
+      }
+    tutorial = null;
+    assert.equal(chapterCompletions, completedChapters.length, 'Each guided lesson is saved exactly once.');
+    const chaptersToCheck = TUTORIAL_CHAPTERS.filter((chapter) => group === 'all' || chapterGroup(chapter) === group);
     assert.equal(await parent.webContents.executeJavaScript('window.unsavedTutorialTestDraft'), 'my unfinished draft');
     assert.equal(await parent.webContents.executeJavaScript('localStorage.getItem("tutorial-isolation-sentinel")'), 'private workspace');
-    for (const chapter of TUTORIAL_CHAPTERS) {
+    for (const chapter of chaptersToCheck) {
       await launch({ chapterId: chapter.id, stepId: chapter.steps.at(-1).id });
       await waitFor(tutorial, 'document.querySelector(".tutorial-highlight")');
-      assert.equal(await tutorial.executeJavaScript('document.querySelectorAll(".action-toast.error").length'), 0, chapter.id);
+      assert.equal(
+        await tutorial.executeJavaScript('document.querySelectorAll(".action-toast.error").length'),
+        0,
+        chapter.id +
+          ': ' +
+          (await tutorial.executeJavaScript('Array.from(document.querySelectorAll(".action-toast.error .toast-msg"),node=>node.textContent).join("; ")')),
+      );
       const body = await tutorial.executeJavaScript('document.body.innerText');
-      assert.ok(body.includes('Übungsmodus'), chapter.id);
+      assert.ok(body.includes(language === 'de' ? 'Übungsmodus' : 'Practice mode'), chapter.id);
       assert.ok(!body.includes('my unfinished draft'), chapter.id);
       await close();
     }
     // Independently reset every step in one renderer, including direct FAQ
     // entries that must not depend on earlier chapters or existing caches.
     await launch({ chapterId: 'basics' });
-    for (const chapter of TUTORIAL_CHAPTERS)
+    for (const chapter of chaptersToCheck)
       for (const step of chapter.steps) {
         const request = { chapterId: chapter.id, stepId: step.id };
         await tutorial.executeJavaScript('window.dispatchEvent(new CustomEvent("tutorial:launch", {detail:' + JSON.stringify(request) + '}))');
         await stepReady(step.id);
-        await waitFor(tutorial, 'document.querySelector(".tutorial-coach-progress")?.innerText.startsWith(' + JSON.stringify(chapter.title[0]) + ')');
+        if (chapter.id === 'branches' || chapter.id.startsWith('branches-'))
+          await require('./tutorial-branches-assertions.cjs')({
+            chapter,
+            step,
+            run: (code) => tutorial.executeJavaScript(code),
+            waitFor,
+            tutorial,
+            languageIndex,
+          });
+        if (chapter.id.startsWith('stash-'))
+          await require('./tutorial-stash-assertions.cjs')({
+            chapter,
+            step,
+            run: (code) => tutorial.executeJavaScript(code),
+            waitFor,
+            tutorial,
+            languageIndex,
+          });
+        if (chapter.id.startsWith('amend-'))
+          await require('./tutorial-amend-assertions.cjs')({
+            chapter,
+            step,
+            run: (code) => tutorial.executeJavaScript(code),
+            waitFor,
+            tutorial,
+            languageIndex,
+          });
+        if (chapter.id.startsWith('tags-'))
+          await require('./tutorial-tags-assertions.cjs')({ chapter, step, run: (code) => tutorial.executeJavaScript(code), waitFor, tutorial, languageIndex });
+        if (chapter.id.startsWith('submodules-'))
+          await require('./tutorial-submodule-assertions.cjs')({
+            chapter,
+            step,
+            run: (code) => tutorial.executeJavaScript(code),
+            waitFor,
+            tutorial,
+            languageIndex,
+          });
+        if (chapter.id.startsWith('rebase-'))
+          await require('./tutorial-rebase-assertions.cjs')({
+            chapter,
+            step,
+            run: (code) => tutorial.executeJavaScript(code),
+            waitFor,
+            tutorial,
+            languageIndex,
+          });
+        if (chapter.id === 'reword' || chapter.id.startsWith('reword-'))
+          await require('./tutorial-reword-assertions.cjs')({
+            chapter,
+            step,
+            run: (code) => tutorial.executeJavaScript(code),
+            waitFor,
+            tutorial,
+            languageIndex,
+          });
+        if (chapter.id === 'cherry-pick' || chapter.id === 'revert')
+          await require('./tutorial-replay-assertions.cjs')({
+            chapter,
+            step,
+            run: (code) => tutorial.executeJavaScript(code),
+            waitFor,
+            tutorial,
+            languageIndex,
+          });
+        if (chapter.id.startsWith('cherry-pick-'))
+          await require('./tutorial-cherry-conflict-assertions.cjs')({
+            chapter,
+            step,
+            run: (code) => tutorial.executeJavaScript(code),
+            waitFor,
+            tutorial,
+            languageIndex,
+          });
+        if (chapter.id.startsWith('reset-'))
+          await require('./tutorial-reset-mode-assertions.cjs')({
+            chapter,
+            step,
+            run: (code) => tutorial.executeJavaScript(code),
+            waitFor,
+            tutorial,
+            languageIndex,
+          });
+        if (chapter.id === 'recovery' || chapter.id.startsWith('recovery-'))
+          await require('./tutorial-recovery-assertions.cjs')({
+            chapter,
+            step,
+            run: (code) => tutorial.executeJavaScript(code),
+            waitFor,
+            tutorial,
+            languageIndex,
+          });
+        if (chapter.id.startsWith('merge-'))
+          await require('./tutorial-merge-assertions.cjs')({
+            chapter,
+            step,
+            run: (code) => tutorial.executeJavaScript(code),
+            waitFor,
+            tutorial,
+            languageIndex,
+          });
+        if (chapter.id === 'conflicts' || chapter.id.startsWith('conflicts-'))
+          await require('./tutorial-conflict-assertions.cjs')({
+            chapter,
+            step,
+            run: (code) => tutorial.executeJavaScript(code),
+            waitFor,
+            tutorial,
+            languageIndex,
+          });
+        const restored = restoredEditorText(step);
+        if (restored) await waitFor(tutorial, restored, 'The restored editor uses the launch language: ' + chapter.id + '/' + step.id);
+        await waitFor(
+          tutorial,
+          'document.querySelector(".tutorial-coach-progress")?.innerText.startsWith(' + JSON.stringify(chapter.title[languageIndex]) + ')',
+        );
         await waitFor(tutorial, 'document.querySelector(".tutorial-highlight")');
-        assert.equal(await tutorial.executeJavaScript('document.querySelectorAll(".action-toast.error").length'), 0, chapter.id + '/' + step.id);
+        if (
+          step.target.startsWith('[data-dialog-field=') ||
+          step.target.startsWith('[data-tutorial="ignore-') ||
+          (chapter.id.startsWith('diff-') && (step.action || step.completion))
+        )
+          await waitFor(tutorial, visibleDialogField(step.target), 'The control is visible inside its dialog or menu: ' + chapter.id + '/' + step.id);
+        const expectedErrors = chapter.id.startsWith('merge-') ? require('./tutorial-merge-assertions.cjs').expectedErrors(step) : 0;
+        if (require('./tutorial-rebase-pause-assertions.cjs').isPause(chapter.id))
+          await require('./tutorial-rebase-pause-assertions.cjs').verifyFeedback({ chapter, step, run: (code) => tutorial.executeJavaScript(code) });
+        else if (require('./tutorial-rebase-guard-assertions.cjs').isGuard(chapter.id))
+          await require('./tutorial-rebase-guard-assertions.cjs').verifyFeedback({
+            chapter,
+            step,
+            run: (code) => tutorial.executeJavaScript(code),
+            languageIndex,
+          });
+        else
+          assert.equal(await tutorial.executeJavaScript('document.querySelectorAll(".action-toast.error").length'), expectedErrors, chapter.id + '/' + step.id);
       }
     await tutorial.executeJavaScript('window.dispatchEvent(new CustomEvent("tutorial:launch", {detail:{chapterId:"run",stepId:"start"}}))');
     await stepReady('start');
@@ -346,10 +711,15 @@ app
     for (let attempt = 0; !crashed.isDestroyed() && attempt < 100; attempt++) await new Promise((resolve) => setTimeout(resolve, 20));
     assert.ok(crashed.isDestroyed(), 'A failed tutorial renderer is disposed.');
     tutorial = null;
-    await waitFor(parent.webContents, 'Array.from(document.querySelectorAll(".action-toast.error")).some(toast => toast.textContent.includes("Einführung"))');
+    await waitFor(
+      parent.webContents,
+      'Array.from(document.querySelectorAll(".action-toast.error")).some(toast => toast.textContent.includes(' +
+        JSON.stringify(language === 'de' ? 'Einführung' : 'introduction') +
+        '))',
+    );
     assert.equal(await parent.webContents.executeJavaScript('window.unsavedTutorialTestDraft'), 'my unfinished draft');
     const progress = await parent.webContents.executeJavaScript('window.electronAPI.app.getTutorialProgress()');
-    assert.ok(progress.completedChapters.includes('basics'));
+    for (const chapter of completedChapters) assert.ok(progress.completedChapters.includes(chapter));
     assert.equal(regularIpcFromTutorial, 0, 'Tutorial actions must never use the native application IPC.');
     assert.equal(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'), settings, 'Tutorial settings must not affect the real profile.');
     assert.deepEqual(errors, [], 'The tutorial must render without errors.');

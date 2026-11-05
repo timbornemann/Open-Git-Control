@@ -1,6 +1,7 @@
 import type { ElectronRemoteTransferAPI } from '@/shared/ipc/contracts/remoteTransfers';
 import type { RemoteTransferOperation, RemoteTransferOperations, RemotePreferences, GitPushPlanDto } from '@/types/remoteTransfers';
-import { DEMO_URL, ok, unavailable, type DemoRepository } from './demoRepository';
+import { ok, unavailable, type DemoRepository } from './demoRepository';
+import { demoRemoteSnapshot } from './demoRemoteSnapshot';
 
 export function createDemoTransferApi(repo: DemoRepository): ElectronRemoteTransferAPI {
   let preferences: RemotePreferences = {
@@ -10,14 +11,7 @@ export function createDemoTransferApi(repo: DemoRepository): ElectronRemoteTrans
     selectionModes: { fetch: 'remember', pull: 'remember', push: 'remember' },
   };
   let plan: GitPushPlanDto | undefined;
-  const remotes = () => ({
-    repoPath: repo.activeRepo,
-    branch: repo.branch,
-    upstream: { remote: 'origin', branch: repo.branch },
-    defaultPushRemote: 'origin',
-    remotes: [{ name: 'origin', fetchUrls: [DEMO_URL], pushUrls: [DEMO_URL] }],
-    supportsPushUrlIsolation: true,
-  });
+  const remotes = () => demoRemoteSnapshot(repo);
   const handlers: { [K in RemoteTransferOperation]?: (input: RemoteTransferOperations[K]['input']) => RemoteTransferOperations[K]['output'] } = {
     getRemotes: remotes,
     getPreferences: () => preferences,
@@ -48,7 +42,7 @@ export function createDemoTransferApi(repo: DemoRepository): ElectronRemoteTrans
         branch: repo.branch,
         tagNames: input.tagNames || [],
         force: false,
-        targets: [{ id: 'origin', remoteName: 'origin', url: DEMO_URL, destinationRef: `refs/heads/${repo.branch}`, sourceOid: repo.commits[0].hash }],
+        targets: [{ id: 'origin', remoteName: 'origin', url: repo.originFor()!, destinationRef: `refs/heads/${repo.branch}`, sourceOid: repo.commits[0].hash }],
       };
       return plan;
     },
@@ -66,6 +60,7 @@ export function createDemoTransferApi(repo: DemoRepository): ElectronRemoteTrans
   };
   return {
     remoteTransferRequest: async <K extends RemoteTransferOperation>(operation: K, input: RemoteTransferOperations[K]['input']) => {
+      if (['planPush', 'executePush'].includes(operation) && (!repo.commits.length || !repo.originFor())) return unavailable();
       const handler = handlers[operation];
       return handler ? ok(handler(input)) : unavailable();
     },

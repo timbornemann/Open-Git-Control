@@ -8,19 +8,29 @@ import { createDemoHostingApi } from './demoHostingApi';
 import { createDemoTransferApi } from './demoTransfers';
 import { createDemoRunApi } from './demoRunApi';
 import { createDemoBranchApi } from './demoBranchApi';
+import { createDemoBranchCleanupApi } from './demoBranchCleanupApi';
+import { createDemoRepositoryApi } from './demoRepositoryApi';
+import { createDemoCommitMessageEditApi } from './demoCommitMessageEdit';
+import { createDemoRebaseApi } from './demoRebaseApi';
 
 /** One facade per checkpoint. Nothing ever falls through to a native API. */
 export function createDemoApi(context: TutorialLaunchContext, step: TutorialStep) {
   const repo = new DemoRepository();
-  repo.reset(step);
+  repo.reset(step, context.language);
+  const settingsContext = step.prepare?.commit?.signoff ? { ...context, practiceSignoff: true } : context;
+  const catalog = createDemoRepositoryApi(repo, step);
   const methods: Partial<ElectronFlatAPI> = {
     ...createDemoGitApi(repo),
-    ...createDemoSystemApi(repo, context),
+    ...createDemoCommitMessageEditApi(repo),
+    ...createDemoRebaseApi(repo),
+    ...createDemoSystemApi(repo, settingsContext, catalog.stored),
     ...createDemoPlanningApi(repo),
     ...createDemoHostingApi(repo),
     ...createDemoTransferApi(repo),
     ...createDemoRunApi(repo),
     ...createDemoBranchApi(repo),
+    ...createDemoBranchCleanupApi(repo),
+    ...catalog.methods,
   };
   const unsupported = new Set<string>();
   const namespaces = new Set(['git', 'app', 'repos', 'settings', 'planner', 'hosting', 'transfers', 'runs', 'ai']);

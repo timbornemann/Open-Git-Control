@@ -78,7 +78,7 @@ export function FileDetailsView({
   };
 
   return (
-    <section className="commit-file-details" aria-label={tr('Dateidetails', 'File details')}>
+    <section className="commit-file-details" data-path={selectedFile.path} data-tab={activeTab} aria-label={tr('Dateidetails', 'File details')}>
       <div className="commit-file-details__summary">
         <div className="commit-file-details__header">
           <div className="commit-file-details__identity" title={selectedFile.path}>
@@ -154,6 +154,7 @@ export function FileDetailsView({
           <button
             type="button"
             className={`commit-file-details__tab${activeTab === 'history' ? ' is-active' : ''}`}
+            data-detail-tab="history"
             aria-pressed={activeTab === 'history'}
             onClick={() => setActiveTab('history')}
           >
@@ -163,6 +164,7 @@ export function FileDetailsView({
           <button
             type="button"
             className={`commit-file-details__tab${activeTab === 'blame' ? ' is-active' : ''}`}
+            data-detail-tab="blame"
             aria-pressed={activeTab === 'blame'}
             onClick={() => setActiveTab('blame')}
           >

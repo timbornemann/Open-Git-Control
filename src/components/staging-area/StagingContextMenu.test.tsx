@@ -88,6 +88,19 @@ describe('StagingContextMenu', () => {
     expect(host.textContent).toContain('Git LFS installieren');
   });
 
+  it('focuses the first enabled item and returns focus when the menu closes', () => {
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
+    trigger.focus();
+    const fileOps = createFileOps();
+    fileOps.lfs = { available: false, loading: false, stateFor: () => ({ eligible: true }) } as any;
+    render({ x: 10, y: 10, entry, section: 'untracked' }, fileOps);
+    expect(document.activeElement).toBe(host.querySelector('button:not(:disabled)'));
+    act(() => root.render(null));
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+
   afterEach(() => {
     act(() => root.unmount());
     host.remove();

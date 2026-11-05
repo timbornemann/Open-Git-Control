@@ -239,6 +239,11 @@
     box-shadow 120ms ease;
 }
 
+.branch-row[role='button']:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
 .branch-row-local:not(.branch-row-current) {
   background: color-mix(in srgb, var(--accent-primary) 8%, var(--bg-panel));
   border-color: color-mix(in srgb, var(--accent-primary) 22%, var(--border-color));

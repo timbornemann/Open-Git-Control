@@ -57,6 +57,8 @@ export const ConflictFileList = ({
           const blocksForFile = blockCountForPath(file.path);
           return (
             <button
+              data-tutorial="conflict-open"
+              data-conflict-path={file.path}
               key={`summary-c-${file.path}`}
               className="conflict-summary-file"
               onClick={() => onOpenConflictResolver(file.path)}
@@ -90,6 +92,8 @@ export const ConflictFileList = ({
           const blocksForFile = blockCountForPath(file.path);
           return (
             <button
+              data-tutorial="conflict-file"
+              data-conflict-path={file.path}
               className={cx('conflict-sidebar-file conflict-sidebar-file--resolver', isActive && 'active')}
               onClick={() => {
                 void openConflictEditor(file.path);

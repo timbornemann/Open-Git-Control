@@ -32,7 +32,7 @@ export const WorkingDirectoryFileToolsMenu: React.FC<Props> = ({ groups, activeG
     <div className="working-file-tools__menu" role="menu" aria-label={ariaLabel}>
       {selectedGroup ? (
         <>
-          <button type="button" className="working-file-tools__back" onClick={() => onGroupChange(null)}>
+          <button type="button" data-file-tool-back className="working-file-tools__back" onClick={() => onGroupChange(null)}>
             <ArrowLeft size={14} />
             <span>
               <strong>{selectedGroup.label}</strong>
@@ -40,7 +40,15 @@ export const WorkingDirectoryFileToolsMenu: React.FC<Props> = ({ groups, activeG
             </span>
           </button>
           {selectedGroup.items.map((item) => (
-            <button key={item.id} type="button" role="menuitem" disabled={item.disabled} onClick={() => void item.action()}>
+            <button
+              key={item.id}
+              data-file-tool={item.id}
+              aria-checked={item.active}
+              type="button"
+              role={item.active === undefined ? 'menuitem' : 'menuitemcheckbox'}
+              disabled={item.disabled}
+              onClick={() => void item.action()}
+            >
               {item.active ? <Check size={14} /> : item.id === 'whitespace' ? <Eye size={14} /> : <Sparkles size={14} />}
               <span>
                 <strong>{item.label}</strong>
@@ -53,7 +61,7 @@ export const WorkingDirectoryFileToolsMenu: React.FC<Props> = ({ groups, activeG
         groups.map((group) => {
           const Icon = group.icon;
           return (
-            <button key={group.id} type="button" role="menuitem" aria-haspopup="menu" onClick={() => onGroupChange(group.id)}>
+            <button key={group.id} data-file-tool-group={group.id} type="button" role="menuitem" aria-haspopup="menu" onClick={() => onGroupChange(group.id)}>
               <Icon size={14} />
               <span>
                 <strong>{group.label}</strong>

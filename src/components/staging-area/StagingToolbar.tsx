@@ -16,12 +16,14 @@ export const StagingToolbar: React.FC<StagingToolbarProps> = ({ searchQuery, set
     <div className="staging-toolbar">
       <div className="staging-search-row">
         <input
+          data-tutorial="staging-search"
           className="staging-search-input"
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
           placeholder={t('generated.components.staging_area.stagingtoolbar.search_file_be8954bd')}
         />
         <button
+          data-tutorial="stage-repository"
           className="staging-tool-btn staging-stage-all"
           onClick={onStageAll}
           disabled={!canStageAll}

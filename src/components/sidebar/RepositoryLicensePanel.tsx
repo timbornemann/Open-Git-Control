@@ -2,6 +2,7 @@ import React from 'react';
 import { useRepositoryContext, useUIContext } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
+import { readCurrentResource } from '@/data/readCurrentResource';
 import { buildLicenseDocuments, getLicenseTemplateRequirements, LICENSE_TEMPLATE_OPTIONS, type LicenseTemplateId } from '@/shared/licenseTemplates';
 import { RepoCard, RepoCardContent, RepoCardHeader } from './RepoCard';
 
@@ -62,8 +63,8 @@ export const RepositoryLicensePanel: React.FC<RepositoryLicensePanelProps> = ({ 
       const isCurrent = () => licenseCheckGenerationRef.current === generation && currentRepoPathRef.current === requestedRepoPath;
       const findExistingFile = async (candidates: string[]): Promise<string | null> => {
         for (const filePath of candidates) {
-          const result = await gitClient.readRepoFile(filePath, requestedRepoPath);
-          if (!isCurrent()) return null;
+          const result = await readCurrentResource(() => gitClient.readRepoFile(filePath, requestedRepoPath), isCurrent);
+          if (!result) return null;
           if (result.success) return filePath;
           // A missing candidate is expected; permission, authorization, and
           // filesystem errors are not evidence that no license exists.

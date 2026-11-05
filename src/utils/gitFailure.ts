@@ -13,6 +13,7 @@ export type GitFailureKind =
   | 'identity'
   | 'local-changes'
   | 'diverged'
+  | 'fast-forward'
   | 'locked'
   | 'repository'
   | 'configuration'
@@ -122,7 +123,13 @@ export function describeGitFailure(raw: string, tr: Translate, explicitGit = fal
       'Lokale Änderungen würden überschrieben. Committe oder stashe sie im Arbeitsbereich, bevor du den Vorgang wiederholst.',
       'Local changes would be overwritten. Commit or stash them in the workspace before retrying.',
     );
-  if (/non-fast-forward|fetch first|tip of your current branch is behind|divergent branches|not possible to fast-forward/i.test(output))
+  if (/not possible to fast-forward|cannot fast-forward/i.test(output))
+    return result(
+      'fast-forward',
+      'Die Branches haben unterschiedliche Entwicklungsstände und lassen sich nicht nur vorziehen. Prüfe die Historie und wähle bewusst Merge oder Rebase.',
+      'The branches have diverged and cannot be combined by advancing alone. Inspect the history and deliberately choose merge or rebase.',
+    );
+  if (/non-fast-forward|fetch first|tip of your current branch is behind|divergent branches/i.test(output))
     return result(
       'diverged',
       'Lokaler Branch und Serverstand passen nicht zusammen. Lade die Änderungen und prüfe Merge oder Rebase vor einem erneuten Push.',

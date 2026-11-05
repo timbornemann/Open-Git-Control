@@ -1,0 +1,27 @@
+{
+  "markdown": [
+    "# Projektleitfaden\n\n## Einstieg\n\n- Öffne das Projekt.\n- Prüfe die **Änderungen**.\n\n```sh\ngit status\n```\n\n| Bereich | Aufgabe |\n| --- | --- |\n| Staging | Änderungen vormerken |\n",
+    "# Project guide\n\n## Getting started\n\n- Open the project.\n- Check the **changes**.\n\n```sh\ngit status\n```\n\n| Area | Task |\n| --- | --- |\n| Staging | Stage changes |\n"
+  ],
+  "html": [
+    "<!doctype html>\n<html lang=\"de\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>Lernseite</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <h1>Hallo Lernprojekt</h1>\n  <p>Lokale Vorschau mit Beispieldaten.</p>\n</body>\n</html>\n",
+    "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>Learning page</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <h1>Hello learning project</h1>\n  <p>Local preview with sample data.</p>\n</body>\n</html>\n"
+  ],
+  "stylesheet": [
+    "body { font-family: sans-serif; padding: 20px; background: #e6f2ff; color: #143047; }\nh1 { color: #215fa3; }\n",
+    "body { font-family: sans-serif; padding: 20px; background: #e6f2ff; color: #143047; }\nh1 { color: #215fa3; }\n"
+  ],
+  "csv": ["Name;Status\nAlex;Offen\nSam;Geplant\n", "Name;Status\nAlex;Open\nSam;Planned\n"],
+  "markdown-edited": [
+    "# Unser Projektleitfaden\n\n## Einstieg\n\n- Öffne das Projekt.\n- Prüfe die **Änderungen**.\n\n```sh\ngit status\n```\n\n| Bereich | Aufgabe |\n| --- | --- |\n| Staging | Änderungen vormerken |\n",
+    "# Our project guide\n\n## Getting started\n\n- Open the project.\n- Check the **changes**.\n\n```sh\ngit status\n```\n\n| Area | Task |\n| --- | --- |\n| Staging | Stage changes |\n"
+  ],
+  "html-edited": [
+    "<!doctype html>\n<html lang=\"de\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>Lernseite</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <h1>Willkommen in unserem Projekt</h1>\n  <p>Lokale Vorschau mit Beispieldaten.</p>\n</body>\n</html>\n",
+    "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>Learning page</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <h1>Welcome to our project</h1>\n  <p>Local preview with sample data.</p>\n</body>\n</html>\n"
+  ],
+  "csv-quoted": ["Name;Status\nAlex;\"Bereit; geprüft\"\nSam;Geplant\n", "Name;Status\nAlex;\"Ready; reviewed\"\nSam;Planned\n"],
+  "csv-row": ["Name;Status\nAlex;\"Bereit; geprüft\"\nSam;Geplant\n;\n", "Name;Status\nAlex;\"Ready; reviewed\"\nSam;Planned\n;\n"],
+  "csv-column": ["Name;Status;\nAlex;\"Bereit; geprüft\";\nSam;Geplant;\n;;\n", "Name;Status;\nAlex;\"Ready; reviewed\";\nSam;Planned;\n;;\n"],
+  "csv-removed": ["Name;Status\nAlex;\"Bereit; geprüft\"\n", "Name;Status\nAlex;\"Ready; reviewed\"\n"]
+}

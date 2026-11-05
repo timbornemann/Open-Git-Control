@@ -109,6 +109,7 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
               : commitShortcut || tr('Kein Tastenkürzel', 'No shortcut')}
           </span>
           <label
+            data-tutorial="commit-amend"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -123,6 +124,7 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
             {t('generated.components.staging_area.stagingcommitpanel.amend_47cd3979')}
           </label>
           <label
+            data-tutorial="commit-signoff"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: 'var(--text-secondary)', cursor: 'pointer' }}
             title={t('generated.components.staging_area.stagingcommitpanel.append_signed_off_by_line_signoff_1c68660a')}
           >

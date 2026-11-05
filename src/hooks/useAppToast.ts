@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useOptionalRepositoryContext } from '@/contexts/AppStateContext';
+import { emitTutorialFeedback } from '@/shared/tutorial/feedback';
 
 export type AppToast = {
   msg: string;
@@ -12,13 +13,16 @@ export type AppToast = {
  * usable when they are rendered outside the application shell.
  */
 export const useAppToast = () => {
-  const repository = useOptionalRepositoryContext();
+  const onToast = useOptionalRepositoryContext()?.onToast;
 
   return useCallback(
     (message: string, isError: boolean) => {
-      if (message) repository?.onToast(message, isError);
+      if (message) {
+        onToast?.(message, isError);
+        if (onToast) emitTutorialFeedback(message, isError);
+      }
     },
-    [repository],
+    [onToast],
   );
 };
 

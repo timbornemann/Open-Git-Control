@@ -1,0 +1,13 @@
+{
+  "affix-base": ["alpha\nbeta\n", "alpha\nbeta\n"],
+  "affixed": ["> alpha !\n> beta !\n", "> alpha !\n> beta !\n"],
+  "compacted": ["> alpha ! > beta !", "> alpha ! > beta !"],
+  "codec-base": ["Café & OGC\n", "Café & OGC\n"],
+  "codec-base64": ["Q2Fmw6kgJiBPR0MK", "Q2Fmw6kgJiBPR0MK"],
+  "codec-url": ["Caf%C3%A9%20%26%20OGC%0A", "Caf%C3%A9%20%26%20OGC%0A"],
+  "invalid-base64": ["%%%not-base64%%%", "%%%not-base64%%%"],
+  "invalid-url": ["%ZZ", "%ZZ"],
+  "selection-base": ["vorher Café nachher\n", "before Café after\n"],
+  "selection-base64": ["vorher Q2Fmw6k= nachher\n", "before Q2Fmw6k= after\n"],
+  "selection-url": ["vorher Caf%C3%A9 nachher\n", "before Caf%C3%A9 after\n"]
+}

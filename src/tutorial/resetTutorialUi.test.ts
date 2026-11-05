@@ -1,53 +1,56 @@
 // @vitest-environment jsdom
-import { afterEach, expect, it } from 'vitest';
-import { setActiveResourceRepository, resourceKey } from '@/data/clientCache';
-import { queryClient } from '@/data/queryClient';
-import { setIsolatedElectronApi } from '@/services/electronApi';
-import { repositoryRunClient } from '@/services/repositoryRunClient';
-import { TUTORIAL_CHAPTERS } from '@/shared/tutorial/catalog';
-import type { TutorialHostApi, TutorialLaunchContext } from '@/shared/tutorial/types';
-import { createDemoApi } from './demoApi';
-import { DEMO_REPO, ok } from './demoRepository';
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import type { TutorialHostApi } from '@/shared/tutorial/types';
+import { usePublicationDraftState, newPublicationSelection } from '@/components/repository-publication/publicationDraftState';
+import { allowlistDrafts } from '@/components/repository-security/allowlistDrafts';
+import { getCommitFormDraft, updateCommitFormDraft, clearCommitFormDraftsForTests } from '@/components/staging-area/commitFormDraft';
+import { DEMO_REPO, DEMO_NEW_REPO, DEMO_CLONE_REPO } from './demoRepository';
 import { resetTutorialUi } from './resetTutorialUi';
-
-const localStorageDescriptor = Object.getOwnPropertyDescriptor(window, 'localStorage');
-const sessionStorageDescriptor = Object.getOwnPropertyDescriptor(window, 'sessionStorage');
-const memoryStorage = () => {
-  const data = new Map<string, string>();
-  return {
-    getItem: (key: string) => data.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      data.set(key, value);
-    },
-    removeItem: (key: string) => {
-      data.delete(key);
-    },
-    clear: () => data.clear(),
-  };
-};
-
-afterEach(() => {
-  delete window.tutorialHost;
-  if (localStorageDescriptor) Object.defineProperty(window, 'localStorage', localStorageDescriptor);
-  if (sessionStorageDescriptor) Object.defineProperty(window, 'sessionStorage', sessionStorageDescriptor);
+import { queryClient } from '@/data/queryClient';
+import { resourceKey } from '@/data/clientCache';
+import { prepareTutorialCache } from './prepareTutorialCache';
+import { createDemoApi } from './demoApi';
+import { TUTORIAL_CHAPTERS } from '@/shared/tutorial/catalog';
+beforeEach(() => {
+  vi.stubGlobal('localStorage', { clear: vi.fn() });
+  vi.stubGlobal('sessionStorage', { clear: vi.fn() });
 });
-it('preserves the prepared run config when the next checkpoint mounts with no selected repository', async () => {
+afterEach(() => {
+  queryClient.clear();
+  delete window.tutorialHost;
+  usePublicationDraftState.setState(usePublicationDraftState.getInitialState());
+  allowlistDrafts.clear();
+  clearCommitFormDraftsForTests();
+  vi.unstubAllGlobals();
+});
+function seed() {
+  usePublicationDraftState.getState().put('practice', newPublicationSelection(DEMO_REPO));
+  allowlistDrafts.set(DEMO_REPO, { text: 'an unsaved practice rule', savedText: '', version: 'demo' });
+  for (const path of [DEMO_REPO, DEMO_NEW_REPO, DEMO_CLONE_REPO]) updateCommitFormDraft(path, { commitMsg: 'docs: draft' });
+}
+it('restores fresh publication, allowlist and newly created repository drafts on a checkpoint jump', () => {
   window.tutorialHost = {} as TutorialHostApi;
-  // Node 25 exposes a placeholder Storage without a backing file. Use the
-  // browser storage contract explicitly in this renderer integration fixture.
-  Object.defineProperty(window, 'localStorage', { configurable: true, value: memoryStorage() });
-  Object.defineProperty(window, 'sessionStorage', { configurable: true, value: memoryStorage() });
-  setActiveResourceRepository(DEMO_REPO);
+  seed();
   resetTutorialUi();
-  // This is the initial empty result published by useRepositoryRun on mount.
-  queryClient.setQueryData(resourceKey('runs', 'getConfig', [null]), ok(null));
-  const context: TutorialLaunchContext = {
-    request: { chapterId: 'run' },
-    language: 'de',
-    theme: 'copper-night',
-    progress: { version: 1, welcomeSeen: true, completedChapters: [] },
-  };
-  setIsolatedElectronApi(createDemoApi(context, TUTORIAL_CHAPTERS.find((chapter) => chapter.id === 'run')!.steps[0]).api);
-  const result = await repositoryRunClient.getConfig(DEMO_REPO);
-  expect(result.success && result.data?.availableActions.test).toBe(true);
+  expect(usePublicationDraftState.getState().drafts).toEqual({});
+  expect(allowlistDrafts.size).toBe(0);
+  for (const path of [DEMO_REPO, DEMO_NEW_REPO, DEMO_CLONE_REPO]) expect(getCommitFormDraft(path, '').commitMsg).toBe('');
+});
+it('refuses a normal renderer before touching any drafts', () => {
+  seed();
+  expect(() => resetTutorialUi()).toThrow('isolated');
+  expect(allowlistDrafts.size).toBe(1);
+  expect(Object.keys(usePublicationDraftState.getState().drafts)).toEqual(['practice']);
+  expect(getCommitFormDraft(DEMO_REPO, '').commitMsg).toBe('docs: draft');
+});
+it('seeds only fixed practice origins independently of background preloading', () => {
+  window.tutorialHost = {} as TutorialHostApi;
+  const { repo } = createDemoApi(
+    { request: { chapterId: 'repositories' }, language: 'de', theme: 'copper-night', progress: { version: 1, welcomeSeen: true, completedChapters: [] } },
+    TUTORIAL_CHAPTERS.find((chapter) => chapter.id === 'repositories')!.steps[0],
+  );
+  resetTutorialUi();
+  prepareTutorialCache(repo);
+  expect(queryClient.getQueryData(resourceKey('git', 'getRepoOriginUrl', [DEMO_REPO]))).toMatchObject({ data: repo.originFor() });
+  expect(queryClient.getQueryData(resourceKey('git', 'getRepoOriginUrl', [DEMO_NEW_REPO]))).toBeUndefined();
 });

@@ -1,0 +1,10 @@
+{
+  "guide": ["# Planet-Handbuch\n\nplanet: blau\nplanet: grün\n", "# Planet guide\n\nplanet: blue\nplanet: green\n"],
+  "guide-one": ["# Planet-Handbuch\n\nworld: blau\nplanet: grün\n", "# Planet guide\n\nworld: blue\nplanet: green\n"],
+  "guide-all": ["# world-Handbuch\n\nworld: blau\nworld: grün\n", "# world guide\n\nworld: blue\nworld: green\n"],
+  "notes": ["PLANET heute.\n", "PLANET today.\n"],
+  "notes-all": ["world heute.\n", "world today.\n"],
+  "code": ["export const topics = [\"planet\"];\n", "export const topics = [\"planet\"];\n"],
+  "code-all": ["export const topics = [\"world\"];\n", "export const topics = [\"world\"];\n"],
+  "draft": ["# Planet-Handbuch\n\nplanet: blau\nplanet: grün\nUngespeicherter Entwurf.\n", "# Planet guide\n\nplanet: blue\nplanet: green\nUnsaved draft.\n"]
+}

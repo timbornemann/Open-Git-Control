@@ -78,6 +78,7 @@ export function isReadCommand(command: unknown, args: unknown[]): boolean {
   if (command === 'tag') return args.length === 0 || args[0] === '--list' || args[0] === '-l';
   if (command === 'remote') return !args.length || ['-v', 'get-url'].includes(String(args[0]));
   if (command === 'submodule') return args[0] === 'status';
+  if (command === 'stash') return args[0] === 'show' || args[0] === 'list';
   return false;
 }
 

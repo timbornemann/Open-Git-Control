@@ -1,0 +1,24 @@
+{
+  "html-source": [
+    "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><title>OGC</title></head><body><main class=\"card\"><h1>OGC</h1><p>Hello <strong>world</strong> &amp; team.</p><pre>\nline 1\n  line 2</pre><!-- layout note --></main></body></html>",
+    "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><title>OGC</title></head><body><main class=\"card\"><h1>OGC</h1><p>Hello <strong>world</strong> &amp; team.</p><pre>\nline 1\n  line 2</pre><!-- layout note --></main></body></html>"
+  ],
+  "html-formatted": [
+    "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <title>OGC</title>\n  </head>\n  <body>\n    <main class=\"card\">\n      <h1>OGC</h1>\n      <p>Hello <strong>world</strong> &amp; team.</p>\n      <pre>\nline 1\n  line 2</pre>\n      <!-- layout note -->\n    </main>\n  </body>\n</html>\n",
+    "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <title>OGC</title>\n  </head>\n  <body>\n    <main class=\"card\">\n      <h1>OGC</h1>\n      <p>Hello <strong>world</strong> &amp; team.</p>\n      <pre>\nline 1\n  line 2</pre>\n      <!-- layout note -->\n    </main>\n  </body>\n</html>\n"
+  ],
+  "html-minified": [
+    "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"/><title>OGC</title></head><body><main class=\"card\"><h1>OGC</h1><p>Hello <strong>world</strong> &amp; team.</p><pre>\nline 1\n  line 2</pre></main></body></html>",
+    "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"/><title>OGC</title></head><body><main class=\"card\"><h1>OGC</h1><p>Hello <strong>world</strong> &amp; team.</p><pre>\nline 1\n  line 2</pre></main></body></html>"
+  ],
+  "html-invalid": ["<div title=\"unterminated", "<div title=\"unterminated"],
+  "xml-source": [
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?><project name=\"OGC\"><!-- project note --><item id=\"1\">Café &amp; tea</item><script><![CDATA[a < b && c > d]]></script><empty/></project>",
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?><project name=\"OGC\"><!-- project note --><item id=\"1\">Café &amp; tea</item><script><![CDATA[a < b && c > d]]></script><empty/></project>"
+  ],
+  "xml-formatted": [
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project name=\"OGC\">\n  <!-- project note -->\n  <item id=\"1\">Café &amp; tea</item>\n  <script><![CDATA[a < b && c > d]]></script>\n  <empty/>\n</project>",
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project name=\"OGC\">\n  <!-- project note -->\n  <item id=\"1\">Café &amp; tea</item>\n  <script><![CDATA[a < b && c > d]]></script>\n  <empty/>\n</project>"
+  ],
+  "xml-invalid": ["<project><item>OGC</project>", "<project><item>OGC</project>"]
+}

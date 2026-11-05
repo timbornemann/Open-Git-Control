@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DialogContextItem, InputDialogField } from '@/app/state/contracts';
 import { DialogFrame } from './DialogFrame';
 import { FolderTreeSelect } from './FolderTreeSelect';
@@ -47,7 +47,7 @@ export const Input: React.FC<InputProps> = ({
     return nextValues;
   }, [fields]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
     setValues(initialValues);
   }, [open, initialValues]);
@@ -101,7 +101,7 @@ export const Input: React.FC<InputProps> = ({
           const setValue = (value: string) => setValues((prev) => ({ ...prev, [field.id]: value }));
           if (field.type === 'checkbox') {
             return (
-              <label key={field.id} className="dialog-field dialog-checkbox-field">
+              <label key={field.id} className="dialog-field dialog-checkbox-field" data-dialog-field={field.id}>
                 <input
                   ref={index === 0 ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
                   type="checkbox"
@@ -116,7 +116,7 @@ export const Input: React.FC<InputProps> = ({
 
           if (field.type === 'folder-tree') {
             return (
-              <div key={field.id} className="dialog-field">
+              <div key={field.id} className="dialog-field" data-dialog-field={field.id}>
                 <span>{field.label}</span>
                 <FolderTreeSelect value={values[field.id] ?? ''} options={field.options || []} loadChildren={field.loadChildren} onChange={setValue} />
                 {field.helperText && <small>{field.helperText}</small>}
@@ -125,7 +125,7 @@ export const Input: React.FC<InputProps> = ({
           }
 
           return (
-            <label key={field.id} className="dialog-field">
+            <label key={field.id} className="dialog-field" data-dialog-field={field.id}>
               <span>{field.label}</span>
               {field.multiline ? (
                 <textarea

@@ -58,12 +58,12 @@ it.each(['de', 'en'] as const)('lists every chapter with persisted completion in
 it('jumps directly from a question to its matching exercise and refreshes after returning', async () => {
   await render();
   await act(async () => container.querySelector<HTMLButtonElement>('.tutorial-help-question')!.click());
-  expect(startTutorial).toHaveBeenCalledWith({ chapterId: 'basics', stepId: 'commit' });
+  expect(startTutorial).toHaveBeenCalledWith({ chapterId: 'basics', stepId: 'orientation' });
   completed = ['basics', 'hosting'];
   await act(async () => refresh?.());
   expect(container.querySelectorAll('.tutorial-help-completed')).toHaveLength(2);
 });
-it('finds help by question keywords and shows an empty result', async () => {
+it('finds help by question keywords and full step text and shows an empty result', async () => {
   await render();
   const input = container.querySelector('input')!;
   const search = async (value: string) =>
@@ -72,8 +72,19 @@ it('finds help by question keywords and shows an empty result', async () => {
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
   await search('konflikt');
-  expect(container.querySelectorAll('article')).toHaveLength(1);
-  expect(container.querySelector('article')!.textContent).toContain('Stash');
+  const results = [...container.querySelectorAll('article')].map((article) => article.textContent);
+  expect(results).toEqual(
+    expect.arrayContaining([
+      expect.stringContaining('Konflikte: Inhalt wählen'),
+      expect.stringContaining('Konfliktentscheidungen: Aktuell'),
+      expect.stringContaining('Konflikteditor: eigenen Inhalt'),
+      expect.stringContaining('Merge abbrechen: Folgen prüfen'),
+      expect.stringContaining('Zeilenpaare'),
+    ]),
+  );
+  const manual = [...container.querySelectorAll('article')].find((article) => article.querySelector('h3')?.textContent?.startsWith('Konflikteditor:'))!;
+  await act(async () => manual.querySelector<HTMLButtonElement>(':scope > .tutorial-help-question')!.click());
+  expect(startTutorial).toHaveBeenLastCalledWith({ chapterId: 'conflicts-manual', stepId: 'write' });
   await search('no-such-help');
   expect(container.querySelectorAll('article')).toHaveLength(0);
 });

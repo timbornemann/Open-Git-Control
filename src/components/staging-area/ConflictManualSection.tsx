@@ -32,6 +32,7 @@ export const ConflictManualSection = ({
         <span className="conflict-manual-action-title">{t('generated.components.staging_area.conflictresolverpanel.editor_actions_b004229c')}</span>
         <div className="conflict-manual-action-buttons">
           <button
+            data-tutorial="conflict-discard-draft"
             className="staging-btn-sm conflict-manual-action-btn"
             onClick={resetConflictEditorDraft}
             disabled={!isConflictEditorDirty || conflictEditor.isSaving}
@@ -39,6 +40,7 @@ export const ConflictManualSection = ({
             {t('generated.components.staging_area.conflictresolverpanel.discard_changes_b80ac3bd')}
           </button>
           <button
+            data-tutorial="conflict-save"
             className="staging-btn-sm conflict-manual-action-btn"
             onClick={() => {
               void saveConflictEditor(false);
@@ -48,6 +50,7 @@ export const ConflictManualSection = ({
             {t('generated.components.input.save_b6a0ea4a')}
           </button>
           <button
+            data-tutorial="conflict-save-resolved"
             className="staging-btn-sm conflict-manual-action-btn conflict-manual-action-btn--success"
             onClick={() => {
               void saveConflictEditor(true);

@@ -1,0 +1,8 @@
+{
+  "head": ["# OGC-Lernprojekt\n\nStatus: Entwurf\n", "# OGC-Lernprojekt\n\nStatus: Draft\n"],
+  "edited": ["# OGC-Lernprojekt\n\nStatus: Bearbeitet\n", "# OGC-Lernprojekt\n\nStatus: Edited\n"],
+  "draft": ["# OGC-Lernprojekt\n\nStatus: Weitere Bearbeitung\n", "# OGC-Lernprojekt\n\nStatus: Further edit\n"],
+  "index": ["# OGC-Lernprojekt\n\nStatus: Nur im Index\n", "# OGC-Lernprojekt\n\nStatus: Index only\n"],
+  "work": ["# OGC-Lernprojekt\n\nStatus: Lokale Bearbeitung\n", "# OGC-Lernprojekt\n\nStatus: Local edit\n"],
+  "index-edited": ["# OGC-Lernprojekt\n\nStatus: Geprüfte Vormerkung\n", "# OGC-Lernprojekt\n\nStatus: Reviewed index\n"]
+}

@@ -84,6 +84,7 @@ export const CsvTableEditor: React.FC<Props> = ({ value, onChange, readOnly = fa
           {tr('Trennzeichen', 'delimiter')}:
         </span>
         <select
+          data-tutorial="csv-delimiter"
           aria-label={tr('CSV-Trennzeichen', 'CSV delimiter')}
           value={document.delimiter}
           onChange={(event) => setDelimiterOverride(event.target.value as CsvDelimiter)}
@@ -93,17 +94,17 @@ export const CsvTableEditor: React.FC<Props> = ({ value, onChange, readOnly = fa
           <option value={'\t'}>{tr('Tabulator', 'Tab')}</option>
         </select>
         <code className="working-csv-editor__delimiter-preview">{delimiterLabel}</code>
-        <button type="button" onClick={addRow} disabled={readOnly}>
+        <button type="button" data-tutorial="csv-add-row" onClick={addRow} disabled={readOnly}>
           <Rows size={14} />
           <Plus size={11} />
           {tr('Zeile', 'Row')}
         </button>
-        <button type="button" onClick={addColumn} disabled={readOnly}>
+        <button type="button" data-tutorial="csv-add-column" onClick={addColumn} disabled={readOnly}>
           <Columns size={14} />
           <Plus size={11} />
           {tr('Spalte', 'Column')}
         </button>
-        <button type="button" onClick={removeLastColumn} disabled={readOnly || columnCount <= 1}>
+        <button type="button" data-tutorial="csv-remove-column" onClick={removeLastColumn} disabled={readOnly || columnCount <= 1}>
           <Columns size={14} />
           <Minus size={11} />
           {tr('Letzte Spalte', 'Last column')}
@@ -130,11 +131,12 @@ export const CsvTableEditor: React.FC<Props> = ({ value, onChange, readOnly = fa
           </thead>
           <tbody>
             {document.rows.slice(0, visibleRowCount).map((row, rowIndex) => (
-              <tr key={rowIndex}>
+              <tr key={rowIndex} data-csv-row={rowIndex}>
                 <th scope="row">{rowIndex + 1}</th>
                 {Array.from({ length: visibleColumnCount }, (_, columnIndex) => (
                   <td key={columnIndex}>
                     <input
+                      data-csv-cell={`${rowIndex}:${columnIndex}`}
                       readOnly={readOnly}
                       value={row[columnIndex] ?? ''}
                       aria-label={`${tr('Zeile', 'Row')} ${rowIndex + 1}, ${tr('Spalte', 'column')} ${columnLabel(columnIndex)}`}
@@ -146,6 +148,7 @@ export const CsvTableEditor: React.FC<Props> = ({ value, onChange, readOnly = fa
                   <button
                     type="button"
                     className="working-csv-editor__delete-row"
+                    data-csv-delete-row={rowIndex}
                     aria-label={`${tr('Zeile löschen', 'Delete row')} ${rowIndex + 1}`}
                     onClick={() => removeRow(rowIndex)}
                     disabled={readOnly}

@@ -11,7 +11,9 @@ export function BranchChangeOutcome({ result, onRestore, onConflicts }: { result
       : tr('Der Vorgang benötigt deine Prüfung. Die Sicherung bleibt erhalten.', 'Review is needed. The backup is retained.');
   return (
     <>
-      <p role="status">{status}</p>
+      <p role="status" data-tutorial="branch-change-result" data-branch-change-restored={result.restored} data-branch-change-switched={result.switched}>
+        {status}
+      </p>
       {result.session && (
         <p>
           {tr('Stash:', 'Stash:')} {result.session.name} <code>{result.session.stashOid?.slice(0, 12)}</code>

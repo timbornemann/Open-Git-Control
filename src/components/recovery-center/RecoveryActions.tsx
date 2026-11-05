@@ -29,7 +29,7 @@ export function RecoveryActions({ state }: { state: RecoveryCenterState }) {
     { label: tr('Commit', 'Commit'), value: selected.abbrevHash },
   ];
   return (
-    <div className="recovery-center__detail-content">
+    <div className="recovery-center__detail-content" data-tutorial="recovery-detail" data-recovery-hash={selected.hash}>
       <header className="recovery-center__selection">
         <span className="recovery-center__eyebrow">{getRecoveryActionLabel(selected, tr)}</span>
         <h2>{description}</h2>
@@ -37,7 +37,7 @@ export function RecoveryActions({ state }: { state: RecoveryCenterState }) {
           <code>{selected.abbrevHash}</code>
           <time dateTime={selected.date}>{formatRecoveryDate(selected.date, locale)}</time>
         </div>
-        <details className="recovery-center__git-details">
+        <details className="recovery-center__git-details" data-tutorial="recovery-git-details">
           <summary>
             <ChevronRight size={12} aria-hidden="true" />
             {tr('Git-Details', 'Git details')}
@@ -45,14 +45,14 @@ export function RecoveryActions({ state }: { state: RecoveryCenterState }) {
           <dl>
             <dt>{tr('Referenz', 'Reference')}</dt>
             <dd>
-              <code>{selected.selector}</code>
+              <code data-tutorial="recovery-reference">{selected.selector}</code>
             </dd>
             <dt>{tr('Commit', 'Commit')}</dt>
             <dd>
-              <code>{selected.hash}</code>
+              <code data-tutorial="recovery-full-hash">{selected.hash}</code>
             </dd>
             <dt>{tr('Git-Aktion', 'Git action')}</dt>
-            <dd>{selected.subject}</dd>
+            <dd data-tutorial="recovery-git-action">{selected.subject}</dd>
           </dl>
         </details>
       </header>
@@ -62,13 +62,13 @@ export function RecoveryActions({ state }: { state: RecoveryCenterState }) {
           <span className="recovery-center__step">2</span>
           {tr('Auf einem neuen Branch weiterarbeiten', 'Continue on a new branch')}
         </h2>
-        <p className="recovery-center__description">
+        <p className="recovery-center__description" data-tutorial="recovery-branch-purpose">
           {tr(
             'Erstellt einen lokalen Branch mit dem gewählten Stand und öffnet ihn direkt. Deine bisherigen Branches bleiben erhalten.',
             'Creates a local branch at the selected state and opens it immediately. Your existing branches are preserved.',
           )}
         </p>
-        <div className="recovery-center__branch-preview" aria-hidden="true">
+        <div className="recovery-center__branch-preview" data-tutorial="recovery-branch-preview" aria-hidden="true">
           <GitCommitHorizontal size={17} />
           <code>{selected.abbrevHash}</code>
           <ArrowRight size={15} />
@@ -79,6 +79,7 @@ export function RecoveryActions({ state }: { state: RecoveryCenterState }) {
           <label htmlFor="recovery-branch-name">{tr('Name des neuen Branches', 'New branch name')}</label>
           <div className="recovery-center__branch-controls">
             <TextField
+              data-tutorial="recovery-branch-name"
               id="recovery-branch-name"
               value={branchName}
               onChange={(event) => setBranchName(event.target.value)}
@@ -90,6 +91,7 @@ export function RecoveryActions({ state }: { state: RecoveryCenterState }) {
               spellCheck={false}
             />
             <Button
+              data-tutorial="recovery-create-branch"
               type="submit"
               size="md"
               variant="primary"
@@ -115,7 +117,7 @@ export function RecoveryActions({ state }: { state: RecoveryCenterState }) {
           </p>
         </form>
         <RecoveryNotice issue={actionIssue} message={successMessage} />
-        <p className="recovery-center__commit-note">
+        <p className="recovery-center__commit-note" data-tutorial="recovery-commit-note">
           {tr(
             'Wiederhergestellt werden gespeicherte Commits. Nicht committete Dateiänderungen sind hier nicht gesichert.',
             'Recovery uses saved commits. Uncommitted file changes are not backed up here.',
@@ -123,7 +125,7 @@ export function RecoveryActions({ state }: { state: RecoveryCenterState }) {
         </p>
       </section>
 
-      <details className="recovery-center__advanced">
+      <details className="recovery-center__advanced" data-tutorial="recovery-advanced">
         <summary>
           <ChevronRight size={14} aria-hidden="true" />
           <span>{tr('Weitere Wiederherstellungsoptionen', 'More recovery options')}</span>
@@ -141,6 +143,7 @@ export function RecoveryActions({ state }: { state: RecoveryCenterState }) {
             </p>
           </div>
           <Button
+            data-tutorial="recovery-inspect"
             size="sm"
             disabled={isBusy}
             onClick={() =>
@@ -182,6 +185,7 @@ export function RecoveryActions({ state }: { state: RecoveryCenterState }) {
             <small>{tr('Git: Hard Reset', 'Git: hard reset')}</small>
           </div>
           <Button
+            data-tutorial="recovery-reset"
             size="sm"
             variant="danger"
             icon={pendingAction === 'reset' ? <Loader2 size={13} className="spin" /> : <AlertTriangle size={13} />}
@@ -196,8 +200,8 @@ export function RecoveryActions({ state }: { state: RecoveryCenterState }) {
                 confirmLabel: tr('Branch zurücksetzen', 'Reset branch'),
                 irreversible: true,
                 consequences: tr(
-                  'Alle nicht committeten Änderungen, auch gestagte Änderungen, gehen dauerhaft verloren. Spätere Commits gehören danach nicht mehr zu diesem Branch.',
-                  'All uncommitted changes, including staged changes, will be permanently lost. Later commits will no longer belong to this branch.',
+                  'Nicht committete Änderungen an erfassten Dateien, einschließlich gestagter Änderungen, gehen verloren. Unversionierte Dateien oder Ordner können bei Pfadkonflikten ersetzt werden. Commits nach dem Zielstand gehören danach nicht mehr zu diesem Branch.',
+                  'Uncommitted changes to tracked files, including staged changes, are lost. Untracked files or directories can be replaced when they conflict with target paths. Commits after the target revision will no longer belong to this branch.',
                 ),
                 contextItems,
                 run: () =>

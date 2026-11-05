@@ -92,6 +92,17 @@ describe('WorkingDirectoryFileTools', () => {
     expect(onChange).not.toHaveBeenCalled();
     expect(showToastMock).toHaveBeenCalledWith(expect.stringContaining('Invalid JSON'), true);
   });
+  it.each([
+    ['%%%', 'Decode Base64', 'Invalid Base64'],
+    ['%ZZ', 'URL decode', 'Invalid URL'],
+  ])('keeps invalid codec input %s unchanged', (value, action, message) => {
+    const onChange = renderTools('notes.txt', value);
+    clickButton('Tools');
+    clickButton('Base64 and URL encoding');
+    clickButton(action);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(showToastMock).toHaveBeenCalledWith(expect.stringContaining(message), true);
+  });
 
   it('minifies a tsconfig JSONC file with comments and trailing commas', () => {
     const onChange = renderTools('tsconfig.json', '{/* Bundler mode */"compilerOptions":{"module":"ESNext",},}');

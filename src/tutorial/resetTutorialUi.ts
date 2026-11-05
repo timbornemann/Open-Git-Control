@@ -7,7 +7,9 @@ import { useRemoteTransferDialogState } from '@/components/hosting/remoteTransfe
 import { usePlannerWorkDialogState } from '@/components/project-planner/plannerWorkDialogState';
 import { useBranchChangeDialogState } from '@/components/branch-change/branchChangeDialogState';
 import { resetCommitFormDraft } from '@/components/staging-area/commitFormDraft';
-import { DEMO_REPO, DEMO_SECOND_REPO } from './demoRepository';
+import { usePublicationDraftState } from '@/components/repository-publication/publicationDraftState';
+import { allowlistDrafts } from '@/components/repository-security/allowlistDrafts';
+import { DEMO_REPO, DEMO_SECOND_REPO, DEMO_NEW_REPO, DEMO_CLONE_REPO } from './demoRepository';
 
 /** All modules here belong to the tutorial renderer's own JavaScript realm. */
 export function resetTutorialUi(): void {
@@ -25,6 +27,7 @@ export function resetTutorialUi(): void {
   usePlannerWorkDialogState.getState().close();
   useBranchChangeDialogState.getState().pending?.finish(null);
   useBranchChangeDialogState.setState({ pending: null });
-  resetCommitFormDraft(DEMO_REPO);
-  resetCommitFormDraft(DEMO_SECOND_REPO);
+  usePublicationDraftState.setState(usePublicationDraftState.getInitialState());
+  allowlistDrafts.clear();
+  for (const path of [DEMO_REPO, DEMO_SECOND_REPO, DEMO_NEW_REPO, DEMO_CLONE_REPO]) resetCommitFormDraft(path);
 }

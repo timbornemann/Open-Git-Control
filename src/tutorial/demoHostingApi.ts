@@ -1,6 +1,7 @@
 import type { ElectronHostingAPI, HostingOperation, HostingOperations } from '@/shared/ipc/contracts/hosting';
 import type { HostedRepository, HostingCapabilities, HostingChangeRequest, HostingConnection } from '@/types/hostingDtos';
-import { DEMO_URL, DEMO_TIME, ok, unavailable, type DemoRepository } from './demoRepository';
+import { DEMO_URL, DEMO_TIME, hashFor, ok, unavailable, type DemoRepository } from './demoRepository';
+import { demoRemoteSnapshot } from './demoRemoteSnapshot';
 
 export const DEMO_CAPABILITIES: HostingCapabilities = {
   createRepository: true,
@@ -60,7 +61,7 @@ export function createDemoHostingApi(repo: DemoRepository): ElectronHostingAPI {
       author: 'alex-beispiel',
       source: DEMO_HOSTED_REPO.ref,
       sourceBranch: 'feature/begruessung',
-      headSha: repo.commits[0].hash,
+      headSha: hashFor(4),
       target: DEMO_HOSTED_REPO.ref,
       targetBranch: 'main',
       draft: false,
@@ -75,6 +76,21 @@ export function createDemoHostingApi(repo: DemoRepository): ElectronHostingAPI {
     capabilities: () => DEMO_CAPABILITIES,
     repositories: () => page([DEMO_HOSTED_REPO]),
     cachedRepositories: () => page([DEMO_HOSTED_REPO]),
+    creationTargets: () => ({
+      ...page([
+        { id: 'demo-user', namespace: 'alex-beispiel', label: 'Alex Beispiel', kind: 'personal' as const, visibility: ['private' as const, 'public' as const] },
+      ]),
+      requiresProject: false,
+      allowsManual: true,
+    }),
+    publicationContext: () => ({
+      snapshot: demoRemoteSnapshot(repo),
+      branches: [...repo.branchHeads].map(([name, oid]) => ({ name, oid })),
+      tags: [...repo.tagRefs].map(([name, tag]) => ({ name, oid: tag.target })),
+      dirtyFiles: repo.changeCount(),
+      publications: [],
+    }),
+    cancelPublication: () => true,
     repository: () => {
       repo.mark('hosting-inspected');
       return DEMO_HOSTED_REPO;
@@ -104,10 +120,10 @@ export function createDemoHostingApi(repo: DemoRepository): ElectronHostingAPI {
       const change = changes.find((entry) => entry.id === input.id);
       if (change) change.state = 'merged';
       repo.mark('pr-merged');
-      return { merged: true, message: 'Merged in the exercise.', sha: repo.commits[0].hash };
+      return { merged: true, message: 'Merged in the exercise.', sha: hashFor(4) };
     },
     status: () => ({
-      sha: repo.commits[0].hash,
+      sha: hashFor(4),
       state: 'success',
       checks: [{ id: 'tests', name: 'Tests', status: 'success', htmlUrl: null, description: '3 tests passed' }],
     }),
@@ -120,7 +136,7 @@ export function createDemoHostingApi(repo: DemoRepository): ElectronHostingAPI {
           status: 'completed',
           conclusion: 'success',
           branch: 'main',
-          headSha: repo.commits[0].hash,
+          headSha: hashFor(4),
           event: 'push',
           htmlUrl: `${DEMO_HOSTED_REPO.htmlUrl}/actions/12`,
           createdAt: date,
@@ -156,8 +172,8 @@ export function createDemoHostingApi(repo: DemoRepository): ElectronHostingAPI {
     releaseAssets: () => page([]),
     inspectRelease: () => ({
       inspectionId: 'demo-inspection',
-      localSha: repo.commits[0].hash,
-      remoteSha: repo.commits[0].hash,
+      localSha: hashFor(4),
+      remoteSha: hashFor(4),
       ahead: 0,
       behind: 0,
       canPush: true,
@@ -165,7 +181,10 @@ export function createDemoHostingApi(repo: DemoRepository): ElectronHostingAPI {
       pushBlockedReason: null,
     }),
     createRelease: (input) => {
-      repo.tags.push(input.tagName);
+      if (!repo.tagRefs.has(input.tagName)) {
+        const created = repo.command('tag', input.tagName);
+        if (!created.success) throw new Error(created.error);
+      }
       repo.mark('release-created');
       return {
         id: 'release-2',
@@ -190,7 +209,7 @@ export function createDemoHostingApi(repo: DemoRepository): ElectronHostingAPI {
         date: commit.date,
       })),
       commitsTarget: repo.branch,
-      targetOid: repo.commits[0].hash,
+      targetOid: hashFor(4),
       fallbackUsed: false,
     }),
     localWorkflows: () => ({

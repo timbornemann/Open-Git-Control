@@ -62,7 +62,7 @@ export const useConflictNavigation = ({
   const conflictPaths = useMemo(() => (status ? [...new Set(status.conflicts.map((entry) => entry.path))].sort((a, b) => a.localeCompare(b)) : []), [status]);
   const safeSelectedConflictBlockIndex = conflictBlocks.length > 0 ? Math.min(selectedConflictBlockIndex, conflictBlocks.length - 1) : 0;
   const activeConflictFileIndex = conflictEditor ? conflictPaths.indexOf(conflictEditor.filePath) : -1;
-  const canUseStructuredConflictNavigation = Boolean(conflictEditor) && !isStructuredConflictViewLocked && conflictBlocks.length > 0;
+  const canUseStructuredConflictNavigation = Boolean(conflictEditor) && !isStructuredConflictViewLocked;
   const hasPreviousConflictTarget = canUseStructuredConflictNavigation && (safeSelectedConflictBlockIndex > 0 || activeConflictFileIndex > 0);
   const hasNextConflictTarget =
     canUseStructuredConflictNavigation &&

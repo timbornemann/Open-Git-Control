@@ -1,0 +1,11 @@
+{
+  "initial": ["# OGC-Lernprojekt\n", "# OGC-Lernprojekt\n"],
+  "app": ["# OGC-Lernprojekt\n\nEin kleines Beispielprojekt.\n", "# OGC-Lernprojekt\n\nA small example project.\n"],
+  "description": [
+    "# OGC-Lernprojekt\n\nProjektübersicht\n\nDateien lesen, ändern und vergleichen.\n",
+    "# OGC-Lernprojekt\n\nProject overview\n\nRead, change and compare files.\n"
+  ],
+  "latest": ["# OGC-Lernprojekt\n\nBegrüßung: Hallo Welt!\nStatus: Bereit\n", "# OGC-Lernprojekt\n\nGreeting: Hello world!\nStatus: Ready\n"],
+  "work": ["# OGC-Lernprojekt\n\nBegrüßung: Hallo Team!\nStatus: Bereit\n", "# OGC-Lernprojekt\n\nGreeting: Hello team!\nStatus: Ready\n"],
+  "index": ["# OGC-Lernprojekt\n\nBegrüßung: Hallo Staging!\nStatus: Bereit\n", "# OGC-Lernprojekt\n\nGreeting: Hello staging!\nStatus: Ready\n"]
+}

@@ -70,7 +70,7 @@ export const Confirm: React.FC<ConfirmProps> = ({
           {contextItems.map((item) => (
             <React.Fragment key={`${item.label}-${item.value}`}>
               <dt>{item.label}</dt>
-              <dd>{item.value}</dd>
+              <dd data-dialog-context-value={item.value}>{item.value}</dd>
             </React.Fragment>
           ))}
         </dl>

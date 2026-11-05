@@ -64,4 +64,22 @@ describe('extensible sidebar actions menu', () => {
     expect(document.querySelector('[role="menu"]')).toBeNull();
     expect(document.activeElement).toBe(trigger());
   });
+  it.each([true, false])('preserves a coaching focus transfer only in the isolated practice renderer (%s)', (practice) => {
+    const previous = window.tutorialHost;
+    if (practice) window.tutorialHost = {} as NonNullable<Window['tutorialHost']>;
+    const coach = document.createElement('section');
+    coach.className = 'tutorial-coach';
+    coach.tabIndex = -1;
+    document.body.append(coach);
+    try {
+      trigger().focus();
+      act(() => trigger().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
+      act(() => coach.focus());
+      act(() => vi.advanceTimersByTime(200));
+      expect(Boolean(document.querySelector('[role="menu"]'))).toBe(practice);
+    } finally {
+      window.tutorialHost = previous;
+      coach.remove();
+    }
+  });
 });

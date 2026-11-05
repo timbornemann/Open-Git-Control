@@ -29,6 +29,7 @@ import { clearSettingsDestination, useSettingsNavigation } from '@/app/state/set
 import { SettingsTutorialSection } from './settings/SettingsTutorialSection';
 import { TUTORIAL_CHAPTERS } from '@/shared/tutorial/catalog';
 import { TUTORIAL_QUESTION_STEPS } from '@/shared/tutorial/catalogSteps';
+import { tutorialSearchStep, tutorialSearchText } from '@/shared/tutorial/curriculum';
 import { tutorialText } from '@/shared/tutorial/types';
 import { launchTutorial } from '@/tutorial/entryApi';
 
@@ -68,7 +69,7 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
           .trim()
           .toLowerCase()
           .split(/\s+/)
-          .every((term) => `${chapter.title.join(' ')} ${chapter.question.join(' ')} ${chapter.keywords}`.toLowerCase().includes(term)),
+          .every((term) => tutorialSearchText(chapter).includes(term)),
       )
     : [];
   const destination = useSettingsNavigation((state) => state.destination);
@@ -180,7 +181,7 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                 key={`help-${chapter.id}`}
                 onClick={() => {
                   setTutorialError('');
-                  void launchTutorial({ chapterId: chapter.id, stepId: TUTORIAL_QUESTION_STEPS[chapter.id] }).catch(() =>
+                  void launchTutorial({ chapterId: chapter.id, stepId: tutorialSearchStep(chapter, query) || TUTORIAL_QUESTION_STEPS[chapter.id] }).catch(() =>
                     setTutorialError(tr('Die Einführung konnte nicht geöffnet werden.', 'The introduction could not be opened.')),
                   );
                 }}

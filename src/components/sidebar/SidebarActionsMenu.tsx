@@ -25,7 +25,10 @@ export function SidebarActionsMenu({ actions }: { actions: Action[] }) {
   };
   const leave = () => {
     keepOpen();
-    closeTimer.current = setTimeout(() => setOpen(false), 180);
+    closeTimer.current = setTimeout(() => {
+      if (window.tutorialHost && !window.electronAPI && document.activeElement?.closest('.tutorial-coach, .tutorial-banner')) return;
+      setOpen(false);
+    }, 180);
   };
 
   useLayoutEffect(() => {
@@ -144,6 +147,7 @@ export function SidebarActionsMenu({ actions }: { actions: Action[] }) {
                 key={action.id}
                 type="button"
                 role="menuitem"
+                data-sidebar-action={action.id}
                 disabled={action.disabled}
                 onClick={() => {
                   close(true);

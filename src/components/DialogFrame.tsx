@@ -89,6 +89,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (openDialogIds.at(-1) !== dialogId) return;
       if (!dialogRef.current) return;
+      if (event.defaultPrevented || event.isComposing) return;
 
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -96,9 +97,9 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
         return;
       }
 
-      if (event.key === 'Enter' && onEnterRef.current) {
+      if (event.key === 'Enter' && !event.repeat && onEnterRef.current) {
         const target = event.target as HTMLElement | null;
-        if (target?.tagName !== 'TEXTAREA' && target?.tagName !== 'BUTTON' && !target?.dataset.dialogNoEnter) {
+        if (target && dialogRef.current.contains(target) && target.tagName !== 'TEXTAREA' && target.tagName !== 'BUTTON' && !target.dataset.dialogNoEnter) {
           event.preventDefault();
           onEnterRef.current();
           return;
@@ -152,17 +153,22 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
         </div>
         <div className="dialog-content">{children}</div>
         <div className="dialog-footer">
-          <button className="dialog-btn dialog-btn-secondary" onClick={onClose}>
+          <button className="dialog-btn dialog-btn-secondary" data-dialog-action="cancel" onClick={onClose}>
             {cancelLabel ?? t('generated.components.confirm.cancel_035b7526')}
           </button>
           {onSecondaryAction && (
-            <button className={`dialog-btn ${secondaryActionVariant === 'danger' ? 'dialog-btn-danger' : 'dialog-btn-primary'}`} onClick={onSecondaryAction}>
+            <button
+              data-dialog-action="secondary"
+              className={`dialog-btn ${secondaryActionVariant === 'danger' ? 'dialog-btn-danger' : 'dialog-btn-primary'}`}
+              onClick={onSecondaryAction}
+            >
               {secondaryActionLabel ?? t('generated.components.dialogframe.run_alternative_fd1645c6')}
             </button>
           )}
           {onConfirm && (
             <button
               ref={confirmRef}
+              data-dialog-action="confirm"
               className={`dialog-btn ${confirmVariant === 'danger' ? 'dialog-btn-danger' : 'dialog-btn-primary'}`}
               onClick={onConfirm}
               disabled={confirmDisabled}

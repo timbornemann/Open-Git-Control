@@ -41,6 +41,17 @@ describe('Git failure explanations', () => {
     ).toBe('locked');
   });
 
+  it.each(['de', 'en'] as const)('explains a refused fast-forward without prescribing a server or push in %s', (language) => {
+    const raw = 'fatal: Not possible to fast-forward, aborting.';
+    const tr = (de: string, text: string) => (language === 'de' ? de : text);
+    expect(describeGitFailure(raw, tr)?.kind).toBe('fast-forward');
+    const output = explainGitNotification({ msg: raw, isError: true }, tr);
+    expect(output.msg).toContain(language === 'de' ? 'nicht nur vorziehen' : 'advancing alone');
+    expect(output.msg).not.toMatch(/Server|server|Push|push|Fetch|fetch/);
+    expect(output.technicalDetails).toBe(raw);
+    expect(output.isError).toBe(true);
+  });
+
   it('explains a deleted pull source without claiming that its local branch was removed', () => {
     const input = {
       msg: "fatal: couldn't find remote ref test-branch",

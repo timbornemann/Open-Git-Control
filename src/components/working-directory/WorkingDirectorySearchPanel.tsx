@@ -49,11 +49,14 @@ export const WorkingDirectorySearchPanel: React.FC<Props> = ({ repoPath, onOpenF
   const [replacing, setReplacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestSequence = useRef(0);
+  const [finishedSearch, setFinishedSearch] = useState(() => JSON.stringify(['', 'filename', false]));
+  const searchIsCurrent = !loading && finishedSearch === JSON.stringify([query, mode, caseSensitive]);
 
   const executeSearch = useCallback(
     async (searchQuery: string, searchMode: WorkingDirectorySearchModeDto, matchCase: boolean) => {
       const sequence = ++requestSequence.current;
       if (!searchQuery) {
+        setFinishedSearch(JSON.stringify([searchQuery, searchMode, matchCase]));
         setResult(EMPTY_RESULT);
         setError(null);
         setLoading(false);
@@ -75,7 +78,10 @@ export const WorkingDirectorySearchPanel: React.FC<Props> = ({ repoPath, onOpenF
         setResult(EMPTY_RESULT);
         setError(searchError instanceof Error ? searchError.message : 'Could not search the working directory.');
       } finally {
-        if (sequence === requestSequence.current) setLoading(false);
+        if (sequence === requestSequence.current) {
+          setFinishedSearch(JSON.stringify([searchQuery, searchMode, matchCase]));
+          setLoading(false);
+        }
       }
     },
     [repoPath],
@@ -95,7 +101,7 @@ export const WorkingDirectorySearchPanel: React.FC<Props> = ({ repoPath, onOpenF
 
   const replace = useCallback(
     async (target?: { path: string; line: number; column: number }) => {
-      if (!query || replacing) return;
+      if (!query || replacing || !searchIsCurrent) return;
       setReplacing(true);
       try {
         if (
@@ -134,11 +140,11 @@ export const WorkingDirectorySearchPanel: React.FC<Props> = ({ repoPath, onOpenF
         setReplacing(false);
       }
     },
-    [activeFilePath, caseSensitive, executeSearch, mode, onFilesChanged, query, replacement, replacing, repoPath, setToast],
+    [activeFilePath, caseSensitive, executeSearch, mode, onFilesChanged, query, replacement, replacing, repoPath, searchIsCurrent, setToast],
   );
 
   const confirmReplaceAll = () => {
-    if (!query || result.totalMatches === 0 || replacing) return;
+    if (!query || result.totalMatches === 0 || replacing || !searchIsCurrent) return;
     setConfirmDialog({
       variant: 'danger',
       title: 'Replace all occurrences?',
@@ -155,7 +161,14 @@ export const WorkingDirectorySearchPanel: React.FC<Props> = ({ repoPath, onOpenF
   };
 
   const renderFileNameResult = (fileResult: WorkingDirectorySearchFileDto) => (
-    <button type="button" className="working-search-file-result" key={fileResult.path} onClick={() => onOpenFile(fileResult.path)} title={fileResult.path}>
+    <button
+      type="button"
+      className="working-search-file-result"
+      key={fileResult.path}
+      data-search-path={fileResult.path}
+      onClick={() => onOpenFile(fileResult.path)}
+      title={fileResult.path}
+    >
       <File size={14} />
       <span>
         <strong>{fileResult.name}</strong>
@@ -165,14 +178,14 @@ export const WorkingDirectorySearchPanel: React.FC<Props> = ({ repoPath, onOpenF
   );
 
   const renderContentResult = (fileResult: WorkingDirectorySearchFileDto) => (
-    <section className="working-search-result-group" key={fileResult.path}>
+    <section className="working-search-result-group" key={fileResult.path} data-search-path={fileResult.path}>
       <button type="button" className="working-search-result-group__file" onClick={() => onOpenFile(fileResult.path)} title={fileResult.path}>
         <File size={14} />
         <strong>{fileResult.path}</strong>
         <span>{fileResult.matches.length}</span>
       </button>
       {fileResult.matches.map((match) => (
-        <div className="working-search-match" key={`${match.line}:${match.column}`}>
+        <div className="working-search-match" key={`${match.line}:${match.column}`} data-search-line={match.line} data-search-column={match.column}>
           <button type="button" className="working-search-match__open" onClick={() => onOpenFile(fileResult.path)}>
             <span className="working-search-match__location">
               {match.line}:{match.column}
@@ -184,7 +197,7 @@ export const WorkingDirectorySearchPanel: React.FC<Props> = ({ repoPath, onOpenF
             className="working-search-match__replace"
             aria-label={`Replace match in ${fileResult.path} at line ${match.line}`}
             title="Replace this occurrence"
-            disabled={replacing}
+            disabled={replacing || !searchIsCurrent}
             onClick={() => void replace({ path: fileResult.path, line: match.line, column: match.column })}
           >
             <Replace size={13} />
@@ -195,11 +208,12 @@ export const WorkingDirectorySearchPanel: React.FC<Props> = ({ repoPath, onOpenF
   );
 
   return (
-    <div className="working-search">
+    <div className="working-search" data-search-settled={searchIsCurrent} data-search-count={result.totalMatches} data-search-files={result.files.length}>
       <div className="working-search__modes" role="tablist" aria-label="Search mode">
         <button
           type="button"
           role="tab"
+          data-tutorial="file-search-names"
           aria-selected={mode === 'filename'}
           className={mode === 'filename' ? 'working-search__mode working-search__mode--active' : 'working-search__mode'}
           onClick={() => setMode('filename')}
@@ -210,6 +224,7 @@ export const WorkingDirectorySearchPanel: React.FC<Props> = ({ repoPath, onOpenF
         <button
           type="button"
           role="tab"
+          data-tutorial="file-search-contents"
           aria-selected={mode === 'content'}
           className={mode === 'content' ? 'working-search__mode working-search__mode--active' : 'working-search__mode'}
           onClick={() => setMode('content')}
@@ -223,6 +238,7 @@ export const WorkingDirectorySearchPanel: React.FC<Props> = ({ repoPath, onOpenF
         <input
           autoFocus
           className="working-search__input"
+          data-tutorial="file-search-query"
           value={query}
           maxLength={1_000}
           placeholder={mode === 'filename' ? 'Search file names…' : 'Search file contents…'}
@@ -234,6 +250,7 @@ export const WorkingDirectorySearchPanel: React.FC<Props> = ({ repoPath, onOpenF
           className={caseSensitive ? 'working-search__case working-search__case--active' : 'working-search__case'}
           aria-pressed={caseSensitive}
           aria-label="Match case"
+          data-tutorial="file-search-case"
           title="Match case"
           onClick={() => setCaseSensitive((current) => !current)}
         >
@@ -245,6 +262,7 @@ export const WorkingDirectorySearchPanel: React.FC<Props> = ({ repoPath, onOpenF
           <Replace className="working-search__field-icon" size={14} />
           <input
             className="working-search__input"
+            data-tutorial="file-search-replacement"
             value={replacement}
             maxLength={100_000}
             placeholder="Replace with…"
@@ -254,7 +272,8 @@ export const WorkingDirectorySearchPanel: React.FC<Props> = ({ repoPath, onOpenF
           <button
             type="button"
             className="working-search__replace-all"
-            disabled={!query || result.totalMatches === 0 || replacing || loading}
+            data-tutorial="file-search-all"
+            disabled={!query || result.totalMatches === 0 || replacing || !searchIsCurrent}
             onClick={confirmReplaceAll}
             title="Replace all occurrences"
           >
@@ -263,7 +282,7 @@ export const WorkingDirectorySearchPanel: React.FC<Props> = ({ repoPath, onOpenF
           </button>
         </div>
       )}
-      <div className="working-search__summary" aria-live="polite">
+      <div className="working-search__summary" data-tutorial="file-search-summary" aria-live="polite">
         {loading
           ? 'Searching…'
           : query

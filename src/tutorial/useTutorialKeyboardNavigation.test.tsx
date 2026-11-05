@@ -11,8 +11,8 @@ describe('tutorial arrow keys', () => {
   let workspace: HTMLDivElement;
   const back = vi.fn();
   const next = vi.fn();
-  function Harness({ canGoBack = true, canGoNext = true, onNext = next }) {
-    useTutorialKeyboardNavigation({ canGoBack, canGoNext, onBack: back, onNext });
+  function Harness({ enabled = true, canGoBack = true, canGoNext = true, onNext = next }) {
+    useTutorialKeyboardNavigation({ enabled, canGoBack, canGoNext, onBack: back, onNext });
     return null;
   }
   function key(key: string, target: EventTarget = document.body, options: KeyboardEventInit = {}) {
@@ -89,13 +89,30 @@ describe('tutorial arrow keys', () => {
     expect(next).toHaveBeenCalledOnce();
   });
 
-  it('preserves open menu navigation even when focus remains on the trigger', () => {
-    workspace.innerHTML = '<div class="topbar-dropdown"></div>';
+  it.each(['topbar-dropdown', 'ctx-menu'])('preserves open %s navigation even when focus remains on the trigger', (className) => {
+    workspace.innerHTML = `<div class="${className}"></div>`;
     key('ArrowRight');
     expect(next).not.toHaveBeenCalled();
     workspace.firstElementChild!.setAttribute('aria-hidden', 'true');
     key('ArrowRight');
     expect(next).toHaveBeenCalledOnce();
+  });
+
+  it.each(['dialog', 'menu'])('allows coach navigation while explaining a %s', (role) => {
+    workspace.innerHTML = `<div role="${role}"><button>Action</button></div><section class="tutorial-coach"><h2 tabindex="-1">Explanation</h2></section>`;
+    key('ArrowRight', workspace.querySelector('[role] button')!);
+    expect(next).not.toHaveBeenCalled();
+    key('ArrowLeft', workspace.querySelector('h2')!);
+    key('ArrowRight', workspace.querySelector('h2')!);
+    expect(back).toHaveBeenCalledOnce();
+    expect(next).toHaveBeenCalledOnce();
+  });
+
+  it('disables coach navigation while choosing another chapter', () => {
+    workspace.innerHTML = '<section class="tutorial-coach"><button>Next</button></section>';
+    act(() => root.render(<Harness enabled={false} />));
+    key('ArrowRight', workspace.querySelector('button')!);
+    expect(next).not.toHaveBeenCalled();
   });
 
   it('does not navigate while a shortcut is being recorded', () => {
@@ -108,6 +125,22 @@ describe('tutorial arrow keys', () => {
     }
     key('ArrowRight');
     expect(next).toHaveBeenCalledOnce();
+  });
+
+  it.each(['role', 'legacy'])('also pauses for a portaled %s menu outside the workspace', (kind) => {
+    const menu = document.createElement('div');
+    if (kind === 'role') menu.setAttribute('role', 'menu');
+    else menu.className = 'ctx-menu';
+    document.body.append(menu);
+    try {
+      expect(key('ArrowRight').defaultPrevented).toBe(false);
+      expect(next).not.toHaveBeenCalled();
+      menu.style.display = 'none';
+      expect(key('ArrowRight').defaultPrevented).toBe(true);
+      expect(next).toHaveBeenCalledOnce();
+    } finally {
+      menu.remove();
+    }
   });
 
   it('ignores held keys, modifiers, composition and other directions', () => {

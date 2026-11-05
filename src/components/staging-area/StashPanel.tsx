@@ -6,7 +6,7 @@ import { useAppToast } from '@/hooks/useAppToast';
 import { gitClient } from '@/services/gitClient';
 import { EmptyState } from '@/components/EmptyState';
 import type { InputDialogState } from './types';
-import { basename } from './utils';
+import { StashFileList } from './StashFileList';
 import { isGuidedStash, restoreGuidedStash } from './restoreGuidedStash';
 
 type Props = {
@@ -332,9 +332,11 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
   };
 
   return (
-    <div className="stash-panel">
+    <div className="stash-panel" data-tutorial="stashes">
       <button
         className="stash-panel-header"
+        data-tutorial="stash-panel-toggle"
+        aria-expanded={!collapsed}
         onClick={() => setCollapsed((c) => !c)}
         title={
           collapsed
@@ -371,7 +373,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
               const isExpanded = expandedFiles.has(stash.name);
               const fileState = stashFiles[stash.name];
               return (
-                <div key={stash.name} className="stash-entry">
+                <div key={stash.name} className="stash-entry" data-stash-name={stash.name} data-stash-hash={stash.hash}>
                   {pendingOp?.name === stash.name && pendingOp.op === 'drop' ? (
                     <div className="stash-entry-confirm">
                       <span className="stash-entry-confirm-msg">{tr(`"${stash.subject}" loeschen?`, `Delete "${stash.subject}"?`)}</span>
@@ -382,10 +384,11 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
                           onClick={() => {
                             void runStashOp(stash.name, 'drop');
                           }}
+                          data-stash-action="confirm-drop"
                         >
                           {t('generated.components.staging_area.stagingfilesections.delete_e5186a63')}
                         </button>
-                        <button className="staging-btn-sm" disabled={isStashMutationRunning} onClick={() => setPendingOp(null)}>
+                        <button className="staging-btn-sm" disabled={isStashMutationRunning} onClick={() => setPendingOp(null)} data-stash-action="cancel-drop">
                           {t('generated.components.confirm.cancel_035b7526')}
                         </button>
                       </div>
@@ -404,6 +407,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
                           className="staging-btn-sm"
                           disabled={isStashMutationRunning}
                           onClick={() => toggleFiles(stash)}
+                          data-stash-action="files"
                           title={
                             isExpanded
                               ? t('generated.components.staging_area.stashpanel.hide_stash_files_be566d4a')
@@ -418,7 +422,15 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
                           className="staging-btn-sm"
                           disabled={isStashMutationRunning}
                           onClick={() => handleOp(stash, 'apply')}
-                          title={t('generated.components.staging_area.stashpanel.apply_stash_keep_stash_43a20097')}
+                          data-stash-action="apply"
+                          title={
+                            isGuidedStash(stash, 'apply')
+                              ? tr(
+                                  'Geführte Wiederherstellung prüfen; die zugeordnete Sicherung wird nach bestätigtem Erfolg entfernt.',
+                                  'Review guided restoration; its assigned backup is removed after verified success.',
+                                )
+                              : t('generated.components.staging_area.stashpanel.apply_stash_keep_stash_43a20097')
+                          }
                         >
                           {runningStashOp?.name === stash.name && runningStashOp.op === 'apply'
                             ? t('generated.components.staging_area.stashpanel.applying_74286d47')
@@ -428,6 +440,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
                           className="staging-btn-sm"
                           disabled={isStashMutationRunning}
                           onClick={() => handleOp(stash, 'pop')}
+                          data-stash-action="pop"
                           title={t('generated.components.staging_area.stashpanel.apply_and_delete_stash_2df674b9')}
                         >
                           {t('generated.components.staging_area.stashpanel.pop_060eb5a7')}
@@ -436,6 +449,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
                           className="staging-btn-sm"
                           disabled={isStashMutationRunning || /\[OGC:[a-f0-9-]+\]/.test(stash.subject)}
                           onClick={() => branchFromStash(stash)}
+                          data-stash-action="branch"
                           title={t('generated.components.staging_area.stashpanel.create_a_branch_from_this_stash_caa1dff5')}
                         >
                           {t('generated.components.staging_area.stashpanel.branch_0e8da813')}
@@ -444,40 +458,14 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
                           className="staging-btn-sm staging-btn-danger"
                           disabled={isStashMutationRunning}
                           onClick={() => handleOp(stash, 'drop')}
+                          data-stash-action="drop"
                           title={t('generated.components.staging_area.stashpanel.delete_stash_6804245b')}
                         >
                           {t('generated.components.staging_area.stashpanel.drop_f1887911')}
                         </button>
                       </div>
                       {isExpanded && (
-                        <div className="stash-file-list">
-                          {fileState?.loading && (
-                            <div className="stash-panel-hint">{t('generated.components.staging_area.stashpanel.loading_files_df8b1d70')}</div>
-                          )}
-                          {!fileState?.loading && (fileState?.files || []).length === 0 && (
-                            <div className="stash-panel-hint">{t('generated.components.staging_area.stashpanel.no_files_found_5e448811')}</div>
-                          )}
-                          {!fileState?.loading &&
-                            (fileState?.files || []).map((filePath) => (
-                              <div key={`${stash.name}:${filePath}`} className="stash-file-row">
-                                <span className="stash-file-path" title={filePath}>
-                                  {basename(filePath)}
-                                </span>
-                                <button
-                                  className="staging-btn-sm"
-                                  disabled={isStashMutationRunning || /\[OGC:[a-f0-9-]+\]/.test(stash.subject)}
-                                  onClick={() => {
-                                    void restoreStashFile(stash.name, filePath);
-                                  }}
-                                  title={t('generated.components.staging_area.stashpanel.apply_file_from_this_stash_8651c38e')}
-                                >
-                                  {pendingFileOp?.stashName === stash.name && pendingFileOp.path === filePath
-                                    ? t('generated.components.staging_area.stashpanel.applying_74286d47')
-                                    : t('generated.components.staging_area.stashpanel.apply_48b5b14b')}
-                                </button>
-                              </div>
-                            ))}
-                        </div>
+                        <StashFileList stash={stash} state={fileState} busy={isStashMutationRunning} pending={pendingFileOp} onRestore={restoreStashFile} />
                       )}
                     </>
                   )}

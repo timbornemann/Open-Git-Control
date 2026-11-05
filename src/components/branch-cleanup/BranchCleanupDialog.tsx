@@ -167,6 +167,7 @@ export function BranchCleanupDialog({ repoPath, onClose, onChanged }: Props) {
                   <label key={comparison.id}>
                     <span>{comparison.id === 'local' ? tr('Vergleich für lokale Branches', 'Comparison for local branches') : comparison.label}</span>
                     <select
+                      data-cleanup-comparison={comparison.id}
                       value={comparison.targetId ?? ''}
                       disabled={Boolean(busy)}
                       onChange={(event) => void model.setTarget(comparison.id, event.target.value)}
@@ -234,6 +235,7 @@ export function BranchCleanupDialog({ repoPath, onClose, onChanged }: Props) {
                   size="sm"
                   disabled={Boolean(busy) || model.patterns === inspection.protectedPatterns.join('\n')}
                   icon={<RefreshCw size={13} />}
+                  data-tutorial="cleanup-save-protection"
                   onClick={() => void model.savePatterns()}
                 >
                   {tr('Schutz speichern und neu prüfen', 'Save protection and inspect again')}

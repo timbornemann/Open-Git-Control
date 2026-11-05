@@ -97,6 +97,7 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
             <div className="directory-mode-switch" role="group" aria-label="Inspector view">
               <button
                 className={`directory-mode-switch__option${directoryMode === 'staging' ? ' is-active' : ''}`}
+                data-tutorial="open-staging"
                 onClick={() => onDirectoryModeChange('staging')}
                 aria-pressed={directoryMode === 'staging'}
               >
@@ -123,11 +124,11 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
               {((isCommitInspectorOpen && repository.selectedCommit) || workingTreeSelection) && (
                 <>
                   {isCommitInspectorOpen && repository.selectedCommit && commitHistoryStack.length > 0 && (
-                    <button className="icon-btn" onClick={handleCommitBack} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
+                    <button data-tutorial="back-inspector" className="icon-btn" onClick={handleCommitBack} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
                       {t('generated.components.layout.main.maininspectorpane.back_c5e2bc76')}
                     </button>
                   )}
-                  <button className="icon-btn" onClick={closeInspector} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
+                  <button data-tutorial="close-inspector" className="icon-btn" onClick={closeInspector} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
                     {t('generated.components.actiontoastviewport.close_181764fa')}
                   </button>
                 </>

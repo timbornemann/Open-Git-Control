@@ -7,6 +7,8 @@ import { buildContentSecurityPolicy } from './security';
 import { registerTutorialContents } from './tutorialAuthorization';
 import { readSettings } from './settingsStore';
 import type { TutorialProgressStore } from './tutorialProgress';
+import { htmlPreviewResponse } from './htmlPreviewProtocol';
+import { HTML_PREVIEW_RESPONSE_CSP, HTML_PREVIEW_SCHEME, isHtmlPreviewUrl } from '../../src/shared/htmlPreviewSecurity';
 
 type RunningTutorial = { view: WebContentsView; context: TutorialLaunchContext; close: (failed?: boolean) => void; ready: () => void };
 const running = new Map<number, RunningTutorial>();
@@ -27,17 +29,26 @@ export function registerTutorialHandlers(store: TutorialProgressStore, isDev: bo
       const preferences = readSettings();
       const context: TutorialLaunchContext = { request, language: preferences.language, theme: preferences.theme, progress: store.snapshot() };
       const partition = session.fromPartition(`tutorial-${randomUUID()}`, { cache: false });
+      partition.protocol.handle(HTML_PREVIEW_SCHEME, htmlPreviewResponse);
       partition.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
       partition.setPermissionCheckHandler(() => false);
       // Only bundled application assets may be loaded. In development Vite's
       // assets/HMR are allowed, never a hosting, AI or local planning endpoint.
       partition.webRequest.onBeforeRequest((details, callback) => {
         const url = new URL(details.url);
-        const allowed = ['file:', 'data:', 'blob:'].includes(url.protocol) || (isDev && ['http://localhost:5173', 'ws://localhost:5173'].includes(url.origin));
+        const allowed =
+          isHtmlPreviewUrl(details.url) ||
+          ['file:', 'data:', 'blob:'].includes(url.protocol) ||
+          (isDev && ['http://localhost:5173', 'ws://localhost:5173'].includes(url.origin));
         callback({ cancel: !allowed });
       });
       partition.webRequest.onHeadersReceived((details, callback) =>
-        callback({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [buildContentSecurityPolicy(isDev)] } }),
+        callback({
+          responseHeaders: {
+            ...details.responseHeaders,
+            'Content-Security-Policy': [isHtmlPreviewUrl(details.url) ? HTML_PREVIEW_RESPONSE_CSP : buildContentSecurityPolicy(isDev)],
+          },
+        }),
       );
       const view = new WebContentsView({
         webPreferences: {

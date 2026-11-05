@@ -25,7 +25,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ repoPath, hash, on
   useLayoutEffect(() => setCollapsedPaths(new Set()), [repoPath, normalizedHash]);
 
   return (
-    <div className="commit-details-panel">
+    <div className="commit-details-panel" data-commit-hash={normalizedHash}>
       <h4 className="commit-details-heading">
         {t('generated.components.commitdetails.commit_details_7b1df325')}:{' '}
         {normalizedHash ? normalizedHash.substring(0, 8) : t('generated.components.commitdetails.invalid_4296db6c')}

@@ -200,7 +200,7 @@ export function cachedClient<T extends object>(domain: ResourceDomain, client: T
           {
             staleTime: immutable && !localLfsSnapshot(key, queryClient.getQueryData(key)) ? Infinity : (policy?.staleTime ?? 15_000),
             priority,
-            force: force || (policy?.refreshOnRead && !immutable),
+            force: force || (readCommand && args[commandIndex] === 'stash') || (policy?.refreshOnRead && !immutable),
             scheduled: !branchPages,
             automaticRefresh: policy?.automaticRefresh,
             signal: ['getWorkingTreeStatus', 'getWorkingTreeSnapshot', 'getWorkingTreeStats', 'getGitLfsStatus'].includes(property)

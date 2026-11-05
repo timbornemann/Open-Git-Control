@@ -8,6 +8,7 @@ vi.mock('@/i18n', () => ({ useI18n: () => ({ t: (key: string) => key, tr: (_de: 
 let root: Root;
 let container: HTMLDivElement;
 const onDelete = vi.fn();
+const close = vi.fn();
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
@@ -28,13 +29,43 @@ function render(branch: string, isProtected = false) {
         onCheckout: vi.fn(),
         onMerge: vi.fn(),
         onRename: vi.fn(),
-        setBranchContextMenu: vi.fn(),
+        setBranchContextMenu: close,
       }),
     ),
   );
   return container.querySelector<HTMLButtonElement>('.ctx-menu-item.danger')!;
 }
 describe('primary branch deletion menu', () => {
+  it('focuses menu actions and navigates with arrow keys while skipping disabled deletion', () => {
+    render('main');
+    const items = [...container.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+    expect(document.activeElement).toBe(items[0]);
+    const key = (value: string) =>
+      act(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true })));
+    key('ArrowUp');
+    expect(document.activeElement).toBe(items.at(-1));
+    key('Home');
+    expect(document.activeElement).toBe(items[0]);
+    key('ArrowDown');
+    expect(document.activeElement).toBe(items[1]);
+    key('End');
+    expect(document.activeElement).toBe(items.at(-1));
+    expect((document.activeElement as HTMLButtonElement).disabled).toBe(false);
+  });
+  it('closes with Escape and restores focus to the opener when unmounted', () => {
+    const opener = document.createElement('button');
+    document.body.append(opener);
+    opener.focus();
+    try {
+      render('feature/done');
+      act(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
+      expect(close).toHaveBeenCalledWith(null);
+      act(() => root.render(null));
+      expect(document.activeElement).toBe(opener);
+    } finally {
+      opener.remove();
+    }
+  });
   it.each(['main', 'master', 'MAIN'])('disables deletion of %s even before protection metadata is loaded', (name) => {
     const button = render(name);
     expect(button.disabled).toBe(true);

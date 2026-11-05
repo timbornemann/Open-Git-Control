@@ -40,6 +40,7 @@ export const CommitMessageFields = ({ commitForm, disabled, hasOpenConflicts, ti
           <label className="staging-commit-field" htmlFor={`${fieldId}-type`}>
             <span>{tr('Typ', 'Type')}</span>
             <select
+              data-tutorial="commit-type"
               id={`${fieldId}-type`}
               className="staging-commit-control"
               value={subject.type}
@@ -60,6 +61,7 @@ export const CommitMessageFields = ({ commitForm, disabled, hasOpenConflicts, ti
           <label className="staging-commit-field" htmlFor={`${fieldId}-scope`}>
             <span>{subject.type ? tr('Bereich (optional)', 'Scope (optional)') : tr('Präfix (optional)', 'Prefix (optional)')}</span>
             <input
+              data-tutorial="commit-prefix"
               id={`${fieldId}-scope`}
               className="staging-commit-control"
               placeholder={subject.type ? tr('z. B. backend', 'e.g. backend') : tr('Text vor der Nachricht', 'Text before the message')}
@@ -72,6 +74,7 @@ export const CommitMessageFields = ({ commitForm, disabled, hasOpenConflicts, ti
           <label className="staging-commit-field staging-commit-message-field" htmlFor={`${fieldId}-message`}>
             <span>{tr('Nachricht', 'Message')}</span>
             <textarea
+              data-tutorial="commit-message"
               ref={messageField}
               id={`${fieldId}-message`}
               className="staging-commit-control staging-commit-input staging-commit-message"
@@ -99,6 +102,7 @@ export const CommitMessageFields = ({ commitForm, disabled, hasOpenConflicts, ti
       <label className="staging-commit-field" htmlFor={`${fieldId}-description`}>
         <span>{tr('Beschreibung (optional)', 'Description (optional)')}</span>
         <textarea
+          data-tutorial="commit-description"
           id={`${fieldId}-description`}
           className="staging-commit-input staging-commit-description"
           placeholder={tr('Zusätzlicher Kontext zu den Änderungen…', 'Additional context for these changes…')}

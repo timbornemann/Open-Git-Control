@@ -1,0 +1,211 @@
+import type { TutorialChapter } from './types';
+import {
+  treeStep as s,
+  treeAction as a,
+  treeContext,
+  treeContextStep,
+  treeInput,
+  treePrepare,
+  treeAll,
+  treeClosed,
+  named,
+  nameField,
+  c,
+  row,
+  element,
+  p,
+  state,
+  paths,
+  dialog,
+  confirmDialog,
+  cancelDialog,
+} from './treeLessonHelpers';
+const collision = 'A file or folder with that name already exists.';
+export const TUTORIAL_TREE_RENAME: TutorialChapter = {
+  id: 'tree-rename',
+  section: 'repo',
+  title: ['Dateien und Ordner umbenennen', 'Rename files and folders'],
+  description: [
+    'Pfad und Namen prüfen, abbrechen, eine Namenskollision erkennen und Datei sowie Ordner gezielt umbenennen.',
+    'Review paths and names, cancel, recognize a name collision and rename a file and folder deliberately.',
+  ],
+  question: ['Wie benenne ich Dateien und ganze Ordner um?', 'How do I rename files and entire folders?'],
+  keywords: 'rename umbenennen name folder ordner datei collision konflikt vorhanden',
+  steps: [
+    s(
+      'overview',
+      ['Umbenennen verändert einen Pfad', 'Renaming changes a path'],
+      [
+        'practice enthält note.md und other.md. Wir benennen zuerst note.md und danach den gesamten Ordner um. Die Inhalte sollen erhalten bleiben; der Index und der letzte Commit bleiben unverändert.',
+        'practice contains note.md and other.md. First we rename note.md, then the entire folder. Contents must be preserved; the index and last commit stay unchanged.',
+      ],
+      row('practice'),
+      { continue: false },
+    ),
+    s(
+      'expand',
+      ['Öffne practice', 'Expand practice'],
+      ['Klicke practice, damit note.md und other.md sichtbar werden.', 'Click practice to reveal note.md and other.md.'],
+      row('practice'),
+      { completion: element(row(paths.note)) },
+    ),
+    treeContextStep('file-menu', paths.note, 'base'),
+    s(
+      'rename-action',
+      ['Wähle Rename', 'Choose Rename'],
+      [
+        'Klicke Rename für practice/note.md. Der Dialog übernimmt den bestehenden Namen und nennt den bisherigen Pfad.',
+        'Click Rename for practice/note.md. The dialog pre-fills its current name and shows the existing path.',
+      ],
+      a('rename'),
+      { prepare: treeContext('base', paths.note), completion: element(nameField) },
+    ),
+    s(
+      'name-explained',
+      ['Nur der letzte Pfadteil wird geändert', 'Only the last path component changes'],
+      [
+        'Im Feld steht note.md, als Pfad practice/note.md. Rename ändert den Namen innerhalb desselben Ordners. Um in einen anderen Ordner zu wechseln, verwenden wir später Cut und Paste.',
+        'The field contains note.md and the path is practice/note.md. Rename changes the name within the same folder. To use another folder, a later lesson uses Cut and Paste.',
+      ],
+      dialog,
+      { prepare: treeInput('base', paths.note, 'rename') },
+    ),
+    s(
+      'cancel',
+      ['Brich die Umbenennung ab', 'Cancel renaming'],
+      [
+        'Klicke Abbrechen. note.md und other.md sollen ihre Namen und Inhalte behalten.',
+        'Click Cancel. note.md and other.md should keep their names and contents.',
+      ],
+      cancelDialog,
+      { prepare: treeInput('base', paths.note, 'rename'), completion: treeClosed('base') },
+    ),
+    treeContextStep('collision-menu', paths.note, 'base'),
+    s(
+      'collision-action',
+      ['Öffne Rename erneut', 'Open Rename again'],
+      ['Klicke Rename. Als Nächstes testen wir bewusst einen bereits belegten Namen.', 'Click Rename. Next we deliberately try a name that is already taken.'],
+      a('rename'),
+      { prepare: treeContext('base', paths.note), completion: element(nameField) },
+    ),
+    s(
+      'collision-name',
+      ['Versuche den belegten Namen other.md', 'Try the existing name other.md'],
+      [
+        'Ersetze note.md durch other.md. Im selben Ordner existiert bereits eine Datei mit diesem Namen. Wir prüfen die Rückmeldung, ohne eine Datei zu überschreiben.',
+        'Replace note.md with other.md. A file with that name already exists in the same folder. We will check the feedback without overwriting a file.',
+      ],
+      nameField,
+      { prepare: treeInput('base', paths.note, 'rename'), completion: named('other.md') },
+    ),
+    s(
+      'collision-submit',
+      ['Prüfe den Schutz vor Namenskollisionen', 'Check protection against name collisions'],
+      [
+        'Klicke Rename. Die Anwendung soll den belegten Namen melden und beide Originaldateien erhalten. Der Dialog schließt sich nach dem Versuch.',
+        'Click Rename. The app should report the existing name and preserve both originals. The dialog closes after the attempt.',
+      ],
+      confirmDialog,
+      {
+        prepare: treeInput('base', paths.note, 'rename', 'other.md'),
+        completion: treeAll(state('base'), { kind: 'feedback', trigger: confirmDialog, message: [collision, collision], error: true }),
+      },
+    ),
+    treeContextStep('valid-menu', paths.note, 'base'),
+    s(
+      'valid-action',
+      ['Beginne eine gültige Umbenennung', 'Start a valid rename'],
+      ['Klicke erneut Rename für note.md. Diesmal wählen wir einen freien Namen.', 'Click Rename for note.md again. This time we choose an available name.'],
+      a('rename'),
+      { prepare: treeContext('base', paths.note), completion: element(nameField) },
+    ),
+    s(
+      'file-name',
+      ['Trage updated.md ein', 'Enter updated.md'],
+      [
+        'Ersetze den Namen durch updated.md. Die Endung .md bleibt erhalten. Der Inhalt der Datei soll sich nicht ändern.',
+        'Replace the name with updated.md. Keep the .md extension. The file’s contents must not change.',
+      ],
+      nameField,
+      { prepare: treeInput('base', paths.note, 'rename'), completion: named('updated.md') },
+    ),
+    s(
+      'rename-file',
+      ['Bestätige die Umbenennung', 'Confirm renaming'],
+      [
+        'Klicke Rename. Unter practice soll jetzt updated.md statt note.md stehen. other.md bleibt erhalten.',
+        'Click Rename. practice should now contain updated.md instead of note.md. other.md is preserved.',
+      ],
+      confirmDialog,
+      { prepare: treeInput('base', paths.note, 'rename', 'updated.md'), completion: treeClosed('renamed-file') },
+    ),
+    s(
+      'file-result',
+      ['Der Arbeitsordner hat einen neuen Namen', 'The working directory has a new name'],
+      [
+        'updated.md enthält weiterhin die ursprüngliche Übungsnotiz. Im Index heißt die gespeicherte Datei noch practice/note.md. Git erkennt die Pfadänderung erst beim Vergleich beziehungsweise nach dem Vormerken.',
+        'updated.md still contains the original practice note. The index still stores practice/note.md. Git recognizes the path change when comparing versions or after staging.',
+      ],
+      row(paths.renamed),
+      { prepare: treePrepare('renamed-file', [{ expand: row('practice') }]) },
+    ),
+    treeContextStep('folder-menu', 'practice', 'renamed-file'),
+    s(
+      'folder-action',
+      ['Wähle Rename für den Ordner', 'Choose Rename for the folder'],
+      [
+        'Klicke Rename am Ordner practice. Dies betrifft den Ordnerpfad und damit auch die Pfade aller enthaltenen Dateien.',
+        'Click Rename for practice. This changes the folder path and consequently the paths of all its files.',
+      ],
+      a('rename'),
+      { prepare: treeContext('renamed-file', 'practice'), completion: element(nameField) },
+    ),
+    s(
+      'folder-name',
+      ['Nenne den Ordner workbench', 'Name the folder workbench'],
+      [
+        'Ersetze practice durch workbench. Die enthaltenen Dateinamen updated.md und other.md sollen erhalten bleiben.',
+        'Replace practice with workbench. The contained filenames updated.md and other.md must be preserved.',
+      ],
+      nameField,
+      { prepare: treeInput('renamed-file', 'practice', 'rename'), completion: named('workbench') },
+    ),
+    s(
+      'rename-folder',
+      ['Benenne den gesamten Ordner um', 'Rename the entire folder'],
+      [
+        'Klicke Rename. practice soll verschwinden und workbench erscheinen. Die Dateien werden gemeinsam unter dem neuen Ordnerpfad geführt.',
+        'Click Rename. practice should disappear and workbench should appear. Its files move together under the new folder path.',
+      ],
+      confirmDialog,
+      { prepare: treeInput('renamed-file', 'practice', 'rename', 'workbench'), completion: treeAll(element(row('workbench')), treeClosed('renamed-folder')) },
+    ),
+    s(
+      'expand-result',
+      ['Prüfe den Inhalt von workbench', 'Check the contents of workbench'],
+      ['Öffne workbench. updated.md und other.md sollen darunter sichtbar werden.', 'Expand workbench. updated.md and other.md should appear underneath.'],
+      row('workbench'),
+      { prepare: p('renamed-folder'), completion: treeAll(element(row('workbench/updated.md')), element(row('workbench/other.md'))) },
+    ),
+    s(
+      'open-staging',
+      ['Prüfe die Pfadänderungen in Git', 'Check path changes in Git'],
+      [
+        'Wechsle zur Staging Area. Die bisherigen versionierten Pfade fehlen im Arbeitsordner, die neuen Pfade sind noch unversioniert.',
+        'Switch to Staging Area. The old tracked paths are missing from the worktree and the new paths are still untracked.',
+      ],
+      c('open-staging'),
+      { prepare: p('renamed-folder'), completion: element(`${c('open-staging')}[aria-pressed="true"]`) },
+    ),
+    s(
+      'finish',
+      ['Inhalt und Pfad sind unterschiedliche Dinge', 'Contents and paths are different things'],
+      [
+        'Du hast Abbrechen und eine Namenskollision geprüft sowie Datei und Ordner umbenannt. Vormerken und Commit sind weiterhin eigene Aktionen. Die Anzeige einer Umbenennung hängt von Git und den verglichenen Ständen ab.',
+        'You practiced Cancel, a name collision, file renaming and folder renaming. Staging and committing remain separate actions. Rename display depends on Git and the versions being compared.',
+      ],
+      c('staging'),
+      { openView: undefined, inspector: 'staging', prepare: p('renamed-folder') },
+    ),
+  ],
+};

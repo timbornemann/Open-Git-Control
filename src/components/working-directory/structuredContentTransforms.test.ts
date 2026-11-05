@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   formatHtmlText,
@@ -16,6 +17,29 @@ beforeEach(() => validation.mockReset().mockResolvedValue({ success: true, data:
 afterEach(() => vi.unstubAllGlobals());
 
 describe('structured content transforms', () => {
+  it('minifies in the browser without fetching external assets or executing embedded code', async () => {
+    const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Network is forbidden.'));
+    const send = vi.spyOn(XMLHttpRequest.prototype, 'send').mockImplementation(() => {
+      throw new Error('Network is forbidden.');
+    });
+    const source =
+      '<html><head><link rel="stylesheet" href="https://example.invalid/site.css"><script src="https://example.invalid/app.js"></script><style>body { color: red; }</style></head><body><!-- remove --><script>globalThis.__htmlToolExecuted = true;</script><p>Keep <strong>this space</strong>.</p></body></html>';
+    try {
+      const result = await minifyHtmlText(source);
+      expect(result).toContain('https://example.invalid/site.css');
+      expect(result).toContain('https://example.invalid/app.js');
+      expect(result).toContain('<style>body { color: red; }</style>');
+      expect(result).toContain('<script>globalThis.__htmlToolExecuted = true;</script>');
+      expect(result).toContain('<p>Keep <strong>this space</strong>.</p>');
+      expect(result).not.toContain('<!-- remove -->');
+      expect((globalThis as typeof globalThis & { __htmlToolExecuted?: boolean }).__htmlToolExecuted).toBeUndefined();
+      expect(fetch).not.toHaveBeenCalled();
+      expect(send).not.toHaveBeenCalled();
+    } finally {
+      fetch.mockRestore();
+      send.mockRestore();
+    }
+  });
   it('formats and minifies strict XML', async () => {
     const source = '<root><item id="1">value</item><empty/></root>';
     const formatted = await formatXmlText(source);

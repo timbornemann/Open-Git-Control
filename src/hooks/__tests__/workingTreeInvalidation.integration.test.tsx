@@ -10,6 +10,7 @@ import { gitClient } from '@/services/gitClient';
 import type { WorkingDirectoryEntryDto } from '@/shared/ipc/contracts/git';
 import type { IpcResult } from '@/types/ipc';
 import { useWorkingTreeSnapshot, type WorkingTreeState } from '../useWorkingTreeSnapshot';
+import type { WorkingTreeStatusDto } from '@/types/gitDtos';
 
 const { repository, ui } = vi.hoisted(() => ({ repository: { onToast: vi.fn() }, ui: { setConfirmDialog: vi.fn(), setInputDialog: vi.fn() } }));
 const { onToast } = repository;
@@ -51,6 +52,34 @@ afterEach(() => {
 });
 
 describe('working tree invalidation during cold file reads', () => {
+  it('confirms the replacement file status when a mutation invalidates a cold status read', async () => {
+    const pending = deferred<IpcResult<WorkingTreeStatusDto>>();
+    const fresh: IpcResult<WorkingTreeStatusDto> = {
+      success: true,
+      data: { repoPath: repo, statusRaw: 'M  current.txt', changeCount: 1, checkedAt: Date.now() },
+    };
+    const read = vi.fn().mockReturnValueOnce(pending.promise).mockResolvedValue(fresh);
+    const client = cachedClient('git', { getWorkingTreeStatus: read });
+    vi.spyOn(gitClient, 'getWorkingTreeStatus').mockImplementation(client.getWorkingTreeStatus);
+    let current!: WorkingTreeState;
+    function Harness() {
+      current = useWorkingTreeSnapshot(repo);
+      return null;
+    }
+    await act(async () => root.render(createElement(Harness)));
+    expect(read).toHaveBeenCalledOnce();
+    const refreshed = current.refresh();
+    const confirmation = expect(refreshed).resolves.toBeUndefined();
+    await act(async () => {
+      invalidateResources('git', repo, ['getWorkingTreeStatus']);
+      await confirmation;
+    });
+    expect(read.mock.calls.length).toBeGreaterThan(1);
+    expect(current.statusRaw).toBe('M  current.txt');
+    expect(current.dataRepoPath).toBe(repo);
+    await act(async () => pending.resolve({ success: true, data: { ...fresh.data, statusRaw: ' M stale.txt' } }));
+    expect(current.statusRaw).toBe('M  current.txt');
+  });
   it.each([false, true])('restarts a cancelled initial directory read after the working-tree snapshot changes (Strict Mode: %s)', async (strict) => {
     const pending = deferred<IpcResult<WorkingDirectoryEntryDto[]>>();
     const read = vi

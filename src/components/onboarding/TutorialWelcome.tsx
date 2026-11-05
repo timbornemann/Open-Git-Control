@@ -71,8 +71,8 @@ export function TutorialWelcome({ onClose }: { onClose: () => void }) {
         <h1 id="tutorial-welcome-title">{tr('Dein Projekt. Dein nächster Schritt.', 'Your project. Your next step.')}</h1>
         <p id="tutorial-welcome-description">
           {tr(
-            'Lerne die App Schritt für Schritt kennen. In einem Lernprojekt probierst du Navigation, Änderungen und deinen ersten Commit selbst aus.',
-            'Get to know the app one step at a time. Practice navigation, changes and your first commit in a learning project.',
+            'Starte mit einer Übersicht durch alle Bereiche der linken Navigation. Danach entscheidest du, ob du mit ausführlichen Übungen weiterlernen oder direkt zur App wechseln möchtest.',
+            'Start with an overview of every area in the activity bar. Afterwards, choose detailed practice lessons or return straight to the app.',
           )}
         </p>
         <p className="tutorial-entry-muted">

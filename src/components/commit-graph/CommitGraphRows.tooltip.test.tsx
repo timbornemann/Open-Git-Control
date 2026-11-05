@@ -28,6 +28,7 @@ const node = (stats: GraphNode['commit']['stats'] = { files: 12, additions: 437,
 });
 let root: Root, host: HTMLDivElement;
 const onSelectCommit = vi.fn(),
+  onContextMenu = vi.fn(),
   onToggleBranchHighlight = vi.fn();
 const render = (nodes = [node()], repoPath = '/first') =>
   act(() => {
@@ -62,7 +63,7 @@ const render = (nodes = [node()], repoPath = '/first') =>
       hasMoreCommits: false,
       onLoadMoreCommits: vi.fn(),
       onSelectCommit,
-      onContextMenu: vi.fn(),
+      onContextMenu,
       onToggleBranchHighlight,
       onClearBranchHighlight: vi.fn(),
       formatCommitDate: () => '10 Oct',
@@ -100,6 +101,13 @@ afterEach(() => {
 });
 
 describe('compact commit history details', () => {
+  it.each([{ key: 'F10', shiftKey: true }, { key: 'ContextMenu' }])('opens the focused row menu using $key', (options) => {
+    render();
+    act(() => row().dispatchEvent(new KeyboardEvent('keydown', { ...options, bubbles: true, cancelable: true })));
+    expect(onContextMenu).toHaveBeenCalledOnce();
+    expect(onContextMenu.mock.calls[0][1].commit.hash).toBe(node().commit.hash);
+    expect(onSelectCommit).not.toHaveBeenCalled();
+  });
   it('opens a delayed, unclipped tooltip only when information is hidden', () => {
     render();
     hover();

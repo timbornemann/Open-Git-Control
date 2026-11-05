@@ -174,7 +174,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
               {tr('Zurück zum Repository', 'Back to repository')}
             </button>
           ) : showRecoveryCenter ? (
-            <button className="icon-btn pane-header-nav-btn" onClick={() => setShowRecoveryCenter(false)}>
+            <button data-tutorial="close-recovery" className="icon-btn pane-header-nav-btn" onClick={() => setShowRecoveryCenter(false)}>
               {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
             </button>
           ) : fileViewerRequest ? (
@@ -182,7 +182,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
               {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
             </button>
           ) : activeConflictPath ? (
-            <button className="icon-btn pane-header-nav-btn" onClick={() => setActiveConflictPath(null)}>
+            <button data-tutorial="conflict-close" className="icon-btn pane-header-nav-btn" onClick={() => setActiveConflictPath(null)}>
               {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
             </button>
           ) : null}

@@ -1,5 +1,6 @@
 import { useCachedResult } from '@/data/resourceHooks';
 import { resourceKey, withReadPriority } from '@/data/clientCache';
+import { readCurrentResource } from '@/data/readCurrentResource';
 import type { IpcResult } from '@/types/ipc';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { GitSubmoduleInfo } from '@/types/git';
@@ -39,8 +40,11 @@ export const useRepositorySubmodules = ({ activeRepo, refreshTrigger, language, 
       }
 
       try {
-        const response = await withReadPriority(() => gitClient.runGitCommandForRepo(activeRepo, 'submoduleStatus'), 'repository');
-        if (cancelled) return;
+        const response = await readCurrentResource(
+          () => withReadPriority(() => gitClient.runGitCommandForRepo(activeRepo, 'submoduleStatus'), 'repository'),
+          () => !cancelled && activeRepoRef.current === activeRepo,
+        );
+        if (!response) return;
         if (!response.success) {
           setSubmodules([]);
           setGitActionToast({

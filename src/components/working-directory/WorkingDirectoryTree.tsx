@@ -3,7 +3,7 @@ import { peekResource } from '@/data/clientCache';
 import { readCurrentResource } from '@/data/readCurrentResource';
 import type { IpcResult } from '@/types/ipc';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ClipboardPaste, Copy, ExternalLink, File, FilePlus, Folder, FolderOpen, FolderPlus, Info, Pencil, Scissors, Search, Trash2, X } from 'lucide-react';
+import { File, Folder, FolderOpen, MoreHorizontal, Search, X } from 'lucide-react';
 import { useUIContext } from '@/contexts/AppStateContext';
 import { useAppToastSetter } from '@/hooks/useAppToast';
 import { gitClient } from '@/services/gitClient';
@@ -13,17 +13,14 @@ import { WorkingDirectoryFileInfoDialog } from './WorkingDirectoryFileInfoDialog
 import { WorkingDirectorySearchPanel } from './WorkingDirectorySearchPanel';
 import { createWorkingDirectoryToolActions } from './workingDirectoryToolActions';
 import { basename, getTopLevelEntries, isEntryName, isSameOrDescendantPath } from './workingDirectoryToolTransforms';
-import { WorkingDirectoryToolsMenu } from './WorkingDirectoryToolsMenu';
+import { WorkingDirectoryContextMenu } from './WorkingDirectoryContextMenu';
+import { useWorkingDirectoryMenuPlacement } from './useWorkingDirectoryMenuPlacement';
 import { VirtualList } from '@/components/VirtualList';
 import { workingDirectoryRows, type WorkingDirectoryRow } from './workingDirectoryRows';
 import '@/styles/working-directory-tree.css';
 
 type ClipboardEntry = { path: string; kind: WorkingDirectoryEntryDto['kind']; cut: boolean } | null;
 type ContextMenu = { entry: WorkingDirectoryEntryDto; entries: WorkingDirectoryEntryDto[]; x: number; y: number };
-
-const CONTEXT_MENU_WIDTH = 210;
-const CONTEXT_MENU_HEIGHT = 280;
-const CONTEXT_MENU_MARGIN = 8;
 
 type Props = {
   repoPath: string | null;
@@ -43,6 +40,8 @@ const WorkingDirectorySearchToggle: React.FC<{ visible: boolean; open: boolean; 
       type="button"
       className={open ? 'working-tree-root__search working-tree-root__search--active' : 'working-tree-root__search'}
       aria-label={open ? 'Close working directory search' : 'Search working directory'}
+      data-tutorial="file-search-toggle"
+      aria-pressed={open}
       title={open ? 'Close search' : 'Search files'}
       onClick={(event) => {
         event.stopPropagation();
@@ -89,8 +88,8 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
   const [loadingDirectories, setLoadingDirectories] = useState<Set<string>>(() => new Set());
   const [clipboard, setClipboard] = useState<ClipboardEntry>(null);
   const [context, setContext] = useState<ContextMenu | null>(null);
-  const [contextPlacement, setContextPlacement] = useState({ left: 0, top: 0 });
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const contextPlacement = useWorkingDirectoryMenuPlacement(context, contextMenuRef);
   const [fileInfoPath, setFileInfoPath] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(() => new Set());
@@ -213,20 +212,6 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
     window.addEventListener('click', close);
     return () => window.removeEventListener('click', close);
   }, []);
-
-  useLayoutEffect(() => {
-    if (!context) return;
-    // A menu opened near the bottom or right edge of the window must not be
-    // anchored at the raw click point: `working-tree-context-menu` can list
-    // many actions, so keeping `left`/`top` unclamped would push part of it
-    // past the viewport where it is visually cut off.
-    const width = contextMenuRef.current?.offsetWidth || CONTEXT_MENU_WIDTH;
-    const height = contextMenuRef.current?.offsetHeight || CONTEXT_MENU_HEIGHT;
-    setContextPlacement({
-      left: Math.max(CONTEXT_MENU_MARGIN, Math.min(context.x, window.innerWidth - width - CONTEXT_MENU_MARGIN)),
-      top: Math.max(CONTEXT_MENU_MARGIN, Math.min(context.y, window.innerHeight - height - CONTEXT_MENU_MARGIN)),
-    });
-  }, [context]);
 
   const runMutation = async (
     action: () => Promise<{ success: boolean; error?: string }>,
@@ -433,8 +418,18 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
     const loading = loadingDirectories.has(entry.path);
     return (
       <button
+        data-file-path={entry.path}
+        aria-expanded={entry.kind === 'directory' ? open : undefined}
         type="button"
         onKeyDown={(event) => {
+          if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
+            event.preventDefault();
+            const bounds = event.currentTarget.getBoundingClientRect();
+            event.currentTarget.dispatchEvent(
+              new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: bounds.left + 12, clientY: bounds.top + bounds.height / 2 }),
+            );
+            return;
+          }
           if (event.key !== 'Tab' || event.ctrlKey || event.altKey || event.metaKey) return;
           const nextIndex = index + (event.shiftKey ? -1 : 1);
           if (nextIndex < 0 || nextIndex >= rows.length) return;
@@ -519,6 +514,24 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
       >
         <FolderOpen className="working-tree-root__icon" size={16} strokeWidth={1.8} />
         <span className="working-tree-root__label">{repoPath ? `${basename(repoPath)}/` : 'Repository/'}</span>
+        {repoPath && (
+          <button
+            type="button"
+            className="working-tree-root__search"
+            data-tree-action="root-menu"
+            aria-label="File actions"
+            title="File actions"
+            aria-haspopup="menu"
+            onClick={(event) => {
+              event.stopPropagation();
+              const bounds = event.currentTarget.getBoundingClientRect();
+              const entry = { path: '', name: 'Repository', kind: 'directory' } as const;
+              setContext({ entry, entries: [entry], x: bounds.left, y: bounds.bottom });
+            }}
+          >
+            <MoreHorizontal size={14} aria-hidden="true" />
+          </button>
+        )}
         <WorkingDirectorySearchToggle
           visible={Boolean(repoPath)}
           open={searchOpen}
@@ -547,205 +560,27 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
         activeFilePath={activeFilePath}
       />
       {context && (
-        <div
-          ref={contextMenuRef}
-          className="working-tree-context-menu"
-          style={{ position: 'fixed', left: contextPlacement.left, top: contextPlacement.top, zIndex: 50 }}
-          onClick={(event) => event.stopPropagation()}
-          role="menu"
-          aria-label="File actions"
-        >
-          <div className="working-tree-context-menu__header">
-            {context.entries.length > 1 ? `${context.entries.length} items selected` : context.entry.path || (repoPath ? basename(repoPath) : 'Repository')}
-          </div>
-          {context.entries.length > 1 ? (
-            <>
-              <WorkingDirectoryToolsMenu entries={context.entries} actions={toolActions} onClose={() => setContext(null)} />
-              <div className="working-tree-context-menu__separator" />
-              <button
-                type="button"
-                className="working-tree-context-menu__item working-tree-context-menu__item--danger"
-                onClick={() => {
-                  const entries = context.entries;
-                  setContext(null);
-                  remove(entries);
-                }}
-              >
-                <Trash2 size={14} />
-                <span>Delete selected</span>
-              </button>
-            </>
-          ) : (
-            <>
-              {context.entry.kind === 'directory' && (
-                <button
-                  type="button"
-                  className="working-tree-context-menu__item"
-                  onClick={() => {
-                    const folder = context.entry.path;
-                    setContext(null);
-                    createEntry(folder, 'file');
-                  }}
-                >
-                  <FilePlus size={14} />
-                  <span>Add file</span>
-                </button>
-              )}
-              {context.entry.kind === 'directory' && (
-                <button
-                  type="button"
-                  className="working-tree-context-menu__item"
-                  onClick={() => {
-                    const folder = context.entry.path;
-                    setContext(null);
-                    createEntry(folder, 'folder');
-                  }}
-                >
-                  <FolderPlus size={14} />
-                  <span>Add folder</span>
-                </button>
-              )}
-              {context.entry.path && context.entry.kind === 'file' && (
-                <button
-                  type="button"
-                  className="working-tree-context-menu__item"
-                  onClick={() => {
-                    setContext(null);
-                    onOpenFile(context.entry.path);
-                  }}
-                >
-                  <File size={14} />
-                  <span>Open</span>
-                </button>
-              )}
-              {context.entry.path && context.entry.kind === 'file' && (
-                <button
-                  type="button"
-                  className="working-tree-context-menu__item"
-                  onClick={() => {
-                    setFileInfoPath(context.entry.path);
-                    setContext(null);
-                  }}
-                >
-                  <Info size={14} />
-                  <span>File information</span>
-                </button>
-              )}
-              {context.entry.path && (
-                <button
-                  type="button"
-                  className="working-tree-context-menu__item"
-                  onClick={() => {
-                    setContext(null);
-                    rename(context.entry);
-                  }}
-                >
-                  <Pencil size={14} />
-                  <span>Rename</span>
-                </button>
-              )}
-              {context.entry.path && (
-                <button
-                  type="button"
-                  className="working-tree-context-menu__item"
-                  onClick={() => {
-                    setClipboard({ path: context.entry.path, kind: context.entry.kind, cut: false });
-                    setContext(null);
-                  }}
-                >
-                  <Copy size={14} />
-                  <span>Copy</span>
-                </button>
-              )}
-              {context.entry.path && (
-                <button
-                  type="button"
-                  className="working-tree-context-menu__item"
-                  onClick={() => {
-                    setClipboard({ path: context.entry.path, kind: context.entry.kind, cut: true });
-                    setContext(null);
-                  }}
-                >
-                  <Scissors size={14} />
-                  <span>Cut</span>
-                </button>
-              )}
-              {clipboard && (
-                <>
-                  <div className="working-tree-context-menu__separator" />
-                  <button
-                    type="button"
-                    className="working-tree-context-menu__item"
-                    onClick={() => {
-                      setContext(null);
-                      void pasteInto(targetFolder);
-                    }}
-                  >
-                    <ClipboardPaste size={14} />
-                    <span>Paste</span>
-                  </button>
-                </>
-              )}
-              <WorkingDirectoryToolsMenu entries={context.entries} actions={toolActions} onClose={() => setContext(null)} />
-              {context.entry.path && <div className="working-tree-context-menu__separator" />}
-              {context.entry.path && (
-                <button
-                  type="button"
-                  className="working-tree-context-menu__item"
-                  onClick={() => {
-                    setContext(null);
-                    void gitClient.openRepositoryPath({ path: context.entry.path, action: 'reveal', repoPath: repoPath! });
-                  }}
-                >
-                  <FolderOpen size={14} />
-                  <span>Show in file system</span>
-                </button>
-              )}
-              {context.entry.path && (
-                <button
-                  type="button"
-                  className="working-tree-context-menu__item"
-                  onClick={() => {
-                    setContext(null);
-                    void gitClient.openRepositoryPath({ path: context.entry.path, action: 'open', repoPath: repoPath! });
-                  }}
-                >
-                  <ExternalLink size={14} />
-                  <span>Open externally</span>
-                </button>
-              )}
-              {context.entry.path && (
-                <button
-                  type="button"
-                  className="working-tree-context-menu__item"
-                  onClick={() => {
-                    setContext(null);
-                    void gitClient.openRepositoryPath({ path: context.entry.path, action: 'openWith', repoPath: repoPath! });
-                  }}
-                >
-                  <ExternalLink size={14} />
-                  <span>Open with</span>
-                </button>
-              )}
-              {context.entry.path && (
-                <>
-                  <div className="working-tree-context-menu__separator" />
-                  <button
-                    type="button"
-                    className="working-tree-context-menu__item working-tree-context-menu__item--danger"
-                    onClick={() => {
-                      setContext(null);
-                      remove([context.entry]);
-                    }}
-                  >
-                    <Trash2 size={14} />
-                    <span>Delete</span>
-                  </button>
-                </>
-              )}
-            </>
-          )}
-        </div>
+        <WorkingDirectoryContextMenu
+          context={context}
+          placement={contextPlacement}
+          menuRef={contextMenuRef}
+          rootLabel={repoPath ? basename(repoPath) : 'Repository'}
+          canPaste={Boolean(clipboard)}
+          actions={toolActions}
+          onClose={() => setContext(null)}
+          onCreate={createEntry}
+          onOpen={onOpenFile}
+          onInfo={setFileInfoPath}
+          onRename={rename}
+          onCopy={(entry, cut) => setClipboard({ path: entry.path, kind: entry.kind, cut })}
+          onPaste={() => {
+            void pasteInto(targetFolder);
+          }}
+          onDelete={remove}
+          onExternal={(path, action) => {
+            void gitClient.openRepositoryPath({ path, action, repoPath: repoPath! });
+          }}
+        />
       )}
       {repoPath && fileInfoPath && <WorkingDirectoryFileInfoDialog repoPath={repoPath} path={fileInfoPath} onClose={() => setFileInfoPath(null)} />}
     </div>

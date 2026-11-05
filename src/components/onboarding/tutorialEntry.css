@@ -95,6 +95,23 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: 14px;
 }
+.tutorial-help-section {
+  margin: 24px 0;
+}
+.tutorial-help-steps {
+  width: 100%;
+  font-size: 12px;
+}
+.tutorial-help-steps summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+.tutorial-help-steps ol {
+  padding-left: 20px;
+}
+.tutorial-help-steps li {
+  margin: 7px 0;
+}
 .tutorial-help-card {
   display: flex;
   flex-direction: column;
