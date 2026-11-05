@@ -245,6 +245,45 @@
       ],
       "createdAt": 1793218330070,
       "updatedAt": 1793218330070
+    },
+    {
+      "id": "31542c1c-4d61-4049-aed6-64fba65b9a7b",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "copy commit hash",
+      "description": "copy commit hash funktioneirt nicht, es wird nur etwas leeres in die zwischenablage gelegt",
+      "priority": "medium",
+      "status": "bug",
+      "tags": [
+        "Bug"
+      ],
+      "createdAt": 1793744289476,
+      "updatedAt": 1793744289476
+    },
+    {
+      "id": "84ff599a-0756-4c61-9f41-705dea8b52c9",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "ai message",
+      "description": "ai message kann nicht generieren wenn man dateien hinzufügt mit add, udn anders herum, diese sachen kommen sich doch eigentlich nicht in die qerere, wenn also die ki die commit nachrticht formuliert sollte man paralel dateiene stagen oder un stagen können",
+      "priority": "medium",
+      "status": "bug",
+      "tags": [
+        "Bug"
+      ],
+      "createdAt": 1793823845830,
+      "updatedAt": 1793823845830
+    },
+    {
+      "id": "3b28b365-7372-4bc3-a1bc-45c479be053a",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "stageing message",
+      "description": "die toast message das satging erfolgreich war braucht es nicht, das sieht man ja sehr schenll",
+      "priority": "medium",
+      "status": "bug",
+      "tags": [
+        "Bug"
+      ],
+      "createdAt": 1793824037249,
+      "updatedAt": 1793824037249
     }
   ]
 }
