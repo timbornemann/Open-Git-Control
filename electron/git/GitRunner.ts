@@ -173,6 +173,10 @@ export class GitRunner {
     return this.scheduler.isRepositoryBusy(repoPath, commonDirectory);
   }
 
+  close(): Promise<void> {
+    return this.scheduler.close();
+  }
+
   async run(repoPath: string, args: string[], options: GitRunOptions = {}): Promise<string> {
     this.assertRepoPathAvailable(repoPath);
 

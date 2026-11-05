@@ -21,30 +21,34 @@ const MAX_STREAM_OUTPUT_BYTES = 8 * 1024 * 1024;
 export class GitSpawnOperations {
   runBuffer(repoPath: string, args: string[], options: GitBufferRunOptions, signal: AbortSignal): Promise<Buffer> {
     return new Promise<Buffer>((resolve, reject) => {
+      signal.throwIfAborted();
       const proc = spawn(toolExecutable('git'), args, {
         cwd: repoPath,
         windowsHide: true,
         stdio: [options.input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
         env: toolEnvironment(options.envOverrides),
+        detached: process.platform !== 'win32',
       });
       const chunks: Buffer[] = [];
       let capturedBytes = 0;
       let stderr = '';
       let tooLarge = false;
 
-      const abort = () => proc.kill();
+      const { stop: abort, waitForStop } = gitProcessTree(proc);
       signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) abort();
       if (options.input !== undefined) {
         proc.stdin?.on('error', () => {});
         proc.stdin?.end(options.input);
       }
 
       proc.stdout!.on('data', (chunk: Buffer) => {
+        if (tooLarge || signal.aborted) return;
         capturedBytes += chunk.length;
         if (capturedBytes > options.maxBytes) {
           if (options.allowTruncation) chunks.push(chunk.subarray(0, Math.max(0, options.maxBytes - (capturedBytes - chunk.length))));
           tooLarge = true;
-          proc.kill();
+          abort();
           return;
         }
         chunks.push(chunk);
@@ -52,42 +56,54 @@ export class GitSpawnOperations {
       proc.stderr!.on('data', (chunk: Buffer) => {
         if (stderr.length < 64 * 1024) stderr += chunk.toString('utf8');
       });
-      proc.on('error', reject);
-      proc.on('close', (code, closeSignal) => {
+      proc.once('error', (error) => {
         signal.removeEventListener('abort', abort);
-        if (tooLarge) {
-          if (options.allowTruncation && !signal.aborted) {
-            resolve(Buffer.concat(chunks));
+        reject(error);
+      });
+      proc.once('close', (code, closeSignal) => {
+        signal.removeEventListener('abort', abort);
+        void waitForStop().then(() => {
+          if (signal.aborted) {
+            reject(createAbortError('Git file read was aborted.'));
             return;
           }
-          reject(new Error(options.tooLargeMessage));
-          return;
-        }
-        if (signal.aborted || closeSignal) {
-          reject(createAbortError('Git file read was aborted.'));
-          return;
-        }
-        if (code !== 0) {
-          reject(new Error(redactGitSensitiveText((stderr || `git ${args.join(' ')} exited with code ${code}`).trim())));
-          return;
-        }
-        resolve(Buffer.concat(chunks));
+          if (tooLarge) {
+            if (options.allowTruncation) {
+              resolve(Buffer.concat(chunks));
+              return;
+            }
+            reject(new Error(options.tooLargeMessage));
+            return;
+          }
+          if (closeSignal) {
+            reject(createAbortError('Git file read was aborted.'));
+            return;
+          }
+          if (code !== 0) {
+            reject(new Error(redactGitSensitiveText((stderr || `git ${args.join(' ')} exited with code ${code}`).trim())));
+            return;
+          }
+          resolve(Buffer.concat(chunks));
+        });
       });
     });
   }
 
   runWithInput(repoPath: string, args: string[], input: string | Buffer, signal: AbortSignal, envOverrides?: NodeJS.ProcessEnv): Promise<string> {
     return new Promise<string>((resolve, reject) => {
+      signal.throwIfAborted();
       const proc = spawn(toolExecutable('git'), args, {
         cwd: repoPath,
         stdio: ['pipe', 'pipe', 'pipe'],
         windowsHide: true,
         env: toolEnvironment(envOverrides),
+        detached: process.platform !== 'win32',
       });
       let stdout = '';
       let stderr = '';
-      const abort = () => proc.kill();
+      const { stop: abort, waitForStop } = gitProcessTree(proc);
       signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) abort();
 
       proc.stdout.on('data', (chunk: Buffer) => {
         stdout += chunk.toString();
@@ -101,21 +117,26 @@ export class GitSpawnOperations {
         // The process can close stdin early when git rejects the input.
       });
 
-      proc.on('error', reject);
-
-      proc.on('close', (code) => {
+      proc.once('error', (error) => {
         signal.removeEventListener('abort', abort);
-        if (signal.aborted) {
-          reject(createAbortError('Git command was aborted.'));
-          return;
-        }
-        if (code === 0) {
-          resolve(stdout.trimEnd());
-          return;
-        }
+        reject(error);
+      });
 
-        const message = redactGitSensitiveText((stderr || stdout || `git ${args.join(' ')} exited with code ${code}`).trim());
-        reject(new Error(message));
+      proc.once('close', (code) => {
+        signal.removeEventListener('abort', abort);
+        void waitForStop().then(() => {
+          if (signal.aborted) {
+            reject(createAbortError('Git command was aborted.'));
+            return;
+          }
+          if (code === 0) {
+            resolve(stdout.trimEnd());
+            return;
+          }
+
+          const message = redactGitSensitiveText((stderr || stdout || `git ${args.join(' ')} exited with code ${code}`).trim());
+          reject(new Error(message));
+        });
       });
 
       proc.stdin.end(input);

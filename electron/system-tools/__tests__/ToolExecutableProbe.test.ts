@@ -58,13 +58,19 @@ describe('isolated program discovery', () => {
 
   it('bounds stalled executable creation and continues to the next candidate', async () => {
     const blocked = path.join(root, 'blocked.exe');
+    const working = path.join(root, 'working.exe');
     fs.writeFileSync(blocked, 'fixture');
+    fs.writeFileSync(working, 'fixture');
     instrumentChild(`const cp=require('node:child_process'),run=cp.spawnSync;cp.spawnSync=function(file,...args){
       if(file===${JSON.stringify(blocked)})Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,30000);
+      if(file===${JSON.stringify(working)})return {status:0,stdout:'v1.0.0',stderr:''};
       return run.call(this,file,...args);
     };`);
-    expect(await probeToolExecutables([blocked, process.execPath], '^v\\d+', { commandTimeoutMs: 100, totalTimeoutMs: 8000 })).toMatchObject({
-      executable: process.execPath,
+    // Actual executable discovery is covered above. Keep this candidate
+    // deterministic so CPU contention cannot turn a valid 100ms deadline
+    // for the deliberately blocked start into a Node startup benchmark.
+    expect(await probeToolExecutables([blocked, working], '^v\\d+', { commandTimeoutMs: 100, totalTimeoutMs: 8000 })).toMatchObject({
+      executable: working,
       timedOut: 1,
     });
   }, 12000);

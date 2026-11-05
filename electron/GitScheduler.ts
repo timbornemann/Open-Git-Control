@@ -62,6 +62,21 @@ export class GitScheduler {
   private readonly repos = new Map<string, RepoState>();
   private readonly diagnostics: GitSchedulerDiagnostic[] = [];
   private readonly repoKeyCache = new Map<string, string>();
+  private closing: Promise<void> | undefined;
+
+  /** Stop accepting work and finish accepted jobs before Electron exits. */
+  close(): Promise<void> {
+    if (this.closing) return this.closing;
+    const pending = new Set<Promise<unknown>>();
+    for (const state of this.repos.values()) {
+      for (const entry of [...state.queue, ...state.activeReads, state.activeWrite, state.activeNetwork]) if (entry) pending.add(entry.promise);
+    }
+    // Accepted writes keep their exclusive lane and are never interrupted.
+    // In-flight reads must settle too: quitting during Windows process
+    // creation can otherwise leave an inherited, suspended Git child behind.
+    this.closing = Promise.allSettled(pending).then(() => undefined);
+    return this.closing;
+  }
 
   schedule<T>(
     repoPath: string,
@@ -70,6 +85,7 @@ export class GitScheduler {
     run: (signal: AbortSignal) => Promise<T>,
     options: { coalesceKey?: string; signal?: AbortSignal } = {},
   ): Promise<T> {
+    if (this.closing) return Promise.reject(abortError());
     const state = this.getState(repoPath);
     const coalesceKey = kind === 'polling' ? `${physicalPathKey(repoPath)}\0${options.coalesceKey || command}` : null;
     if (coalesceKey) {

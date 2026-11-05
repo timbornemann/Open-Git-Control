@@ -219,6 +219,7 @@ if (isPrimaryInstance) {
       });
     }
     await commitStatsService.dispose();
+    await gitService.runner.close();
     recordStartup('shutdown-cleanup-complete');
     await flushStartupDiagnostics();
   });

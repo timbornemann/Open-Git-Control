@@ -1,8 +1,5 @@
-import { execFile } from 'child_process';
-import * as util from 'util';
+import { runGitExecFile } from './GitExecFileProcess';
 import type { GitJobKind } from '../GitScheduler';
-
-const execFileAsync = util.promisify(execFile);
 
 export type ExecFileAsyncResult = { stdout: string; stderr: string };
 
@@ -16,7 +13,7 @@ export type GitExecFileOptions = {
 
 export type ExecFileAsyncRunner = (file: string, args: string[], options: GitExecFileOptions) => Promise<ExecFileAsyncResult>;
 
-export const defaultExecFileAsyncRunner = execFileAsync as ExecFileAsyncRunner;
+export const defaultExecFileAsyncRunner: ExecFileAsyncRunner = runGitExecFile;
 
 export type GitRunOptions = {
   envOverrides?: NodeJS.ProcessEnv;
