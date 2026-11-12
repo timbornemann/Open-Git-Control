@@ -23,6 +23,7 @@ const workspace = (() => {
     fail(error);
   }
 })();
+const registryStartup = isolation?.createRegistryStartupBarrier(fs.realpathSync.native(workspace.directory));
 if (fresh) {
   const { TutorialProgressStore } = require(path.join(root, 'dist-electron/electron/main-process/tutorialProgress.js'));
   assert.equal(new TutorialProgressStore(profile).snapshot().welcomeSeen, false, 'A genuinely fresh Electron profile is eligible for the welcome.');
@@ -48,7 +49,13 @@ ipcMain.handle = (channel, listener) =>
   originalHandle(channel, (event, ...args) => {
     if (tutorial && event.sender.id === tutorial.id && !channel.startsWith('tutorial:')) regularIpcFromTutorial++;
     if (channel === 'tutorial:complete') chapterCompletions++;
-    return listener(event, ...args);
+    const result = listener(event, ...args);
+    if (registryStartup && channel === 'repos:mutate')
+      return Promise.resolve(result).then((response) => {
+        if (event.sender.id === parent?.webContents.id) registryStartup.observe(args[0], response);
+        return response;
+      });
+    return result;
   });
 const timeout = setTimeout(() => fail(new Error('Tutorial smoke test timed out.')), 150_000);
 timeout.unref();
@@ -64,6 +71,22 @@ app.on('browser-window-created', (_event, win) => {
 });
 app.on('web-contents-created', (_event, contents) => {
   contents.setBackgroundThrottling(false);
+  // Electron requires the owning BrowserWindow to be focused for native key
+  // events. Showing it inactive or focusing only a DOM field is insufficient.
+  const sendInputEvent = contents.sendInputEvent.bind(contents);
+  const insertText = contents.insertText.bind(contents);
+  const focusInput = () => {
+    parent.focus();
+    contents.focus();
+  };
+  contents.sendInputEvent = (event) => {
+    focusInput();
+    sendInputEvent(event);
+  };
+  contents.insertText = (text) => {
+    focusInput();
+    return insertText(text);
+  };
   contents.on('console-message', (event) => {
     if (event.message.includes('Tutorial simulation has no handler')) console.log(event.message);
     if (event.level === 'error') {
@@ -124,12 +147,15 @@ async function click(selector) {
   await tutorial.executeJavaScript('document.querySelector(' + JSON.stringify(selector) + ').click()');
 }
 async function stepReady(id) {
-  await waitFor(
-    tutorial,
+  const condition =
     'document.querySelector(".tutorial-coach:not([aria-busy=true])")?.dataset.step === ' +
-      JSON.stringify(id) +
-      ' && document.querySelector("[data-tutorial=primary]")',
-  );
+    JSON.stringify(id) +
+    ' && document.querySelector("[data-tutorial=primary]")';
+  await waitFor(tutorial, condition);
+  // Native input must follow a painted React commit, including focus and
+  // keyboard effects. DOM readiness alone can still precede those effects.
+  await tutorial.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))');
+  await waitFor(tutorial, condition);
 }
 async function next() {
   await click('.tutorial-coach .tutorial-button.primary:not(:disabled)');
@@ -269,7 +295,19 @@ app
       'localStorage.setItem("tutorial-isolation-sentinel","private workspace"); window.unsavedTutorialTestDraft = "my unfinished draft"',
     );
     if (isolation) {
-      await isolation.verify({ parent, getTutorial: () => tutorial, launch, close, stepReady, click, waitFor, workspace, profile, languageIndex });
+      await isolation.verify({
+        parent,
+        getTutorial: () => tutorial,
+        launch,
+        close,
+        stepReady,
+        click,
+        waitFor,
+        workspace,
+        profile,
+        languageIndex,
+        registryStartup,
+      });
       assert.equal(regularIpcFromTutorial, 0, 'Practice mutations cannot use native repository IPC.');
       assert.equal(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'), settings);
       assert.deepEqual(errors, []);

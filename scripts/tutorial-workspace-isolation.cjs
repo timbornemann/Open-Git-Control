@@ -8,6 +8,37 @@ const draft = 'PRIVATE UNSAVED EDITOR DRAFT\n';
 const message = 'PRIVATE UNFINISHED COMMIT';
 const description = 'Private commit description that must survive the tutorial.';
 
+function createRegistryStartupBarrier(expectedRepoPath) {
+  let acknowledge;
+  const ready = new Promise((resolve) => {
+    acknowledge = resolve;
+  });
+  const key = (value) => {
+    const absolute = path.resolve(value);
+    return process.platform === 'win32' ? absolute.toLowerCase() : absolute;
+  };
+  return {
+    observe(operation, result) {
+      if (operation?.kind !== 'activate' || !result?.success || typeof result.data?.activeRepo !== 'string') return;
+      if (key(result.data.activeRepo) !== key(expectedRepoPath)) return;
+      acknowledge(structuredClone(result.data));
+    },
+    async wait() {
+      let timer;
+      try {
+        return await Promise.race([
+          ready,
+          new Promise((_resolve, reject) => {
+            timer = setTimeout(() => reject(new Error('The real workspace did not acknowledge its startup repository activation.')), 12_000);
+          }),
+        ]);
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+  };
+}
+
 function prepare(profile) {
   const directory = path.join(path.resolve(profile), 'private-workspace');
   assert.equal(path.dirname(directory), path.resolve(profile));
@@ -42,13 +73,21 @@ function prepare(profile) {
   git('commit', '-m', 'Isolated native test baseline');
   fs.writeFileSync(path.join(directory, 'staged.txt'), 'An actual staged change.\n');
   git('add', '--', 'staged.txt');
+  // A saved subdirectory forces path canonicalization before activation, just
+  // like short/long Windows path aliases on CI. Both writes must finish first.
+  const savedDirectory = path.join(directory, 'selected-subdirectory');
+  fs.mkdirSync(savedDirectory);
   return {
     directory,
-    stored: { repos: [{ path: directory, pinned: false, lastOpened: Date.now(), createdAt: Date.now() }], activeRepo: directory, sortBy: 'lastOpenedDesc' },
+    stored: {
+      repos: [{ path: savedDirectory, pinned: false, lastOpened: Date.now(), createdAt: Date.now() }],
+      activeRepo: savedDirectory,
+      sortBy: 'lastOpenedDesc',
+    },
   };
 }
 
-async function verify({ parent, getTutorial, launch, close, stepReady, click, waitFor, workspace, profile, languageIndex }) {
+async function verify({ parent, getTutorial, launch, close, stepReady, click, waitFor, workspace, profile, languageIndex, registryStartup }) {
   const regular = parent.webContents;
   const run = (code) => regular.executeJavaScript(code);
   const key = (contents, keyCode, modifiers = []) => {
@@ -77,15 +116,21 @@ async function verify({ parent, getTutorial, launch, close, stepReady, click, wa
   await run(
     'window.tutorialIsolationNodes={viewer:document.querySelector(".file-viewer"),message:document.querySelector("[data-tutorial=commit-message]"),description:document.querySelector("[data-tutorial=commit-description]")}',
   );
-  // The real startup restores the active repository after probing Git. Wait for
-  // that acknowledged registry mutation, rather than comparing its pending write.
-  let stored;
-  for (let attempt = 0; attempt < 200; attempt++) {
-    stored = await run('window.electronAPI.repos.getStoredRepos()');
-    if (stored.revision > 0) break;
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-  assert.ok(stored.revision > 0, 'The real workspace finished restoring its active repository.');
+  // A positive revision may acknowledge only path canonicalization. The
+  // renderer queues activation after it; capture that exact persisted receipt.
+  const stored = await registryStartup.wait();
+  console.log('Native workspace startup activation acknowledged at catalog revision:', stored.revision);
+  const canonicalDirectory = fs.realpathSync.native(workspace.directory);
+  assert.deepEqual(
+    stored,
+    {
+      ...workspace.stored,
+      repos: workspace.stored.repos.map((entry) => ({ ...entry, path: canonicalDirectory })),
+      activeRepo: canonicalDirectory,
+      revision: stored.revision,
+    },
+    'Startup only canonicalizes and activates the saved repository.',
+  );
   const refs = ['.git/HEAD', '.git/refs/heads/main', '.git/index', privateFile, 'staged.txt'];
   const files = refs.map((file) => [file, fs.readFileSync(path.join(workspace.directory, file))]);
   const nativeViews = parent.contentView.children.length;
@@ -198,4 +243,4 @@ async function prepareShutdown(workspace, profile, fail) {
   };
   await reading;
 }
-module.exports = { prepare, verify, prepareShutdown };
+module.exports = { prepare, verify, prepareShutdown, createRegistryStartupBarrier };

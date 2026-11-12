@@ -49,6 +49,41 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 const complete = () => container.textContent === 'true';
+it('recognizes a preview URL assigned to an existing iframe without another click or render', async () => {
+  workspace.innerHTML = '<iframe class="preview"></iframe>';
+  const frame = workspace.querySelector('iframe')!;
+  act(() => root.render(<Harness current={{ ...step, completion: { kind: 'element', selector: '.preview[src^="ogc-html-preview:"]' } }} />));
+  expect(complete()).toBe(false);
+  await act(async () => frame.setAttribute('src', 'ogc-html-preview://document/example'));
+  expect(workspace.querySelector('iframe')).toBe(frame);
+  expect(complete()).toBe(true);
+  await act(async () => frame.removeAttribute('src'));
+  expect(complete()).toBe(false);
+});
+
+it.each([
+  ['aria-busy', 'true', 'false'],
+  ['data-entry-count', '0', '1'],
+  ['data-recovery-hash', 'original', 'restored'],
+  ['data-submodule-state', 'uninitialized', 'clean'],
+  ['data-branch-change-restored', 'false', 'true'],
+])('checks completion again when only %s changes', async (attribute, before, after) => {
+  workspace.innerHTML = `<div class="recovery-state" ${attribute}="${before}"></div>`;
+  const control = workspace.querySelector('div')!;
+  act(() => root.render(<Harness current={{ ...step, completion: { kind: 'element', selector: `.recovery-state[${attribute}="${after}"]` } }} />));
+  expect(complete()).toBe(false);
+  await act(async () => control.setAttribute(attribute, after));
+  expect(complete()).toBe(true);
+});
+
+it('recognizes a delayed input default reflected in its value attribute without an input event', async () => {
+  const field = workspace.querySelector('input')!;
+  act(() => root.render(<Harness />));
+  expect(complete()).toBe(false);
+  await act(async () => field.setAttribute('value', 'Fertig'));
+  expect(field.value).toBe('Fertig');
+  expect(complete()).toBe(true);
+});
 it('observes native disclosure changes without requiring another render or input event', async () => {
   workspace.innerHTML = '<details><summary>Keep protected branches</summary><p>main</p></details>';
   act(() => root.render(<Harness current={{ ...step, completion: { kind: 'element', selector: 'details[open]' } }} />));

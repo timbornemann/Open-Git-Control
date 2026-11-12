@@ -284,6 +284,32 @@
       ],
       "createdAt": 1793824037249,
       "updatedAt": 1793824037249
+    },
+    {
+      "id": "c81d1900-3341-4738-b784-6a9789071ded",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "working dir",
+      "description": "im working directory, wenn bei eienr datei die preview verfügbar ist wie bei markdown dateien bildern oder htmls  oder so, dann soll direkt die prewiew ansicht geöffnet sein damit man nicht manuell auf preview klicken mus bei den datenen",
+      "priority": "medium",
+      "status": "planned",
+      "tags": [
+        "Planned"
+      ],
+      "createdAt": 1794072187160,
+      "updatedAt": 1794072187160
+    },
+    {
+      "id": "ddee9878-a0c5-4119-a098-2aa09a925eda",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "gelöschtes repo",
+      "description": "wenn ein repo auf der festplatte gelöscht wird, und man es nicht offen hat in open git controll wird trozdem ein fehkler geworfen, weil es nichtmer erreichbar ist, das popup wird nur angezeigt, wenn man das repo öffnet und dann festgetsellt wird, das es nichtmehr da ist",
+      "priority": "medium",
+      "status": "bug",
+      "tags": [
+        "Bug"
+      ],
+      "createdAt": 1794507134421,
+      "updatedAt": 1794507134421
     }
   ]
 }

@@ -50,6 +50,68 @@ it('waits for the requested search snapshot even when no result nodes need to ch
   expect(container.textContent).toBe('true');
 });
 
+it('continues when a controlled branch-name field receives its delayed default without replacing any nodes', async () => {
+  let setName!: (value: string) => void;
+  const expected = 'recovery-78dde6c';
+  const current: TutorialStep = {
+    ...step,
+    openView: undefined,
+    prepare: { actions: [{ waitValue: { selector: '.branch-name', value: [expected, expected] } }] },
+  };
+  function Form() {
+    const [name, update] = useState('');
+    setName = update;
+    const ready = useTutorialPreparation(current);
+    return (
+      <>
+        <output>{String(ready)}</output>
+        {createPortal(<input className="branch-name" value={name} onChange={(event) => update(event.target.value)} />, workspace)}
+      </>
+    );
+  }
+  await act(async () => root.render(<Form />));
+  const field = workspace.querySelector('input')!;
+  expect(container.textContent).toBe('false');
+  await act(async () => setName(expected));
+  expect(workspace.querySelector('input')).toBe(field);
+  expect(field.value).toBe(expected);
+  expect(container.textContent).toBe('true');
+});
+
+it.each([
+  ['aria-busy', 'true', 'false'],
+  ['data-entry-count', '0', '1'],
+  ['data-recovery-hash', 'original', 'restored'],
+  ['src', 'about:blank', 'ogc-html-preview:example'],
+  ['data-submodule-state', 'uninitialized', 'clean'],
+  ['data-branch-change-restored', 'false', 'true'],
+])('continues when a retained recovery element changes only %s', async (attribute, before, after) => {
+  workspace.innerHTML = `<div class="recovery-state" ${attribute}="${before}"></div>`;
+  const control = workspace.querySelector('div')!;
+  await act(async () => root.render(<Harness current={{ ...step, openView: undefined, prepare: { ready: `.recovery-state[${attribute}="${after}"]` } }} />));
+  expect(container.textContent).toBe('false');
+  await act(async () => control.setAttribute(attribute, after));
+  expect(container.textContent).toBe('true');
+});
+
+it('continues when a delayed textarea default changes its existing text node', async () => {
+  workspace.innerHTML = '<textarea class="delayed-default">Original</textarea>';
+  const field = workspace.querySelector('textarea')!;
+  await act(async () =>
+    root.render(
+      <Harness
+        current={{ ...step, openView: undefined, prepare: { actions: [{ waitValue: { selector: '.delayed-default', value: ['Restored', 'Restored'] } }] } }}
+      />,
+    ),
+  );
+  expect(container.textContent).toBe('false');
+  await act(async () => {
+    field.firstChild!.nodeValue = 'Restored';
+  });
+  expect(field.value).toBe('Restored');
+  expect(container.textContent).toBe('true');
+});
+
 it('opens the sample only once after the real row appears and waits for the viewer', async () => {
   act(() => root.render(<Harness />));
   expect(container.textContent).toBe('false');
