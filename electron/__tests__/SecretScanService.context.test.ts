@@ -3,6 +3,38 @@ import { SecretScanService } from '../SecretScanService';
 import { createGitServiceMock } from './secretScanTestUtils';
 
 describe('bounded secret finding previews', () => {
+  it.each(['', 'RSA ', 'EC ', 'OPENSSH '])('hides the complete %sprivate-key line including escaped key material', async (format) => {
+    const body = 'synthetic-private-key-body-for-preview-test';
+    const diff = [
+      'diff --git a/key.ts b/key.ts',
+      '+++ b/key.ts',
+      '@@ -0,0 +1 @@',
+      `+const key = \`-----BEGIN ${format}PRIVATE KEY-----\\n${body}\\n-----END ${format}PRIVATE KEY-----\`;`,
+    ].join('\n');
+    const service = new SecretScanService(createGitServiceMock({ 'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': diff }));
+    const result = await service.scanStagedDiffs({ repoPath: '/repo', strictness: 'low', allowlistText: '' });
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]).toMatchObject({ ruleId: 'private-key-block', filePath: 'key.ts', lineNumber: 1, contextLine: '[REDACTED_SECRET]' });
+    expect(JSON.stringify(result.findings)).not.toContain(body);
+  });
+
+  it('also hides inline private-key material in previews for other rules on the same line', async () => {
+    const body = 'synthetic-private-key-body-for-preview-test';
+    const token = 'ghp_abcdefghijklmnopqrstuvwxyz123456';
+    const diff = [
+      'diff --git a/key.ts b/key.ts',
+      '+++ b/key.ts',
+      '@@ -0,0 +1 @@',
+      `+const key = \`-----BEGIN PRIVATE KEY-----\\n${body}\\n-----END PRIVATE KEY-----\`; const token = '${token}';`,
+    ].join('\n');
+    const service = new SecretScanService(createGitServiceMock({ 'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': diff }));
+    const result = await service.scanStagedDiffs({ repoPath: '/repo', strictness: 'low', allowlistText: '' });
+    expect(result.findings).toHaveLength(2);
+    expect(result.findings.every((finding) => finding.contextLine === '[REDACTED_SECRET]')).toBe(true);
+    expect(JSON.stringify(result.findings)).not.toContain(body);
+    expect(JSON.stringify(result.findings)).not.toContain(token);
+  });
+
   it.each(['ordinary-data ', '😀'])('retains the location and valid redacted context without retaining a huge %s line', async (prefix) => {
     const token = 'ghp_abcdefghijklmnopqrstuvwxyz123456';
     const diff = ['diff --git a/app.ts b/app.ts', '+++ b/app.ts', '@@ -0,0 +1 @@', `+${prefix.repeat(20000)} ${token} ${'more-data '.repeat(20000)}`].join(

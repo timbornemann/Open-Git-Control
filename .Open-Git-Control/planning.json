@@ -160,10 +160,10 @@
       "title": "Einzelne Zeilen stagen",
       "description": "Einzelne Zeilen stagen: Die vorhandenen Aktionen für ganze Änderungsblöcke um eine Zeilenauswahl ergänzen. Das erleichtert saubere Commits, wenn mehrere Themen denselben Block betreffen.",
       "priority": "medium",
-      "status": "planned",
+      "status": "in-progress",
       "tags": [],
       "createdAt": 1792502128090,
-      "updatedAt": 1792608908843
+      "updatedAt": 1794673608835
     },
     {
       "id": "68868582-9d66-423c-903b-3bd7ce03e6a2",

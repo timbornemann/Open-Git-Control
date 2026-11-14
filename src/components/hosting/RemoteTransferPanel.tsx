@@ -7,6 +7,8 @@ import { PushTransferResults } from './PushTransferResults';
 import { PullTransferRecovery } from './PullTransferRecovery';
 import { GitFailureMessage } from '@/components/ui/GitFailureMessage';
 import { transferFailureContext } from './transferFailureContext';
+import { Button } from '@/components/ui/Button';
+import { Settings2 } from 'lucide-react';
 
 export type TransferMode = 'remotes' | 'push' | 'pull' | 'fetch';
 export function RemoteTransferPanel({
@@ -77,7 +79,13 @@ export function RemoteTransferPanel({
         />
       )}
       {state.error && <GitFailureMessage message={state.error} context={transferFailureContext(state)} />}
-      <button onClick={openConfiguration}>{tr('Remote-Konfiguration öffnen', 'Open remote configuration')}</button>
+      {state.phase === 'review' && state.scan?.findings.length ? (
+        <Button className="push-secret-configuration" variant="ghost" icon={<Settings2 size={13} aria-hidden="true" />} onClick={openConfiguration}>
+          {tr('Remote-Konfiguration öffnen', 'Open remote configuration')}
+        </Button>
+      ) : (
+        <button onClick={openConfiguration}>{tr('Remote-Konfiguration öffnen', 'Open remote configuration')}</button>
+      )}
     </section>
   );
 }

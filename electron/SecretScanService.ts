@@ -328,6 +328,9 @@ function patternEnabledForStrictness(pattern: PatternDefinition, strictness: Sec
 }
 
 function sanitizeContextLine(line: string): string {
+  // A PEM block can occupy one physical line through escaped newlines. Redact
+  // that whole line so no key body leaks into this or another finding's preview.
+  if (SECRET_PATTERNS.some((pattern) => pattern.id === 'private-key-block' && pattern.regex.test(line))) return '[REDACTED_SECRET]';
   const replacedQuotedValues = line.replace(/(["'])([^"'\\]{8,})(\1)/g, (_full, quote: string) => `${quote}[REDACTED]${quote}`);
   const sanitized = SECRET_PATTERNS.reduce((sanitized, pattern) => {
     const flags = `${pattern.regex.flags.replace('g', '')}g`;

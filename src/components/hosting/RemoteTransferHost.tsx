@@ -61,8 +61,10 @@ export function RemoteTransferHost({ onOpenConfiguration }: { onOpenConfiguratio
     }
   }, [intent, closeRequest, coordinator]);
   const state = useRemoteTransferState();
-  const title =
-    state.intent?.mode === 'push'
+  const reviewingSecrets = state.phase === 'review' && Boolean(state.scan?.findings.length);
+  const title = reviewingSecrets
+    ? tr('Secret-Scan · Push angehalten', 'Secret scan · Push paused')
+    : state.intent?.mode === 'push'
       ? tr('Push-Ziele', 'Push targets')
       : state.intent?.mode === 'pull'
         ? tr('Pull-Quelle', 'Pull source')
@@ -70,7 +72,18 @@ export function RemoteTransferHost({ onOpenConfiguration }: { onOpenConfiguratio
   const modal = ['selection', 'review'].includes(state.phase) || (state.phase === 'result' && state.resultVisible);
   return (
     <>
-      <DialogFrame open={modal} title={title} closeOnBackdrop={false} onClose={() => coordinator.close()} cancelLabel={tr('Schließen', 'Close')}>
+      <DialogFrame
+        open={modal}
+        title={title}
+        className={reviewingSecrets ? 'push-secret-dialog' : undefined}
+        focusCancel={reviewingSecrets}
+        closeOnBackdrop={false}
+        onClose={() => {
+          coordinator.close();
+          if (reviewingSecrets) setActiveTab('repo');
+        }}
+        cancelLabel={reviewingSecrets ? tr('Abbrechen und beheben', 'Cancel and fix') : tr('Schließen', 'Close')}
+      >
         <RemoteTransferPanel
           state={state}
           tags={tags}

@@ -1,6 +1,7 @@
 import { useI18n } from '@/i18n';
 import type { GitPushPlanDto, GitPushBatchDto } from '@/types/remoteTransfers';
 import type { SecretScanResultDto } from '@/types/gitDtos';
+import { PushSecretScanReview } from './PushSecretScanReview';
 
 export function PushTransferReview({
   plan,
@@ -26,24 +27,22 @@ export function PushTransferReview({
   openAllowlist?: () => void;
 }) {
   const { tr } = useI18n();
-  return (
-    <div className="hosting-card">
+  const reviewedTargets = plan.targets.filter(
+    (target) =>
+      !reviewingRetry || (!target.grouped && batch?.targets.some((result) => result.id === target.id && !['success', 'up-to-date'].includes(result.status))),
+  );
+  const planDetails = (
+    <>
       <strong>{reviewingRetry ? tr('Geprüfte Wiederholung', 'Reviewed retry') : tr('Geprüfter Push-Plan', 'Reviewed push plan')}</strong>
       <p>
         {tr('Quellbranch', 'Source branch')}: <strong>{plan.branch}</strong> · <code title={plan.sourceOid}>{plan.sourceOid.slice(0, 12)}</code>
       </p>
-      {plan.targets
-        .filter(
-          (target) =>
-            !reviewingRetry ||
-            (!target.grouped && batch?.targets.some((result) => result.id === target.id && !['success', 'up-to-date'].includes(result.status))),
-        )
-        .map((target) => (
-          <p key={target.id}>
-            {target.remoteName} → {target.destinationRef}
-            <small>{target.url}</small>
-          </p>
-        ))}
+      {reviewedTargets.map((target) => (
+        <p key={target.id}>
+          {target.remoteName} → {target.destinationRef}
+          <small>{target.url}</small>
+        </p>
+      ))}
       {plan.targets.some((target) => target.grouped) && (
         <p>
           {tr(
@@ -52,25 +51,32 @@ export function PushTransferReview({
           )}
         </p>
       )}
-      {scan?.findings.length ? (
-        <>
-          <p className="hosting-error">
-            {tr('Secret-Scan hat Treffer gefunden:', 'Secret scan found matches:')} {scan.findings.length}
-          </p>
-          <ul>
-            {scan.findings.map((finding) => (
-              <li key={finding.id}>
-                {finding.filePath}:{finding.lineNumber} · {finding.ruleId}
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
-      {scan?.findings.length && allowlistAndRescan ? (
-        <button disabled={busy || scan.historyScanIncomplete} onClick={allowlistAndRescan}>
-          {tr('Dateien allowlisten und erneut prüfen', 'Allowlist files and check again')}
-        </button>
-      ) : null}
+    </>
+  );
+  if (scan?.findings.length) {
+    return (
+      <PushSecretScanReview
+        scan={scan}
+        force={force}
+        busy={busy}
+        reviewingRetry={reviewingRetry}
+        executePush={executePush}
+        retryScan={retryScan}
+        allowlistAndRescan={allowlistAndRescan}
+        openAllowlist={openAllowlist}
+      >
+        <details className="push-secret-review__plan">
+          <summary tabIndex={0}>
+            {tr('Push-Ziele', 'Push targets')} · {plan.branch} → {[...new Set(reviewedTargets.map((target) => target.remoteName))].join(', ')}
+          </summary>
+          <div className="hosting-card">{planDetails}</div>
+        </details>
+      </PushSecretScanReview>
+    );
+  }
+  return (
+    <div className="hosting-card">
+      {planDetails}
       {openAllowlist && (
         <button disabled={busy} onClick={openAllowlist}>
           {tr('Allowlist bearbeiten', 'Edit allowlist')}
@@ -98,13 +104,7 @@ export function PushTransferReview({
         </button>
       )}
       <button disabled={busy || scan?.historyScanIncomplete === true} onClick={() => executePush(Boolean(scan?.findings.length))}>
-        {scan?.findings.length
-          ? force
-            ? tr('Treffer geprüft & Force-with-lease bestätigen', 'Matches reviewed & confirm force with lease')
-            : tr('Treffer geprüft: trotzdem auf diese Ziele pushen', 'Matches reviewed: push to these targets anyway')
-          : force
-            ? tr('Force-with-lease bestätigen', 'Confirm force with lease')
-            : tr('Auf diese Ziele pushen', 'Push to these targets')}
+        {force ? tr('Force-with-lease bestätigen', 'Confirm force with lease') : tr('Auf diese Ziele pushen', 'Push to these targets')}
       </button>
     </div>
   );

@@ -6,6 +6,7 @@ import { registerOpenDialog } from './ui/notificationDialogs';
 interface DialogFrameProps {
   open: boolean;
   title: string;
+  className?: string;
   onClose: () => void;
   onConfirm?: () => void;
   onSecondaryAction?: () => void;
@@ -20,6 +21,7 @@ interface DialogFrameProps {
   closeOnBackdrop?: boolean;
   initialFocusRef?: React.RefObject<HTMLElement | null>;
   focusConfirm?: boolean;
+  focusCancel?: boolean;
   children: React.ReactNode;
 }
 
@@ -38,6 +40,7 @@ const openDialogIds: number[] = [];
 export const DialogFrame: React.FC<DialogFrameProps> = ({
   open,
   title,
+  className,
   onClose,
   onConfirm,
   onSecondaryAction,
@@ -52,10 +55,12 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
   closeOnBackdrop = true,
   initialFocusRef,
   focusConfirm = false,
+  focusCancel = false,
   children,
 }) => {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const confirmRef = useRef<HTMLButtonElement | null>(null);
+  const cancelRef = useRef<HTMLButtonElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const dialogIdRef = useRef<number | null>(null);
   const onCloseRef = useRef(onClose);
@@ -78,7 +83,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     const focusDialog = window.setTimeout(() => {
-      const preferred = initialFocusRef?.current ?? (focusConfirm ? confirmRef.current : null);
+      const preferred = initialFocusRef?.current ?? (focusCancel ? cancelRef.current : focusConfirm ? confirmRef.current : null);
       if (preferred) {
         preferred.focus();
         return;
@@ -138,7 +143,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
       previousFocusRef.current?.focus();
       unregister();
     };
-  }, [open, initialFocusRef, focusConfirm]);
+  }, [open, initialFocusRef, focusConfirm, focusCancel]);
 
   if (!open) return null;
 
@@ -149,13 +154,20 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
         if (closeOnBackdrop) onClose();
       }}
     >
-      <div ref={dialogRef} className="dialog-modal" role="dialog" aria-modal="true" aria-label={title} onMouseDown={(event) => event.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        className={['dialog-modal', className].filter(Boolean).join(' ')}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <div className="dialog-header">
           <h3>{title}</h3>
         </div>
         <div className="dialog-content">{children}</div>
         <div className="dialog-footer">
-          <button className="dialog-btn dialog-btn-secondary" data-dialog-action="cancel" onClick={onClose} disabled={cancelDisabled}>
+          <button ref={cancelRef} className="dialog-btn dialog-btn-secondary" data-dialog-action="cancel" onClick={onClose} disabled={cancelDisabled}>
             {cancelLabel ?? t('generated.components.confirm.cancel_035b7526')}
           </button>
           {onSecondaryAction && (

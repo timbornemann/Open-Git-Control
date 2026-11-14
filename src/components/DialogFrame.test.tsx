@@ -60,3 +60,25 @@ it.each([{ repeat: true }, { isComposing: true }])('ignores a held or composing 
   key(host.querySelector('input')!, options);
   expect(entered).not.toHaveBeenCalled();
 });
+
+it('can focus the safe cancel action before any actions in the body', () => {
+  act(() =>
+    root.render(
+      createElement(DialogFrame, {
+        open: true,
+        title: 'Secret scan',
+        className: 'push-secret-dialog',
+        focusCancel: true,
+        cancelLabel: 'Cancel and fix',
+        onClose: closed,
+        children: createElement('button', { onClick: entered }, 'Allowlist files'),
+      }),
+    ),
+  );
+  act(() => vi.runOnlyPendingTimers());
+  expect(host.querySelector('.dialog-modal')?.classList.contains('push-secret-dialog')).toBe(true);
+  expect(document.activeElement?.getAttribute('data-dialog-action')).toBe('cancel');
+  act(() => (document.activeElement as HTMLButtonElement).click());
+  expect(closed).toHaveBeenCalledOnce();
+  expect(entered).not.toHaveBeenCalled();
+});
