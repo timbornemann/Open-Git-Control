@@ -15,7 +15,11 @@ export const formatCommitDate = (dateStr: string, locale: string): string => {
       return formatRelativeTime(date, locale, now);
     }
 
-    return formatDate(date, locale, { day: '2-digit', month: 'short' });
+    // Without a year, a commit from an earlier year is indistinguishable from
+    // one of the current year. A two-digit year keeps the fixed-width column.
+    const options: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short' };
+    if (date.getFullYear() !== now.getFullYear()) options.year = '2-digit';
+    return formatDate(date, locale, options);
   } catch {
     return '';
   }
