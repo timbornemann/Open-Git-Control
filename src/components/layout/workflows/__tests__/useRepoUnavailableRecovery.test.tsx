@@ -68,6 +68,22 @@ afterEach(() => {
 const unavailable = () => act(() => listener({ repoPath: missing, command: 'status', error: '[REPO_UNAVAILABLE]' }));
 
 describe('unavailable repository recovery actions', () => {
+  it('ignores a missing inactive repository and offers recovery after the user opens it', () => {
+    const hook = renderWorkflow();
+    hook.render('C:/other');
+    unavailable();
+    expect(hook.setDialog).not.toHaveBeenCalled();
+    expect(toast).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+
+    hook.render(missing);
+    unavailable();
+    expect(hook.setDialog).toHaveBeenCalledTimes(1);
+    expect(hook.dialog.title).toBe('Repository nicht verfügbar');
+    expect(hook.dialog.contextItems).toContainEqual(expect.objectContaining({ value: missing }));
+    hook.unmount();
+  });
+
   it('offers all four app-styled actions with preservation text, safe keyboard focus and a separate removal confirmation', async () => {
     const hook = renderWorkflow();
     unavailable();

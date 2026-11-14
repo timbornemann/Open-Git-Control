@@ -60,6 +60,21 @@ afterEach(() => {
 const move = () => fs.renameSync(oldPath, newPath);
 
 describe('saved repository relocation with real Git', () => {
+  it.each(['unchanged', 'equivalent'])('leaves a missing repository untouched when its canonical path is %s', async (kind) => {
+    const saved = oldPath.replace(/\\/g, '/');
+    writeStoreData({ ...readStoreData(), repos: [{ path: saved, pinned: true, createdAt: 17, lastOpened: 23 }], activeRepo: saved });
+    move();
+    const before = readStoreData();
+    const storedText = fs.readFileSync(path.join(state.directory, 'repos.json'), 'utf8');
+    const run = vi.fn(async () => '');
+    const location = new RepositoryLocationService({ run });
+
+    await expect(location.canonicalize(saved, kind === 'unchanged' ? saved : oldPath + path.sep)).resolves.toEqual(before);
+    expect(run).not.toHaveBeenCalled();
+    expect(fs.readFileSync(path.join(state.directory, 'repos.json'), 'utf8')).toBe(storedText);
+    await expect(location.recheck(saved, vi.fn())).rejects.toThrow('ENOENT');
+  });
+
   it('canonicalizes a saved nested folder in the main process and retains its metadata without transferring command approvals', async () => {
     const nested = path.join(oldPath, 'nested');
     fs.mkdirSync(nested);

@@ -84,6 +84,41 @@ describe('useWorkspaceDomain repository recovery', () => {
     vi.spyOn(appClient, 'selectRepositoryLocation').mockResolvedValue({ success: true, data: moved });
     vi.spyOn(appClient, 'recheckRepository').mockResolvedValue({ success: true, data: missing });
   });
+
+  it('keeps a missing inactive repository quiet when Windows resolution only changes path separators', async () => {
+    const active = 'D:/Projects/Software/Open-Git-Control';
+    const missing = 'D:/Projects/Software/Agent-Assistant-Lite';
+    vi.mocked(appClient.getStoredRepos).mockResolvedValue({
+      repos: [
+        { path: active, lastOpened: 2, pinned: false, createdAt: 1 },
+        { path: missing, lastOpened: 1, pinned: true, createdAt: 1 },
+      ],
+      activeRepo: active,
+    });
+    vi.mocked(appClient.setRepoPath).mockResolvedValue(active);
+    vi.mocked(appClient.resolveRepoPath).mockResolvedValue(missing.replace(/\//g, '\\'));
+    const persist = vi.mocked(appClient.mutateStoredRepos).getMockImplementation()!;
+    vi.mocked(appClient.mutateStoredRepos).mockImplementation(async (operation) =>
+      operation.kind === 'canonicalize'
+        ? { success: false, error: `ENOENT: no such file or directory, stat '${operation.canonicalPath}'` }
+        : persist(operation),
+    );
+    const setConfirmDialog = vi.fn();
+    const hook = renderWorkspace(setConfirmDialog);
+    await flushEffects();
+
+    await vi.waitFor(() => expect(appClient.resolveRepoPath).toHaveBeenCalledWith(missing));
+    await flushEffects();
+    expect(hook.current.activeRepo).toBe(active);
+    expect(hook.current.isRestoringRepos).toBe(false);
+    expect(new Set(hook.current.openRepos)).toEqual(new Set([active, missing]));
+    expect(hook.current.repoMeta[missing]).toEqual({ pinned: true, createdAt: 1, lastOpened: 1 });
+    expect(appClient.mutateStoredRepos).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'canonicalize' }));
+    expect(hook.setGitActionToast).not.toHaveBeenCalled();
+    expect(setConfirmDialog).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
   it('rebinds the saved entry and reopens its graph without resetting pins or timestamps', async () => {
     const hook = renderWorkspace();
     await flushEffects();

@@ -319,6 +319,9 @@ export const useWorkspaceDomain = ({
                 try {
                   const canonicalPath = String((await appClient.resolveRepoPath(repoPath)) || '').trim() || repoPath;
                   if (repoOperationSequenceRef.current !== operationId) return;
+                  // A missing Windows repo falls back to the same path with
+                  // backslashes. That spelling change needs no migration.
+                  if (normalizeRepoPathKey(repoPath) === normalizeRepoPathKey(canonicalPath)) continue;
                   migrateRepoPathToCanonical(repoPath, canonicalPath);
                 } catch {
                   // Keep unavailable entries visible so their existing recovery

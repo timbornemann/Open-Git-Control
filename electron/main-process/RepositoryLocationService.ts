@@ -87,6 +87,9 @@ export class RepositoryLocationService {
       return initial;
     const saved = this.saved(repoPath, initial);
     if (typeof canonicalPath !== 'string' || !path.isAbsolute(canonicalPath)) throw new Error('An absolute canonical path is required.');
+    // Equivalent path spellings need no migration or filesystem validation.
+    // Background normalization must also leave unavailable saved entries alone.
+    if (repositoryPathKey(saved) === repositoryPathKey(canonicalPath)) return initial;
     const root = await this.resolve(saved);
     const target = await this.resolve(canonicalPath);
     if (

@@ -304,12 +304,12 @@
       "title": "gelöschtes repo",
       "description": "wenn ein repo auf der festplatte gelöscht wird, und man es nicht offen hat in open git controll wird trozdem ein fehkler geworfen, weil es nichtmer erreichbar ist, das popup wird nur angezeigt, wenn man das repo öffnet und dann festgetsellt wird, das es nichtmehr da ist",
       "priority": "medium",
-      "status": "bug",
+      "status": "in-progress",
       "tags": [
         "Bug"
       ],
       "createdAt": 1794507134421,
-      "updatedAt": 1794507134421
+      "updatedAt": 1794659655925
     }
   ]
 }
