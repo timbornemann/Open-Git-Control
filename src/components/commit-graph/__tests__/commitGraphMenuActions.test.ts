@@ -8,7 +8,10 @@ import { trByLanguage, translateFromCatalog, type AppLanguage } from '@/i18nCore
 import type { GraphNode } from '@/utils/graphLayout';
 import { gitClient } from '@/services/gitClient';
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 const HASH = 'a'.repeat(40);
 const PARENT_HASH = 'b'.repeat(40);
@@ -81,6 +84,58 @@ const buildActions = (
 };
 
 describe('commit graph menu localization', () => {
+  it.each([
+    { language: 'de' as const, hashLength: 40 },
+    { language: 'en' as const, hashLength: 64 },
+  ])('copies the selected full $hashLength-character hash natively before reporting success in $language', async ({ language, hashLength }) => {
+    const selectedHash = 'c'.repeat(hashLength);
+    let finish!: (result: { success: boolean }) => void;
+    const nativeWrite = vi.fn(
+      () =>
+        new Promise<{ success: boolean }>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const browserWrite = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('window', { electronAPI: { app: { writeClipboardText: nativeWrite } } });
+    vi.stubGlobal('navigator', { clipboard: { writeText: browserWrite } });
+    const result = buildActions(language, { ...node, commit: { ...node.commit, hash: selectedHash, abbrevHash: selectedHash.slice(0, 8) } });
+
+    const copying = result.actions.find((action) => action.icon === 'ID')!.action();
+    expect(nativeWrite).toHaveBeenCalledExactlyOnceWith(selectedHash);
+    expect(browserWrite).not.toHaveBeenCalled();
+    expect(result.setToast).not.toHaveBeenCalled();
+    finish({ success: true });
+    await copying;
+    expect(result.setToast).toHaveBeenCalledExactlyOnceWith({ msg: language === 'de' ? 'Hash kopiert!' : 'Hash copied!', isError: false });
+  });
+
+  it.each(['failure', 'rejection'])('reports a native clipboard %s instead of claiming the hash was copied', async (failure) => {
+    const nativeWrite = failure === 'failure' ? vi.fn().mockResolvedValue({ success: false }) : vi.fn().mockRejectedValue(new Error('Clipboard locked'));
+    const browserWrite = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('window', { electronAPI: { app: { writeClipboardText: nativeWrite } } });
+    vi.stubGlobal('navigator', { clipboard: { writeText: browserWrite } });
+    const result = buildActions('en');
+
+    await result.actions.find((action) => action.icon === 'ID')!.action();
+    expect(nativeWrite).toHaveBeenCalledExactlyOnceWith(HASH);
+    expect(browserWrite).not.toHaveBeenCalled();
+    expect(result.setToast).toHaveBeenCalledExactlyOnceWith({ msg: 'Could not copy the commit hash.', isError: true });
+  });
+
+  it('leaves the clipboard untouched when no commit hash is available', async () => {
+    const nativeWrite = vi.fn().mockResolvedValue({ success: true });
+    const browserWrite = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('window', { electronAPI: { app: { writeClipboardText: nativeWrite } } });
+    vi.stubGlobal('navigator', { clipboard: { writeText: browserWrite } });
+    const result = buildActions('de', { ...node, commit: { ...node.commit, hash: '' } });
+
+    await result.actions.find((action) => action.icon === 'ID')!.action();
+    expect(nativeWrite).not.toHaveBeenCalled();
+    expect(browserWrite).not.toHaveBeenCalled();
+    expect(result.setToast).toHaveBeenCalledExactlyOnceWith({ msg: 'Commit-Hash konnte nicht kopiert werden.', isError: true });
+  });
+
   it.each((['de', 'en'] as const).flatMap((language) => (['root', 'off-head', 'merge'] as const).map((reason) => ({ language, reason }))))(
     'refuses $reason rebase before opening an editor or calling Git in $language',
     ({ language, reason }) => {

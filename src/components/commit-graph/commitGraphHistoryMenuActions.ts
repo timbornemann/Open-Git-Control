@@ -3,6 +3,7 @@ import type { TranslateFn } from '@/i18n';
 import type { ToastMessage } from '@/types/git';
 import type { GraphLayout, GraphNode } from '@/utils/graphLayout';
 import { gitClient } from '@/services/gitClient';
+import { copyTextToClipboard } from '@/utils/clipboard';
 import type { MenuAction } from './CommitContextMenu';
 
 type BuildCommitHistoryMenuActionsParams = {
@@ -278,9 +279,12 @@ export const buildCommitHistoryMenuActions = ({
         'Copies the full unique identifier of this commit to the clipboard.',
       ),
       icon: 'ID',
-      action: () => {
-        navigator.clipboard.writeText(hash);
-        setToast({ msg: tr('Hash kopiert!', 'Hash copied!'), isError: false });
+      action: async () => {
+        const copied = await copyTextToClipboard(hash);
+        setToast({
+          msg: copied ? tr('Hash kopiert!', 'Hash copied!') : tr('Commit-Hash konnte nicht kopiert werden.', 'Could not copy the commit hash.'),
+          isError: !copied,
+        });
       },
     },
   ];
