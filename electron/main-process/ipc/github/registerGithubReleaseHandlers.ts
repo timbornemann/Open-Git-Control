@@ -34,7 +34,7 @@ const RELEASE_ASSET_AUTHORIZATION_TTL_MS = 30 * 60 * 1000;
 // Git tag names are refs. Keep this main-process validation local instead of
 // importing renderer code, which is intentionally excluded from tsconfig.node.
 // eslint-disable-next-line no-control-regex -- Git ref names reject ASCII control bytes.
-const RELEASE_TAG_PATTERN = /^[^\s\x00-\x1F\x7F~^:?*[\]\\]+$/;
+const RELEASE_TAG_PATTERN = /^[^\s\x00-\x1F\x7F~^:?*[\\]+$/;
 
 const isValidReleaseTagName = (tagName: string): boolean => {
   if (!RELEASE_TAG_PATTERN.test(tagName)) return false;

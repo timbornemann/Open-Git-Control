@@ -22,6 +22,11 @@ describe('validateGithubReleaseInput', () => {
     expect(result.errors.tagName).toBe('release.validation.tagInvalid');
   });
 
+  it('treats only the opening bracket as reserved, like git', () => {
+    expect(validateGithubReleaseInput({ tagName: 'v1]', releaseName: 'Release 1.0.0' }).valid).toBe(true);
+    expect(validateGithubReleaseInput({ tagName: 'v1[', releaseName: 'Release 1.0.0' }).errors.tagName).toBe('release.validation.tagInvalid');
+  });
+
   it('accepts valid hierarchical tag names', () => {
     const result = validateGithubReleaseInput({ tagName: 'releases/v1.0.0', releaseName: 'Release 1.0.0' });
 
