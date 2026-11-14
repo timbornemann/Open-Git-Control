@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter, TutorialText, ToolExample } from './types';
 import { toolStep as s, toolRecipe, toolContent, toolValue, savedTool, tool, toolGroup, c, row, viewer, editor, element } from './toolLessonHelpers';
 const p = (version: ToolExample = 'lines', options: Parameters<typeof toolRecipe>[1] = {}) =>
@@ -176,5 +177,5 @@ export const TUTORIAL_EDITOR_LINES: TutorialChapter = {
       c('open-files'),
       { prepare: { edits: [{ path: 'README.md', content: toolContent('lower') }] } },
     ),
-  ],
+  ].flatMap(withTextViewSteps({ open: 'README.md' })),
 };

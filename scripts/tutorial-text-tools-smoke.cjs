@@ -83,30 +83,38 @@ module.exports = async function verifyTextTools({
     for (const step of chapter.steps) {
       console.log('Text tool lesson:', chapter.id, step.id);
       await stepReady(step.id);
-      if (family === 'history' || family.startsWith('history-'))
-        await require('./tutorial-history-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
-      if (branchFamily) await require('./tutorial-branches-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
-      if (family.startsWith('stash-'))
-        await require('./tutorial-stash-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
-      if (family.startsWith('merge-'))
-        await require('./tutorial-merge-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
-      if (family.startsWith('tags-')) await require('./tutorial-tags-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
-      if (family.startsWith('submodules-'))
-        await require('./tutorial-submodule-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
-      if (family.startsWith('amend-'))
-        await require('./tutorial-amend-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
-      if (rebaseFamily) await require('./tutorial-rebase-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
-      if (family === 'reword' || family.startsWith('reword-'))
-        await require('./tutorial-reword-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
-      if (family === 'cherry-pick' || family === 'revert')
-        await require('./tutorial-replay-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
-      if (family.startsWith('cherry-pick-'))
-        await require('./tutorial-cherry-conflict-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
-      if (resetFamily) await require('./tutorial-reset-mode-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
-      if (family === 'recovery' || family.startsWith('recovery-'))
-        await require('./tutorial-recovery-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
-      if (family === 'conflicts' || family.startsWith('conflicts-'))
-        await require('./tutorial-conflict-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
+      // A previewable working file opens in Preview. Assertions that read its
+      // editor must follow the lesson's explicit Text action, including when
+      // running the chapter continuously rather than restoring a checkpoint.
+      const inspectAfterText = step.target === '.file-viewer [data-file-tab="text"]' && Boolean(step.action || step.completion);
+      const verifyStep = async () => {
+        if (family === 'history' || family.startsWith('history-'))
+          await require('./tutorial-history-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
+        if (branchFamily) await require('./tutorial-branches-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
+        if (family.startsWith('stash-'))
+          await require('./tutorial-stash-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
+        if (family.startsWith('merge-'))
+          await require('./tutorial-merge-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
+        if (family.startsWith('tags-'))
+          await require('./tutorial-tags-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
+        if (family.startsWith('submodules-'))
+          await require('./tutorial-submodule-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
+        if (family.startsWith('amend-'))
+          await require('./tutorial-amend-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
+        if (rebaseFamily) await require('./tutorial-rebase-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
+        if (family === 'reword' || family.startsWith('reword-'))
+          await require('./tutorial-reword-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
+        if (family === 'cherry-pick' || family === 'revert')
+          await require('./tutorial-replay-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
+        if (family.startsWith('cherry-pick-'))
+          await require('./tutorial-cherry-conflict-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
+        if (resetFamily) await require('./tutorial-reset-mode-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
+        if (family === 'recovery' || family.startsWith('recovery-'))
+          await require('./tutorial-recovery-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
+        if (family === 'conflicts' || family.startsWith('conflicts-'))
+          await require('./tutorial-conflict-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
+      };
+      if (!inspectAfterText) await verifyStep();
       if (chapter.id === 'json-schema' && step.id === 'contract') await require('./tutorial-schema-layout.cjs')(parent, getTutorial(), waitFor);
       if ((family === 'markup' || family.startsWith('search-')) && step.id === 'read-diff')
         await waitFor(
@@ -167,6 +175,7 @@ module.exports = async function verifyTextTools({
       // A retained disclosure or an earlier natural action may already satisfy
       // the exercise. Do not toggle a correct state back while it auto-advances.
       if (step.completion && (await run('Boolean(document.querySelector(".tutorial-status.completed"))'))) {
+        if (inspectAfterText) await verifyStep();
         const following = chapter.steps[chapter.steps.indexOf(step) + 1];
         if (following) await stepReady(following.id);
         continue;
@@ -253,6 +262,7 @@ module.exports = async function verifyTextTools({
           );
         }
       } else await click(`${step.target}:not(:disabled)`);
+      if (inspectAfterText) await verifyStep();
       const following = chapter.steps[chapter.steps.indexOf(step) + 1];
       if (following) await stepReady(following.id);
     }

@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter } from './types';
 import {
   treeStep as s,
@@ -260,5 +261,5 @@ export const TUTORIAL_TREE_CREATE: TutorialChapter = {
       c('staging'),
       { openView: undefined, inspector: 'staging', prepare: p('new-saved') },
     ),
-  ],
+  ].flatMap(withTextViewSteps({ open: 'scratch/notes.md' })),
 };

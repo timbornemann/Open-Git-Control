@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter } from './types';
 import {
   mergeStep as s,
@@ -248,5 +249,5 @@ export const TUTORIAL_MERGE_DIVERGED: TutorialChapter = {
       '[data-tutorial="graph"]',
       { prepare: result() },
     ),
-  ],
+  ].flatMap(withTextViewSteps({ 'open-readme': 'README.md' })),
 };

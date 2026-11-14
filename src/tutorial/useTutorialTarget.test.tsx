@@ -130,3 +130,35 @@ it('reveals a partially covered control when the coach subsequently reduces the 
   });
   expect(target.scrollIntoView).toHaveBeenCalledTimes(2);
 });
+
+it('reveals a field clipped by a resized dialog even when it remains inside the workspace', async () => {
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+  const scrollArea = document.createElement('div');
+  scrollArea.className = 'dialog-content';
+  workspace.append(scrollArea);
+  scrollArea.append(target);
+  let clip = new DOMRect(50, 100, 500, 200.4);
+  let position = new DOMRect(100, 200, 90, 30);
+  scrollArea.getBoundingClientRect = () => clip;
+  target.getBoundingClientRect = () => position;
+  target.scrollIntoView = vi.fn(() => {
+    if (position.bottom > clip.bottom) position = new DOMRect(100, clip.bottom - position.height - 1, 90, 30);
+  });
+  act(() => root.render(<Harness />));
+  await act(async () => {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 15);
+    });
+  });
+  expect(target.scrollIntoView).toHaveBeenCalledOnce();
+  clip = new DOMRect(50, 100, 500, 129.6);
+  await act(async () => {
+    notifyResize([], {} as ResizeObserver);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 15);
+    });
+  });
+  expect(target.scrollIntoView).toHaveBeenCalledTimes(2);
+  expect(position.bottom).toBeLessThanOrEqual(clip.bottom);
+  expect(container.textContent).toBe('100,198.6');
+});

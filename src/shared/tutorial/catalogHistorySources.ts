@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter, TutorialStep } from './types';
 import {
   historyStep as s,
@@ -272,5 +273,5 @@ export const TUTORIAL_HISTORY_SOURCES: TutorialChapter = {
       c('staging'),
       { prepare: data() },
     ),
-  ],
+  ].flatMap(withTextViewSteps({ 'open-working': 'README.md' })),
 };

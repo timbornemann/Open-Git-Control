@@ -13,6 +13,7 @@ export function useTutorialTarget(target: string, prepared = true) {
     let frame = 0;
     let hiddenUpdate: ReturnType<typeof setTimeout> | undefined;
     let element: HTMLElement | null = null;
+    let scrollArea: HTMLElement | null = null;
     let previousDescription: string | null = null;
     let revealAfterResize = false;
     const workspace = document.querySelector<HTMLElement>('.tutorial-workspace');
@@ -55,17 +56,30 @@ export function useTutorialTarget(target: string, prepared = true) {
       if (next !== element) {
         restoreDescription();
         if (element) resize.unobserve(element);
+        if (scrollArea) resize.unobserve(scrollArea);
         element = next;
+        scrollArea = element?.closest<HTMLElement>('.dialog-content') ?? null;
         if (element) {
           previousDescription = element.getAttribute('aria-describedby');
           element.setAttribute('aria-describedby', 'tutorial-step-description');
           resize.observe(element);
+          if (scrollArea) resize.observe(scrollArea);
           element.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
         }
       }
       let rect = element?.getBoundingClientRect() ?? null;
       const area = workspace?.getBoundingClientRect() ?? null;
-      if (revealAfterResize && rect && area && (rect.top < area.top || rect.bottom > area.bottom || rect.left < area.left || rect.right > area.right)) {
+      const clip = scrollArea?.getBoundingClientRect() ?? area;
+      if (
+        revealAfterResize &&
+        rect &&
+        area &&
+        clip &&
+        (rect.top < Math.max(area.top, clip.top) ||
+          rect.bottom > Math.min(area.bottom, clip.bottom) ||
+          rect.left < Math.max(area.left, clip.left) ||
+          rect.right > Math.min(area.right, clip.right))
+      ) {
         element?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
         rect = element?.getBoundingClientRect() ?? null;
       }

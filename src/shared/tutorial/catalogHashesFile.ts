@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter } from './types';
 import {
   hashStep as s,
@@ -411,5 +412,5 @@ export const TUTORIAL_HASHES_FILE: TutorialChapter = {
       c('open-files'),
       { prepare: { edits: [{ path: 'README.md', content: toolContent('hash-edited') }] } },
     ),
-  ],
+  ].flatMap(withTextViewSteps({ open: 'README.md' })),
 };

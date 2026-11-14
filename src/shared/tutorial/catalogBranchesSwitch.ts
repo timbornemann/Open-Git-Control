@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter } from './types';
 import { branchStep as s, branchControl as c, branchPanel as panel, branchRow as row, branchElement as element } from './branchLessonHelpers';
 import { branchSwitchRecipe as seed } from './branchSwitchHelpers';
@@ -286,5 +287,5 @@ export const TUTORIAL_BRANCHES_SWITCH: TutorialChapter = {
       panel,
       { prepare: seed('main', 'inspector') },
     ),
-  ],
+  ].flatMap(withTextViewSteps({ 'open-main': 'README.md', 'open-older': 'README.md', 'open-again': 'README.md' })),
 };

@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter, TutorialText, ToolExample } from './types';
 import { BASE64_DECODE_ERROR, URL_DECODE_ERROR } from '../fileCodecMessages';
 import {
@@ -234,5 +235,5 @@ export const TUTORIAL_CODECS_DOCUMENT: TutorialChapter = {
       c('open-files'),
       { prepare: { edits: [{ path: 'README.md', content: toolContent('codec-base') }] } },
     ),
-  ],
+  ].flatMap(withTextViewSteps({ open: 'README.md' })),
 };

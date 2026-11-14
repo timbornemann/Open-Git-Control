@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter } from './types';
 import { formatStep as s, formatRecipe as recipe, formatViewer, formatValue, formatSaved, c, row, tab, editor, element } from './formatLessonHelpers';
 const p = (options: Parameters<typeof recipe>[1] = {}) => recipe('markdown', options);
@@ -206,5 +207,5 @@ export const TUTORIAL_FILES_MARKDOWN: TutorialChapter = {
       c('open-files'),
       { prepare: { edits: [{ path: 'docs/guide.md', content: { example: 'file-formats', version: 'markdown-edited' } }] } },
     ),
-  ],
+  ].flatMap(withTextViewSteps({ open: 'docs/guide.md' })),
 };

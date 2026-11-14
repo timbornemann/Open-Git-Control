@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter } from './types';
 import type { TextFileEncodingDto } from '../ipc/contracts/git';
 import { encodingStep as s, toolRecipe, toolContent, savedTool, tool, toolGroup, c, row, viewer, editor, element } from './toolLessonHelpers';
@@ -306,5 +307,5 @@ export const TUTORIAL_EDITOR_ENCODING: TutorialChapter = {
       c('open-files'),
       {},
     ),
-  ],
+  ].flatMap(withTextViewSteps({ open: 'README.md', 'reopen-bom': 'README.md' })),
 };

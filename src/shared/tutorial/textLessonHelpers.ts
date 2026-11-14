@@ -1,5 +1,6 @@
 import type { TutorialStep, TutorialText, TutorialEditorSelection, ToolExample, TutorialCompletion } from './types';
 import { toolStep, toolRecipe, toolValue, savedTool, tool, toolGroup, c, row, editor } from './toolLessonHelpers';
+import { fileTab } from './fileLessonHelpers';
 export { tool, toolGroup, c, row, viewer, editor, element, toolContent, toolValue } from './toolLessonHelpers';
 export { dialog, cancelDialog, confirmDialog } from './stagingLessonHelpers';
 export const textStep = (id: string, title: TutorialText, description: TutorialText, target = editor, extra: Partial<TutorialStep> = {}) =>
@@ -19,7 +20,7 @@ export const textRecipe = (
 export const affixField = (id: string) => `[data-dialog-field="${id}"] input`;
 export const affixDialog = (saved: ToolExample = 'affix-base', prefix = '', suffix = ''): NonNullable<TutorialStep['prepare']> => ({
   ...toolRecipe(saved),
-  click: [row(), c('file-tools'), toolGroup('lines'), tool('affixes')],
+  click: [row(), fileTab('text'), c('file-tools'), toolGroup('lines'), tool('affixes')],
   fill: [
     { selector: affixField('prefix'), value: [prefix, prefix] },
     { selector: affixField('suffix'), value: [suffix, suffix] },

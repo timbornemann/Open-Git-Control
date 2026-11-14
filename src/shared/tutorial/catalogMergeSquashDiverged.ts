@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter } from './types';
 import { squashDivergedRecipe as seed, squashDivergedMessage, squashDivergedDescription } from './mergeSquashDivergedHelpers';
 import {
@@ -373,5 +374,5 @@ export const TUTORIAL_MERGE_SQUASH_DIVERGED: TutorialChapter = {
       '[data-tutorial="graph"]',
       { prepare: committed() },
     ),
-  ],
+  ].flatMap(withTextViewSteps({ 'open-readme': 'README.md' })),
 };

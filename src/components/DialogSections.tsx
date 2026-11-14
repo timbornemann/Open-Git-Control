@@ -47,7 +47,10 @@ export function DialogImpact({ irreversible, consequences }: { irreversible: boo
   if (!irreversible && !consequences) return null;
   const Icon = irreversible ? AlertTriangle : ArrowRight;
   return (
-    <section className={`dialog-impact dialog-decision-impact${irreversible ? ' dialog-decision-impact--warning' : ''}`}>
+    <section
+      className={`dialog-impact dialog-decision-impact${irreversible ? ' dialog-decision-impact--warning' : ''}`}
+      data-dialog-irreversible={irreversible}
+    >
       <Icon size={17} aria-hidden="true" />
       <div>
         <h4>

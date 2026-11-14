@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter, TutorialText, ToolExample } from './types';
 import {
   selectionStep as s,
@@ -186,5 +187,5 @@ export const TUTORIAL_CODECS_SELECTION: TutorialChapter = {
       c('open-files'),
       { prepare: { edits: [{ path: 'README.md', content: toolContent('selection-base') }] } },
     ),
-  ],
+  ].flatMap(withTextViewSteps({ open: 'README.md' })),
 };

@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter } from './types';
 import {
   treeStep as s,
@@ -172,5 +173,5 @@ export const TUTORIAL_TREE_MOVE: TutorialChapter = {
       c('staging'),
       { openView: undefined, inspector: 'staging', prepare: p('moved') },
     ),
-  ],
+  ].flatMap(withTextViewSteps({ 'open-result': 'archive/note.md' })),
 };

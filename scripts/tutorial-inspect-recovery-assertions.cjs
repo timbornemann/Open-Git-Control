@@ -38,7 +38,7 @@ module.exports = async function verifyInspectRecovery({ step, run, waitFor, tuto
   if (await run('Boolean(document.querySelector(".dialog-modal"))')) {
     const context = await run('document.querySelector(".dialog-modal .dialog-context-list").textContent');
     assert.ok(context.includes(hash(4).slice(0, 7)), 'Confirmation names the selected saved commit.');
-    assert.ok((await run('document.querySelector(".dialog-modal .dialog-impact").textContent')).includes(languageIndex === 0 ? 'Nein' : 'No'));
+    assert.equal(await run('document.querySelector(".dialog-modal [data-dialog-irreversible]").dataset.dialogIrreversible'), 'false');
   }
   if (['files', 'close-file'].includes(step.id)) {
     await waitFor(

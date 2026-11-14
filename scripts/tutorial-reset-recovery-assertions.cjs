@@ -28,7 +28,7 @@ module.exports = async function verifyResetRecovery({ step, run, waitFor, tutori
   }
   if (await run('Boolean(document.querySelector(".dialog-modal"))')) {
     assert.ok((await run('document.querySelector(".dialog-modal .dialog-context-list").textContent')).includes(hash(4).slice(0, 7)));
-    assert.ok((await run('document.querySelector(".dialog-modal .dialog-impact").textContent')).includes(languageIndex === 0 ? 'Ja' : 'Yes'));
+    assert.equal(await run('document.querySelector(".dialog-modal [data-dialog-irreversible]").dataset.dialogIrreversible'), 'true');
   }
   if (['files', 'close-file'].includes(step.id)) {
     await waitFor(

@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter } from './types';
 import { encodingStep as s, toolRecipe, toolContent, savedTool, tool, toolGroup, c, row, viewer, editor, element } from './toolLessonHelpers';
 const p = (options: Parameters<typeof toolRecipe>[1] = {}) => toolRecipe('encoding', options);
@@ -248,5 +249,5 @@ export const TUTORIAL_EDITOR_LINE_ENDINGS: TutorialChapter = {
       c('open-files'),
       {},
     ),
-  ],
+  ].flatMap(withTextViewSteps({ open: 'README.md', 'reopen-crlf': 'README.md' })),
 };

@@ -1,5 +1,5 @@
 import type { TutorialStep, TutorialText, TutorialPreparationAction, TutorialCompletion, TutorialFileContent, TreeExample } from './types';
-import { fileStep, fileRow, fileControl, editor, element } from './fileLessonHelpers';
+import { fileStep, fileRow, fileTab, fileControl, editor, element } from './fileLessonHelpers';
 import { treeSeed, treeState, treeContent, treePaths, type TreeLessonState } from './treeLessonStates';
 export { fileRow as row, fileControl as c, editor, element, treeSeed as p, treeState as state, treeContent as content, treePaths as paths };
 export { dialog, confirmDialog, cancelDialog } from './stagingLessonHelpers';
@@ -57,6 +57,7 @@ export const treeFile = (state: TreeLessonState, path: string, draft?: TreeExamp
     [
       ...expandTreePath(path),
       { click: fileRow(path) },
+      { click: fileTab('text') },
       { waitFor: `${treeViewer(path)} ${editor}` },
       ...(draft ? [{ fill: { selector: editor, value: treeContent(draft) } }] : []),
     ],

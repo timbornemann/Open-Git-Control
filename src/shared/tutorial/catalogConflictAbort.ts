@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter, TutorialCompletion } from './types';
 import { conflictStep as s, conflictControl as c } from './conflictLessonHelpers';
 import { conflictAbortRecipe as seed } from './conflictAbortHelpers';
@@ -171,5 +172,5 @@ export const TUTORIAL_CONFLICT_ABORT: TutorialChapter = {
       '[data-tutorial="graph"]',
       { prepare: seed('aborted') },
     ),
-  ],
+  ].flatMap(withTextViewSteps({ 'open-readme': 'README.md' })),
 };

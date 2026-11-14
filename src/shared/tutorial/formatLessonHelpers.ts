@@ -12,7 +12,7 @@ export const formatRecipe = (
   { saved, draft, tab = 'text' }: { saved?: FormatExample; draft?: FormatExample; tab?: 'text' | 'preview' | 'table' | 'diff' } = {},
 ): NonNullable<TutorialStep['prepare']> => ({
   ...(saved ? { edits: [{ path: formatPath(kind), content: formatContent(saved) }] } : {}),
-  click: [fileRow(formatPath(kind).split('/')[0]), fileRow(formatPath(kind)), ...(!draft && tab !== 'text' ? [fileTab(tab)] : [])],
+  click: [fileRow(formatPath(kind).split('/')[0]), fileRow(formatPath(kind)), fileTab(draft ? 'text' : tab)],
   ...(draft ? { fill: [{ selector: editor, value: formatContent(draft) }] } : {}),
   ...(draft && tab !== 'text' ? { after: [fileTab(tab)] } : {}),
   ready: `${formatViewer(kind)}[data-tab="${tab}"]${draft ? '[data-dirty="true"]' : ''}`,

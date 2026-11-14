@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter } from './types';
 import {
   fileStep as s,
@@ -203,5 +204,5 @@ export const TUTORIAL_FILES_EDIT: TutorialChapter = {
       c('staging'),
       { openView: undefined, inspector: 'staging', prepare: seed('draft', 'head', { click: [] }) },
     ),
-  ],
+  ].flatMap(withTextViewSteps({ 'open-editor': 'README.md' })),
 };

@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter } from './types';
 import { markupToolSteps } from './markupToolSteps';
 export const TUTORIAL_MARKUP_HTML: TutorialChapter = {
@@ -52,5 +53,5 @@ export const TUTORIAL_MARKUP_HTML: TutorialChapter = {
       'Unexpected character EOF bedeutet hier, dass der Parser das Dateiende erreicht, bevor das Attribut abgeschlossen ist. Das ist ein Verarbeitungsfehler für dieses Beispiel; die Werkzeuge ersetzen keine umfassende HTML-Prüfung.',
       'Unexpected character EOF means the parser reached the end before the attribute was closed. This is a processing error for this example; the tools do not replace comprehensive HTML validation.',
     ],
-  }),
+  }).flatMap(withTextViewSteps({ open: 'page.html', reopen: 'page.html' })),
 };

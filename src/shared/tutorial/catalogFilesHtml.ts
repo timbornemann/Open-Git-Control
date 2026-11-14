@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter } from './types';
 import { formatStep as s, formatRecipe as recipe, formatViewer, formatValue, formatSaved, c, row, tab, editor, element } from './formatLessonHelpers';
 const p = (options: Parameters<typeof recipe>[1] = {}) => recipe('html', options);
@@ -223,5 +224,5 @@ export const TUTORIAL_FILES_HTML: TutorialChapter = {
       c('open-files'),
       { prepare: { edits: [{ path: 'site/index.html', content: { example: 'file-formats', version: 'html-edited' } }] } },
     ),
-  ],
+  ].flatMap(withTextViewSteps({ open: 'site/index.html' })),
 };

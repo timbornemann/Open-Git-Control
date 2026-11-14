@@ -69,6 +69,7 @@ describe('guided shared dialogs', () => {
       }),
     );
     expect(host.querySelector('.dialog-impact')?.textContent).toContain('What happens next');
+    expect(host.querySelector('.dialog-impact')?.getAttribute('data-dialog-irreversible')).toBe('false');
     expect(host.querySelector('.dialog-impact')?.textContent).toContain('The saved stash remains available afterwards.');
     expect(host.textContent).not.toContain('Cannot be undone automatically');
   });
@@ -91,6 +92,7 @@ describe('guided shared dialogs', () => {
     );
     expect(document.activeElement).toBe(action('cancel'));
     expect(host.querySelector('.dialog-impact')?.textContent).toContain('Uncommitted edits will be removed.');
+    expect(host.querySelector('.dialog-impact')?.getAttribute('data-dialog-irreversible')).toBe('true');
     expect(action('confirm').classList.contains('dialog-btn-danger')).toBe(true);
     expect(action('secondary').classList.contains('dialog-btn-primary')).toBe(false);
     act(() => [...host.querySelectorAll('button')].find((button) => button.textContent === 'Review files')!.click());

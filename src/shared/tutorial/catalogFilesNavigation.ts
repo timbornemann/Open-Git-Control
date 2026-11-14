@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter } from './types';
 import { fileStep as s, fileControl as c, fileRow as row, fileTab as tab, fileRecipe as seed, fileViewer, editor, element } from './fileLessonHelpers';
 const code = { click: [row('src'), row('src/app.ts')] };
@@ -169,5 +170,5 @@ export const TUTORIAL_FILES_NAVIGATION: TutorialChapter = {
       c('staging'),
       { openView: undefined, inspector: 'staging' },
     ),
-  ],
+  ].flatMap(withTextViewSteps({ 'open-readme': 'README.md' })),
 };

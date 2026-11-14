@@ -14,7 +14,7 @@ export const fileRecipe = (
 ): TutorialStep['prepare'] => ({
   edits: [{ path: 'README.md', content: editorText(work) }],
   indexEdits: [{ path: 'README.md', content: editorText(index) }],
-  click: [fileRow()],
+  click: [fileRow(), fileTab('text')],
   ...extra,
 });
 export const draftRecipe = (draft: EditorExample = 'draft', work: EditorExample = 'head') =>

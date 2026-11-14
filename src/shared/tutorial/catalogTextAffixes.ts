@@ -1,3 +1,4 @@
+import { withTextViewSteps } from './fileTextViewSteps';
 import type { TutorialChapter, TutorialCompletion, ToolExample } from './types';
 import {
   textStep as s,
@@ -310,5 +311,5 @@ export const TUTORIAL_TEXT_AFFIXES: TutorialChapter = {
       c('open-files'),
       { prepare: { edits: [{ path: 'README.md', content: toolContent('compacted') }] } },
     ),
-  ],
+  ].flatMap(withTextViewSteps({ open: 'README.md' })),
 };
