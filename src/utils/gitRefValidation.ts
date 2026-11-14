@@ -14,7 +14,7 @@ export type BranchNameValidationErrorCode =
   | 'segment-starts-with-dot';
 
 // eslint-disable-next-line no-control-regex -- Git refs cannot contain ASCII control characters (including DEL) or spaces.
-const INVALID_BRANCH_CHAR_PATTERN = /[\x00-\x20\x7f~^:?*\\[\]]/;
+const INVALID_BRANCH_CHAR_PATTERN = /[\x00-\x20\x7f~^:?*\\[]/;
 
 export function validateBranchName(branchNameRaw: string): BranchNameValidationErrorCode | null {
   const name = String(branchNameRaw || '').trim();

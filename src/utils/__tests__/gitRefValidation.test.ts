@@ -41,6 +41,9 @@ describe('validateBranchName', () => {
     expect(validateBranchName('-foo')).toBe('starts-with-dash');
     expect(validateBranchName('--orphan')).toBe('starts-with-dash');
     expect(validateBranchName('foo/-bar')).toBeNull();
+    // Git only reserves the opening bracket (glob syntax); a closing one is legal.
+    expect(validateBranchName('feature]')).toBeNull();
+    expect(validateBranchName('feature[1')).toBe('contains-invalid-char');
     expect(validateBranchName('foobar')).toBe('contains-invalid-char');
   });
 });
