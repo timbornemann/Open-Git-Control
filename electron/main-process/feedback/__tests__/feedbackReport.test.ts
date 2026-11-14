@@ -73,7 +73,8 @@ describe('feedbackReport', () => {
     }
     expect(report.browserPreview.title).toBe(query.get('title'));
     expect(query.get('affected-area')).toBe('GitHub workflows');
-    expect(report.browserPreview.body).not.toContain('�');
+    // U+FFFD (written as an escape so the encoding-hygiene scan stays meaningful).
+    expect(report.browserPreview.body).not.toContain('\ufffd');
   });
   it.each(minimal)(
     'keeps the $category GitHub form compatible with every prefilled field and requires only the primary description',
