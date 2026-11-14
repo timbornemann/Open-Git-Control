@@ -17,6 +17,19 @@ describe('dateTime utilities', () => {
     expect(formatDate(value, 'en-US')).toBe(value.toLocaleDateString('en-US'));
   });
 
+  it('promotes values that round up to the next unit size', () => {
+    const now = new Date('2024-01-01T00:00:00.000Z');
+    const rtf = new Intl.RelativeTimeFormat('en-US', { numeric: 'always', style: 'short' });
+    const ago = (seconds: number) => formatRelativeTime(new Date(now.getTime() - seconds * 1000), 'en-US', now);
+
+    expect(ago(3599)).toBe(rtf.format(-1, 'hour'));
+    expect(ago(86399)).toBe(rtf.format(-1, 'day'));
+    expect(ago(604799)).toBe(rtf.format(-1, 'week'));
+    expect(ago(31557599)).toBe(rtf.format(-1, 'year'));
+    expect(ago(3540)).toBe(rtf.format(-59, 'minute'));
+    expect(ago(0)).toBe(rtf.format(0, 'second'));
+  });
+
   it('formats relative time across all unit boundaries', () => {
     const now = new Date('2024-01-01T00:00:00.000Z');
     const rtf = new Intl.RelativeTimeFormat('en-US', { numeric: 'always', style: 'short' });
