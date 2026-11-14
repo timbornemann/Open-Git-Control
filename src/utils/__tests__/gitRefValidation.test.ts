@@ -36,4 +36,11 @@ describe('validateBranchName', () => {
     expect(validateBranchName('foo.lock')).toBe('ends-with-lock');
     expect(validateBranchName('foo/bar.lock')).toBe('ends-with-lock');
   });
+
+  it('rejects names git would parse as options or that contain DEL', () => {
+    expect(validateBranchName('-foo')).toBe('starts-with-dash');
+    expect(validateBranchName('--orphan')).toBe('starts-with-dash');
+    expect(validateBranchName('foo/-bar')).toBeNull();
+    expect(validateBranchName('foobar')).toBe('contains-invalid-char');
+  });
 });

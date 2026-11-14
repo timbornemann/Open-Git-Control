@@ -10,16 +10,19 @@ export type BranchNameValidationErrorCode =
   | 'ends-with-dot'
   | 'ends-with-lock'
   | 'is-at'
+  | 'starts-with-dash'
   | 'segment-starts-with-dot';
 
-// eslint-disable-next-line no-control-regex -- Git refs cannot contain ASCII control characters or spaces.
-const INVALID_BRANCH_CHAR_PATTERN = /[\x00-\x20~^:?*\\[\]]/;
+// eslint-disable-next-line no-control-regex -- Git refs cannot contain ASCII control characters (including DEL) or spaces.
+const INVALID_BRANCH_CHAR_PATTERN = /[\x00-\x20\x7f~^:?*\\[\]]/;
 
 export function validateBranchName(branchNameRaw: string): BranchNameValidationErrorCode | null {
   const name = String(branchNameRaw || '').trim();
   if (!name) return 'empty';
   if (/\s/.test(name)) return 'contains-space';
   if (name === '@') return 'is-at';
+  // A leading dash would be parsed as a command-line option by git branch/checkout.
+  if (name.startsWith('-')) return 'starts-with-dash';
   if (name.startsWith('/')) return 'starts-with-slash';
   if (name.endsWith('/')) return 'ends-with-slash';
   if (name.includes('//')) return 'double-slash';
