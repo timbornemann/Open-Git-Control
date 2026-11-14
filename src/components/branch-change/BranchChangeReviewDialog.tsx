@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DialogFrame } from '@/components/DialogFrame';
+import { Button } from '@/components/ui/Button';
+import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { useWorkflowStore } from '@/contexts/AppStateContext';
 import { branchChangeClient } from '@/services/branchChangeClient';
@@ -10,6 +12,7 @@ import { branchChangeText, branchChangeLabels } from './branchChangeText';
 import type { ReadyBranchChangeDialog as Dialog } from './branchChangeDialogState';
 import { useBranchChangeDialogState } from './branchChangeDialogState';
 import { useBranchChangeProgress, BranchChangeProgressView } from './BranchChangeProgress';
+import { BranchChangeChoices, BranchChangeGuide, BranchChangeFilesHeading, BranchChangeReviewHint } from './BranchChangeGuide';
 import './branch-change.css';
 
 export function BranchChangeReviewDialog({ dialog, onChanged, onWorktree }: { dialog: Dialog; onChanged(): void; onWorktree(path: string): void }) {
@@ -22,6 +25,10 @@ export function BranchChangeReviewDialog({ dialog, onChanged, onWorktree }: { di
   const [error, setError] = useState('');
   const activity = useBranchChangeProgress(inspection.repoPath, dialog.id);
   const [result, setResult] = useState<BranchChangeResult>();
+  const nameRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (step === 1) nameRef.current?.focus();
+  }, [step]);
   const finish = () => {
     if (busy) {
       void branchChangeClient.cancelBranchChange(inspection.repoPath);
@@ -81,6 +88,9 @@ export function BranchChangeReviewDialog({ dialog, onChanged, onWorktree }: { di
     <DialogFrame
       open
       title={labels.title}
+      className="branch-change-dialog"
+      focusCancel={Boolean(result)}
+      closeOnBackdrop={false}
       onClose={finish}
       cancelLabel={labels.cancel}
       onConfirm={result || busy || blocked ? undefined : step === 0 && !restore ? () => setStep(1) : () => void run('carry')}
@@ -88,8 +98,10 @@ export function BranchChangeReviewDialog({ dialog, onChanged, onWorktree }: { di
       confirmDisabled={busy || blocked || (!restore && step === 1 && !name.trim())}
       onSecondaryAction={!result && !busy && !blocked && step === 1 && !restore ? () => void run('park') : undefined}
       secondaryActionLabel={tr('Parken und wechseln', 'Park and switch')}
+      secondaryActionDisabled={!name.trim()}
     >
       <div className="branch-change" aria-busy={busy} data-branch-change-mode={restore ? 'restore' : 'switch'}>
+        <BranchChangeGuide inspection={inspection} step={step} finished={Boolean(result)} />
         {restore && Boolean(dialog.alternatives && dialog.alternatives.length > 1) && !result && (
           <label>
             {tr('Geparkte Änderungen auswählen', 'Choose parked changes')}
@@ -117,19 +129,10 @@ export function BranchChangeReviewDialog({ dialog, onChanged, onWorktree }: { di
             </select>
           </label>
         )}
-        <p>
-          <code>{inspection.sourceBranch || inspection.sourceHead.slice(0, 10)}</code>
-          {inspection.target && (
-            <>
-              {' '}
-              → <code>{inspection.target.kind === 'detached' ? inspection.target.ref : inspection.target.branch}</code>
-            </>
-          )}
-        </p>
         {busy && <BranchChangeProgressView activity={activity} />}
         {error && <p role="alert">{branchChangeText(error, tr)}</p>}
         {inspection.blocks.map((block) => (
-          <p role="status" key={block}>
+          <p className="branch-change-block" role="status" key={block}>
             {branchChangeText(block, tr)}
           </p>
         ))}
@@ -209,33 +212,50 @@ export function BranchChangeReviewDialog({ dialog, onChanged, onWorktree }: { di
               </label>
             )}
             {step === 0 || restore ? (
-              <BranchChangeFiles key={inspection.planId} inspection={inspection} />
+              <>
+                <BranchChangeFilesHeading inspection={inspection} restore={restore} />
+                <BranchChangeFiles key={inspection.planId} inspection={inspection} />
+              </>
             ) : (
               <>
-                <label>
-                  {tr('Stash-Name', 'Stash name')}
-                  <input data-tutorial="branch-change-name" value={name} maxLength={500} onChange={(event) => setName(event.target.value)} disabled={busy} />
+                <BranchChangeChoices />
+                <label className="branch-change-name">
+                  <strong>{tr('Name der Sicherung', 'Backup name')}</strong>
+                  <input
+                    ref={nameRef}
+                    data-tutorial="branch-change-name"
+                    value={name}
+                    maxLength={500}
+                    onChange={(event) => setName(event.target.value)}
+                    disabled={busy}
+                  />
+                  <small>{tr('Unter diesem Namen findest du den Stash später wieder.', 'Use this name to find the stash later.')}</small>
                 </label>
-                <p>
-                  {tr(
-                    'Mitnehmen stellt alle Änderungen im Zielbranch wieder her. Parken lässt den Stash für die spätere Rückkehr gespeichert.',
-                    'Carry restores all changes on the target branch. Park keeps the stash for your return.',
-                  )}
-                </p>
-                <button type="button" data-tutorial="branch-change-review" disabled={busy} onClick={() => setStep(0)}>
-                  {tr('Zurück zur Prüfung', 'Back to review')}
-                </button>
               </>
             )}
-            <p className="branch-change-muted">
-              {tr(
-                'Gestagte, ungestagte und neue Dateien werden gemeinsam gesichert. Ignorierte Dateien bleiben ausgeschlossen.',
-                'Staged, unstaged and new files are saved together. Ignored files are excluded.',
+            {(step === 0 || restore) && <BranchChangeReviewHint restore={restore} />}
+            <div className="branch-change-tools">
+              {step === 1 && !restore && (
+                <Button
+                  variant="ghost"
+                  icon={<ArrowLeft size={13} aria-hidden="true" />}
+                  data-tutorial="branch-change-review"
+                  disabled={busy}
+                  onClick={() => setStep(0)}
+                >
+                  {tr('Zurück zur Prüfung', 'Back to review')}
+                </Button>
               )}
-            </p>
-            <button type="button" data-tutorial="branch-change-refresh" disabled={busy} onClick={() => void review()}>
-              {tr('Erneut prüfen', 'Review again')}
-            </button>
+              <Button
+                variant="ghost"
+                icon={<RefreshCw size={13} aria-hidden="true" />}
+                data-tutorial="branch-change-refresh"
+                disabled={busy}
+                onClick={() => void review()}
+              >
+                {tr('Erneut prüfen', 'Review again')}
+              </Button>
+            </div>
           </>
         )}
       </div>

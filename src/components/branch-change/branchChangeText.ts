@@ -5,7 +5,11 @@ export function branchChangeLabels(restore: boolean, step: number, busy: boolean
       ? tr('Geparkte Änderungen wiederherstellen', 'Restore parked changes')
       : tr('Änderungen beim Branchwechsel', 'Changes when switching branches'),
     cancel: busy ? tr('Abbrechen', 'Cancel') : result ? tr('Schließen', 'Close') : restore ? tr('Später', 'Later') : tr('Abbrechen', 'Cancel'),
-    confirm: restore ? tr('Wiederherstellen', 'Restore') : step === 0 ? tr('Weiter', 'Next') : tr('Mitnehmen und wechseln', 'Carry and switch'),
+    confirm: restore
+      ? tr('Wiederherstellen', 'Restore')
+      : step === 0
+        ? tr('Weiter: Aktion wählen', 'Next: choose action')
+        : tr('Mitnehmen und wechseln', 'Carry and switch'),
   };
 }
 export function branchChangeText(message: string, tr: Translate) {

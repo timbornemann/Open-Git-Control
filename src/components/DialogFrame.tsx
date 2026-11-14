@@ -16,6 +16,7 @@ interface DialogFrameProps {
   cancelLabel?: string;
   cancelDisabled?: boolean;
   confirmDisabled?: boolean;
+  secondaryActionDisabled?: boolean;
   confirmVariant?: 'default' | 'danger';
   secondaryActionVariant?: 'default' | 'danger';
   closeOnBackdrop?: boolean;
@@ -50,6 +51,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
   cancelLabel,
   cancelDisabled = false,
   confirmDisabled = false,
+  secondaryActionDisabled = false,
   confirmVariant = 'default',
   secondaryActionVariant = 'default',
   closeOnBackdrop = true,
@@ -173,8 +175,9 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
           {onSecondaryAction && (
             <button
               data-dialog-action="secondary"
-              className={`dialog-btn ${secondaryActionVariant === 'danger' ? 'dialog-btn-danger' : 'dialog-btn-primary'}`}
+              className={`dialog-btn ${secondaryActionVariant === 'danger' ? 'dialog-btn-danger' : 'dialog-btn-secondary'}`}
               onClick={onSecondaryAction}
+              disabled={secondaryActionDisabled}
             >
               {secondaryActionLabel ?? t('generated.components.dialogframe.run_alternative_fd1645c6')}
             </button>

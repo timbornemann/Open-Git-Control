@@ -353,7 +353,8 @@ describe('remote transfer host and selection UI', () => {
     await render();
     await start('pull');
     expect(container.querySelector('[role="dialog"]')).not.toBeNull();
-    expect(container.textContent).toContain('Remote branch not found: forgejo/test-branch');
+    expect(container.textContent).toContain('Remote branch not found');
+    expect(container.querySelector('.pull-recovery__source')?.textContent).toContain('forgejo/test-branch');
     expect(container.textContent).not.toContain('Retry this pull source');
     await click('Switch to main');
     expect(mocked.runGit).toHaveBeenCalledWith(['checkout', 'main'], expect.stringContaining('Pull there'), 'Switching branch …', {

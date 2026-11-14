@@ -117,6 +117,37 @@ describe('guided branch-change UI', () => {
     expect(finish).toHaveBeenCalledWith(null);
     expect(branchChangeClient.executeBranchChange).not.toHaveBeenCalled();
   });
+  it('shows the current step and requires a backup name for both branch-change choices', async () => {
+    await render();
+    expect(host.querySelector('[aria-current="step"]')?.textContent).toContain('Review changes');
+    expect(host.querySelector('.branch-change-route')?.textContent).toContain('Current branchfeature');
+    expect(host.querySelector('.branch-change-route')?.textContent).toContain('Target branchmain');
+    act(() => button('Next').click());
+    expect(host.querySelector('[aria-current="step"]')?.textContent).toContain('Choose action');
+    const input = host.querySelector<HTMLInputElement>('[data-tutorial="branch-change-name"]')!;
+    expect(document.activeElement).toBe(input);
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, ' ');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(button('Carry and switch').disabled).toBe(true);
+    expect(button('Park and switch').disabled).toBe(true);
+    act(() => button('Park and switch').click());
+    expect(branchChangeClient.executeBranchChange).not.toHaveBeenCalled();
+  });
+  it('identifies conflicting files after restoration rather than describing the changes as parked', async () => {
+    vi.mocked(branchChangeClient.executeBranchChange).mockResolvedValue({
+      success: true,
+      data: { switched: true, restored: false, session: { ...session, phase: 'conflict' }, conflicts: ['src/feature.ts'] },
+    });
+    await render();
+    act(() => button('Next').click());
+    await act(async () => button('Carry and switch').click());
+    expect(host.querySelector('[data-tutorial="branch-change-result"]')?.textContent).toContain('Restoration has conflicts');
+    expect(host.querySelector('.branch-change-conflict-files')?.textContent).toContain('src/feature.ts');
+    expect(button('Resolve conflicts')).toBeDefined();
+    expect(button('Review restoration')).toBeDefined();
+  });
   it('shows a failed restoration review request within the same dialog', async () => {
     vi.mocked(branchChangeClient.executeBranchChange).mockResolvedValue({
       success: true,

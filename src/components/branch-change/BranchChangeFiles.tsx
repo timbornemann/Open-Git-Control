@@ -6,6 +6,7 @@ import { repositoryFileClient } from '@/services/repositoryFileClient';
 import { useI18n } from '@/i18n';
 import type { BranchChangeFile, BranchChangeInspection } from '@/shared/ipc/branchChange';
 import '@/styles/diff-viewer.css';
+import { ChevronRight, FileText } from 'lucide-react';
 
 type Selection = { file: BranchChangeFile; group: 'staged' | 'unstaged' | 'new' };
 function ChangePreview({ inspection, selection }: { inspection: BranchChangeInspection; selection: Selection }) {
@@ -119,7 +120,7 @@ export function BranchChangeFiles({ inspection }: { inspection: BranchChangeInsp
     <>
       <div className="branch-change-files" data-branch-change-plan={inspection.planId}>
         {groups.map((group) => (
-          <section key={group.id} data-branch-change-group={group.id}>
+          <section key={group.id} data-branch-change-group={group.id} className={group.files.length ? undefined : 'branch-change-group-empty'}>
             <h4>
               {group.label} ({group.files.length})
             </h4>
@@ -133,11 +134,13 @@ export function BranchChangeFiles({ inspection }: { inspection: BranchChangeInsp
                       onClick={() => setSelected({ file, group: group.id })}
                       aria-pressed={selected?.file === file && selected?.group === group.id}
                     >
+                      <FileText size={14} aria-hidden="true" />
                       <code>
                         {file.previousPath ? `${file.previousPath} → ` : ''}
                         {file.path}
                       </code>{' '}
                       <span>{file.binary ? tr('Binärdatei', 'Binary file') : group.id === 'staged' ? file.index : file.worktree}</span>
+                      <ChevronRight size={13} aria-hidden="true" />
                     </button>
                   </li>
                 ))}

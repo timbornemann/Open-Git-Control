@@ -3,6 +3,7 @@ import type { DialogContextItem, InputDialogField } from '@/app/state/contracts'
 import { DialogFrame } from './DialogFrame';
 import { FolderTreeSelect } from './FolderTreeSelect';
 import { useI18n } from '@/i18n';
+import { DialogContext, DialogImpact, DialogMessage } from './DialogSections';
 
 export type { InputDialogField } from '@/app/state/contracts';
 
@@ -76,25 +77,18 @@ export const Input: React.FC<InputProps> = ({
     <DialogFrame
       open={open && !suspended}
       title={title}
+      className="dialog-decision"
       onClose={onCancel}
       onConfirm={handleSubmit}
       onEnter={handleSubmit}
       confirmLabel={confirmLabel ?? t('generated.components.input.save_b6a0ea4a')}
       cancelLabel={cancelLabel ?? t('generated.components.confirm.cancel_035b7526')}
       confirmDisabled={Boolean(validationError)}
+      confirmVariant={irreversible ? 'danger' : 'default'}
       initialFocusRef={firstInputRef as React.RefObject<HTMLElement | null>}
     >
-      {message && <p className="dialog-message">{message}</p>}
-      {contextItems.length > 0 && (
-        <dl className="dialog-context-list">
-          {contextItems.map((item) => (
-            <React.Fragment key={`${item.label}-${item.value}`}>
-              <dt>{item.label}</dt>
-              <dd>{item.value}</dd>
-            </React.Fragment>
-          ))}
-        </dl>
-      )}
+      {message && <DialogMessage danger={irreversible}>{message}</DialogMessage>}
+      <DialogContext items={contextItems} />
       <div className="dialog-inputs">
         {fields.map((field, index) => {
           if (field.visible && !field.visible(values)) return null;
@@ -162,13 +156,7 @@ export const Input: React.FC<InputProps> = ({
         })}
       </div>
       {validationError && <div className="dialog-validation">{validationError}</div>}
-      <div className="dialog-impact">
-        <span>
-          {t('generated.components.confirm.irreversible_6920e2ad')}:{' '}
-          <strong>{irreversible ? t('generated.components.confirm.yes_f3b8387d') : t('generated.components.confirm.no_52682a7b')}</strong>
-        </span>
-        {consequences && <span>{consequences}</span>}
-      </div>
+      <DialogImpact irreversible={irreversible} consequences={consequences} />
     </DialogFrame>
   );
 };

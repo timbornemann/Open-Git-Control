@@ -62,20 +62,23 @@ export function RemoteTransferHost({ onOpenConfiguration }: { onOpenConfiguratio
   }, [intent, closeRequest, coordinator]);
   const state = useRemoteTransferState();
   const reviewingSecrets = state.phase === 'review' && Boolean(state.scan?.findings.length);
+  const reviewingPull = state.phase === 'result' && Boolean(state.failedPull);
   const title = reviewingSecrets
     ? tr('Secret-Scan · Push angehalten', 'Secret scan · Push paused')
-    : state.intent?.mode === 'push'
-      ? tr('Push-Ziele', 'Push targets')
-      : state.intent?.mode === 'pull'
-        ? tr('Pull-Quelle', 'Pull source')
-        : tr('Fetch-Quelle', 'Fetch source');
+    : reviewingPull
+      ? tr('Pull prüfen', 'Review pull')
+      : state.intent?.mode === 'push'
+        ? tr('Push-Ziele', 'Push targets')
+        : state.intent?.mode === 'pull'
+          ? tr('Pull-Quelle', 'Pull source')
+          : tr('Fetch-Quelle', 'Fetch source');
   const modal = ['selection', 'review'].includes(state.phase) || (state.phase === 'result' && state.resultVisible);
   return (
     <>
       <DialogFrame
         open={modal}
         title={title}
-        className={reviewingSecrets ? 'push-secret-dialog' : undefined}
+        className={reviewingSecrets ? 'push-secret-dialog' : reviewingPull ? 'pull-recovery-dialog' : undefined}
         focusCancel={reviewingSecrets}
         closeOnBackdrop={false}
         onClose={() => {

@@ -1,0 +1,121 @@
+.dialog-modal.dialog-decision {
+  width: min(640px, 100%);
+}
+
+.dialog-decision .dialog-content {
+  gap: 18px;
+  padding: 18px;
+}
+
+.dialog-decision-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.dialog-decision-message > svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--accent-primary);
+}
+
+.dialog-decision-message--warning > svg {
+  color: var(--status-warning);
+}
+
+.dialog-decision-message .dialog-message {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.dialog-decision-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  margin-bottom: 8px;
+}
+
+.dialog-decision-section-heading h4,
+.dialog-decision-impact h4 {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.dialog-decision-context .dialog-context-list {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.35fr) minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.dialog-decision-context .dialog-context-list > dt,
+.dialog-decision-context .dialog-context-list > dd {
+  padding: 9px 11px;
+  line-height: 1.5;
+}
+
+.dialog-decision-context .dialog-context-list > dt:not(:first-of-type),
+.dialog-decision-context .dialog-context-list > dd:not(:first-of-type) {
+  border-top: 1px solid var(--border-color);
+}
+
+.dialog-decision-context .dialog-context-list > dd {
+  min-width: 0;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.dialog-decision .dialog-decision-impact {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 11px 12px;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+}
+
+.dialog-decision-impact > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--text-secondary);
+}
+
+.dialog-decision .dialog-decision-impact--warning {
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-soft);
+}
+
+.dialog-decision-impact--warning > svg {
+  color: var(--status-warning);
+}
+
+.dialog-decision-impact p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.77rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .dialog-decision-context .dialog-context-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dialog-decision-context .dialog-context-list > dt {
+    padding-bottom: 2px;
+  }
+  .dialog-decision-context .dialog-context-list > dd {
+    padding-top: 0;
+    border-top: 0;
+  }
+}

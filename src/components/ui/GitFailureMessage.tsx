@@ -6,11 +6,12 @@ import { Button } from './Button';
 import { TechnicalDetails } from './TechnicalDetails';
 
 /** The same explanation/remedies as notifications, for retained operation results. */
-export function GitFailureMessage({ message, context }: { message: string; context?: GitErrorContext }) {
+export function GitFailureMessage({ message, context, detailsOnly = false }: { message: string; context?: GitErrorContext; detailsOnly?: boolean }) {
   const { tr } = useI18n();
   const notifications = useOptionalNotifications();
   const input = { msg: message, isError: true, gitContext: context };
   const presentation = explainGitNotification(notifications?.prepare?.(input) ?? input, tr);
+  if (detailsOnly) return <TechnicalDetails>{presentation.technicalDetails || presentation.msg}</TechnicalDetails>;
   return (
     <div className="git-failure-message">
       <p className="hosting-error" role="alert">

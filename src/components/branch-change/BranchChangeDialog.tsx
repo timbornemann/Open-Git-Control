@@ -31,6 +31,7 @@ function BranchChangePreparation({ dialog, onChanged }: { dialog: Dialog; onChan
   return (
     <DialogFrame
       open
+      className="branch-change-dialog"
       title={title}
       onClose={failed ? () => dialog.finish(null) : dialog.cancel}
       cancelLabel={failed ? tr('Schließen', 'Close') : tr('Abbrechen', 'Cancel')}

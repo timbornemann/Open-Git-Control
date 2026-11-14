@@ -24,12 +24,24 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
 });
-const render = (recovery: GitPullRecoveryDto, busy = false) =>
+const render = (recovery: GitPullRecoveryDto | null, busy = false) =>
   act(() => root.render(createElement(PullTransferRecovery, { failedPull, busy, retry, openWorkspace, switchToDefault, recovery })));
 function button(text: string) {
   return [...container.querySelectorAll('button')].find((node) => node.textContent === text);
 }
 describe('deleted remote branch recovery panel', () => {
+  it('leads to the working files for interrupted pulls and retries only on explicit request', () => {
+    render(null);
+    expect(container.querySelector('.pull-recovery__source')?.textContent).toContain('origin/test-branch');
+    expect(container.querySelector('.pull-recovery__source')?.textContent).toContain('Rebase');
+    expect(button('Open workspace')?.classList.contains('ui-button--primary')).toBe(true);
+    expect(retry).not.toHaveBeenCalled();
+    act(() => button('Open workspace')!.click());
+    expect(openWorkspace).toHaveBeenCalledOnce();
+    expect(retry).not.toHaveBeenCalled();
+    act(() => button('Retry this pull source')!.click());
+    expect(retry).toHaveBeenCalledExactlyOnceWith(failedPull);
+  });
   it('shows the missing source and offers the verified default rather than a conflict retry', () => {
     render({ branchExists: false, defaultBranch: { name: 'trunk', localExists: false } });
     expect(container.textContent).toContain('origin/test-branch');
@@ -48,6 +60,8 @@ describe('deleted remote branch recovery panel', () => {
   });
   it('retries the original source if that branch has reappeared', () => {
     render({ branchExists: true, defaultBranch: { name: 'main', localExists: true } });
+    expect(container.textContent).toContain('Pull source available again');
+    expect(container.textContent).not.toContain('Remote branch not found');
     expect(button('Switch to main')).toBeUndefined();
     act(() => button('Retry this pull source')!.click());
     expect(retry).toHaveBeenCalledWith(failedPull);
@@ -56,6 +70,11 @@ describe('deleted remote branch recovery panel', () => {
     render({ branchExists: false, defaultBranch: { name: 'main', localExists: true } }, true);
     act(() => button('Switch to main')!.click());
     expect(switchToDefault).not.toHaveBeenCalled();
+    expect(button('Open workspace')!.disabled).toBe(true);
+  });
+  it('also prevents retry and navigation while an interrupted pull is still busy', () => {
+    render(null, true);
+    expect(button('Retry this pull source')!.disabled).toBe(true);
     expect(button('Open workspace')!.disabled).toBe(true);
   });
 });

@@ -1,0 +1,113 @@
+.dialog-modal.pull-recovery-dialog {
+  width: min(680px, 100%);
+}
+.pull-recovery-dialog .hosting-transfers {
+  padding: 0;
+}
+.pull-recovery-dialog .hosting-transfers > small {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  overflow-wrap: anywhere;
+  margin-bottom: 14px;
+}
+.pull-recovery-dialog .transfer-configuration {
+  margin-top: 8px;
+  color: var(--text-secondary);
+}
+.pull-recovery {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 14px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.79rem;
+  line-height: 1.6;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pull-recovery h4,
+.pull-recovery p {
+  margin: 0;
+}
+.pull-recovery__heading {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+}
+.pull-recovery__heading > svg {
+  flex-shrink: 0;
+  color: var(--status-warning);
+}
+.pull-recovery__heading h4 {
+  font-size: 0.91rem;
+}
+.pull-recovery__heading p,
+.pull-recovery__explanation,
+.pull-recovery__next p,
+.pull-recovery__alternative p {
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+}
+.pull-recovery__source {
+  padding: 10px 12px;
+  margin: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-dark);
+  display: grid;
+  gap: 8px;
+}
+.pull-recovery__source > div {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 10px;
+}
+.pull-recovery__source dt {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+.pull-recovery__source dd {
+  margin: 0;
+  font-size: 0.76rem;
+}
+.pull-recovery__next {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 14px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+.pull-recovery__next > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent-primary);
+}
+.pull-recovery__next h4 {
+  font-size: 0.8rem;
+}
+.pull-recovery__next p {
+  margin-top: 4px;
+}
+.pull-recovery__next .ui-button {
+  margin-top: 11px;
+}
+.pull-recovery > .ui-button {
+  align-self: flex-start;
+}
+.pull-recovery__alternative {
+  border-top: 1px solid var(--border-color);
+  padding-top: 12px;
+}
+.pull-recovery__alternative .ui-button {
+  margin-top: 8px;
+}
+@media (max-width: 480px) {
+  .pull-recovery__source > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}

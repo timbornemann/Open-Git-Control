@@ -250,6 +250,8 @@
 
 .dialog-footer {
   display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   padding: 12px 16px;
@@ -262,6 +264,8 @@
   padding: 6px 12px;
   font-size: 0.8rem;
   cursor: pointer;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
   transition: all 0.12s;
 }
 

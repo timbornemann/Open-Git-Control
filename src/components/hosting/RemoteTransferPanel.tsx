@@ -39,6 +39,7 @@ export function RemoteTransferPanel({
   openConfiguration: () => void;
 }) {
   const { tr } = useI18n();
+  const reviewingPull = state.phase === 'result' && Boolean(state.failedPull);
   return (
     <section className="hosting-transfers">
       <small>{state.intent?.repoPath}</small>
@@ -78,9 +79,9 @@ export function RemoteTransferPanel({
           switchToDefault={switchPullToDefault}
         />
       )}
-      {state.error && <GitFailureMessage message={state.error} context={transferFailureContext(state)} />}
-      {state.phase === 'review' && state.scan?.findings.length ? (
-        <Button className="push-secret-configuration" variant="ghost" icon={<Settings2 size={13} aria-hidden="true" />} onClick={openConfiguration}>
+      {state.error && <GitFailureMessage message={state.error} context={transferFailureContext(state)} detailsOnly={reviewingPull} />}
+      {(state.phase === 'review' && state.scan?.findings.length) || reviewingPull ? (
+        <Button className="transfer-configuration" variant="ghost" icon={<Settings2 size={13} aria-hidden="true" />} onClick={openConfiguration}>
           {tr('Remote-Konfiguration öffnen', 'Open remote configuration')}
         </Button>
       ) : (
