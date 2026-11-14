@@ -6,7 +6,16 @@ import { TUTORIAL_CHAPTERS } from '@/shared/tutorial/catalog';
 import type { TutorialStep } from '@/shared/tutorial/types';
 import { useFileViewerTab } from '@/components/file-viewer/useFileViewerTab';
 import { fileViewerRequestFromWorkingFile } from '@/components/file-viewer/fileViewerRequest';
+import { WorkingDirectorySearchPanel } from '@/components/working-directory/WorkingDirectorySearchPanel';
+import { gitClient } from '@/services/gitClient';
+import { DemoRepository } from './demoRepository';
+import { createDemoSearchApi } from './demoSearchApi';
 import { useTutorialPreparation } from './useTutorialPreparation';
+
+vi.mock('@/contexts/AppStateContext', () => ({
+  useUIContext: () => ({ setConfirmDialog: vi.fn() }),
+  useOptionalRepositoryContext: () => null,
+}));
 
 let root: Root;
 let host: HTMLDivElement;
@@ -22,6 +31,8 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
+  vi.restoreAllMocks();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 function Viewer({ path }: { path: string }) {
@@ -95,6 +106,66 @@ it('teaches the explicit Preview-to-Text action after opening a new Markdown fil
   expect(chapter.steps[opened + 2].id).toBe('write');
   await act(async () => root.render(<Harness step={textStep} path="scratch/notes.md" />));
   expect(host.querySelector('output')?.dataset.ready).toBe('true');
+  expect(host.querySelector('.file-viewer')?.getAttribute('data-tab')).toBe('preview');
+  expect(chooseText).not.toHaveBeenCalled();
+  await act(async () => host.querySelector<HTMLButtonElement>(textStep.target)!.click());
+  expect(host.querySelector('[data-tutorial="file-editor"]')).not.toBeNull();
+});
+
+function SearchHarness({ step }: { step: TutorialStep }) {
+  const [searching, setSearching] = useState(false);
+  const [path, setPath] = useState<string | null>(null);
+  const ready = useTutorialPreparation(step);
+  return (
+    <>
+      <output data-ready={ready}>{String(ready)}</output>
+      <button data-tutorial="open-files">Working Directory</button>
+      <button data-tutorial="file-search-toggle" onClick={() => setSearching(!searching)}>
+        Search
+      </button>
+      {searching && <WorkingDirectorySearchPanel repoPath="/tutorial/repo" onOpenFile={setPath} onFilesChanged={async () => {}} />}
+      {path && <Viewer path={path} />}
+    </>
+  );
+}
+
+async function openSearchStep(step: TutorialStep) {
+  vi.useFakeTimers();
+  const repo = new DemoRepository();
+  repo.reset(step, 'de');
+  // The search panel uses the same saved files as a directly entered lesson.
+  repo.activeRepo = '/tutorial/repo';
+  vi.spyOn(gitClient, 'searchWorkingDirectory').mockImplementation(createDemoSearchApi(repo).searchWorkingDirectory!);
+  await act(async () => root.render(<SearchHarness step={step} />));
+  for (let attempt = 0; attempt < 10 && host.querySelector('output')?.dataset.ready !== 'true'; attempt++) {
+    await act(async () => vi.advanceTimersByTimeAsync(100));
+  }
+  expect(host.querySelector('output')?.dataset.ready).toBe('true');
+}
+
+const searchSteps = [
+  ['search-names', 'open-file', 'contents'],
+  ['search-content', 'open-match', 'saved-source'],
+  ['search-one', 'open-file', 'read'],
+  ['search-all', 'open-file', 'read'],
+];
+
+it.each(searchSteps)('restores the Text view when directly entering a reading step in %s', async (chapterId, _openId, readId) => {
+  const step = TUTORIAL_CHAPTERS.find((chapter) => chapter.id === chapterId)!.steps.find((step) => step.id === readId)!;
+  await openSearchStep(step);
+  expect(host.querySelector('.file-viewer')?.getAttribute('data-path')).toBe('guides/Planet.md');
+  expect(host.querySelector('.file-viewer')?.getAttribute('data-tab')).toBe('text');
+  expect(host.querySelector('[data-tutorial="file-editor"]')).not.toBeNull();
+  expect(chooseText).toHaveBeenCalledOnce();
+});
+
+it.each(searchSteps)('teaches switching to Text after opening a result in %s', async (chapterId, openId, readId) => {
+  const chapter = TUTORIAL_CHAPTERS.find((chapter) => chapter.id === chapterId)!;
+  const opened = chapter.steps.findIndex((step) => step.id === openId);
+  const textStep = chapter.steps[opened + 1];
+  expect(textStep.id).toBe(`${openId}-text`);
+  expect(chapter.steps[opened + 2].id).toBe(readId);
+  await openSearchStep(textStep);
   expect(host.querySelector('.file-viewer')?.getAttribute('data-tab')).toBe('preview');
   expect(chooseText).not.toHaveBeenCalled();
   await act(async () => host.querySelector<HTMLButtonElement>(textStep.target)!.click());

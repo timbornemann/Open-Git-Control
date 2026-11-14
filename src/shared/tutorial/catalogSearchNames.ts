@@ -1,4 +1,5 @@
 import type { TutorialChapter } from './types';
+import { withTextViewSteps } from './fileTextViewSteps';
 import {
   searchStep as s,
   searchRecipe as seed,
@@ -198,5 +199,5 @@ export const TUTORIAL_SEARCH_NAMES: TutorialChapter = {
       c('file-search-toggle'),
       { prepare: p() },
     ),
-  ],
+  ].flatMap(withTextViewSteps({ 'open-file': 'guides/Planet.md' })),
 };

@@ -1,5 +1,5 @@
 import type { SearchExample, TutorialCompletion, TutorialFileContent, TutorialPreparationAction, TutorialStep, TutorialText } from './types';
-import { fileStep, fileControl as c, editor, element } from './fileLessonHelpers';
+import { fileStep, fileControl as c, editor, element, fileTab } from './fileLessonHelpers';
 export { fileControl as c, editor, element, dialog, confirmDialog, cancelDialog } from './fileLessonHelpers';
 export const searchContent = (version: SearchExample): TutorialFileContent => ({ example: 'search-files', version });
 export const searchPaths = { guide: 'guides/Planet.md', notes: 'notes/planet.txt', code: 'src/planet.ts' };
@@ -65,7 +65,8 @@ export const searchRecipe = (state: SearchState = 'base', options: Options = {})
     ...(options.file
       ? [
           { click: mode === 'filename' ? `button${searchResult()}` : `${searchResult()} .working-search-result-group__file` },
-          { waitFor: `${searchViewer} ${editor}` },
+          { click: fileTab('text') },
+          { waitFor: `${searchViewer}[data-tab="text"] ${editor}` },
         ]
       : []),
     ...(options.draft ? [{ fill: { selector: editor, value: searchContent('draft') } }, { waitFor: `${searchViewer}[data-dirty="true"]` }] : []),

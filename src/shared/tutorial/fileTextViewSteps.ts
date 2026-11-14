@@ -13,8 +13,8 @@ export function withTextViewStep(open: TutorialStep, path: string): TutorialStep
     {
       ...open,
       description: [
-        `Klicke ${path} im Dateibaum. Die Arbeitsdatei öffnet sich in der Vorschau. Im nächsten Schritt wechselst du zur Textansicht.`,
-        `Click ${path} in the file tree. The working file opens in Preview. In the next step you will switch to Text.`,
+        `Klicke ${path}. Die Arbeitsdatei öffnet sich in der Vorschau. Im nächsten Schritt wechselst du zur Textansicht.`,
+        `Click ${path}. The working file opens in Preview. In the next step you will switch to Text.`,
       ],
       completion: element(viewer),
     },
