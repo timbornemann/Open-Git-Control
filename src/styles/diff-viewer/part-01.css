@@ -169,10 +169,12 @@
 }
 
 .diff-file-header {
+  display: grid;
+  grid-template-columns: minmax(100%, max-content);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   margin-bottom: 10px;
-  overflow: hidden;
+  overflow-x: auto;
 }
 
 .diff-header-line {
@@ -180,7 +182,7 @@
   border-bottom: 1px solid var(--line-subtle);
   color: var(--text-secondary);
   white-space: pre;
-  overflow-x: auto;
+  overflow-x: visible;
 }
 
 .diff-hunk {
@@ -258,7 +260,13 @@
 }
 
 .diff-unified-wrap {
+  display: grid;
+  grid-template-columns: minmax(100%, max-content);
   overflow-x: auto;
+}
+
+.diff-unified-wrap .diff-code {
+  overflow-x: visible;
 }
 
 .diff-line {
