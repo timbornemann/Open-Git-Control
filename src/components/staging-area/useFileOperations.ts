@@ -189,7 +189,7 @@ export const useFileOperations = ({
   );
 
   const git = useCallback(
-    async (args: string[] | string[][], msg: string, notify = false) => {
+    async (args: string[] | string[][], msg: string | null, notify = false) => {
       const repoAtStart = repoPath;
       const generation = repoGenerationRef.current;
       const isBatch = Array.isArray(args[0]);
@@ -222,7 +222,8 @@ export const useFileOperations = ({
           }
           changed = true;
         }
-        setToast({ msg: failure ?? msg, isError: failure !== null });
+        const message = failure ?? msg;
+        if (message) setToast({ msg: message, isError: failure !== null });
         // A failed checkout can already have restored some selected files.
         // Reconcile the status once, while retaining the shared mutation lock.
         if (changed || isBatch || commands.some((command) => command[0] === 'add')) {
@@ -429,8 +430,8 @@ export const useFileOperations = ({
   );
   const stageAll = useCallback(async () => {
     if (!status || status.conflicts.length > 0) return false;
-    return git(['add', '-A'], tr('Alle Änderungen hinzugefügt', 'Staged all changes'));
-  }, [status, git, tr]);
+    return git(['add', '-A'], null);
+  }, [status, git]);
   const stageAllUnstaged = useCallback(() => {
     const paths = (bulkFiles?.unstaged || []).map((entry) => entry.path);
     return stagePathsForCurrentRepo([...new Set(paths)]);
