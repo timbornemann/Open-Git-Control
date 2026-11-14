@@ -2,8 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'reac
 import { Save, X } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { useAppToast } from '@/hooks/useAppToast';
-import { isHtmlFilePath } from '@/utils/htmlPreview';
-import { isMarkdownFilePath } from '@/utils/markdownPreview';
 import { isCsvFilePath } from '@/components/working-directory/fileContentTransforms';
 import { WorkingDirectoryFileTools } from '@/components/working-directory/WorkingDirectoryFileTools';
 import { WorkingDirectoryFileStatusBar } from '@/components/working-directory/WorkingDirectoryFileStatusBar';
@@ -12,6 +10,7 @@ import type { WorkingDirectoryNavigationGuard } from '@/components/working-direc
 import { fileViewerIdentity, repositoryFileContext, type FileViewerRequest, type FileViewerTab } from './fileViewerRequest';
 import { useFileDocument } from './useFileDocument';
 import { useFileNavigation } from './useFileNavigation';
+import { useFileViewerTab } from './useFileViewerTab';
 import { FileViewerContent } from './FileViewerContent';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { isShortcutSuppressed } from '@/hooks/keyboardShortcutRuntime';
@@ -48,7 +47,6 @@ export function FileViewer({
   const { repoPath, path, source, commitHash } = activeRequest;
   const context = useMemo(() => repositoryFileContext({ repoPath, path, source, commitHash, startView: 'text' }), [repoPath, path, source, commitHash]);
   const identity = fileViewerIdentity(context);
-  const [tab, setTab] = useState<FileViewerTab>(activeRequest.startView);
   const [localRefresh, setLocalRefresh] = useState(0);
   const [showWhitespace, setShowWhitespace] = useState(false);
   const [selection, setSelection] = useState<TextSelection>({ from: 0, to: 0 });
@@ -62,6 +60,8 @@ export function FileViewer({
   }, [refreshed, showToast, source, tr]);
   const reportError = useCallback((message: string) => showToast(message, true), [showToast]);
   const document = useFileDocument(context, localRefresh + refreshTrigger, saved, reportError);
+  const textFile = document.preview?.kind === 'text';
+  const { tab, setTab, hasPreview } = useFileViewerTab(activeRequest, document.preview);
   const navigation = useFileNavigation({
     context,
     dirty: document.dirty,
@@ -72,13 +72,9 @@ export function FileViewer({
     onNavigationGuardChange,
   });
   useLayoutEffect(() => {
-    setTab(activeRequest.startView);
     setShowWhitespace(false);
     setSelection({ from: 0, to: 0 });
   }, [identity, activeRequest.startView]);
-  useLayoutEffect(() => {
-    if (activeRequest.position) setTab('text');
-  }, [activeRequest.position]);
   const openStagedDiff = () => {
     const next: FileViewerRequest = { repoPath, path, source: 'staged', startView: 'diff' };
     navigation.protectNavigation(() => {
@@ -98,7 +94,10 @@ export function FileViewer({
     return () => window.removeEventListener('keydown', listener);
   }, [document, shortcuts]);
   const changeTab = (next: FileViewerTab) => {
-    if (next === tab) return;
+    if (next === tab) {
+      setTab(next);
+      return;
+    }
     if (next === 'diff')
       navigation.protectDiff(() => {
         setTab('diff');
@@ -112,14 +111,13 @@ export function FileViewer({
       : source === 'commit'
         ? `${tr('Commit', 'Commit')} ${commitHash?.slice(0, 10)} · ${tr('schreibgeschützt', 'read-only')}`
         : tr('Arbeitsdatei', 'Working file');
-  const textFile = document.preview?.kind === 'text';
   const tabs: Array<{ id: FileViewerTab; label: string; available: boolean }> = [
     { id: 'text', label: 'Text', available: true },
     { id: 'diff', label: 'Diff', available: true },
     {
       id: 'preview',
       label: tr('Vorschau', 'Preview'),
-      available: Boolean(document.preview?.kind === 'image') || (textFile && (isHtmlFilePath(path) || isMarkdownFilePath(path))),
+      available: hasPreview,
     },
     { id: 'table', label: tr('Tabelle', 'Table'), available: textFile && isCsvFilePath(path) },
     { id: 'history', label: 'History', available: true },

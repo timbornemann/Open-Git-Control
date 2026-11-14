@@ -4,7 +4,7 @@ import type { EditorPosition } from '@/types/editor';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 
 export type FileViewerTab = 'text' | 'diff' | 'preview' | 'table' | 'history' | 'blame';
-export type FileViewerRequest = RepositoryFileContextDto & { startView: 'text' | 'diff'; position?: EditorPosition };
+export type FileViewerRequest = RepositoryFileContextDto & { startView: 'auto' | 'text' | 'diff'; position?: EditorPosition };
 export function fileViewerIdentity(request: RepositoryFileContextDto): string {
   return JSON.stringify([normalizeRepoPathKey(request.repoPath), request.path, request.source, request.commitHash || '']);
 }
@@ -15,5 +15,5 @@ export function fileViewerRequestFromDiff(repoPath: string, request: DiffRequest
   return { repoPath, path: request.path, source: request.source, commitHash: request.commitHash, startView: 'diff' };
 }
 export function fileViewerRequestFromWorkingFile(repoPath: string, path: string, position?: EditorPosition): FileViewerRequest {
-  return { repoPath, path, source: 'unstaged', startView: 'text', ...(position ? { position } : {}) };
+  return { repoPath, path, source: 'unstaged', startView: position ? 'text' : 'auto', ...(position ? { position } : {}) };
 }
