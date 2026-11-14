@@ -1,67 +1,30 @@
 name: Bug report / Fehler melden
-description: Report something that is broken or not working as expected.
+description: Tell us what went wrong. One description is enough.
 title: '[Bug]: '
 labels: ['bug']
 body:
   - type: markdown
     attributes:
-      value: |
-        Thanks for reporting a bug. Please provide enough detail so the problem can be reproduced.
-
-        Danke fuer die Fehlermeldung. Bitte gib genug Kontext an, damit das Problem reproduziert werden kann.
-  - type: input
-    id: app-version
+      value: 'One description is enough. All other details are optional. / Eine Beschreibung genügt. Alle weiteren Angaben sind freiwillig.'
+  - type: textarea
+    id: actual
     attributes:
-      label: Open-Git-Control version / Version
-      description: Use the version from Settings or the release you installed.
-      placeholder: 'Example: v1.3.0'
+      label: What happened? / Was ist passiert?
+      placeholder: Describe the bug and, if possible, what you expected. / Beschreibe den Fehler und, wenn möglich, was du erwartet hast.
     validations:
       required: true
-  - type: dropdown
-    id: install-method
+  - type: textarea
+    id: steps
     attributes:
-      label: Installation method / Installationsart
-      options:
-        - GitHub release installer
-        - Built from source
-        - Development mode with npm run dev
-        - Other / Andere
-    validations:
-      required: true
-  - type: dropdown
-    id: operating-system
+      label: Steps to reproduce (optional) / Schritte zum Reproduzieren (optional)
+  - type: textarea
+    id: expected
     attributes:
-      label: Operating system / Betriebssystem
-      options:
-        - Windows
-        - macOS
-        - Linux
-        - Other / Andere
-    validations:
-      required: true
-  - type: input
-    id: os-version
-    attributes:
-      label: OS version / Betriebssystem-Version
-      placeholder: 'Example: Windows 11 23H2, macOS 15, Ubuntu 24.04'
-    validations:
-      required: true
-  - type: input
-    id: git-version
-    attributes:
-      label: Git version / Git-Version
-      placeholder: 'Run: git --version'
-    validations:
-      required: true
-  - type: input
-    id: gh-version
-    attributes:
-      label: GitHub CLI version, if relevant / GitHub-CLI-Version, falls relevant
-      placeholder: 'Run: gh --version'
+      label: Expected behavior (optional) / Erwartetes Verhalten (optional)
   - type: dropdown
     id: affected-area
     attributes:
-      label: Affected area / Betroffener Bereich
+      label: Affected area (optional) / Betroffener Bereich (optional)
       options:
         - Repository workspace
         - Commit graph
@@ -74,53 +37,26 @@ body:
         - Project planning API/MCP
         - Secret scanning or security settings
         - AI-assisted features
+        - Settings
         - Packaging, install, or auto-update
         - Documentation
         - Other / Andere
-    validations:
-      required: true
   - type: textarea
-    id: steps
+    id: environment
     attributes:
-      label: Steps to reproduce / Schritte zum Reproduzieren
-      description: List the exact steps that trigger the problem.
-      placeholder: |
-        1. Open ...
-        2. Click ...
-        3. See ...
-    validations:
-      required: true
-  - type: textarea
-    id: expected
+      label: Environment (optional) / Umgebung (optional)
+      description: Automatically filled by the app. / Wird von der App automatisch ergänzt.
+  - type: input
+    id: app-version
     attributes:
-      label: Expected behavior / Erwartetes Verhalten
-      description: What should have happened?
-    validations:
-      required: true
-  - type: textarea
-    id: actual
-    attributes:
-      label: Actual behavior / Tatsaechliches Verhalten
-      description: What happened instead?
-    validations:
-      required: true
+      label: App version (optional) / App-Version (optional)
   - type: textarea
     id: logs
     attributes:
-      label: Logs or diagnostics / Logs oder Diagnoseinformationen
-      description: Paste relevant logs only. Remove tokens, secrets, private repository names, and personal data.
+      label: Diagnostics (optional) / Diagnoseinformationen (optional)
+      description: Remove secrets and private information before posting. / Entferne vor dem Senden Secrets und private Angaben.
       render: text
   - type: textarea
     id: screenshots
     attributes:
-      label: Screenshots or screen recordings / Screenshots oder Screen Recordings
-      description: Add images or recordings if they help explain the issue.
-  - type: checkboxes
-    id: checklist
-    attributes:
-      label: Before submitting / Vor dem Absenden
-      options:
-        - label: I searched existing issues. / Ich habe bestehende Issues durchsucht.
-          required: true
-        - label: I removed secrets and private data from logs and screenshots. / Ich habe Secrets und private Daten aus Logs und Screenshots entfernt.
-          required: true
+      label: Screenshots (optional)

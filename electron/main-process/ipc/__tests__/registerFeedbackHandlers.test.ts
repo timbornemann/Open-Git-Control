@@ -30,6 +30,54 @@ describe('registerFeedbackHandlers', () => {
     handleMock.mockImplementation((channel: string, handler: (...args: any[]) => Promise<any>) => handlers.set(channel, handler));
   });
 
+  it('previews the exact sanitized direct issue without publishing it', async () => {
+    const createFeedbackIssue = vi.fn().mockResolvedValue({ number: 12, htmlUrl: 'https://github.com/example/12' });
+    registerFeedbackHandlers({
+      githubService: { isAuthenticated: () => true, normalizeHost: (value: string) => value, getHost: () => 'github.com', createFeedbackIssue } as any,
+    });
+    const input = {
+      category: 'bug',
+      submissionMode: 'manual',
+      source: 'settings',
+      actual: 'Editor failed\ntoken=github_pat_abcdefghijklmnopqrstuvwxyz123456',
+      diagnostics: 'Reviewed diagnostic',
+    };
+    const preview = await handlers.get('feedback:preview')!({}, input);
+    expect(preview).toMatchObject({ success: true, data: { title: '[Bug]: Editor failed', delivery: 'direct', diagnosticsIncluded: true, truncated: false } });
+    expect(preview.data.body).not.toContain('github_pat_');
+    expect(createFeedbackIssue).not.toHaveBeenCalled();
+    await handlers.get('feedback:submit')!({}, input);
+    expect(createFeedbackIssue).toHaveBeenCalledExactlyOnceWith(preview.data.title, preview.data.body, 'bug');
+  });
+
+  it('previews the browser payload without diagnostics when no account is connected or the browser route is explicitly selected', async () => {
+    const createFeedbackIssue = vi.fn();
+    registerFeedbackHandlers({
+      githubService: { isAuthenticated: () => false, normalizeHost: (value: string) => value, getHost: () => 'github.com', createFeedbackIssue } as any,
+    });
+    const preview = await handlers.get('feedback:preview')!({}, { ...bugReport, diagnostics: 'Private diagnostic' });
+    expect(preview).toMatchObject({ success: true, data: { delivery: 'browser', diagnosticsIncluded: false } });
+    expect(preview.data.body).not.toContain('Private diagnostic');
+    expect(preview.data.fallbackUrl).not.toContain('Private');
+    expect(new URL(preview.data.fallbackUrl).searchParams.get('actual')).toBe('It fails');
+    expect(createFeedbackIssue).not.toHaveBeenCalled();
+    handlers.clear();
+    registerFeedbackHandlers({
+      githubService: { isAuthenticated: () => true, normalizeHost: (value: string) => value, getHost: () => 'github.com', createFeedbackIssue } as any,
+    });
+    expect(await handlers.get('feedback:preview')!({}, bugReport, 'browser')).toMatchObject({ success: true, data: { delivery: 'browser' } });
+  });
+
+  it('rejects invalid previews without any GitHub operation', async () => {
+    const createFeedbackIssue = vi.fn();
+    registerFeedbackHandlers({
+      githubService: { isAuthenticated: () => true, normalizeHost: (value: string) => value, getHost: () => 'github.com', createFeedbackIssue } as any,
+    });
+    expect(await handlers.get('feedback:preview')!({}, { ...bugReport, actual: ' ' })).toMatchObject({ success: false });
+    expect(await handlers.get('feedback:preview')!({}, bugReport, 'unknown')).toMatchObject({ success: false });
+    expect(createFeedbackIssue).not.toHaveBeenCalled();
+  });
+
   it('returns capability and a browser fallback without authentication', async () => {
     registerFeedbackHandlers({
       githubService: {

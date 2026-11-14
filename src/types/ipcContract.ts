@@ -52,6 +52,7 @@ export const enum IpcChannel {
   DialogSelectProjectParentDirectory = 'dialog:selectProjectParentDirectory',
   ExternalOpen = 'external:open',
   FeedbackGetCapability = 'feedback:getCapability',
+  FeedbackPreview = 'feedback:preview',
   FeedbackSubmit = 'feedback:submit',
   GitAddIgnoreRule = 'git:addIgnoreRule',
   GitAiAutoCommit = 'git:aiAutoCommit',

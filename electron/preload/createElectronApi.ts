@@ -135,6 +135,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     },
     openExternalUrl: (url: string) => ipcRenderer.invoke(IpcChannel.ExternalOpen, url),
     getFeedbackReportCapability: () => ipcRenderer.invoke(IpcChannel.FeedbackGetCapability),
+    previewFeedbackReport: (input: FeedbackReportInputDto, delivery?: 'browser') => ipcRenderer.invoke(IpcChannel.FeedbackPreview, input, delivery),
     submitFeedbackReport: (input: FeedbackReportInputDto) => ipcRenderer.invoke(IpcChannel.FeedbackSubmit, input),
     runGitCommand: (commandName: GitCommandNameDto, ...args: string[]) => invokeGitCommand(commandName, ...args),
     runGitCommandForRepo: (repoPath: string, commandName: GitCommandNameDto, ...args: string[]) =>
@@ -496,6 +497,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       selectProjectParentDirectory: flatApi.selectProjectParentDirectory,
       openExternalUrl: flatApi.openExternalUrl,
       getFeedbackReportCapability: flatApi.getFeedbackReportCapability,
+      previewFeedbackReport: flatApi.previewFeedbackReport,
       submitFeedbackReport: flatApi.submitFeedbackReport,
       getPlanningApiInfo: flatApi.getPlanningApiInfo,
       generatePlanningApiToken: flatApi.generatePlanningApiToken,

@@ -1,6 +1,9 @@
 export type FeedbackReportCategoryDto = 'bug' | 'feature' | 'question';
 export type FeedbackReportSourceDto = 'settings' | 'error-toast';
 export type FeedbackReportSubmissionModeDto = 'manual';
+export const FEEDBACK_TITLE_MAX = 180;
+export const FEEDBACK_TEXT_MAX = 8_000;
+export const FEEDBACK_DIAGNOSTICS_MAX = 20_000;
 export const FEEDBACK_REPORT_AREAS = [
   'Repository workspace',
   'Commit graph',
@@ -17,16 +20,16 @@ export const FEEDBACK_REPORT_AREAS = [
 export type FeedbackReportAreaDto = (typeof FEEDBACK_REPORT_AREAS)[number];
 
 type FeedbackReportBaseDto = {
-  title: string;
-  area: FeedbackReportAreaDto;
+  title?: string;
+  area?: FeedbackReportAreaDto;
   source: FeedbackReportSourceDto;
 };
 
 export type ManualBugFeedbackReportDto = FeedbackReportBaseDto & {
   category: 'bug';
   submissionMode: 'manual';
-  steps: string;
-  expected: string;
+  steps?: string;
+  expected?: string;
   actual: string;
   diagnostics?: string;
 };
@@ -35,16 +38,16 @@ export type ManualFeatureFeedbackReportDto = FeedbackReportBaseDto & {
   category: 'feature';
   submissionMode: 'manual';
   problem: string;
-  desiredWorkflow: string;
-  proposal: string;
-  value: string;
+  desiredWorkflow?: string;
+  proposal?: string;
+  value?: string;
 };
 
 export type ManualQuestionFeedbackReportDto = FeedbackReportBaseDto & {
   category: 'question';
   submissionMode: 'manual';
   question: string;
-  context: string;
+  context?: string;
   tried?: string;
 };
 
@@ -53,6 +56,16 @@ export type FeedbackReportInputDto = ManualBugFeedbackReportDto | ManualFeatureF
 export type FeedbackReportCapabilityDto = {
   directSubmissionAvailable: boolean;
   reason: 'not-authenticated' | 'wrong-host' | null;
+};
+
+export type FeedbackReportPreviewDto = {
+  title: string;
+  body: string;
+  repositoryUrl: string;
+  delivery: 'direct' | 'browser';
+  diagnosticsIncluded: boolean;
+  truncated: boolean;
+  fallbackUrl?: string;
 };
 
 export type FeedbackReportErrorCodeDto = 'DIRECT_UNAVAILABLE' | 'VALIDATION_FAILED' | 'GITHUB_FAILED';

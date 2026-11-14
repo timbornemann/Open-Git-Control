@@ -2,8 +2,15 @@ import { app, ipcMain } from 'electron';
 import * as os from 'os';
 import type { GitHubService } from '../../GitHubService';
 import { IpcChannel } from '../../../src/types/ipcContract';
-import type { FeedbackReportCapabilityDto, FeedbackReportInputDto, FeedbackReportSubmissionResultDto } from '../../../src/types/feedbackDtos';
+import type {
+  FeedbackReportCapabilityDto,
+  FeedbackReportInputDto,
+  FeedbackReportPreviewDto,
+  FeedbackReportSubmissionResultDto,
+} from '../../../src/types/feedbackDtos';
+import type { IpcResult } from '../../../src/types/ipc';
 import { prepareFeedbackReport, redactFeedbackText } from '../feedback/feedbackReport';
+import { feedbackRepositoryUrl } from '../feedback/feedbackReportFallback';
 
 type RegisterFeedbackHandlersDeps = {
   githubService: GitHubService;
@@ -25,6 +32,34 @@ export function registerFeedbackHandlers({ githubService, hasPublicGithubConnect
         : { directSubmissionAvailable: false, reason: 'not-authenticated' }
       : capabilityFor(githubService);
   ipcMain.handle(IpcChannel.FeedbackGetCapability, async () => capability());
+
+  ipcMain.handle(
+    IpcChannel.FeedbackPreview,
+    async (_event: unknown, input: FeedbackReportInputDto, delivery?: 'browser'): Promise<IpcResult<FeedbackReportPreviewDto>> => {
+      try {
+        if (delivery !== undefined && delivery !== 'browser') throw new Error('Invalid feedback delivery.');
+        const prepared = prepareFeedbackReport(input, {
+          appVersion: app.getVersion(),
+          platform: `${process.platform} ${os.release()} ${process.arch}`,
+        });
+        const browser = delivery === 'browser' || !capability().directSubmissionAvailable;
+        return {
+          success: true,
+          data: {
+            title: browser ? prepared.browserPreview.title : prepared.title,
+            body: browser ? prepared.browserPreview.body : prepared.body,
+            repositoryUrl: feedbackRepositoryUrl,
+            delivery: browser ? 'browser' : 'direct',
+            diagnosticsIncluded: !browser && prepared.diagnosticsIncluded,
+            truncated: browser && prepared.browserPreview.truncated,
+            ...(browser ? { fallbackUrl: prepared.fallbackUrl } : {}),
+          },
+        };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? redactFeedbackText(error.message) : 'Invalid feedback report.' };
+      }
+    },
+  );
 
   ipcMain.handle(IpcChannel.FeedbackSubmit, async (_event: unknown, input: FeedbackReportInputDto): Promise<FeedbackReportSubmissionResultDto> => {
     let prepared: ReturnType<typeof prepareFeedbackReport>;

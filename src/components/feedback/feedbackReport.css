@@ -1,0 +1,137 @@
+.feedback-report-form,
+.feedback-report-review,
+.feedback-report-extra-fields,
+.feedback-report-diagnostics {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.feedback-report-form .ui-segmented-control {
+  align-self: stretch;
+}
+
+.feedback-report-form .ui-segmented-control__item {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.feedback-report-form textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.feedback-report-message textarea {
+  min-height: 144px;
+}
+
+.feedback-report-hint {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.feedback-report-details > summary {
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.78rem;
+  padding: 4px 0;
+}
+
+.feedback-report-details > summary:focus-visible {
+  outline: 1px solid var(--accent-primary-border);
+  outline-offset: 3px;
+}
+
+.feedback-report-details[open] > summary {
+  margin-bottom: 10px;
+}
+
+.feedback-report-diagnostics {
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-dark);
+  gap: 8px;
+}
+
+.feedback-report-diagnostics-toggle,
+.feedback-report-diagnostics-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.feedback-report-diagnostics-actions {
+  flex-wrap: wrap;
+}
+
+.feedback-report-diagnostics-toggle input {
+  accent-color: var(--accent-primary);
+}
+
+.feedback-report-diagnostics textarea {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.74rem;
+}
+
+.feedback-report-destination,
+.feedback-report-review-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+
+.feedback-report-destination > span,
+.feedback-report-review-title > span {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.feedback-report-destination a {
+  color: var(--text-accent);
+  font-size: 0.8rem;
+}
+
+.feedback-report-review-title strong {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.feedback-report-preview {
+  width: 100%;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-dark);
+  font-size: 0.8rem;
+}
+
+.feedback-report-preview pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.feedback-report-preview h2 {
+  font-size: 0.92rem;
+}
+
+.feedback-report-error {
+  color: var(--status-danger);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.feedback-report-notice {
+  color: var(--status-warning);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}

@@ -3,6 +3,17 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { createElectronApi } from '../createElectronApi';
 
 describe('createElectronApi', () => {
+  it('previews feedback without submitting through both API namespaces', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true, data: {} });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+    const input = { category: 'bug' as const, submissionMode: 'manual' as const, source: 'settings' as const, actual: 'The editor is empty.' };
+    await api.app.previewFeedbackReport(input);
+    await api.previewFeedbackReport(input, 'browser');
+    expect(invoke.mock.calls).toEqual([
+      [IpcChannel.FeedbackPreview, input, undefined],
+      [IpcChannel.FeedbackPreview, input, 'browser'],
+    ]);
+  });
   it('forwards JSON Schema validation through flat and app APIs', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true, data: [] });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

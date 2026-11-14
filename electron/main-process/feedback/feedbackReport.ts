@@ -1,6 +1,13 @@
-import { FEEDBACK_REPORT_AREAS, type FeedbackReportAreaDto, type FeedbackReportInputDto } from '../../../src/types/feedbackDtos';
+import {
+  FEEDBACK_REPORT_AREAS,
+  FEEDBACK_TITLE_MAX,
+  FEEDBACK_TEXT_MAX,
+  FEEDBACK_DIAGNOSTICS_MAX,
+  type FeedbackReportAreaDto,
+  type FeedbackReportInputDto,
+} from '../../../src/types/feedbackDtos';
 import { redactGitSensitiveText } from '../../git/GitErrorFormatter';
-import { FEEDBACK_REPOSITORY_NAME, FEEDBACK_REPOSITORY_OWNER } from '../../github/GitHubIssueService';
+import { buildFeedbackFallback, type FeedbackFormField } from './feedbackReportFallback';
 
 export type FeedbackEnvironment = {
   appVersion: string;
@@ -12,13 +19,11 @@ export type PreparedFeedbackReport = {
   title: string;
   body: string;
   label: string;
-  fallbackUrl: string | null;
+  fallbackUrl: string;
+  browserPreview: { title: string; body: string; truncated: boolean };
+  diagnosticsIncluded: boolean;
 };
 
-const TITLE_MAX = 180;
-const FIELD_MAX = 8_000;
-const DIAGNOSTICS_MAX = 20_000;
-const FALLBACK_URL_MAX = 4_000;
 const categoryConfig = {
   bug: { prefix: '[Bug]:', label: 'bug', template: 'bug_report.yml' },
   feature: { prefix: '[Feature]:', label: 'enhancement', template: 'feature_request.yml' },
@@ -43,13 +48,13 @@ export const redactFeedbackText = (value: unknown, redactPaths = false): string 
   return text;
 };
 
-const requiredText = (value: unknown, label: string, max = FIELD_MAX, redactPaths = false): string => {
+const requiredText = (value: unknown, label: string, max = FEEDBACK_TEXT_MAX, redactPaths = false): string => {
   const normalized = redactFeedbackText(value, redactPaths).trim();
   if (!normalized) throw new Error(`${label} is required.`);
   return normalized.slice(0, max);
 };
 
-const optionalText = (value: unknown, max = FIELD_MAX): string => redactFeedbackText(value).trim().slice(0, max);
+const optionalText = (value: unknown, max = FEEDBACK_TEXT_MAX): string => redactFeedbackText(value).trim().slice(0, max);
 
 const normalizedArea = (value: unknown): FeedbackReportAreaDto =>
   FEEDBACK_REPORT_AREAS.includes(value as FeedbackReportAreaDto) ? (value as FeedbackReportAreaDto) : 'Other';
@@ -75,117 +80,61 @@ const formArea = (category: FeedbackReportInputDto['category'], area: FeedbackRe
   return area;
 };
 
-const fallbackUrl = (input: FeedbackReportInputDto, title: string, environment: FeedbackEnvironment, fields: Record<string, string>): string | null => {
-  const config = categoryConfig[input.category];
-  const params = new URLSearchParams({ template: config.template, title });
-  for (const [key, value] of Object.entries(fields)) {
-    if (value) params.set(key, value.slice(0, 700));
-  }
-  params.set('app-version', environment.appVersion);
-  const urlBase = `https://github.com/${FEEDBACK_REPOSITORY_OWNER}/${FEEDBACK_REPOSITORY_NAME}/issues/new`;
-  let result = `${urlBase}?${params.toString()}`;
-  while (result.length > FALLBACK_URL_MAX) {
-    const candidates = [...params.entries()].filter(([key, value]) => key !== 'template' && key !== 'title' && value.length > 80);
-    const longest = candidates.sort((left, right) => right[1].length - left[1].length)[0];
-    if (!longest) break;
-    params.set(longest[0], `${longest[1].slice(0, Math.max(80, Math.floor(longest[1].length * 0.7)))}…`);
-    result = `${urlBase}?${params.toString()}`;
-  }
-  return result.length <= FALLBACK_URL_MAX
-    ? result
-    : `${urlBase}?template=${encodeURIComponent(config.template)}&title=${encodeURIComponent(title.slice(0, 100))}`;
-};
-
 export function prepareFeedbackReport(input: FeedbackReportInputDto, environment: FeedbackEnvironment): PreparedFeedbackReport {
-  if (!input || !categoryConfig[input.category]) throw new Error('Invalid feedback category.');
+  if (!input || !Object.prototype.hasOwnProperty.call(categoryConfig, input.category)) throw new Error('Invalid feedback category.');
   if (input.submissionMode !== 'manual') throw new Error('Only manual feedback reports are supported.');
   const config = categoryConfig[input.category];
-  const rawTitle = requiredText(input.title, 'Title', TITLE_MAX).replace(/^\[(?:Bug|Feature|Question)\]:\s*/i, '');
-  const title = `${config.prefix} ${rawTitle}`.slice(0, TITLE_MAX + config.prefix.length + 1);
   const area = normalizedArea(input.area);
   const source = input.source === 'error-toast' ? 'Error toast' : 'Settings';
   const environmentBlock = environmentMarkdown(environment, area, source);
-
+  const fields: FeedbackFormField[] = [];
+  let description: string;
+  let diagnostics = '';
+  const add = (id: string, heading: string, value: unknown, required = false) => {
+    const text = required ? requiredText(value, heading) : optionalText(value);
+    if (text) fields.push({ id, heading, value: text });
+    return text;
+  };
   if (input.category === 'bug') {
-    const steps = requiredText(input.steps, 'Steps');
-    const expected = requiredText(input.expected, 'Expected behavior');
-    const actual = requiredText(input.actual, 'Actual behavior');
-    const diagnostics = optionalText(input.diagnostics, DIAGNOSTICS_MAX);
-    const body = [
-      '## Steps to reproduce',
-      steps,
-      '',
-      '## Expected behavior',
-      expected,
-      '',
-      '## Actual behavior',
-      actual,
-      '',
-      '## Environment',
-      environmentBlock,
-      ...(diagnostics ? ['', '## Diagnostics', '```text', markdownValue(diagnostics), '```'] : []),
-    ].join('\n');
-    return {
-      title,
-      body,
-      label: config.label,
-      fallbackUrl: fallbackUrl(input, title, environment, { steps, expected, actual, 'affected-area': formArea(input.category, area) }),
-    };
+    description = add('actual', 'Actual behavior', input.actual, true);
+    add('steps', 'Steps to reproduce', input.steps);
+    add('expected', 'Expected behavior', input.expected);
+    diagnostics = optionalText(input.diagnostics, FEEDBACK_DIAGNOSTICS_MAX);
+  } else if (input.category === 'feature') {
+    description = add('problem', 'Idea or opportunity', input.problem, true);
+    add('workflow', 'Desired workflow', input.desiredWorkflow);
+    add('proposal', 'Proposed solution', input.proposal);
+    add('value', 'User value', input.value);
+  } else {
+    description = add('question', 'Question', input.question, true);
+    add('context', 'Context', input.context);
+    add('tried', 'What I already tried', input.tried);
   }
-
-  if (input.category === 'feature') {
-    const problem = requiredText(input.problem, 'Problem');
-    const desiredWorkflow = requiredText(input.desiredWorkflow, 'Desired workflow');
-    const proposal = requiredText(input.proposal, 'Proposal');
-    const value = requiredText(input.value, 'User value');
-    const body = [
-      '## Problem or opportunity',
-      problem,
-      '',
-      '## Desired workflow',
-      desiredWorkflow,
-      '',
-      '## Proposed solution',
-      proposal,
-      '',
-      '## User value',
-      value,
-      '',
-      '## Environment',
-      environmentBlock,
-    ].join('\n');
-    return {
-      title,
-      body,
-      label: config.label,
-      fallbackUrl: fallbackUrl(input, title, environment, {
-        problem,
-        workflow: desiredWorkflow,
-        proposal,
-        value,
-        'affected-area': formArea(input.category, area),
-      }),
-    };
-  }
-
-  const question = requiredText(input.question, 'Question');
-  const context = requiredText(input.context, 'Context');
-  const tried = optionalText(input.tried);
+  const stripPrefix = (value: string) => value.replace(/^\[(?:Bug|Feature|Question)\]:\s*/i, '').trim();
+  const firstLine = (value: string) =>
+    value
+      .split(/\r?\n/)
+      .map((line) => stripPrefix(line.trim()))
+      .find(Boolean) || '';
+  const rawTitle = firstLine(optionalText(input.title, FEEDBACK_TITLE_MAX)) || firstLine(description);
+  const title = `${config.prefix} ${Array.from(rawTitle)
+    .slice(0, FEEDBACK_TITLE_MAX - config.prefix.length - 1)
+    .join('')}`;
+  fields.push({ id: 'environment', heading: 'Environment', value: environmentBlock });
   const body = [
-    '## Question',
-    question,
-    '',
-    '## Context',
-    context,
-    ...(tried ? ['', '## What I already tried', tried] : []),
-    '',
-    '## Environment',
-    environmentBlock,
-  ].join('\n');
+    ...fields.map((field) => `## ${field.heading}\n${field.value}`),
+    ...(diagnostics ? [`## Diagnostics\n\`\`\`text\n${markdownValue(diagnostics)}\n\`\`\``] : []),
+  ].join('\n\n');
+  const browser = buildFeedbackFallback(config.template, title, [
+    ...fields,
+    { id: input.category === 'question' ? 'area' : 'affected-area', heading: 'Affected area', value: formArea(input.category, area) },
+  ]);
   return {
     title,
     body,
     label: config.label,
-    fallbackUrl: fallbackUrl(input, title, environment, { question, context, tried, area: formArea(input.category, area) }),
+    fallbackUrl: browser.url,
+    browserPreview: { title: browser.title, body: browser.body, truncated: browser.truncated },
+    diagnosticsIncluded: Boolean(diagnostics),
   };
 }

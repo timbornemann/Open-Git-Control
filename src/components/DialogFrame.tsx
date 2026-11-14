@@ -13,6 +13,7 @@ interface DialogFrameProps {
   confirmLabel?: string;
   secondaryActionLabel?: string;
   cancelLabel?: string;
+  cancelDisabled?: boolean;
   confirmDisabled?: boolean;
   confirmVariant?: 'default' | 'danger';
   secondaryActionVariant?: 'default' | 'danger';
@@ -44,6 +45,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
   confirmLabel,
   secondaryActionLabel,
   cancelLabel,
+  cancelDisabled = false,
   confirmDisabled = false,
   confirmVariant = 'default',
   secondaryActionVariant = 'default',
@@ -153,7 +155,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
         </div>
         <div className="dialog-content">{children}</div>
         <div className="dialog-footer">
-          <button className="dialog-btn dialog-btn-secondary" data-dialog-action="cancel" onClick={onClose}>
+          <button className="dialog-btn dialog-btn-secondary" data-dialog-action="cancel" onClick={onClose} disabled={cancelDisabled}>
             {cancelLabel ?? t('generated.components.confirm.cancel_035b7526')}
           </button>
           {onSecondaryAction && (

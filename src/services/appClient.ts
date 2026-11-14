@@ -68,6 +68,10 @@ export const appClient = cachedClient('app', {
     return requireElectronAppApi().getFeedbackReportCapability(...args);
   },
 
+  async previewFeedbackReport(...args: Parameters<ElectronAPI['previewFeedbackReport']>): ReturnType<ElectronAPI['previewFeedbackReport']> {
+    return requireElectronAppApi().previewFeedbackReport(...args);
+  },
+
   async submitFeedbackReport(...args: Parameters<ElectronAPI['submitFeedbackReport']>): ReturnType<ElectronAPI['submitFeedbackReport']> {
     return requireElectronAppApi().submitFeedbackReport(...args);
   },
