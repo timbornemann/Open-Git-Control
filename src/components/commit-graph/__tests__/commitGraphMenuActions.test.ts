@@ -136,6 +136,54 @@ describe('commit graph menu localization', () => {
     expect(result.setToast).toHaveBeenCalledExactlyOnceWith({ msg: 'Commit-Hash konnte nicht kopiert werden.', isError: true });
   });
 
+  it.each(['de', 'en'] as const)('copies the selected commit metadata and its complete multiline message in %s', async (language) => {
+    const selectedHash = 'c'.repeat(64);
+    const author = 'Léa Müller';
+    const date = '2026-11-14 15:42:03 +0100';
+    const message = 'feat: Add commit information\n\nInclude the complete description.\nKeep paragraphs and Unicode: ä ö ü.\n\nSigned-off-by: Léa Müller\n';
+    const read = vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: message });
+    const nativeWrite = vi.fn().mockResolvedValue({ success: true });
+    vi.stubGlobal('window', { electronAPI: { app: { writeClipboardText: nativeWrite } } });
+    const result = buildActions(language, { ...node, commit: { ...node.commit, hash: selectedHash, author, date, subject: 'Only the graph subject' } });
+    const label = language === 'de' ? 'Commit-Informationen kopieren' : 'Copy commit information';
+
+    await result.actions.find((action) => action.label === label)!.action();
+    expect(read).toHaveBeenCalledExactlyOnceWith('C:/repo', 'show', '-s', '--format=%B', selectedHash);
+    expect(nativeWrite).toHaveBeenCalledExactlyOnceWith(
+      `Hash: ${selectedHash}\n${language === 'de' ? 'Autor' : 'Author'}: ${author}\n${language === 'de' ? 'Zeitpunkt' : 'Date'}: ${date}\n\n${message}`,
+    );
+    expect(result.setToast).toHaveBeenCalledExactlyOnceWith({
+      msg: language === 'de' ? 'Commit-Informationen kopiert.' : 'Commit information copied.',
+      isError: false,
+    });
+    expect(result.actions).toContainEqual(expect.objectContaining({ label: language === 'de' ? 'Commit-Hash kopieren' : 'Copy commit hash' }));
+    expect(result.runGitAction).not.toHaveBeenCalled();
+  });
+
+  it.each(['failure', 'rejection'])('keeps the clipboard untouched when loading the commit message ends in %s', async (failure) => {
+    const read = vi.spyOn(gitClient, 'runGitCommandForRepo');
+    if (failure === 'failure') read.mockResolvedValue({ success: false, error: 'Repository unavailable' });
+    else read.mockRejectedValue(new Error('Repository unavailable'));
+    const nativeWrite = vi.fn().mockResolvedValue({ success: true });
+    vi.stubGlobal('window', { electronAPI: { app: { writeClipboardText: nativeWrite } } });
+    const result = buildActions('en');
+
+    await result.actions.find((action) => action.label === 'Copy commit information')!.action();
+    expect(nativeWrite).not.toHaveBeenCalled();
+    expect(result.setToast).toHaveBeenCalledExactlyOnceWith({ msg: 'Could not copy the commit information. Repository unavailable', isError: true });
+  });
+
+  it('reports a failed clipboard write after loading the complete commit information', async () => {
+    vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: 'Commit message\n\nDescription\n' });
+    const nativeWrite = vi.fn().mockResolvedValue({ success: false });
+    vi.stubGlobal('window', { electronAPI: { app: { writeClipboardText: nativeWrite } } });
+    const result = buildActions('de');
+
+    await result.actions.find((action) => action.label === 'Commit-Informationen kopieren')!.action();
+    expect(nativeWrite).toHaveBeenCalledOnce();
+    expect(result.setToast).toHaveBeenCalledExactlyOnceWith({ msg: 'Commit-Informationen konnten nicht kopiert werden.', isError: true });
+  });
+
   it.each((['de', 'en'] as const).flatMap((language) => (['root', 'off-head', 'merge'] as const).map((reason) => ({ language, reason }))))(
     'refuses $reason rebase before opening an editor or calling Git in $language',
     ({ language, reason }) => {

@@ -4,6 +4,7 @@ import type { ToastMessage } from '@/types/git';
 import type { GraphLayout, GraphNode } from '@/utils/graphLayout';
 import { gitClient } from '@/services/gitClient';
 import { copyTextToClipboard } from '@/utils/clipboard';
+import { isFullGitObjectId } from '@/utils/gitObjectId';
 import type { MenuAction } from './CommitContextMenu';
 
 type BuildCommitHistoryMenuActionsParams = {
@@ -285,6 +286,40 @@ export const buildCommitHistoryMenuActions = ({
           msg: copied ? tr('Hash kopiert!', 'Hash copied!') : tr('Commit-Hash konnte nicht kopiert werden.', 'Could not copy the commit hash.'),
           isError: !copied,
         });
+      },
+    },
+    {
+      label: tr('Commit-Informationen kopieren', 'Copy commit information'),
+      description: tr(
+        'Kopiert Hash, vollständige Commit-Nachricht, Zeitpunkt und Autor in die Zwischenablage.',
+        'Copies the hash, full commit message, date and author to the clipboard.',
+      ),
+      icon: 'CI',
+      action: async () => {
+        const failureMessage = tr('Commit-Informationen konnten nicht kopiert werden.', 'Could not copy the commit information.');
+        if (!repoPath || !isFullGitObjectId(hash)) {
+          setToast({ msg: failureMessage, isError: true });
+          return;
+        }
+        try {
+          const result = await gitClient.runGitCommandForRepo(repoPath, 'show', '-s', '--format=%B', hash);
+          if (!result.success) throw new Error(result.error);
+          const text = [
+            `Hash: ${hash}`,
+            `${tr('Autor', 'Author')}: ${node.commit.author}`,
+            `${tr('Zeitpunkt', 'Date')}: ${node.commit.date}`,
+            '',
+            result.data,
+          ].join('\n');
+          const copied = await copyTextToClipboard(text);
+          setToast({
+            msg: copied ? tr('Commit-Informationen kopiert.', 'Commit information copied.') : failureMessage,
+            isError: !copied,
+          });
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          setToast({ msg: detail ? `${failureMessage} ${detail}` : failureMessage, isError: true });
+        }
       },
     },
   ];
