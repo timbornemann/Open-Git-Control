@@ -53,6 +53,16 @@ describe('working-directory search handlers', () => {
     expect(runCommandAtPath).toHaveBeenCalledWith(repoPath, ['-c', 'core.quotepath=false', 'ls-files', '-z', '--cached', '--others', '--exclude-standard']);
   });
 
+  it('lists a conflicted path (repeated once per index stage) only once', async () => {
+    runCommandAtPath.mockResolvedValue('src/app.ts\0src/app.ts\0src/app.ts\0docs/my-app.md\0');
+    const content = await handlers.get(IpcChannel.GitSearchWorkingDirectory)?.({}, { query: 'app()', mode: 'content', caseSensitive: true }, repoPath);
+    const names = await handlers.get(IpcChannel.GitSearchWorkingDirectory)?.({}, { query: 'app.ts', mode: 'filename', caseSensitive: false }, repoPath);
+
+    expect(content.data.files.map((file: { path: string }) => file.path)).toEqual(['src/app.ts']);
+    expect(content.data).toMatchObject({ totalMatches: 1, scannedFiles: 2 });
+    expect(names.data.files.map((file: { path: string }) => file.path)).toEqual(['src/app.ts']);
+  });
+
   it('treats regular-expression characters as literal search text', async () => {
     const result = await handlers.get(IpcChannel.GitSearchWorkingDirectory)?.({}, { query: 'app()', mode: 'content', caseSensitive: true }, repoPath);
 

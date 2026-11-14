@@ -33,10 +33,9 @@ const pathKey = (value: string): string => (process.platform === 'win32' ? value
 
 const listCandidateFiles = async (gitService: GitService, repoPath: string): Promise<{ paths: string[]; truncated: boolean }> => {
   const output = await gitService.runCommandAtPath(repoPath, ['-c', 'core.quotepath=false', 'ls-files', '-z', '--cached', '--others', '--exclude-standard']);
-  const allPaths = output
-    .split('\0')
-    .filter(Boolean)
-    .sort((left, right) => left.localeCompare(right));
+  // `ls-files --cached` repeats a path once per index stage while it is
+  // conflicted, which would otherwise duplicate its results and match counts.
+  const allPaths = [...new Set(output.split('\0').filter(Boolean))].sort((left, right) => left.localeCompare(right));
   return { paths: allPaths.slice(0, MAX_CANDIDATE_FILES), truncated: allPaths.length > MAX_CANDIDATE_FILES };
 };
 
