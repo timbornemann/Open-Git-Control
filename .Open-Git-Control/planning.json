@@ -252,12 +252,12 @@
       "title": "ai message",
       "description": "ai message kann nicht generieren wenn man dateien hinzufügt mit add, und anders herum, diese sachen kommen sich doch eigentlich nicht in die qerere, wenn also die ki die commit nachrticht formuliert sollte man paralel dateiene stagen oder unstagen können",
       "priority": "medium",
-      "status": "bug",
+      "status": "in-progress",
       "tags": [
         "Bug"
       ],
       "createdAt": 1793823845830,
-      "updatedAt": 1794660519061
+      "updatedAt": 1794662603204
     },
     {
       "id": "c81d1900-3341-4738-b784-6a9789071ded",
@@ -284,19 +284,6 @@
       ],
       "createdAt": 1794660755863,
       "updatedAt": 1794660755863
-    },
-    {
-      "id": "9bfd87b0-c3cc-47da-ab54-5ae9159cab9a",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "copy commit",
-      "description": "copy commit: complette comit infos copieren im rechtsklick menü, heißt hash, commit nachricht und zeitpunkt und author",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [
-        "Planned"
-      ],
-      "createdAt": 1794660814184,
-      "updatedAt": 1794660829522
     }
   ]
 }

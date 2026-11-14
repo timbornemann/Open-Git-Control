@@ -51,8 +51,8 @@ const sharedWorkingTreeMatchesRepository = ({
   );
 };
 
-const canStageAllChanges = (status: GitStatusWithConflicts, isBareRepository: boolean, isCommitInputDisabled: boolean): boolean =>
-  !isBareRepository && !isCommitInputDisabled && status.unstaged.length + status.untracked.length > 0;
+const canStageAllChanges = (status: GitStatusWithConflicts, isBareRepository: boolean, isStagingDisabled: boolean): boolean =>
+  !isBareRepository && !isStagingDisabled && status.unstaged.length + status.untracked.length > 0;
 
 const sharedDetailInputs = (shared: boolean, snapshot: StagingAreaProps['workingTreeSnapshot'], raw?: string) => ({
   externalStatusRaw: shared ? (raw ?? snapshot?.statusRaw) : undefined,
@@ -184,8 +184,10 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const isBareRepository = Boolean(sharedSnapshot?.isBare);
   const totalChanges = status.staged.length + status.unstaged.length + status.untracked.length + status.conflicts.length;
   const hasOpenConflicts = status.conflicts.length > 0;
-  const isCommitInputDisabled =
-    hasOpenConflicts || fileOps.isMutating || commitForm.isCommitting || aiCommit.isAiCommitting || aiCommit.isAiJobRunning || aiCommit.isAiMessageGenerating;
+  // Generating text from notes does not change the Git index. Only the commit
+  // fields need to wait for that result; staging can continue independently.
+  const isStagingDisabled = hasOpenConflicts || fileOps.isMutating || commitForm.isCommitting || aiCommit.isAiCommitting || aiCommit.isAiJobRunning;
+  const isCommitInputDisabled = isStagingDisabled || aiCommit.isAiMessageGenerating;
 
   const visibleStaged = visibleFiles.staged;
   const visibleUnstaged = visibleFiles.unstaged;
@@ -259,7 +261,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
           searchQuery={fileOps.searchQuery}
           setSearchQuery={fileOps.setSearchQuery}
           onStageAll={fileOps.stageAll}
-          canStageAll={canStageAllChanges(status, isBareRepository, isCommitInputDisabled)}
+          canStageAll={canStageAllChanges(status, isBareRepository, isStagingDisabled)}
           hasConflicts={hasOpenConflicts}
         />
       )}

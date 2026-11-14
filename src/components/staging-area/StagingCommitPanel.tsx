@@ -192,13 +192,7 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
             type="button"
             onClick={openAiCommitMessageDialog}
             disabled={
-              fileOps.isMutating ||
-              hasOpenConflicts ||
-              commitForm.isCommitting ||
-              aiCommit.isAiCommitting ||
-              aiCommit.isAiJobRunning ||
-              aiCommit.isAiMessageGenerating ||
-              !status
+              hasOpenConflicts || commitForm.isCommitting || aiCommit.isAiCommitting || aiCommit.isAiJobRunning || aiCommit.isAiMessageGenerating || !status
             }
             title={tr(
               `Commit-Message aus Notizen generieren (${aiCommitMessageStyleLabel})`,
