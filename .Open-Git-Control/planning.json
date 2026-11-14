@@ -247,30 +247,17 @@
       "updatedAt": 1793218330070
     },
     {
-      "id": "c81d1900-3341-4738-b784-6a9789071ded",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "working dir",
-      "description": "im working directory, wenn bei eienr datei die preview verfügbar ist wie bei markdown dateien bildern oder htmls  oder so, dann soll direkt die prewiew ansicht geöffnet sein damit man nicht manuell auf preview klicken mus bei den datenen",
-      "priority": "medium",
-      "status": "in-progress",
-      "tags": [
-        "Planned"
-      ],
-      "createdAt": 1794072187160,
-      "updatedAt": 1794662861645
-    },
-    {
       "id": "2ce32d8d-3907-4146-a783-9849bb7d1d45",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "ai release text",
       "description": "ai release text: 2 neue felder, custom instructions, bzw eigene agent anweisugnen, diese wirken projektgebunden und werdne permanent gespeichert, damit man z.b. einen ton, oder eigene anwesungen geben kann ide dann fpe alle releases gelten. und das 2 feld sind für jeden release einzeld indem man anweisungen für die generation hinzufügen kann wie z.b. wenn man sicherstellen möchte das die ki beim erstellen fokus auf ein spezielles featur legt",
       "priority": "medium",
-      "status": "planned",
+      "status": "in-progress",
       "tags": [
         "Planned"
       ],
       "createdAt": 1794660755863,
-      "updatedAt": 1794660755863
+      "updatedAt": 1794666306839
     }
   ]
 }

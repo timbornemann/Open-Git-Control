@@ -6,6 +6,8 @@ import { I18nProvider } from '@/i18n';
 import type { HostedRepository, HostingCapabilities } from '@/types/hostingDtos';
 import { RepositoryReleaseCreator } from '../RepositoryReleaseCreator';
 import { releaseDraftKey, useReleaseDraftState } from '../releaseDraftState';
+import { storageClient } from '@/services/storageClient';
+import type { RepositoryUiPreferences } from '@/shared/ipc/repositoryUiPreferences';
 
 const mocks = vi.hoisted(() => ({
   request: vi.fn(),
@@ -16,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   toast: vi.fn(),
   openExternal: vi.fn(),
   branch: 'main',
+  language: 'en' as 'de' | 'en',
 }));
 vi.mock('@/hooks/useAppToast', () => ({ useAppToast: () => mocks.toast }));
 vi.mock('../useReleaseTarget', () => ({ useReleaseTarget: () => mocks.target }));
@@ -24,7 +27,7 @@ vi.mock('@/services/aiClient', () => ({ aiClient: { generateReleaseNotes: mocks.
 vi.mock('@/services/appClient', () => ({ appClient: { selectFiles: async () => [], isAvailable: () => true, openExternalUrl: mocks.openExternal } }));
 vi.mock('@/contexts/AppStateContext', () => ({
   useGitStore: (select: (state: unknown) => unknown) => select({ currentBranch: mocks.branch, refreshTrigger: 0, triggerRefresh: vi.fn() }),
-  useSettingsStore: (select: (state: unknown) => unknown) => select({ settings: { language: 'en' } }),
+  useSettingsStore: (select: (state: unknown) => unknown) => select({ settings: { language: mocks.language } }),
   useUIStore: (select: (state: unknown) => unknown) => select({ onOpenRemoteConfig: mocks.config, setActiveTab: mocks.tab, setConfirmDialog: vi.fn() }),
   useAppStateReader: () => () => ({ repository: { activeRepo: 'C:/repo' } }),
 }));
@@ -72,13 +75,20 @@ const render = async (repoPath = 'C:/repo') =>
   });
 const click = async (text: string) =>
   act(async () => {
-    const button = [...host.querySelectorAll('button')].find((item) => item.textContent?.trim() === text);
+    const button = [...host.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === text || item.textContent?.trim() === text);
     expect(button).toBeTruthy();
     button!.click();
   });
 async function notes(value: string) {
   await act(async () => {
-    const input = host.querySelector<HTMLTextAreaElement>('textarea')!;
+    const input = host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!;
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+async function instructions(kind: 'release' | 'project', value: string) {
+  await act(async () => {
+    const input = host.querySelector<HTMLTextAreaElement>(`textarea[data-release-instructions="${kind}"]`)!;
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(input, value);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
@@ -97,6 +107,7 @@ beforeEach(() => {
   useReleaseDraftState.setState({ sessions: {} });
   mocks.target = target('forgejo');
   mocks.branch = 'main';
+  mocks.language = 'en';
   mocks.request.mockReset();
   mocks.generate.mockReset();
   mocks.request.mockResolvedValue(history);
@@ -109,9 +120,94 @@ afterEach(() => {
   act(() => root.unmount());
   host.remove();
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 describe('full repository release creator', () => {
+  it('uses the current settings language for templates and AI while keeping the existing draft', async () => {
+    await render();
+    await notes('Keep this draft while changing settings.');
+    await instructions('release', 'Focus on search.');
+    mocks.language = 'de';
+    await render();
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toBe('Keep this draft while changing settings.');
+    expect(host.querySelector<HTMLTextAreaElement>('[data-release-instructions="release"]')!.value).toBe('Focus on search.');
+
+    await click('Generate notes from template');
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toContain('Dieses Patch-Release');
+    await click('Generate release notes with AI');
+    expect(mocks.generate).toHaveBeenLastCalledWith(expect.objectContaining({ language: 'de', releaseInstructions: 'Focus on search.' }));
+
+    mocks.language = 'en';
+    await render();
+    await click('Generate notes from template');
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toContain('This patch release');
+    await click('Generate release notes with AI');
+    expect(mocks.generate).toHaveBeenLastCalledWith(expect.objectContaining({ language: 'en' }));
+  });
+
+  it('saves project instructions durably, combines them with release hints and restores only the project defaults in a fresh session', async () => {
+    const saved: Record<string, RepositoryUiPreferences> = {};
+    vi.spyOn(storageClient, 'hasUiPreferences').mockReturnValue(true);
+    vi.spyOn(storageClient, 'uiPreferences').mockImplementation(async () => ({ success: true, data: structuredClone(saved) }));
+    const persist = vi.spyOn(storageClient, 'updateUiPreferences').mockImplementation(async ({ repoPath, patch }) => {
+      saved[repoPath] = { ...saved[repoPath], ...patch };
+      return { success: true, data: structuredClone(saved) };
+    });
+    await render();
+    await click('Configure');
+    await instructions('project', 'Friendly tone.\nExplain benefits first.');
+    await click('Save for this project');
+    expect(persist).toHaveBeenCalledExactlyOnceWith({ repoPath: 'C:/repo', patch: { releaseNotesInstructions: 'Friendly tone.\nExplain benefits first.' } });
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    expect(host.textContent).toContain('Saved · for every release');
+    await instructions('release', 'Highlight the new search.');
+    await click('Generate release notes with AI');
+    expect(mocks.generate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        projectInstructions: 'Friendly tone.\nExplain benefits first.',
+        releaseInstructions: 'Highlight the new search.',
+      }),
+    );
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toContain('AI notes');
+
+    act(() => root.unmount());
+    useReleaseDraftState.setState({ sessions: {} });
+    root = createRoot(host);
+    await render();
+    expect(host.querySelector<HTMLTextAreaElement>('[data-release-instructions="release"]')!.value).toBe('');
+    await click('Configure');
+    expect(host.querySelector<HTMLTextAreaElement>('[data-release-instructions="project"]')!.value).toBe('Friendly tone.\nExplain benefits first.');
+    await click('Cancel');
+    await click('Generate release notes with AI');
+    expect(mocks.generate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ projectInstructions: 'Friendly tone.\nExplain benefits first.', releaseInstructions: '' }),
+    );
+
+    await render('C:/other');
+    await click('Configure');
+    expect(host.querySelector<HTMLTextAreaElement>('[data-release-instructions="project"]')!.value).toBe('');
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps failed project edits in the dialog and does not treat them as saved instructions', async () => {
+    vi.spyOn(storageClient, 'hasUiPreferences').mockReturnValue(true);
+    vi.spyOn(storageClient, 'uiPreferences').mockResolvedValue({ success: true, data: { 'C:/repo': { releaseNotesInstructions: 'Existing tone.' } } });
+    vi.spyOn(storageClient, 'updateUiPreferences').mockResolvedValue({ success: false, error: 'Settings file is read-only.' });
+    await render();
+    await click('Configure');
+    await instructions('project', 'Unsaved replacement.');
+    await click('Save for this project');
+    expect(host.querySelector('[role="dialog"]')).toBeTruthy();
+    expect(host.querySelector<HTMLTextAreaElement>('[data-release-instructions="project"]')!.value).toBe('Unsaved replacement.');
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('read-only');
+    expect(mocks.generate).not.toHaveBeenCalled();
+    await click('Cancel');
+    await click('Reload');
+    await click('Generate release notes with AI');
+    expect(mocks.generate).toHaveBeenCalledWith(expect.objectContaining({ projectInstructions: 'Existing tone.' }));
+  });
+
   it('previews the current draft without publishing or losing text and refreshes after notes generation', async () => {
     await render();
     const body = '## Fixed\n\n- **Keep the draft**\n\n[Details](https://forge.example/team/repo/commit/aaaaaaa)\n\n<script>unsafe()</script>';
@@ -122,13 +218,13 @@ describe('full repository release creator', () => {
     expect(preview.querySelector('h2')?.textContent).toBe('Fixed');
     expect(preview.querySelector('strong')?.textContent).toBe('Keep the draft');
     expect(preview.querySelector('script')).toBeNull();
-    expect(host.querySelector('textarea')).toBeNull();
+    expect(host.querySelector('.release-textarea--editor')).toBeNull();
     expect(mocks.request).not.toHaveBeenCalled();
     expect(mocks.generate).not.toHaveBeenCalled();
     await act(async () => preview.querySelector<HTMLAnchorElement>('a')!.click());
     expect(mocks.openExternal).toHaveBeenCalledWith('https://forge.example/team/repo/commit/aaaaaaa');
     await click('Edit');
-    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe(body);
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toBe(body);
 
     await click('Preview');
     mocks.generate.mockResolvedValue({ success: true, data: { markdown: '## Generated\n\nUpdated notes.', source: 'ai' } });
@@ -136,7 +232,7 @@ describe('full repository release creator', () => {
     expect(host.querySelector('.release-notes-preview h2')?.textContent).toBe('Generated');
     expect(host.querySelector('.release-notes-preview')?.textContent).toContain('Updated notes.');
     await click('Edit');
-    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toContain('## Generated');
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toContain('## Generated');
   });
 
   it('offers an offline empty preview and keeps preview contents isolated when changing repositories', async () => {
@@ -153,7 +249,7 @@ describe('full repository release creator', () => {
     await click('Preview');
     expect(host.querySelector('.release-notes-preview')?.textContent).not.toContain('Private draft');
     await render();
-    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('# Private draft');
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toBe('# Private draft');
   });
 
   it.each(['Patch', 'Minor', 'Major'])('generates the %s template and a full commit list without an AI or network request', async (version) => {
@@ -161,7 +257,7 @@ describe('full repository release creator', () => {
     await click(version);
     mocks.request.mockClear();
     await click('Generate notes from template');
-    const body = host.querySelector<HTMLTextAreaElement>('textarea')!.value;
+    const body = host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value;
     expect(body).toContain(`This ${version.toLowerCase()} release`);
     expect(body).toContain('  Preserve existing settings.\n\n  - Include migration details.');
     expect(body.match(/## Commit List/g)).toHaveLength(1);
@@ -185,8 +281,8 @@ describe('full repository release creator', () => {
     });
     await click('Generate notes from template');
     expect(mocks.request).toHaveBeenCalledWith('releaseNotesCommits', { repoPath: 'C:/repo', toRef: 'main', fromRef: 'v1.0.0' });
-    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toContain('  Preserve configuration.');
-    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.disabled).toBe(false);
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toContain('  Preserve configuration.');
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.disabled).toBe(false);
     expect((host.querySelector('.release-primary-btn') as HTMLButtonElement).disabled).toBe(true);
     expect(mocks.generate).not.toHaveBeenCalled();
   });
@@ -198,7 +294,7 @@ describe('full repository release creator', () => {
     expect(mocks.generate).toHaveBeenCalledWith(
       expect.objectContaining({ commits: [expect.objectContaining({ description: history.commitsSinceLastRelease[0].description })] }),
     );
-    const body = host.querySelector<HTMLTextAreaElement>('textarea')!.value;
+    const body = host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value;
     expect(body).not.toContain('Breaking Changes');
     expect(body).not.toContain('None');
     expect(body).toContain('  Preserve existing settings.');
@@ -211,7 +307,7 @@ describe('full repository release creator', () => {
       data: { markdown: '# Release\n\n## Commit List (Automatic)\n- after last release', source: 'fallback' },
     });
     await click('Generate release notes with AI');
-    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value.match(/## Commit List/g)).toHaveLength(1);
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value.match(/## Commit List/g)).toHaveLength(1);
   });
 
   it('preserves the draft on local history failure and ignores late local history after a repository switch', async () => {
@@ -221,15 +317,15 @@ describe('full repository release creator', () => {
     await click('Patch');
     await notes('Keep my draft');
     await click('Generate notes from template');
-    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('Keep my draft');
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toBe('Keep my draft');
     expect(mocks.toast).toHaveBeenCalledWith('Notes baseline not found', true);
     const late = deferred<unknown>();
     mocks.request.mockReturnValue(late.promise);
     await click('Generate notes from template');
-    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.disabled).toBe(true);
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.disabled).toBe(true);
     await render('C:/other');
     await act(async () => late.resolve([{ sha: 'a'.repeat(40), message: 'private old changes', description: 'Do not cross repositories.' }]));
-    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('');
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toBe('');
     const key = releaseDraftKey('C:/repo', repository('offline').ref, 'origin');
     expect(useReleaseDraftState.getState().sessions[key].form.body).toBe('Keep my draft');
     expect(mocks.generate).not.toHaveBeenCalled();
@@ -254,15 +350,15 @@ describe('full repository release creator', () => {
     await notes('private notes');
     mocks.target = target('github');
     await render();
-    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('');
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toBe('');
     await notes('backup notes');
     mocks.target = target('forgejo');
     await render('C:/other');
-    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('');
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toBe('');
     await render();
-    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('private notes');
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toBe('private notes');
     await click('Refresh');
-    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('private notes');
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toBe('private notes');
   });
 
   it('uses provider capabilities for draft, prerelease, uploads and the publication label', async () => {
@@ -308,7 +404,7 @@ describe('full repository release creator', () => {
     mocks.generate.mockResolvedValue({ success: true, data: { markdown: 'fallback notes', source: 'deterministic', warning: 'AI unavailable' } });
     await click('Generate release notes with AI');
     expect(mocks.toast).toHaveBeenCalledWith('AI unavailable', false);
-    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toContain('fallback notes');
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toContain('fallback notes');
     expect(host.querySelector('.release-page-message')).toBeNull();
   });
 
@@ -326,7 +422,7 @@ describe('full repository release creator', () => {
     mocks.target = target('forgejo');
     await render();
     await act(async () => ai.resolve({ success: true, data: { markdown: 'late private notes', source: 'ai' } }));
-    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('');
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toBe('');
     expect(useReleaseDraftState.getState().sessions[releaseDraftKey('C:/repo', repository('github').ref, 'origin')].form.body).toBe('');
   });
 });

@@ -1,0 +1,80 @@
+.release-ai-instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-subtle);
+}
+
+.release-ai-project-instructions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.release-ai-project-instructions > div,
+.release-ai-instructions-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.release-ai-project-instructions strong,
+.release-ai-instructions-field > span {
+  color: var(--text-primary);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.release-ai-project-instructions small,
+.release-ai-instructions-field > small {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.release-ai-instructions-input {
+  resize: vertical;
+  min-height: 72px;
+  line-height: 1.5;
+  font-family: inherit;
+}
+
+.release-ai-instructions-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex-shrink: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-dark);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.release-ai-instructions-button:hover:not(:disabled) {
+  border-color: var(--accent-primary-border);
+  color: var(--text-primary);
+  background: var(--accent-primary-soft);
+}
+
+.release-ai-instructions-button:focus-visible {
+  outline: 1px solid var(--accent-primary-border);
+  outline-offset: 2px;
+}
+
+.release-ai-instructions-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.release-ai-instructions-error {
+  color: var(--status-danger);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}

@@ -94,6 +94,10 @@ describe('saved repository relocation with real Git', () => {
     await expect(service.canonicalize(oldPath, other)).rejects.toThrow('same Git');
   });
   it('preserves metadata, remote accounts/profiles, local planning IDs, run settings, icons and pending publication records', async () => {
+    json(path.join(state.directory, 'repository-ui-state.json'), {
+      version: 1,
+      repositories: { [repositoryPathKey(oldPath)]: { releaseNotesInstructions: 'Friendly tone for this project.' } },
+    });
     const preferences = {
       hostingRemote: 'backup',
       fetchRemote: 'origin',
@@ -141,6 +145,9 @@ describe('saved repository relocation with real Git', () => {
     });
     expect(new RemotePreferencesStore().read(newPath)).toEqual(preferences);
     expect(new RemotePreferencesStore().read(oldPath)).toEqual({});
+    expect(JSON.parse(fs.readFileSync(path.join(state.directory, 'repository-ui-state.json'), 'utf8')).repositories).toEqual({
+      [repositoryPathKey(newPath)]: { releaseNotesInstructions: 'Friendly tone for this project.' },
+    });
     expect(fs.readFileSync(path.join(newPath, '.Open-Git-Control', 'planning.json'), 'utf8')).toBe(planningText);
     expect(readProjectPlannerData()).toMatchObject({ projects: [{ id: 'project', repoPath: newPath }], items: [{ id: 'todo' }] });
     expect(fs.readFileSync(path.join(newPath, '.Open-Git-Control', 'run.json'), 'utf8')).toBe('{"custom":"run settings"}');

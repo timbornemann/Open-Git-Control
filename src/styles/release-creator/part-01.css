@@ -306,10 +306,7 @@
 }
 
 .release-ai-headline {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
+  display: flex;
 }
 
 .release-ai-headline-copy {
@@ -331,27 +328,36 @@
 }
 
 .release-ai-main-actions {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 8px;
 }
 
 .release-ai-generate-btn,
 .release-offline-generate-btn {
-  min-height: 40px;
+  min-height: 48px;
   width: 100%;
+  padding: 7px 6px;
   border: 1px solid var(--accent-primary-border);
   background: color-mix(in srgb, var(--accent-primary-soft) 70%, var(--bg-dark));
   color: var(--text-primary);
-  font-size: 0.8rem;
+  font-size: 0.74rem;
+  line-height: 1.35;
   font-weight: 700;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 5px;
   transition:
     background-color 120ms ease,
     border-color 120ms ease;
+}
+
+.release-ai-generate-btn svg,
+.release-offline-generate-btn svg {
+  flex-shrink: 0;
 }
 
 .release-ai-generate-btn:hover:not(:disabled),
@@ -369,8 +375,6 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
-  border-top: 1px solid var(--line-subtle);
-  padding-top: 8px;
   width: 100%;
   max-width: none;
 }

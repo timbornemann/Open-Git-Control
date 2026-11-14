@@ -10,6 +10,7 @@ import { ReleaseHistoryPanel } from './ReleaseHistoryPanel';
 import { ReleaseNotesWorkbench } from './ReleaseNotesWorkbench';
 import { ReleaseVersionStep } from './ReleaseVersionStep';
 import { aiNotesRequirement } from './releaseActionRequirements';
+import type { ReleaseNotesInstructionsModel } from './ReleaseNotesInstructions';
 import '@/styles/release-creator.css';
 
 type Props = {
@@ -33,10 +34,9 @@ type Props = {
   onGenerateOfflineNotes: (versionBump: ReleaseVersionBump) => Promise<void>;
   notesGenerating: boolean;
   notesGenerationMode?: 'ai' | 'offline' | null;
-  notesLanguage: 'de' | 'en';
-  setNotesLanguage: (value: 'de' | 'en') => void;
   notesOptions: ReleaseNotesOptions;
   setNotesOptions: (updater: (prev: ReleaseNotesOptions) => ReleaseNotesOptions) => void;
+  notesInstructions?: ReleaseNotesInstructionsModel;
   published?: boolean;
   uploadedAssets?: string[];
 };
@@ -79,10 +79,9 @@ export const ReleaseCreator: React.FC<Props> = ({
   onGenerateOfflineNotes,
   notesGenerating,
   notesGenerationMode,
-  notesLanguage,
-  setNotesLanguage,
   notesOptions,
   setNotesOptions,
+  notesInstructions,
   published = false,
   uploadedAssets,
 }) => {
@@ -243,11 +242,10 @@ export const ReleaseCreator: React.FC<Props> = ({
               releasePhase={releasePhase}
               notesGenerating={notesGenerating}
               notesGenerationMode={notesGenerationMode}
-              notesLanguage={notesLanguage}
-              setNotesLanguage={setNotesLanguage}
               notesOptions={notesOptions}
               setNotesOptions={setNotesOptions}
-              canGenerateNotes={canGenerateNotes}
+              notesInstructions={notesInstructions}
+              canGenerateNotes={canGenerateNotes && (notesInstructions?.project.ready ?? true)}
               notesRequirement={notesRequirement}
               onRefreshNotesContext={repositoryLabel && !contextLoading && !contextMatchesTarget ? onRefreshContext : undefined}
               effectiveVersionBump={effectiveVersionBump}

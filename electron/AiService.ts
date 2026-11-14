@@ -80,6 +80,8 @@ export class AiService {
       language: 'de' | 'en';
       versionBump: ReleaseVersionBump;
       hints?: string[];
+      projectInstructions?: string;
+      releaseInstructions?: string;
     },
     getOpenAiApiKey: () => string = () => '',
   ): Promise<GeneratedReleaseNotes> {

@@ -43,6 +43,8 @@ export type ReleaseNotesGenerationParamsDto = {
   language: 'de' | 'en';
   versionBump: 'major' | 'minor' | 'patch';
   hints?: string[];
+  projectInstructions?: string;
+  releaseInstructions?: string;
 };
 
 export type ReleaseNotesGenerationResultDto = { markdown: string; source: 'ai' | 'fallback'; warning?: string };

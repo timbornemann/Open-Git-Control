@@ -6,6 +6,7 @@ import { repositoryPathKey } from '../activeRepositoryAuthorization';
 const state = vi.hoisted(() => ({ root: '' }));
 vi.mock('electron', () => ({ app: { getPath: () => state.root } }));
 import { readRepositoryUiPreferences, updateRepositoryUiPreferences } from '../repositoryUiPreferences';
+import { MAX_RELEASE_NOTES_INSTRUCTIONS_LENGTH } from '../../../src/shared/releaseNotesInstructions';
 
 // Real inventories and fsync-backed state writes need headroom on shared CI disks.
 describe('shared per-repository UI metadata', { timeout: 30_000 }, () => {
@@ -16,6 +17,26 @@ describe('shared per-repository UI metadata', { timeout: 30_000 }, () => {
     fixture.file('repos.json', fixture.data);
   });
   afterEach(() => fixture.dispose());
+  it('persists project release instructions alongside sidebar preferences and isolates repositories', () => {
+    const key = repositoryPathKey(fixture.repo);
+    const other = path.join(fixture.directory, 'other');
+    const instructions = 'Write in a friendly tone.\nExplain user benefits before technical details.';
+    updateRepositoryUiPreferences({ repoPath: fixture.repo, patch: { releaseNotesInstructions: instructions } });
+    updateRepositoryUiPreferences({ repoPath: fixture.repo, patch: { branchPanelCollapsed: true } });
+    expect(readRepositoryUiPreferences()[key]).toEqual({ releaseNotesInstructions: instructions, branchPanelCollapsed: true });
+    expect(readRepositoryUiPreferences()[repositoryPathKey(other)]).toBeUndefined();
+    updateRepositoryUiPreferences({ repoPath: fixture.repo, patch: { releaseNotesInstructions: '' } });
+    expect(readRepositoryUiPreferences()[key]).toEqual({ releaseNotesInstructions: '', branchPanelCollapsed: true });
+  });
+  it('rejects invalid instruction values without overwriting stored project instructions', () => {
+    updateRepositoryUiPreferences({ repoPath: fixture.repo, patch: { releaseNotesInstructions: 'Keep this tone.' } });
+    const file = path.join(state.root, 'repository-ui-state.json');
+    const before = fs.readFileSync(file, 'utf8');
+    for (const value of [false, 'x'.repeat(MAX_RELEASE_NOTES_INSTRUCTIONS_LENGTH + 1)]) {
+      expect(() => updateRepositoryUiPreferences({ repoPath: fixture.repo, patch: { releaseNotesInstructions: value } } as never)).toThrow('Invalid');
+      expect(fs.readFileSync(file, 'utf8')).toBe(before);
+    }
+  });
   it('migrates supported legacy preferences once, merges targeted patches and rejects stale removed owners', () => {
     const key = repositoryPathKey(fixture.repo);
     expect(readRepositoryUiPreferences({ [fixture.repo]: { tagPanelCollapsed: true } })[key]).toEqual({ tagPanelCollapsed: true });

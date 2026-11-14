@@ -11,6 +11,7 @@ import { emitJobEvent } from './jobEvents';
 import { IpcChannel } from '../../../src/types/ipcContract';
 import { requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
 import { beginCommitProtection, COMMIT_PROTECTION_BUSY_ERROR } from '../RepositoryCommitProtection';
+import { normalizeReleaseNotesInstructions } from '../../../src/shared/releaseNotesInstructions';
 
 type RegisterAiHandlersDeps = {
   aiService: AiService;
@@ -267,6 +268,8 @@ export function registerAiHandlers({
         language: 'de' | 'en';
         versionBump?: 'major' | 'minor' | 'patch';
         hints?: string[];
+        projectInstructions?: string;
+        releaseInstructions?: string;
       },
     ) => {
       try {
@@ -299,6 +302,8 @@ export function registerAiHandlers({
             language,
             versionBump,
             hints,
+            projectInstructions: normalizeReleaseNotesInstructions(params?.projectInstructions),
+            releaseInstructions: normalizeReleaseNotesInstructions(params?.releaseInstructions),
           },
           getOpenAiApiKeyFromSecureStore,
         );

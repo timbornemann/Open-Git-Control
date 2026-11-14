@@ -79,6 +79,8 @@ describe('AiService release notes', () => {
       repositoryHtmlUrl: 'https://github.com/acme/project',
       language: 'en',
       versionBump: 'major',
+      projectInstructions: 'Write in a friendly tone.\nUse short paragraphs.',
+      releaseInstructions: 'Focus on the new workflow and its migration steps.',
     });
 
     const requestBody = JSON.parse(String(fetchMock.mock.calls[0][1].body));
@@ -91,6 +93,9 @@ describe('AiService release notes', () => {
     expect(userPrompt).toContain('BREAKING CHANGE: rename config.json to settings.json.');
     expect(userPrompt).toContain('Description (repository data)');
     expect(userPrompt).toContain('Semantic version change: major');
+    expect(userPrompt).toContain('Project instructions (apply to every release):\nWrite in a friendly tone.\nUse short paragraphs.');
+    expect(userPrompt).toContain('Instructions for this release only:\nFocus on the new workflow and its migration steps.');
+    expect(systemPrompt).toContain('take precedence when they conflict');
     expect(userPrompt).toContain('Explicitly call this a major release');
     expect(userPrompt).toContain('breaking changes and migration requirements');
     expect(userPrompt).toContain('Repository URL: https://github.com/acme/project');

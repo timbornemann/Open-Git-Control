@@ -8,6 +8,7 @@ import type { HostingCapabilities } from '@/types/hostingDtos';
 import { ReleaseNotesActions } from './ReleaseNotesActions';
 import { ReleaseNotesEditor } from './ReleaseNotesEditor';
 import { ActionRequirement } from '@/components/ui/ActionRequirement';
+import { ReleaseNotesInstructions, type ReleaseNotesInstructionsModel } from './ReleaseNotesInstructions';
 
 type ReleaseNotesWorkbenchProps = {
   releaseForm: ReleaseDraft;
@@ -20,10 +21,9 @@ type ReleaseNotesWorkbenchProps = {
   releasePhase?: ReleaseSubmissionPhase;
   notesGenerating: boolean;
   notesGenerationMode?: 'ai' | 'offline' | null;
-  notesLanguage: 'de' | 'en';
-  setNotesLanguage: (value: 'de' | 'en') => void;
   notesOptions: ReleaseNotesOptions;
   setNotesOptions: (updater: (prev: ReleaseNotesOptions) => ReleaseNotesOptions) => void;
+  notesInstructions?: ReleaseNotesInstructionsModel;
   canGenerateNotes: boolean;
   notesRequirement?: string | null;
   onRefreshNotesContext?: () => Promise<void>;
@@ -52,10 +52,9 @@ export const ReleaseNotesWorkbench = ({
   releasePhase,
   notesGenerating,
   notesGenerationMode,
-  notesLanguage,
-  setNotesLanguage,
   notesOptions,
   setNotesOptions,
+  notesInstructions,
   canGenerateNotes,
   notesRequirement,
   onRefreshNotesContext,
@@ -89,39 +88,6 @@ export const ReleaseNotesWorkbench = ({
                 <strong>{tr('Release Notes', 'Release notes')}</strong>
                 <span>{tr('Mit Vorlage oder KI erstellen.', 'Generate with a template or AI.')}</span>
               </div>
-              <div className="release-language-wrap">
-                <label htmlFor="release-language">{tr('Sprache', 'Language')}</label>
-                <select
-                  id="release-language"
-                  className="release-select"
-                  value={notesLanguage}
-                  onChange={(event) => setNotesLanguage(event.target.value === 'de' ? 'de' : 'en')}
-                  disabled={isEditorDisabled}
-                >
-                  <option value="en">{t('generated.components.releasecreator.english_61acbce0')}</option>
-                  <option value="de">{t('generated.components.releasecreator.german_239646b7')}</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="release-offline-actions">
-              <button
-                type="button"
-                className="release-offline-generate-btn"
-                onClick={() => void onGenerateOfflineNotes(effectiveVersionBump)}
-                disabled={!canGenerateOfflineNotes}
-              >
-                <FileText size={16} />
-                {notesGenerating && notesGenerationMode === 'offline'
-                  ? tr('Vorlage wird erstellt …', 'Generating template …')
-                  : tr('Notes aus Vorlage erstellen', 'Generate notes from template')}
-              </button>
-              <small>
-                {tr(
-                  'Patch-, Minor- oder Major-Text mit Commit-Liste und Beschreibungen. Lokal, ohne KI.',
-                  'Patch, minor or major text with commit list and descriptions. Local, without AI.',
-                )}
-              </small>
             </div>
 
             <div className="release-ai-options-list">
@@ -169,21 +135,46 @@ export const ReleaseNotesWorkbench = ({
               />
             </div>
 
+            {notesInstructions && <ReleaseNotesInstructions model={notesInstructions} disabled={isEditorDisabled} />}
+
             <div className="release-ai-main-actions">
+              <button
+                type="button"
+                className="release-offline-generate-btn"
+                onClick={() => void onGenerateOfflineNotes(effectiveVersionBump)}
+                disabled={!canGenerateOfflineNotes}
+                aria-label={tr('Notes aus Vorlage erstellen', 'Generate notes from template')}
+                title={tr(
+                  'Patch-, Minor- oder Major-Text mit Commit-Liste und Beschreibungen. Lokal, ohne KI.',
+                  'Patch, minor or major text with commit list and descriptions. Local, without AI.',
+                )}
+              >
+                <FileText size={15} aria-hidden="true" />
+                <span>{notesGenerating && notesGenerationMode === 'offline' ? tr('Wird erstellt …', 'Generating …') : tr('Aus Vorlage', 'From template')}</span>
+              </button>
               <ActionRequirement
                 reason={notesRequirement}
                 remedy={
                   onRefreshNotesContext ? { label: tr('Verlauf aktualisieren', 'Refresh history'), onClick: () => void onRefreshNotesContext() } : undefined
                 }
               >
-                <button className="release-ai-generate-btn" onClick={() => void onGenerateNotes(effectiveVersionBump)} disabled={!canGenerateNotes}>
-                  <Sparkles size={16} />
-                  {notesGenerating && notesGenerationMode !== 'offline'
-                    ? t('generated.components.releasecreator.ai_is_generating_release_notes_106c5b32')
-                    : t('generated.components.releasecreator.generate_release_notes_with_ai_2905a726')}
+                <button
+                  type="button"
+                  className="release-ai-generate-btn"
+                  onClick={() => void onGenerateNotes(effectiveVersionBump)}
+                  disabled={!canGenerateNotes}
+                  aria-label={t('generated.components.releasecreator.generate_release_notes_with_ai_2905a726')}
+                >
+                  <Sparkles size={15} aria-hidden="true" />
+                  <span>
+                    {notesGenerating && notesGenerationMode !== 'offline' ? tr('Wird erstellt …', 'Generating …') : tr('Mit KI generieren', 'Generate with AI')}
+                  </span>
                 </button>
               </ActionRequirement>
             </div>
+            <small className="release-generation-hint">
+              {tr('Vorlagen entstehen lokal. Eigene Anweisungen gelten für die KI.', 'Templates are generated locally. Custom instructions apply to AI.')}
+            </small>
           </div>
 
           <div className="release-publish-panel">
@@ -202,7 +193,7 @@ export const ReleaseNotesWorkbench = ({
                   />
                   <span className="release-option-copy">
                     <strong>{t('generated.components.layout.sidebar.repogithubactionscontent.draft_4fc4eecc')}</strong>
-                    <small>{t('generated.components.releasecreator.save_the_release_without_publishing_it_immediately_492ee21f')}</small>
+                    <small>{tr('Unveröffentlicht speichern.', 'Save without publishing.')}</small>
                   </span>
                 </label>
               )}
@@ -216,7 +207,7 @@ export const ReleaseNotesWorkbench = ({
                   />
                   <span className="release-option-copy">
                     <strong>{t('generated.components.layout.sidebar.githubconnectedcontent.pre_release_4bb763f1')}</strong>
-                    <small>{t('generated.components.releasecreator.marks_this_version_as_an_early_preview_beta_rc_02a7aae9')}</small>
+                    <small>{tr('Vorabversion (Beta/RC).', 'Early preview (beta/RC).')}</small>
                   </span>
                 </label>
               )}

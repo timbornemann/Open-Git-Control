@@ -10,6 +10,7 @@ export interface ReleaseSession {
   versionBump: ReleaseVersionBump;
   language: 'de' | 'en';
   options: ReleaseNotesOptions;
+  releaseInstructions?: string;
   assets: string[];
   uploaded: string[];
   created: HostingRelease | null;
@@ -23,6 +24,7 @@ export const newReleaseSession = (branch: string, language: 'de' | 'en'): Releas
   versionBump: 'patch',
   language,
   options: { ...DEFAULT_RELEASE_NOTES_OPTIONS },
+  releaseInstructions: '',
   assets: [],
   uploaded: [],
   created: null,

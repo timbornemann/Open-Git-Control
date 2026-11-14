@@ -52,8 +52,6 @@ const createReleaseCreatorProps = (overrides: Partial<ComponentProps<typeof Rele
   onGenerateNotes: vi.fn(),
   onGenerateOfflineNotes: vi.fn(),
   notesGenerating: false,
-  notesLanguage: 'en',
-  setNotesLanguage: vi.fn(),
   notesOptions: DEFAULT_RELEASE_NOTES_OPTIONS,
   setNotesOptions: vi.fn(),
   ...overrides,

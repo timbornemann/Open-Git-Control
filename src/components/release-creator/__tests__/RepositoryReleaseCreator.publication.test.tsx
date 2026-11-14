@@ -152,6 +152,7 @@ describe('release creator after publication', () => {
       useReleaseDraftState.getState().update(key(), (previous) => ({
         ...previous!,
         versionBump: 'major',
+        releaseInstructions: 'Focus on this major release only.',
         options: { ...previous!.options, includeTechnicalDetails: false },
         form: { ...previous!.form, tagName: 'v2.0.0', releaseName: 'Custom release', fromRef: 'v0.9.0', prerelease: true },
       })),
@@ -166,7 +167,9 @@ describe('release creator after publication', () => {
     expect(session().uploaded).toEqual([]);
     expect(session().options.includeTechnicalDetails).toBe(false);
     expect(session().versionBump).toBe('patch');
-    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('');
+    expect(session().releaseInstructions).toBe('');
+    expect(host.querySelector<HTMLTextAreaElement>('[data-release-instructions="release"]')!.value).toBe('');
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toBe('');
     expect(host.textContent).not.toContain('Original change');
     expect(host.textContent).toContain('v2.0.0');
     expect(host.textContent).not.toContain('Prepare another release');
@@ -176,7 +179,7 @@ describe('release creator after publication', () => {
     await flush(() => root.render(<div />));
     await render();
     expect(session().form.tagName).toBe('v2.0.1');
-    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('');
+    expect(host.querySelector<HTMLTextAreaElement>('.release-textarea--editor')!.value).toBe('');
     expect(mocks.request.mock.calls.filter(([operation]) => operation === 'createRelease')).toHaveLength(1);
   });
 

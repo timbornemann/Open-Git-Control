@@ -192,6 +192,8 @@ describe('registerAiHandlers', () => {
         commits: [{ hash: 'abc', shortHash: 'abc', subject: 'fix', description: 'Preserve settings and migrate keys.', author: 'A', date: '2026-07-11' }],
         language: 'en',
         versionBump: 'patch',
+        projectInstructions: '  Keep a friendly tone.  ',
+        releaseInstructions: '  Emphasize the new search.  ',
       },
     );
 
@@ -199,7 +201,11 @@ describe('registerAiHandlers', () => {
     expect(aiService.generateReleaseNotes).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
-      expect.objectContaining({ commits: [expect.objectContaining({ description: 'Preserve settings and migrate keys.' })] }),
+      expect.objectContaining({
+        commits: [expect.objectContaining({ description: 'Preserve settings and migrate keys.' })],
+        projectInstructions: 'Keep a friendly tone.',
+        releaseInstructions: 'Emphasize the new search.',
+      }),
       expect.anything(),
     );
   });

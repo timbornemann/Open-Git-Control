@@ -9,6 +9,7 @@ import { releaseDraftKey, newReleaseSession, useReleaseDraftState, type ReleaseS
 import { useReleaseTarget } from './useReleaseTarget';
 import { useReleaseContext } from './useReleaseContext';
 import { useReleaseNotesGeneration } from './useReleaseNotesGeneration';
+import { useReleaseProjectInstructions } from './useReleaseProjectInstructions';
 import { useReleasePublication } from './useReleasePublication';
 import { useReleaseFeedback } from './useReleaseFeedback';
 import { hostingClient } from '@/services/hostingClient';
@@ -43,6 +44,9 @@ function ReleaseSessionView({ draftKey, repoPath, target }: { draftKey: string; 
     useReleaseDraftState.getState().update(draftKey, (previous) => previous || initial);
   }, [draftKey, initial]);
   useLayoutEffect(() => {
+    if (session.language !== appLanguage) update((previous) => ({ ...previous, language: appLanguage }));
+  }, [appLanguage, session.language, update]);
+  useLayoutEffect(() => {
     if (!session.form.targetCommitish && branch) update((previous) => ({ ...previous, form: { ...previous.form, targetCommitish: branch } }));
   }, [branch, session.form.targetCommitish, update]);
   const scope = JSON.stringify([draftKey, target.scope, branch, hostingClient.sessionVersion(target.endpoint?.repository?.connectionId)]);
@@ -75,7 +79,16 @@ function ReleaseSessionView({ draftKey, repoPath, target }: { draftKey: string; 
           },
     }));
   }, [history.context, session.suggestionApplied, session.versionBump, update]);
-  const notes = useReleaseNotesGeneration(scope, session, history.context, target.endpoint?.repository?.connectionId, update, repoPath);
+  const projectInstructions = useReleaseProjectInstructions(repoPath);
+  const notes = useReleaseNotesGeneration(
+    scope,
+    session,
+    history.context,
+    target.endpoint?.repository?.connectionId,
+    update,
+    repoPath,
+    projectInstructions.value,
+  );
   const publication = useReleasePublication({
     scope,
     repoPath,
@@ -204,10 +217,13 @@ function ReleaseSessionView({ draftKey, repoPath, target }: { draftKey: string; 
           onGenerateOfflineNotes={notes.generateOffline}
           notesGenerating={notes.busy}
           notesGenerationMode={notes.mode}
-          notesLanguage={session.language}
-          setNotesLanguage={(value) => update((previous) => ({ ...previous, language: value }))}
           notesOptions={session.options}
           setNotesOptions={(updater) => update((previous) => ({ ...previous, options: updater(previous.options) }))}
+          notesInstructions={{
+            project: projectInstructions,
+            releaseInstructions: session.releaseInstructions || '',
+            onReleaseChange: (value) => update((previous) => ({ ...previous, releaseInstructions: value })),
+          }}
         />
       </div>
     </section>

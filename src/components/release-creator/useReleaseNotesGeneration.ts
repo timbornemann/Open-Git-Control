@@ -45,17 +45,18 @@ export function useReleaseNotesGeneration(
   connectionId: string | undefined,
   update: (updater: (previous: ReleaseSession) => ReleaseSession) => void,
   repoPath: string,
+  projectInstructions = '',
 ) {
   const lifecycle = useRef({ generation: 0 }).current;
   const running = useRef(false);
-  const current = useRef({ scope, session, context });
+  const current = useRef({ scope, session, context, projectInstructions });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [mode, setMode] = useState<'ai' | 'offline' | null>(null);
   useLayoutEffect(() => {
-    current.current = { scope, session, context };
-  }, [scope, session, context]);
+    current.current = { scope, session, context, projectInstructions };
+  }, [scope, session, context, projectInstructions]);
   useLayoutEffect(() => {
     lifecycle.generation++;
     running.current = false;
@@ -76,6 +77,7 @@ export function useReleaseNotesGeneration(
       lifecycle.generation === started &&
       current.current.scope === scope &&
       current.current.context?.targetOid === context?.targetOid &&
+      current.current.projectInstructions === projectInstructions &&
       JSON.stringify(current.current.session) === fingerprint &&
       hostingClient.sessionVersion(connectionId) === authVersion;
     running.current = true;
@@ -99,6 +101,8 @@ export function useReleaseNotesGeneration(
         language: session.language,
         versionBump,
         hints: buildReleaseNotesPromptHints(session.options, session.language),
+        projectInstructions,
+        releaseInstructions: session.releaseInstructions || '',
       };
       if (kind === 'offline') {
         if (valid()) {
