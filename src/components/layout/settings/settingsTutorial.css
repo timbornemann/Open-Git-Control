@@ -1,0 +1,393 @@
+.tutorial-catalog {
+  max-width: 1240px;
+  padding: 18px 20px 28px;
+  color: var(--text-primary);
+}
+
+.tutorial-catalog-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.tutorial-catalog-intro h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.tutorial-catalog-intro h3:focus-visible {
+  outline: 1px solid var(--accent-primary-border);
+  outline-offset: 3px;
+}
+
+.tutorial-catalog-intro p {
+  max-width: 640px;
+  margin-top: 5px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.tutorial-catalog-progress {
+  flex: none;
+  width: 180px;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.tutorial-catalog-progress > div {
+  height: 3px;
+  margin-top: 8px;
+  background: var(--line-subtle);
+}
+
+.tutorial-catalog-progress > div > span {
+  display: block;
+  height: 100%;
+  background: var(--status-success);
+}
+
+.tutorial-catalog-layout {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.tutorial-topics {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  position: sticky;
+  top: 18px;
+}
+
+.tutorial-topics-label {
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0 10px 8px;
+}
+
+.tutorial-topic {
+  display: grid;
+  grid-template-columns: 15px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.tutorial-topic:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.tutorial-topic.is-active {
+  background: var(--accent-primary-soft);
+  color: var(--text-primary);
+  border-color: var(--accent-primary-border);
+  box-shadow: inset 2px 0 var(--accent-primary);
+}
+
+.tutorial-topic-count {
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tutorial-catalog-results {
+  min-width: 0;
+  scroll-margin-top: 18px;
+}
+
+.tutorial-catalog-results-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tutorial-catalog-results-heading h3 {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.tutorial-catalog-results-heading > span {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+}
+
+.tutorial-catalog-group + .tutorial-catalog-group {
+  margin-top: 20px;
+}
+
+.tutorial-catalog-group-title {
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.tutorial-lesson-list {
+  border: 1px solid var(--border-color);
+  background: var(--bg-dark);
+}
+
+.tutorial-lesson + .tutorial-lesson {
+  border-top: 1px solid var(--line-subtle);
+}
+
+.tutorial-lesson-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px 0 0;
+}
+
+.tutorial-lesson-toggle {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 12px;
+  min-height: 67px;
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.tutorial-lesson-heading:hover {
+  background: var(--bg-hover);
+}
+
+.tutorial-lesson-title {
+  min-width: 0;
+}
+
+.tutorial-lesson-title > strong {
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.tutorial-lesson-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+}
+
+.tutorial-lesson-completed,
+.tutorial-lesson-completed-icon {
+  color: var(--status-success);
+}
+
+.tutorial-lesson--expanded .tutorial-lesson-chevron {
+  transform: rotate(180deg);
+}
+
+.tutorial-lesson-details {
+  padding: 0 14px 14px 40px;
+}
+
+.tutorial-lesson-details[hidden] {
+  display: none;
+}
+
+.tutorial-lesson-details > p {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+
+.tutorial-lesson-question {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+  color: var(--text-accent);
+  font: inherit;
+  font-size: 0.74rem;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.tutorial-lesson-question > svg {
+  flex: none;
+}
+
+.tutorial-lesson-steps {
+  margin-top: 14px;
+}
+
+.tutorial-lesson-steps h5 {
+  color: var(--text-secondary);
+  font-size: 0.69rem;
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+
+.tutorial-lesson-steps ol {
+  list-style: none;
+  padding: 0;
+  max-height: 300px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.tutorial-lesson-steps button {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 12px;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--line-subtle);
+  padding: 8px 6px;
+  background: transparent;
+  text-align: left;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.73rem;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.tutorial-lesson-steps button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.tutorial-lesson-step-number,
+.tutorial-lesson-steps button > svg {
+  color: var(--text-secondary);
+}
+
+.tutorial-topic:focus-visible,
+.tutorial-lesson-toggle:focus-visible,
+.tutorial-lesson-question:focus-visible,
+.tutorial-lesson-steps button:focus-visible {
+  outline: 1px solid var(--accent-primary-border);
+  outline-offset: -1px;
+}
+
+.tutorial-lesson-question:disabled,
+.tutorial-lesson-steps button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.tutorial-catalog-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 36px 20px;
+  border: 1px solid var(--line-subtle);
+  color: var(--text-secondary);
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.tutorial-catalog-empty > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.tutorial-catalog-notice,
+.tutorial-catalog-error {
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.tutorial-catalog-error {
+  color: var(--status-danger);
+}
+
+@container settings-page (min-width: 1241px) {
+  .settings-main--help .settings-page-header {
+    padding-right: calc(100% - 1220px);
+  }
+}
+
+@container settings-page (max-width: 780px) {
+  .tutorial-catalog-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .tutorial-topics {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .tutorial-topics-label {
+    display: none;
+  }
+  .tutorial-topic {
+    width: auto;
+    min-height: 32px;
+    padding: 5px 8px;
+    border-color: var(--line-subtle);
+    font-size: 0.7rem;
+  }
+}
+
+@container settings-page (max-width: 520px) {
+  .tutorial-catalog {
+    padding: 14px 12px 20px;
+  }
+  .tutorial-catalog-intro {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .tutorial-catalog-progress {
+    width: 100%;
+  }
+  .tutorial-lesson-heading {
+    gap: 4px;
+    padding-right: 5px;
+  }
+  .tutorial-lesson-toggle {
+    gap: 8px;
+    padding: 10px 8px;
+  }
+  .tutorial-lesson-details {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}

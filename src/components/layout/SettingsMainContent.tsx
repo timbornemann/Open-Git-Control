@@ -61,7 +61,7 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
   const previousTabRef = useRef(activeTab);
   const categories = getSettingsCategories(tr);
   const category = categories.find((item) => item.id === activeTab)!;
-  const searching = Boolean(query.trim());
+  const searching = activeTab !== 'help' && Boolean(query.trim());
   const matches = searchSettingsGroups(query, tr);
   const helpMatches = searching
     ? TUTORIAL_CHAPTERS.filter((chapter) =>
@@ -102,7 +102,7 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
   }, [activeTab, searching, destination, onSelectTab]);
 
   return (
-    <div className="settings-main">
+    <div className={`settings-main${activeTab === 'help' ? ' settings-main--help' : ''}`}>
       <header className="settings-page-header">
         <div className="settings-page-heading">
           <h2 id="settings-page-title">{searching ? tr('Suchergebnisse', 'Search results') : category.label}</h2>
@@ -134,8 +134,12 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
             <Search size={14} aria-hidden="true" />
             <TextField
               type="search"
-              aria-label={tr('Einstellungen durchsuchen', 'Search settings')}
-              placeholder={tr('Einstellungen durchsuchen …', 'Search settings …')}
+              aria-label={
+                activeTab === 'help'
+                  ? tr('Lektionen, Schritte und Fragen durchsuchen', 'Search lessons, steps and questions')
+                  : tr('Einstellungen durchsuchen', 'Search settings')
+              }
+              placeholder={activeTab === 'help' ? tr('Lektionen durchsuchen …', 'Search lessons …') : tr('Einstellungen durchsuchen …', 'Search settings …')}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => {
@@ -197,7 +201,7 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
           </div>
         )}
         <div hidden={searching} className="settings-category-content">
-          {activeTab === 'help' && <SettingsTutorialSection />}
+          {activeTab === 'help' && <SettingsTutorialSection query={query} onClearSearch={() => setQuery('')} />}
           {activeTab === 'general' && (
             <SettingsGeneralSection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" onResetLayout={onResetLayout} />
           )}

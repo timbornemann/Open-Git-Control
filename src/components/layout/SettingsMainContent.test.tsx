@@ -79,6 +79,19 @@ describe('SettingsMainContent AI and MCP organization', () => {
     expect(host.textContent).toContain('Enable AI auto-commit');
     expect(host.textContent).toContain('Local API');
   });
+  it('provides one contextual lesson search in Help without replacing the catalog with settings results', async () => {
+    await render('help');
+    expect(host.querySelectorAll('input[type="search"]')).toHaveLength(1);
+    const search = host.querySelector<HTMLInputElement>('input[aria-label="Search lessons, steps and questions"]')!;
+    changeInput(search, 'rebase');
+    expect(host.querySelector('.settings-search-results')).toBeNull();
+    expect(host.querySelector('.settings-category-content')?.hasAttribute('hidden')).toBe(false);
+    expect(host.querySelectorAll('.tutorial-lesson').length).toBeGreaterThan(0);
+    expect(host.querySelector('.tutorial-lesson[data-chapter="hosting"]')).toBeNull();
+    act(() => search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(search.value).toBe('');
+    expect(host.querySelector('.tutorial-lesson[data-chapter="hosting"]')).toBeTruthy();
+  });
   it.each([
     ['en', 'Keyboard shortcuts', 'keyboard'],
     ['de', 'Tastenkürzel', 'Tastenbelegung'],
