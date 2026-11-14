@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { formatCommitSubject, parseCommitSubject } from '../commitSubject';
+import { formatCommitSubject, parseCommitSubject, splitCommitMessage } from '../commitSubject';
+
+describe('splitCommitMessage', () => {
+  it('splits subject and body at the blank separator', () => {
+    expect(splitCommitMessage('feat: a\n\nBody 1\nBody 2\n')).toEqual({ title: 'feat: a', description: 'Body 1\nBody 2' });
+  });
+
+  it('keeps a body line that directly follows the subject', () => {
+    expect(splitCommitMessage('subject\nsecond line\n\nthird')).toEqual({ title: 'subject', description: 'second line\n\nthird' });
+  });
+
+  it('handles subject-only, CRLF and empty messages', () => {
+    expect(splitCommitMessage('only subject\n')).toEqual({ title: 'only subject', description: '' });
+    expect(splitCommitMessage('a\r\n\r\nb\r\n')).toEqual({ title: 'a', description: 'b' });
+    expect(splitCommitMessage('')).toEqual({ title: '', description: '' });
+  });
+});
 
 describe('structured commit subjects', () => {
   it.each([

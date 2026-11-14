@@ -8,6 +8,7 @@ import { addSecretScanFindingPaths } from '@/services/repositorySecretScanAllowl
 import { SECRET_SCAN_ALLOWLIST_PATH } from '@/types/repositorySecretScanAllowlist';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import type { GitStatusWithConflicts } from './types';
+import { splitCommitMessage } from './commitSubject';
 import { useCommitMessageDraft } from './useCommitMessageDraft';
 import type { SettingsUpdateHandler } from '@/components/layout/settings/SettingsSectionPrimitives';
 
@@ -63,9 +64,9 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
     void gitClient.runGitCommandForRepo(repoPath, 'show', '--format=%B', '-s', 'HEAD').then((r) => {
       if (cancelled) return;
       if (r.success && typeof r.data === 'string') {
-        const lines = r.data.trimEnd().split('\n');
-        setCommitMsg(lines[0] || '');
-        setCommitDescription(lines.slice(2).join('\n'));
+        const { title, description } = splitCommitMessage(r.data);
+        setCommitMsg(title);
+        setCommitDescription(description);
       }
     });
     return () => {
