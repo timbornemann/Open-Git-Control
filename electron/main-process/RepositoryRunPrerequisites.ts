@@ -5,22 +5,25 @@ import { getShellInvocation } from './RepositoryRunShell';
 import { windowsSystemExecutable } from '../system-tools/windowsSystemExecutable';
 
 export type RunPrerequisiteProbe = (repoPath: string, shell: RepositoryRunShell, command: string) => Promise<string>;
-const probe: RunPrerequisiteProbe = (repoPath, shell, command) =>
-  new Promise((resolve, reject) => {
-    const invocation = getShellInvocation(shell, command);
-    execFile(
-      invocation.executable,
-      invocation.args,
-      {
-        cwd: repoPath,
-        env: process.env,
-        windowsHide: true,
-        timeout: 8_000,
-        maxBuffer: 64 * 1024,
-      },
-      (error, stdout) => (error ? reject(error) : resolve(stdout)),
-    );
-  });
+/** Keep interactive discovery bounded; process-backed tests can use their own startup budget. */
+export const createRunPrerequisiteProbe =
+  (timeout = 8_000): RunPrerequisiteProbe =>
+  (repoPath, shell, command) =>
+    new Promise((resolve, reject) => {
+      const invocation = getShellInvocation(shell, command);
+      execFile(
+        invocation.executable,
+        invocation.args,
+        {
+          cwd: repoPath,
+          env: process.env,
+          windowsHide: true,
+          timeout,
+          maxBuffer: 64 * 1024,
+        },
+        (error, stdout) => (error ? reject(error) : resolve(stdout)),
+      );
+    });
 
 /** Only fixed executable names reach these scripts. Project commands and tool binaries are never run by discovery. */
 export function prerequisiteProbeCommand(shell: RepositoryRunShell, programs: RepositoryRunProgram[]): string {
@@ -59,7 +62,7 @@ export function prerequisiteProbeCommand(shell: RepositoryRunShell, programs: Re
 }
 
 export class RepositoryRunPrerequisites {
-  constructor(private readonly runProbe: RunPrerequisiteProbe = probe) {}
+  constructor(private readonly runProbe: RunPrerequisiteProbe = createRunPrerequisiteProbe()) {}
   async check(repoPath: string, steps: Array<Omit<RepositoryRunStepDto, 'id'>>): Promise<RepositoryRunPrerequisitesDto> {
     const platform = getRepositoryRunPlatform(process.platform);
     const byShell = new Map<RepositoryRunShell, Set<RepositoryRunProgram>>();

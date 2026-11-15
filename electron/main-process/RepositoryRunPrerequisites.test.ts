@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { RepositoryRunPrerequisites, prerequisiteProbeCommand } from './RepositoryRunPrerequisites';
+import { RepositoryRunPrerequisites, prerequisiteProbeCommand, createRunPrerequisiteProbe } from './RepositoryRunPrerequisites';
 import type { RepositoryRunShell, RepositoryRunStepDto } from '../../src/types/repositoryRun';
 
 const originalPlatform = process.platform;
@@ -83,10 +83,23 @@ describe('Run template prerequisites', () => {
     command.windows = { shell: 'powershell', command: 'npm run THIS_SCRIPT_DOES_NOT_EXIST' };
     command.macos = { shell: 'zsh', command: 'npm run THIS_SCRIPT_DOES_NOT_EXIST' };
     command.linux = { shell: 'bash', command: 'npm run THIS_SCRIPT_DOES_NOT_EXIST' };
-    const result = await new RepositoryRunPrerequisites().check(process.cwd(), [command]);
-    expect(result.checks).toEqual([
+    // Starting a real shell on a busy CI VM is not a measurement of the
+    // interactive UI deadline. Keep resolution real, with a bounded test budget.
+    const probe = createRunPrerequisiteProbe(20_000);
+    let diagnostic = '';
+    const prerequisites = new RepositoryRunPrerequisites(async (...args) => {
+      try {
+        diagnostic = await probe(...args);
+        return diagnostic;
+      } catch (error) {
+        diagnostic = error instanceof Error ? error.message : String(error);
+        throw error;
+      }
+    });
+    const result = await prerequisites.check(process.cwd(), [command]);
+    expect(result.checks, diagnostic || 'Shell discovery returned no output').toEqual([
       { program: 'node', shell: shellCommand, state: 'available' },
       { program: 'npm', shell: shellCommand, state: 'available' },
     ]);
-  }, 15_000);
+  }, 30_000);
 });

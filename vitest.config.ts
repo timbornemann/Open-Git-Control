@@ -9,9 +9,9 @@ export default defineConfig({
     },
   },
   test: {
-    // Real Git tests launch process trees. Large Windows worker pools can
-    // exhaust process-start capacity and time out otherwise healthy tests.
-    maxWorkers: process.platform === 'win32' ? Math.min(4, availableParallelism()) : undefined,
+    // Git and shell integration tests start child processes in addition to the
+    // Vitest workers. Reserve CPU capacity for them (two workers on 4-core CI).
+    maxWorkers: process.platform === 'win32' ? Math.min(4, Math.max(1, availableParallelism() - 2)) : undefined,
     setupFiles: ['src/data/testSetup.ts'],
     include: ['src/**/*.test.{ts,tsx}', 'src/**/__tests__/**/*.test.{ts,tsx}', 'electron/**/*.test.ts'],
     coverage: {
