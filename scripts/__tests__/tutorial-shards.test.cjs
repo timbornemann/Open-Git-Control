@@ -25,6 +25,8 @@ test('all six tutorial shards cover every native group exactly once', () => {
 test('group and checkpoint selection remain usable without launching Electron', () => {
   assert.deepEqual(JSON.parse(list('--group=branches-switch').stdout), ['branches-switch']);
   assert.deepEqual(JSON.parse(list('--checkpoint=tree-create/write').stdout), ['checkpoint']);
+  assert.deepEqual(JSON.parse(list('--groups=codecs,branches-switch', '--workers=4').stdout), ['codecs', 'branches-switch']);
+  assert.equal(list('--workers=auto').status, 0);
 });
 
 test('invalid or conflicting selection cannot accidentally run the entire tutorial suite', () => {
@@ -36,9 +38,18 @@ test('invalid or conflicting selection cannot accidentally run the entire tutori
     ['--shard=1.5/6'],
     ['--shard=abc'],
     ['--group=missing'],
+    ['--groups=welcome,missing'],
+    ['--groups=welcome,welcome'],
+    ['--groups=welcome,'],
+    ['--workers=0'],
+    ['--workers=-1'],
+    ['--workers=1.5'],
+    ['--workers=999'],
+    ['--workers=fast'],
     ['--language=fr'],
     ['--shards=1/6'],
     ['--group=welcome', '--shard=1/6'],
+    ['--groups=welcome,curriculum', '--shard=1/6'],
     ['--checkpoint=tree-create/write', '--shard=1/6'],
     ['--group=welcome', '--group=curriculum'],
   ])

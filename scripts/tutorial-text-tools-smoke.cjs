@@ -112,7 +112,15 @@ module.exports = async function verifyTextTools({
         if (family === 'recovery' || family.startsWith('recovery-'))
           await require('./tutorial-recovery-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
         if (family === 'conflicts' || family.startsWith('conflicts-'))
-          await require('./tutorial-conflict-assertions.cjs')({ chapter, step, run, waitFor, tutorial: getTutorial(), languageIndex });
+          await require('./tutorial-conflict-assertions.cjs')({
+            chapter,
+            step,
+            run,
+            waitFor,
+            tutorial: getTutorial(),
+            languageIndex,
+            afterAction: inspectAfterText,
+          });
       };
       if (!inspectAfterText) await verifyStep();
       if (chapter.id === 'json-schema' && step.id === 'contract') await require('./tutorial-schema-layout.cjs')(parent, getTutorial(), waitFor);

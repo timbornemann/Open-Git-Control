@@ -1048,6 +1048,8 @@ CI und Releases verwenden gemeinsam [.github/workflows/quality.yml](.github/work
 
 CI verteilt außerdem alle nativen Tutorial-Testgruppen auf sechs getrennte Windows-Runner. Innerhalb eines Runners laufen die Gruppen nacheinander, damit Tastatureingaben ihren Fokus behalten. `npm run test:tutorial:electron -- --shard=1/6` führt lokal einen Teil aus; mit zusätzlichem `--list` werden dessen Gruppen angezeigt. Ohne Auswahl läuft weiterhin die vollständige Suite. `npm run test:ci` bleibt die vollständige lokale Qualitätsprüfung.
 
+Lokal lassen sich die Tutorial-Tests mit `npm run test:tutorial:electron -- --workers=4` parallel ausführen. `--workers=auto` wählt anhand verfügbarer CPU-Kerne und Arbeitsspeicher bis zu vier Worker. Jeder Worker verwendet ein eigenes temporäres Profil und sendet native Tastatureingaben direkt an seinen Renderer; unter Windows bleiben die Testfenster inaktiv. Pro Gruppe wird ein Protokoll unter `node_modules/.cache/ogc-tutorial-electron/` gespeichert. Für eine Auswahl lässt sich die Worker-Option mit `--groups=files,editor,codecs,branches-switch` kombinieren.
+
 ## Release Builds
 
 Lokale Paket-Artefakte landen in `release/`.

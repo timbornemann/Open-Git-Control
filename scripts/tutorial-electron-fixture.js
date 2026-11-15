@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const profile = process.env.OGC_TUTORIAL_TEST_PROFILE;
+const parallelInput = process.env.OGC_TUTORIAL_TEST_PARALLEL === '1';
+let backgroundInputEvents = 0;
 app.disableHardwareAcceleration();
 // Keep native layout tests painting when another desktop window covers them.
 // WebContentsView otherwise retains stale viewport sizes (electron/electron#44590).
@@ -67,17 +69,22 @@ process.on('uncaughtException', fail);
 process.on('unhandledRejection', fail);
 app.on('browser-window-created', (_event, win) => {
   parent = win;
+  if (parallelInput && ['win32', 'darwin'].includes(process.platform)) win.setFocusable(false);
   win.showInactive();
 });
 app.on('web-contents-created', (_event, contents) => {
   contents.setBackgroundThrottling(false);
-  // Electron requires the owning BrowserWindow to be focused for native key
-  // events. Showing it inactive or focusing only a DOM field is insufficient.
+  // Parallel workers send native input straight to their own WebContents.
+  // Activating each OS window here would make the workers steal focus.
   const sendInputEvent = contents.sendInputEvent.bind(contents);
   const insertText = contents.insertText.bind(contents);
   const focusInput = () => {
-    parent.focus();
-    contents.focus();
+    if (parallelInput) {
+      if (!parent.isFocused()) backgroundInputEvents++;
+    } else {
+      parent.focus();
+      contents.focus();
+    }
   };
   contents.sendInputEvent = (event) => {
     focusInput();
@@ -763,6 +770,7 @@ app
     assert.deepEqual(errors, [], 'The tutorial must render without errors.');
     clearTimeout(timeout);
     console.log('Native tutorial automatic progression, isolation, staging, commit and chapter entry smoke tests passed.');
+    if (parallelInput) console.log('Native input events delivered with an inactive window:', backgroundInputEvents);
     verified = true;
     fs.writeFileSync(path.join(profile, 'tutorial-verified'), 'yes');
     app.quit();

@@ -1049,6 +1049,8 @@ CI and releases share [.github/workflows/quality.yml](.github/workflows/quality.
 
 CI also distributes all native tutorial groups across six isolated Windows runners. Each runner executes its groups serially to preserve native keyboard focus. Use `npm run test:tutorial:electron -- --shard=1/6` to run one part locally, or add `--list` to inspect its groups. Without a selector the command still runs the full suite. `npm run test:ci` remains the complete local quality gate.
 
+For parallel local tutorial tests, use `npm run test:tutorial:electron -- --workers=4`. `--workers=auto` chooses up to four workers based on available CPU cores and memory. Workers have separate temporary profiles and send native keyboard input directly to their own renderers; Windows test windows stay inactive. Logs for each group are saved under `node_modules/.cache/ogc-tutorial-electron/`. To run only selected groups, combine the worker option with `--groups=files,editor,codecs,branches-switch`.
+
 ## Release Builds
 
 Local package artifacts are written to `release/`.

@@ -3,7 +3,7 @@ const examples = require('../src/tutorial/fixtures/merge-conflicts.json');
 const { practiceCommitHash: hash } = require('../dist-electron/src/shared/tutorial/exampleGitIds.js');
 const control = (name) => '[data-tutorial="conflict-' + name + '"]';
 const query = (selector) => 'document.querySelector(' + JSON.stringify(selector) + ')';
-module.exports = async function verifyMultiple({ chapter, step, run, waitFor, tutorial, languageIndex }) {
+module.exports = async function verifyMultiple({ chapter, step, run, waitFor, tutorial, languageIndex, afterAction = false }) {
   const actions = step.prepare.actions;
   const used = (name) => actions.some((action) => action.click === control(name));
   const deletion = chapter.id === 'conflicts-deletion';
@@ -64,7 +64,9 @@ module.exports = async function verifyMultiple({ chapter, step, run, waitFor, tu
   }
   if (await run('Boolean(' + query('[data-dialog-action=confirm]') + ')'))
     assert.deepEqual(await run('Array.from(document.querySelectorAll(".dialog-context-list dd"),node=>node.textContent)'), ['README.md', 'LICENSE']);
-  if (!deletion && continued && ['read-diff', 'text'].includes(step.id))
+  // Direct entry into the Text action still shows Diff. During the continuous
+  // lesson the action has already switched tabs when this assertion runs.
+  if (!deletion && continued && (step.id === 'read-diff' || (step.id === 'text' && !afterAction)))
     for (const [kind, version] of [
       ['del', 'current'],
       ['add', 'incoming'],
@@ -77,10 +79,10 @@ module.exports = async function verifyMultiple({ chapter, step, run, waitFor, tu
           JSON.stringify(examples[version][languageIndex].split('\n')[2]) +
           ')',
       );
-  if (!deletion && continued && step.id === 'contents')
+  if (!deletion && continued && (step.id === 'contents' || (step.id === 'text' && afterAction)))
     await waitFor(
       tutorial,
-      'Array.from(document.querySelectorAll(".file-viewer .cm-content .cm-line"),node=>node.textContent).join("\\n") === ' +
+      'Array.from(document.querySelectorAll(".file-viewer[data-tab=text] .cm-content .cm-line"),node=>node.textContent).join("\\n") === ' +
         JSON.stringify(examples.mixed[languageIndex]),
     );
   if (!deletion && continued && ['greeting-origin', 'closing-origin', 'file-history'].includes(step.id)) {

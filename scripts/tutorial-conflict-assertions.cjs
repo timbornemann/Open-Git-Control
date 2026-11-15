@@ -4,9 +4,9 @@ const { practiceCommitHash: hash } = require('../dist-electron/src/shared/tutori
 const { conflictChoiceContent } = require('../dist-electron/src/shared/tutorial/conflictLessonHelpers.js');
 const control = (name) => '[data-tutorial="conflict-' + name + '"]';
 const query = (selector) => 'document.querySelector(' + JSON.stringify(selector) + ')';
-module.exports = async function verifyConflict({ chapter, step, run, waitFor, tutorial, languageIndex }) {
+module.exports = async function verifyConflict({ chapter, step, run, waitFor, tutorial, languageIndex, afterAction = false }) {
   if (step.prepare.branches.fixture === 'diverged-conflicts')
-    return require('./tutorial-conflict-multiple-assertions.cjs')({ chapter, step, run, waitFor, tutorial, languageIndex });
+    return require('./tutorial-conflict-multiple-assertions.cjs')({ chapter, step, run, waitFor, tutorial, languageIndex, afterAction });
   const actions = step.prepare.actions;
   const used = (name) => actions.some((action) => action.click === control(name));
   const continued = used('continue'),
