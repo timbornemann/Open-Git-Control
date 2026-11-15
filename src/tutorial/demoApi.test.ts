@@ -93,17 +93,19 @@ describe('the isolated learning project', () => {
     expect(create('branch').repo.branches).not.toContain('feature/practice');
     expect(await api.git.runGitCommand('clean', '-fd')).toMatchObject({ success: false });
   });
-  it('loads every checkpoint without a native bridge, credentials or real repositories', async () => {
-    for (const chapter of TUTORIAL_CHAPTERS)
-      for (const step of chapter.steps) {
-        const { api, repo } = createDemoApi(context, step);
-        const boot = await api.app.getBootstrap();
-        expect(boot.snapshots).toEqual([]);
-        expect(boot.settings.hasOpenAiApiKey).toBe(false);
-        expect(boot.repositories.activeRepo).toBe(repo.activeRepo);
-        expect(repo.conflicted).toBe(step.scenario === 'conflict');
-        expect((await api.app.getTutorialProgress()).welcomeSeen).toBe(true);
-      }
+  // Keep the timeout scoped to one lesson as the catalog grows. Every
+  // checkpoint is still loaded independently; failures name its exact entry.
+  it.each(TUTORIAL_CHAPTERS)('loads every checkpoint of $id without a native bridge, credentials or real repositories', async (chapter) => {
+    for (const step of chapter.steps) {
+      const checkpoint = `${chapter.id}/${step.id}`;
+      const { api, repo } = createDemoApi(context, step);
+      const boot = await api.app.getBootstrap();
+      expect(boot.snapshots, checkpoint).toEqual([]);
+      expect(boot.settings.hasOpenAiApiKey, checkpoint).toBe(false);
+      expect(boot.repositories.activeRepo, checkpoint).toBe(repo.activeRepo);
+      expect(repo.conflicted, checkpoint).toBe(step.scenario === 'conflict');
+      expect((await api.app.getTutorialProgress()).welcomeSeen, checkpoint).toBe(true);
+    }
   });
   it('tracks planning and hosting changes in memory', async () => {
     const { api, repo } = create();
