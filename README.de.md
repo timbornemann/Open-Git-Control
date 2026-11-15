@@ -1044,6 +1044,10 @@ Verfuegbare Skripte:
 | `npm run test:coverage`  | Tests mit Coverage ausfuehren                               |
 | `npm run test:ci`        | Kompilieren, Tests mit Coverage und Build ausfuehren        |
 
+CI und Releases verwenden gemeinsam [.github/workflows/quality.yml](.github/workflows/quality.yml). Die Unit-Tests laufen unter Windows in vier und unter Linux/macOS in zwei Teilen. Die Coverage-Berichte werden pro Betriebssystem zusammengeführt und anschließend gegen die bisherigen Grenzwerte geprüft. Die Anwendung wird pro Plattform einmal kompiliert; Tests und Release-Paketierung verwenden dieselben Dateien.
+
+CI verteilt außerdem alle nativen Tutorial-Testgruppen auf sechs getrennte Windows-Runner. Innerhalb eines Runners laufen die Gruppen nacheinander, damit Tastatureingaben ihren Fokus behalten. `npm run test:tutorial:electron -- --shard=1/6` führt lokal einen Teil aus; mit zusätzlichem `--list` werden dessen Gruppen angezeigt. Ohne Auswahl läuft weiterhin die vollständige Suite. `npm run test:ci` bleibt die vollständige lokale Qualitätsprüfung.
+
 ## Release Builds
 
 Lokale Paket-Artefakte landen in `release/`.

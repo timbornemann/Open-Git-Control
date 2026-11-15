@@ -21,51 +21,29 @@ concurrency:
 jobs:
   quality:
     name: ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             name: Build and Test
+            platform: linux
+            unit-shards: '[1,2]'
           - os: windows-latest
             name: Build and Test (Windows)
+            platform: windows
+            unit-shards: '[1,2,3,4]'
           - os: macos-latest
             name: Build and Test (macOS)
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Prepare Electron runtime
-        run: npx --no-install install-electron
-
-      - name: Verify Git LFS test dependency
-        run: git lfs version
-
-      - name: Run full quality gate
-        run: npm run test:ci
-
-      - name: Verify native Windows startup and restart
-        if: runner.os == 'Windows'
-        run: npm run test:startup:electron
-
-      - name: Verify isolated interactive introduction
-        if: runner.os == 'Windows'
-        run: npm run test:tutorial:electron
-
-      - name: Verify archived JSON Schema validation under production CSP
-        if: runner.os == 'Windows'
-        run: npm run test:schema:electron
+            platform: macos
+            unit-shards: '[1,2]'
+    uses: ./.github/workflows/quality.yml
+    with:
+      os: ${{ matrix.os }}
+      artifact-name: ci-compiled-${{ matrix.platform }}
+      unit-shards: ${{ matrix.unit-shards }}
+      native-checks: ${{ matrix.platform == 'windows' }}
+      tutorials: ${{ matrix.platform == 'windows' }}
 
   recovery:
     name: Native recovery (${{ matrix.os }})

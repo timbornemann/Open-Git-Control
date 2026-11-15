@@ -43,6 +43,8 @@
     "test": "npm run test:unit",
     "test:unit": "node scripts/run-tests.js",
     "test:coverage": "node scripts/run-tests.js --coverage",
+    "test:coverage:merge": "node scripts/run-tests.js --merge-reports --coverage",
+    "test:ci:scripts": "node --test scripts/__tests__/*.test.cjs",
     "test:storage:electron": "npm run build:electron && node scripts/test-storage-electron.js",
     "test:startup:electron": "node scripts/test-startup-electron.js",
     "test:rebase:electron": "npm run build:electron && node scripts/test-rebase-message-electron.cjs",
@@ -52,7 +54,8 @@
     "test:schema:electron": "npm run build:electron && node scripts/test-schema-validation-electron.js",
     "tutorial:schema:generate": "node scripts/generate-tutorial-schema.cjs",
     "tutorial:schema:check": "node scripts/generate-tutorial-schema.cjs --check",
-    "test:ci": "npm run legal:prepare && npm run legal:check && npm run tutorial:schema:check && npm run lint && npm run format:check && npm run build:electron && npm run test:coverage && npm run build",
+    "test:ci:checks": "npm run legal:prepare && npm run legal:check && npm run tutorial:schema:check && npm run test:ci:scripts && npm run lint && npm run format:check && npm run build",
+    "test:ci": "npm run test:ci:checks && npm run test:coverage",
     "docs:release-links": "node scripts/update-readme-release-links.js"
   },
   "dependencies": {

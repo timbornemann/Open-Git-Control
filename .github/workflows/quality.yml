@@ -1,0 +1,198 @@
+name: Application quality gate
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+      artifact-name:
+        required: true
+        type: string
+      ref:
+        default: ''
+        type: string
+      version:
+        default: ''
+        type: string
+      unit-shards:
+        default: '[1,2]'
+        type: string
+      native-checks:
+        default: false
+        type: boolean
+      tutorials:
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Checks and application build
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: 20
+    outputs:
+      sharded: ${{ steps.gate.outputs.sharded }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Prepare release version
+        if: inputs.version != ''
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: node scripts/prepare-release-version.js "$RELEASE_VERSION"
+        shell: bash
+      # A manual release rebuild can target a tag predating this workflow.
+      # Keep its original complete gate instead of requiring new npm scripts.
+      - name: Select compatible quality gate
+        id: gate
+        run: node -e "const fs=require('node:fs'); const sharded=Boolean(require('./package.json').scripts['test:ci:checks']); fs.appendFileSync(process.env.GITHUB_OUTPUT, 'sharded='+sharded+'\n');"
+      - if: steps.gate.outputs.sharded == 'true'
+        run: npm run test:ci:checks
+      - if: steps.gate.outputs.sharded != 'true'
+        run: npx --no-install install-electron
+      - if: steps.gate.outputs.sharded != 'true'
+        run: git lfs version
+      - if: steps.gate.outputs.sharded != 'true'
+        run: npm run test:ci
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: |
+            dist/
+            dist-electron/
+          if-no-files-found: error
+          retention-days: 3
+
+  unit:
+    name: Unit tests (${{ matrix.shard }}/${{ strategy.job-total }})
+    needs: build
+    if: needs.build.outputs.sharded == 'true'
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(inputs.unit-shards) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Prepare release version
+        if: inputs.version != ''
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: node scripts/prepare-release-version.js "$RELEASE_VERSION"
+        shell: bash
+      - run: npx --no-install install-electron
+      - run: git lfs version
+      - uses: actions/download-artifact@v6
+        with:
+          name: ${{ inputs.artifact-name }}
+      - name: Run test shard and collect coverage
+        run: npm run test:coverage -- --shard=${{ matrix.shard }}/${{ strategy.job-total }} --reporter=default --reporter=blob
+      - name: Upload test and coverage blob
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ inputs.artifact-name }}-unit-${{ matrix.shard }}
+          path: .vitest-reports/blob-${{ matrix.shard }}-${{ strategy.job-total }}.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  coverage:
+    name: Combined coverage thresholds
+    needs: unit
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Prepare release version
+        if: inputs.version != ''
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: node scripts/prepare-release-version.js "$RELEASE_VERSION"
+        shell: bash
+      - uses: actions/download-artifact@v6
+        with:
+          name: ${{ inputs.artifact-name }}
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: ${{ inputs.artifact-name }}-unit-*
+          path: .vitest-reports
+          merge-multiple: true
+      - name: Require every shard before merging
+        run: node scripts/verify-coverage-shards.cjs
+        env:
+          OGC_COVERAGE_SHARDS: ${{ inputs.unit-shards }}
+      - name: Merge coverage and enforce all existing thresholds
+        run: npm run test:coverage:merge
+
+  native:
+    name: Native Windows startup and schema
+    if: inputs.native-checks
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx --no-install install-electron
+      - uses: actions/download-artifact@v6
+        with:
+          name: ${{ inputs.artifact-name }}
+      - run: npm run test:startup:electron
+      - run: npm run test:schema:electron
+
+  tutorial:
+    name: Native tutorials (${{ matrix.shard }}/6)
+    if: inputs.tutorials
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx --no-install install-electron
+      - uses: actions/download-artifact@v6
+        with:
+          name: ${{ inputs.artifact-name }}
+      # Every runner has its own desktop. Keep native input serial within it.
+      - run: npm run test:tutorial:electron -- --shard=${{ matrix.shard }}/6

@@ -1045,6 +1045,10 @@ Available scripts:
 | `npm run test:coverage`  | Run tests with coverage                                  |
 | `npm run test:ci`        | Compile, test with coverage, and build                   |
 
+CI and releases share [.github/workflows/quality.yml](.github/workflows/quality.yml). Unit tests run in four Windows shards and two Linux/macOS shards. Coverage reports are merged separately for each operating system before applying the existing coverage thresholds. The application is compiled once per platform and reused by the tests and release packaging.
+
+CI also distributes all native tutorial groups across six isolated Windows runners. Each runner executes its groups serially to preserve native keyboard focus. Use `npm run test:tutorial:electron -- --shard=1/6` to run one part locally, or add `--list` to inspect its groups. Without a selector the command still runs the full suite. `npm run test:ci` remains the complete local quality gate.
+
 ## Release Builds
 
 Local package artifacts are written to `release/`.

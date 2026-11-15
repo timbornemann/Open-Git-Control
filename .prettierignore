@@ -1,4 +1,5 @@
 coverage/
+.vitest-reports/
 dist/
 dist-electron/
 node_modules/

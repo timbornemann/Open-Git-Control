@@ -12,6 +12,7 @@ dist
 dist-ssr
 dist-electron
 coverage
+.vitest-reports/
 *.tsbuildinfo
 *.local
 
