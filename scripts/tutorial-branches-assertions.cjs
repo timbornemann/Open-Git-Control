@@ -36,19 +36,7 @@ module.exports = async function verifyBranchStep({ chapter, step, run, waitFor, 
     return;
   }
   if (chapter.id === 'branches-switch') {
-    const featureSteps = [
-      'current-feature',
-      'feature-reference',
-      'retained-main',
-      'older-tree',
-      'open-older',
-      'older-text',
-      'close-older',
-      'keyboard-main',
-      'keyboard-state',
-      'return-main',
-    ];
-    const branch = featureSteps.includes(step.id) ? 'feature/begruessung' : 'main';
+    const branch = step.prepare.branches.current;
     await waitFor(tutorial, query('[data-branch-name=' + JSON.stringify(branch) + '][data-branch-head=true]'));
     const version = step.id === 'older-text' ? 'description' : ['main-text', 'restored-text'].includes(step.id) ? 'latest' : undefined;
     if (version)
