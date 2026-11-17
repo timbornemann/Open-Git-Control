@@ -33,7 +33,7 @@ export function nativeMergeFixture(language: 'de' | 'en' = 'en', prepared?: Tuto
   fs.mkdirSync(cwd);
   fs.mkdirSync(hooks);
   fs.writeFileSync(config, '');
-  const git = (args: string[], expected = 0, overrides: Record<string, string> = {}) => {
+  const git = (args: string[], expected = 0, input?: Buffer) => {
     const result = spawnSync(
       'git',
       [
@@ -57,7 +57,9 @@ export function nativeMergeFixture(language: 'de' | 'en' = 'en', prepared?: Tuto
         cwd,
         encoding: 'utf8',
         windowsHide: true,
-        env: { ...process.env, GIT_CONFIG_GLOBAL: config, GIT_CONFIG_NOSYSTEM: '1', GIT_EDITOR: 'true', GIT_MERGE_AUTOEDIT: 'no', ...overrides },
+        input,
+        timeout: 10_000,
+        env: { ...process.env, GIT_CONFIG_GLOBAL: config, GIT_CONFIG_NOSYSTEM: '1', GIT_EDITOR: 'true', GIT_MERGE_AUTOEDIT: 'no' },
       },
     );
     expect(result.error).toBeUndefined();
@@ -66,28 +68,40 @@ export function nativeMergeFixture(language: 'de' | 'en' = 'en', prepared?: Tuto
   };
   const writeNative = (name: string, contents: string) => fs.writeFileSync(path.join(cwd, name), contents);
   const read = (name = 'README.md') => (fs.existsSync(path.join(cwd, name)) ? fs.readFileSync(path.join(cwd, name), 'utf8') : undefined);
-  const writeTree = (number: number) => {
-    const commit = resolveDemoCommit(demo.repo, practiceCommitHash(number))!;
-    const files = commit.files!;
-    const removed = git(['ls-files', '-z'])
-      .split('\0')
-      .filter((name) => name && !Object.prototype.hasOwnProperty.call(files, name));
-    if (removed.length) git(['rm', '-f', '--', ...removed]);
-    for (const [name, blob] of Object.entries(files)) {
-      fs.mkdirSync(path.dirname(path.join(cwd, name)), { recursive: true });
-      fs.writeFileSync(path.join(cwd, name), demoBlobBytes(blob));
-    }
-    git(['add', '-A']);
-    git(['commit', '-m', 'Saved practice tree ' + number], 0, { GIT_AUTHOR_DATE: commit.date, GIT_COMMITTER_DATE: commit.date });
-  };
   const source = 'feature/begruessung';
+  // Seed the same divergent trees in one Git process. Merge operations below
+  // still run normally; setup no longer checks out/adds/commits each snapshot.
+  const history: Buffer[] = [];
+  const command = (value: string) => history.push(Buffer.from(value));
+  const data = (value: string | Uint8Array) => {
+    const bytes = typeof value === 'string' ? Buffer.from(value, 'utf8') : Buffer.from(value);
+    command(`data ${bytes.length}\n`);
+    history.push(bytes);
+    command('\n');
+  };
+  for (const [number, parent, branch] of [
+    [3, undefined, 'main'],
+    [4, 3, 'main'],
+    [5, 3, source],
+  ] as const) {
+    const commit = resolveDemoCommit(demo.repo, practiceCommitHash(number))!;
+    const date = `${Math.floor(Date.parse(commit.date) / 1000)} +0000`;
+    command(
+      `commit refs/heads/${branch}\nmark :${number}\nauthor Example <example@example.invalid> ${date}\ncommitter Example <example@example.invalid> ${date}\n`,
+    );
+    data('Saved practice tree ' + number + '\n');
+    if (parent) command(`from :${parent}\n`);
+    command('deleteall\n');
+    for (const [name, blob] of Object.entries(commit.files!)) {
+      command(`M 100644 inline ${JSON.stringify(name)}\n`);
+      data(demoBlobBytes(blob));
+    }
+    command('\n');
+  }
+  command('done\n');
   git(['init', '-b', 'main']);
-  writeTree(3);
-  git(['branch', source]);
-  writeTree(4);
-  git(['checkout', source]);
-  writeTree(5);
-  git(['checkout', 'main']);
+  git(['fast-import', '--quiet'], 0, Buffer.concat(history));
+  git(['reset', '--hard', 'main']);
   git(['merge', ...(merge?.flags || []), source], merge?.exit ?? 1);
   return { ...demo, step, git, source, read, writeNative };
 }
