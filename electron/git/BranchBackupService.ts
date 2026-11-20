@@ -26,9 +26,10 @@ import type { GitRunner } from './GitRunner';
 import type { RepositoryHeadService } from './RepositoryHeadService';
 
 const intervalMs = 15 * 60_000;
+const interruptedRetryMs = 5_000;
 const retainedVersions = 3;
 type Preferences = { enabled: boolean; directory: string | null; automatic: string[] };
-type CheckStatus = Pick<BranchBackupStatus, 'checkedAt' | 'verifiedAt' | 'lastError'>;
+type CheckStatus = { checkedAt: number } & Pick<BranchBackupStatus, 'verifiedAt' | 'lastError'>;
 type RemovalPreview = {
   selection: BranchBackupRemoval;
   root: string;
@@ -321,45 +322,58 @@ export class BranchBackupService {
 
   private async backup(repoPath: string, manual: boolean): Promise<BranchBackupOutcome> {
     const key = repositoryPathKey(repoPath);
-    const signal = this.controller.signal;
-    const options = { signal, requestedKind: 'preflight' as const };
+    const signal = AbortSignal.any([this.controller.signal]);
     const checkedAt = Date.now();
     this.due.set(key, checkedAt + intervalMs);
-    const status: CheckStatus = { checkedAt, verifiedAt: this.statuses.get(key)?.verifiedAt ?? null, lastError: null };
+    const previous = this.statuses.get(key);
+    const status: CheckStatus = { checkedAt, verifiedAt: previous?.verifiedAt ?? null, lastError: previous?.lastError ?? null };
     this.busy.add(key);
     this.statuses.set(key, status);
     try {
-      const repo = await describeBranchRepository(this.git, repoPath, options);
-      const preferences = this.preferences;
-      const directory = preferences.directory ?? this.defaultDirectory;
-      status.verifiedAt = this.verifiedTimes.get(repo.key) ?? null;
-      if (!preferences.directory && [await fs.realpath(repoPath), repo.gitDir, repo.commonDir].some((base) => withinDirectory(base, this.defaultDirectory))) {
-        throw new Error('The default backup directory is inside this repository. Choose another destination.');
-      }
-      const root = await this.target(preferences, true);
-      const versions = await this.bundles.versions(root, repo);
-      status.verifiedAt = versions[0]?.verifiedAt ?? null;
-      await this.rememberVerification(directory, repo.key, status.verifiedAt);
-      await this.heads.read(repoPath, options);
-      const refs = await readBranchTips(this.git, repo, signal);
-      if (!Object.keys(refs).length) return 'empty';
-      await this.tips.record(repo, refs, checkedAt);
-      const newest = versions[0];
-      if (newest && sameBranchTips(newest.refs, refs) && (!manual || (await this.bundles.isIntact(newest, signal)))) {
-        if (versions.length > retainedVersions) await this.bundles.retainLatest(root, repo, retainedVersions);
-        return 'up-to-date';
-      }
-      const saved = await this.bundles.create(root, repo, refs, signal);
-      status.verifiedAt = saved.verifiedAt;
-      await this.rememberVerification(directory, repo.key, status.verifiedAt);
-      await this.bundles.retainLatest(root, repo, retainedVersions);
-      return 'created';
+      const outcome = await this.saveBackup(repoPath, manual, status, signal);
+      status.lastError = null;
+      return outcome;
     } catch (error) {
-      if (!signal.aborted) status.lastError = errorMessage(error);
+      if (!signal.aborted && error instanceof Error && error.name === 'AbortError') {
+        // A foreground Git write can interrupt an individual preflight job.
+        this.due.set(key, Date.now() + interruptedRetryMs);
+        if (manual) this.repositoriesChanged();
+      } else if (!signal.aborted && !manual) {
+        status.lastError = errorMessage(error);
+      }
       throw error;
     } finally {
       this.busy.delete(key);
     }
+  }
+
+  private async saveBackup(repoPath: string, manual: boolean, status: CheckStatus, signal: AbortSignal): Promise<BranchBackupOutcome> {
+    const options = { signal, requestedKind: 'preflight' as const };
+    const repo = await describeBranchRepository(this.git, repoPath, options);
+    const preferences = this.preferences;
+    const directory = preferences.directory ?? this.defaultDirectory;
+    status.verifiedAt = this.verifiedTimes.get(repo.key) ?? null;
+    if (!preferences.directory && [await fs.realpath(repoPath), repo.gitDir, repo.commonDir].some((base) => withinDirectory(base, this.defaultDirectory))) {
+      throw new Error('The default backup directory is inside this repository. Choose another destination.');
+    }
+    const root = await this.target(preferences, true);
+    const versions = await this.bundles.versions(root, repo);
+    status.verifiedAt = versions[0]?.verifiedAt ?? null;
+    await this.rememberVerification(directory, repo.key, status.verifiedAt);
+    await this.heads.read(repoPath, options);
+    const refs = await readBranchTips(this.git, repo, signal);
+    if (!Object.keys(refs).length) return 'empty';
+    await this.tips.record(repo, refs, status.checkedAt);
+    const newest = versions[0];
+    if (newest && sameBranchTips(newest.refs, refs) && (!manual || (await this.bundles.isIntact(newest, signal)))) {
+      if (versions.length > retainedVersions) await this.bundles.retainLatest(root, repo, retainedVersions);
+      return 'up-to-date';
+    }
+    const saved = await this.bundles.create(root, repo, refs, signal);
+    status.verifiedAt = saved.verifiedAt;
+    await this.rememberVerification(directory, repo.key, status.verifiedAt);
+    await this.bundles.retainLatest(root, repo, retainedVersions);
+    return 'created';
   }
 
   async previewRemoval(selection: BranchBackupRemoval): Promise<RemovalPreview> {

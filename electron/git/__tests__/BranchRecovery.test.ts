@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { GitRunner } from '../GitRunner';
+import { defaultExecFileAsyncRunner, GitRunner } from '../GitRunner';
 import { BranchBackupService } from '../BranchBackupService';
 import { BranchBundleStore, readBranchTips } from '../branchBundles';
 import { describeBranchRepository } from '../branchRecoveryRepository';
@@ -260,6 +260,41 @@ describe('global branch bundles', () => {
       await service.dispose();
     }
   }, 50_000);
+
+  it('retries an automatic backup interrupted by a Git write', async () => {
+    fs.writeFileSync(path.join(repo, 'file.txt'), 'first');
+    const oid = commit('Initial');
+    let bundleAttempts = 0;
+    const backupRunner = new GitRunner(async (file, args, options) => {
+      if (args[0] === 'bundle' && args[1] === 'create' && ++bundleAttempts === 1) {
+        const signal = options.signal!;
+        return new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        });
+      }
+      return defaultExecFileAsyncRunner(file, args, options);
+    });
+    const backupHeads = new RepositoryHeadService(backupRunner);
+    const service = new BranchBackupService(path.join(root, 'profile'), backupRunner, backupHeads, tips, () => [repo]);
+    try {
+      await service.setSelection({ automatic: true, repoPath: repo });
+      await service.enable(true);
+      await vi.waitFor(() => expect(bundleAttempts).toBe(1), { timeout: 10_000 });
+      await backupRunner.run(repo, ['update-ref', 'refs/heads/feature', oid]);
+      expect(backupRunner.getSchedulerDiagnostics()).toContainEqual(expect.objectContaining({ command: 'bundle', kind: 'preflight', aborted: true }));
+
+      await vi.waitFor(async () => expect((await service.overview()).repositories[0].busy).toBe(false));
+      expect(await service.overview()).toMatchObject({ versionCount: 0, repositories: [{ lastError: null }] });
+      await vi.waitFor(async () => expect((await service.overview()).versionCount).toBe(1), { timeout: 15_000 });
+      expect(bundleAttempts).toBe(2);
+      const layout = await describeBranchRepository(backupRunner, repo);
+      const [version] = await service.versions(layout);
+      expect(version?.refs).toEqual({ 'refs/heads/main': oid, 'refs/heads/feature': oid });
+    } finally {
+      await service.dispose();
+      await backupRunner.close();
+    }
+  }, 35_000);
 
   it('creates a manual backup at the default destination and manages saved versions after the repository is removed', async () => {
     const profile = path.join(root, 'profile');

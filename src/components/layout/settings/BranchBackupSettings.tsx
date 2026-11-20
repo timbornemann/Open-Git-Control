@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { FolderOpen, HardDrive, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
+import { useAppToast } from '@/hooks/useAppToast';
 import { useI18n, type TranslateFn } from '@/i18n';
 import type { BranchBackupOverview, BranchBackupRemoval, BranchBackupStatus } from '@/shared/ipc/branchRecovery';
 import type { IpcResult } from '@/types/ipc';
@@ -13,13 +14,15 @@ import './branchBackupSettings.css';
 
 export function BranchBackupSettings() {
   const { tr } = useI18n();
+  const showToast = useAppToast();
   const available = branchBackupClient.isAvailable();
   const [overview, setOverview] = useState<BranchBackupOverview | null>(null);
   const [action, setAction] = useState<string | null>(null);
-  const [error, setError] = useState('');
+  const [overviewError, setOverviewError] = useState('');
   const [notice, setNotice] = useState('');
   const [search, setSearch] = useState('');
   const generation = useRef(0);
+  const reportedErrors = useRef(new Map<string, string>());
 
   const refresh = useCallback(async () => {
     const current = ++generation.current;
@@ -28,8 +31,9 @@ export function BranchBackupSettings() {
       if (current !== generation.current) return;
       if (!result.success) throw new Error(result.error);
       setOverview(result.data);
+      setOverviewError('');
     } catch (failure) {
-      if (current === generation.current) setError(failure instanceof Error ? failure.message : String(failure));
+      if (current === generation.current) setOverviewError(errorMessage(failure));
     }
   }, []);
 
@@ -48,18 +52,36 @@ export function BranchBackupSettings() {
     };
   }, [action, available, refresh]);
 
+  useEffect(() => {
+    const errors = new Map<string, string>();
+    if (overviewError) errors.set('overview', overviewError);
+    if (overview?.directoryError) {
+      const label = tr('Speicherort nicht erreichbar', 'Backup destination unavailable');
+      errors.set(`directory:${overview.directory}`, `${label} · ${overview.directoryError}`);
+    }
+    for (const repo of overview?.repositories ?? []) {
+      if (repo.repoPath && repo.lastError && repo.lastError !== overview?.directoryError) {
+        errors.set(`repository:${repo.repoPath}`, `${repoName(repo.repoPath)} · ${repo.lastError}`);
+      }
+    }
+    const previous = reportedErrors.current;
+    reportedErrors.current = errors;
+    for (const [key, message] of errors) {
+      if (previous.get(key) !== message) showToast(message, true);
+    }
+  }, [overview, overviewError, showToast, tr]);
+
   const perform = async <T,>(key: string, task: () => Promise<IpcResult<T>>, accepted: (value: T) => void) => {
     if (action) return;
     generation.current++;
     setAction(key);
-    setError('');
     setNotice('');
     try {
       const result = await task();
       if (!result.success) throw new Error(result.error);
       accepted(result.data);
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure));
+      showToast(errorMessage(failure), true);
     } finally {
       setAction(null);
     }
@@ -100,28 +122,14 @@ export function BranchBackupSettings() {
       group="branch-backups"
       actions={
         available && (
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={<RefreshCw size={14} />}
-            disabled={busy}
-            onClick={() => {
-              setError('');
-              void refresh();
-            }}
-          >
+          <Button size="sm" variant="ghost" icon={<RefreshCw size={14} />} disabled={busy} onClick={() => void refresh()}>
             {tr('Aktualisieren', 'Refresh')}
           </Button>
         )
       }
     >
       {!available && <p>{tr('Repository-Sicherungen stehen in der Desktop-App zur Verfügung.', 'Repository backups are available in the desktop app.')}</p>}
-      {available && !overview && !error && <p role="status">{tr('Sicherungen werden geladen …', 'Loading backups …')}</p>}
-      {error && (
-        <p className="storage-error" role="alert">
-          {error}
-        </p>
-      )}
+      {available && !overview && !overviewError && <p role="status">{tr('Sicherungen werden geladen …', 'Loading backups …')}</p>}
       {notice && (
         <p className="backup-notice" role="status">
           {notice}
@@ -160,11 +168,7 @@ export function BranchBackupSettings() {
               )}
             </div>
           </div>
-          {overview.directoryError ? (
-            <p className="storage-error" role="alert">
-              {tr('Speicherort nicht erreichbar', 'Backup destination unavailable')} · {overview.directoryError}
-            </p>
-          ) : (
+          {!overview.directoryError && (
             <div className="backup-total">
               <HardDrive size={16} aria-hidden="true" />
               <strong>{formatStorageBytes(overview.totalBytes)}</strong>
@@ -290,7 +294,6 @@ function RepositoryBackupRow({
           </Button>
         </div>
       )}
-      {repo.lastError && <p className="storage-error">{repo.lastError}</p>}
       {count > 0 && (
         <SettingsDisclosure title={tr('Sicherungsversionen', 'Backup versions')}>
           <ul className="backup-versions">
@@ -319,3 +322,4 @@ function RepositoryBackupRow({
 }
 
 const versionCount = (count: number, tr: TranslateFn) => (count === 1 ? tr('1 Version', '1 version') : tr(`${count} Versionen`, `${count} versions`));
+const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
