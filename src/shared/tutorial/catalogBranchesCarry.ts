@@ -180,7 +180,7 @@ export const TUTORIAL_BRANCHES_CARRY: TutorialChapter = {
       'open-staged',
       ['Öffne den vorgemerkten README-Diff', 'Open the staged README diff'],
       [
-        'Klicke README.md im Bereich Vorgemerkt. Wähle den Dateinamen, damit du die Quelle liest, ohne etwas aus dem Index zu nehmen.',
+        'Klicke README.md im Bereich „Gestagt“. Wähle den Dateinamen, damit du die Quelle liest, ohne etwas aus dem Index zu nehmen.',
         'Click README.md in Staged. Choose the filename to read that source without removing anything from the index.',
       ],
       stagingRow('staged', 'README.md'),
@@ -210,8 +210,8 @@ export const TUTORIAL_BRANCHES_CARRY: TutorialChapter = {
       'unstaged',
       ['Dieselbe README besitzt weiterhin eine weitere Bearbeitung', 'The same README still has a further edit'],
       [
-        'README steht auch im Bereich Änderungen. Ihr Arbeitsinhalt weicht weiterhin vom Index ab. Mitnehmen hat die beiden Fassungen nicht zu einer einzigen vorgemerkten Version zusammengefasst.',
-        'README also appears in Changes. Its working contents still differ from the index. Carry did not combine both versions into one staged version.',
+        'README steht auch im Bereich „Ungestagt“. Ihr Arbeitsinhalt weicht weiterhin vom Index ab. Mitnehmen hat die beiden Fassungen nicht zu einer einzigen vorgemerkten Version zusammengefasst.',
+        'README also appears in Unstaged. Its working contents still differ from the index. Carry did not combine both versions into one staged version.',
       ],
       c('unstaged-files'),
       { prepare: seed(post) },
@@ -220,8 +220,8 @@ export const TUTORIAL_BRANCHES_CARRY: TutorialChapter = {
       'open-unstaged',
       ['Öffne nun den ungestagten README-Diff', 'Now open the unstaged README diff'],
       [
-        'Klicke README.md im Bereich Änderungen. Dieser Vergleich soll Index gegen Arbeitsdatei lesen.',
-        'Click README.md in Changes. This diff should compare the index against the working file.',
+        'Klicke README.md im Bereich „Ungestagt“. Dieser Vergleich soll Index gegen Arbeitsdatei lesen.',
+        'Click README.md in Unstaged. This diff should compare the index against the working file.',
       ],
       stagingRow('unstaged', 'README.md'),
       { prepare: seed(post), completion: element(viewer('unstaged')) },

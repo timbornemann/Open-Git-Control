@@ -200,7 +200,7 @@ export const TUTORIAL_CONFLICTS: TutorialChapter = {
       'index',
       ['Die gelöste Team-Begrüßung ist jetzt vorgemerkt', 'The resolved team greeting is now staged'],
       [
-        'README.md steht unter Vorgemerkte Änderungen. Sie unterscheidet sich vom bisherigen main, wurde aber noch nicht als neuer Commit gespeichert.',
+        'README.md steht unter „Gestagt“. Sie unterscheidet sich vom bisherigen main, wurde aber noch nicht als neuer Commit gespeichert.',
         'README.md is in Staged changes. It differs from the old main but has not yet been saved as a new commit.',
       ],
       '[data-tutorial="staged-files"]',

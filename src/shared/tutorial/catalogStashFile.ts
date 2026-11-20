@@ -80,8 +80,8 @@ export const TUTORIAL_STASH_FILE: TutorialChapter = {
       'menu',
       ['Öffne das Kontextmenü der ungestagten README', 'Open the unstaged README context menu'],
       [
-        'Öffne das Kontextmenü von README im Bereich Änderungen. Dort findest du die einzelne Datei und alle Änderungen als getrennte Stash-Aktionen.',
-        'Open the context menu of README under Changes. It offers separate stash actions for the single file and for all changes.',
+        'Öffne das Kontextmenü von README im Bereich „Ungestagt“. Dort findest du die einzelne Datei und alle Änderungen als getrennte Stash-Aktionen.',
+        'Open the context menu of README under Unstaged. It offers separate stash actions for the single file and for all changes.',
       ],
       stagingRow('unstaged', 'README.md'),
       { prepare: seed(), gesture: 'contextmenu', completion: element(c('stash-file')) },
@@ -250,8 +250,8 @@ export const TUTORIAL_STASH_FILE: TutorialChapter = {
       'ordinary-index',
       ['Gewöhnliches Anwenden stellt hier nicht den alten Index wieder her', 'Ordinary application does not restore the old index here'],
       [
-        'README erscheint jetzt nur unter Änderungen. Bei dieser vorhandenen Datei stellt gewöhnliches Anwenden die Arbeitsfassung wieder her; die frühere teilweise Vormerkung wird nicht automatisch rekonstruiert. Die geführte Branchwechsel-Wiederherstellung arbeitet ausdrücklich anders.',
-        'README now appears only under Changes. For this existing file, ordinary application restores the working version without automatically reconstructing the former partial staging. Guided branch-switch restoration explicitly behaves differently.',
+        'README erscheint jetzt nur unter „Ungestagt“. Bei dieser vorhandenen Datei stellt gewöhnliches Anwenden die Arbeitsfassung wieder her; die frühere teilweise Vormerkung wird nicht automatisch rekonstruiert. Die geführte Branchwechsel-Wiederherstellung arbeitet ausdrücklich anders.',
+        'README now appears only under Unstaged. For this existing file, ordinary application restores the working version without automatically reconstructing the former partial staging. Guided branch-switch restoration explicitly behaves differently.',
       ],
       c('staging'),
       { prepare: seed('applied') },
@@ -260,8 +260,8 @@ export const TUTORIAL_STASH_FILE: TutorialChapter = {
       'open-diff',
       ['Kontrolliere den zurückgekehrten README-Diff', 'Inspect the restored README diff'],
       [
-        'Öffne README im Bereich Änderungen. Der Vergleich soll die gespeicherte Welt-Begrüßung gegen die zurückgebrachte Team-Begrüßung zeigen.',
-        'Open README under Changes. The diff should compare the saved world greeting against the restored team greeting.',
+        'Öffne README im Bereich „Ungestagt“. Der Vergleich soll die gespeicherte Welt-Begrüßung gegen die zurückgebrachte Team-Begrüßung zeigen.',
+        'Open README under Unstaged. The diff should compare the saved world greeting against the restored team greeting.',
       ],
       stagingRow('unstaged', 'README.md'),
       { prepare: seed('applied'), completion: element(viewer('unstaged')) },

@@ -234,10 +234,7 @@ export const TUTORIAL_TREE_CREATE: TutorialChapter = {
     s(
       'open-staging',
       ['Prüfe die Änderungsliste', 'Check the change list'],
-      [
-        'Wechsle zur Staging Area. Dort soll scratch/notes.md unter Unversioniert stehen.',
-        'Switch to Staging Area. scratch/notes.md should appear under Untracked.',
-      ],
+      ['Wechsle zur Staging Area. Dort soll scratch/notes.md unter „Neu“ stehen.', 'Switch to Staging Area. scratch/notes.md should appear under Untracked.'],
       c('open-staging'),
       { prepare: p('new-saved'), completion: element(`${c('open-staging')}[aria-pressed="true"]`) },
     ),

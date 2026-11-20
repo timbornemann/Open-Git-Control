@@ -1,10 +1,17 @@
+import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { FileEntry } from '@/utils/gitParsing';
 import { useI18n } from '@/i18n';
-import { VirtualList } from '@/components/VirtualList';
-import { AlertCircle } from 'lucide-react';
-import type { FileSection } from './types';
+import { StagingFileRow } from './StagingFileRow';
+import type { DiffStats, FileSection } from './types';
 import type { useFileOperations } from './useFileOperations';
-import { basename, formatDiffStats, getStatusInfo } from './utils';
+import { formatDiffStats } from './utils';
+
+const rowHeight = 40;
+const headerHeight = 32;
+const overscan = 8 * rowHeight;
+const fullListLimit = 32;
+const listStyle = { '--staging-row-height': `${rowHeight}px`, '--staging-header-height': `${headerHeight}px` } as CSSProperties;
 
 type StagingFileSectionsProps = {
   visibleStaged: FileEntry[];
@@ -15,269 +22,286 @@ type StagingFileSectionsProps = {
   selectedFile?: { path: string; source: 'staged' | 'unstaged' } | null;
 };
 
-const SectionHeader = ({
-  title,
-  count,
-  color,
-  actions,
-  statsText,
-}: {
-  title: string;
-  count: number;
+type GroupAction = { tutorial: string; text: string; title: string; run: () => void; destructive?: boolean };
+type Group = {
+  section: FileSection;
+  label: string;
   color: string;
-  actions?: React.ReactNode;
-  statsText?: string;
-}) => (
-  <div className="staging-section-header">
-    <span style={{ color }}>{title}</span>
-    <span className="staging-count">{count}</span>
-    {statsText && <span className="staging-stats-inline">{statsText}</span>}
-    <div style={{ flex: 1 }} />
-    {actions}
-  </div>
-);
+  files: FileEntry[];
+  actions: GroupAction[];
+  stats?: DiffStats;
+};
+type GroupLayout = Group & { expanded: boolean; filesTop: number };
+type FocusedFile = { section: FileSection; path: string };
+type Viewport = { top: number; height: number };
 
-export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
+function mountedRowIndexes(count: number, filesTop: number, viewport: Viewport, focusedIndex: number) {
+  const clamp = (index: number) => Math.max(0, Math.min(count, index));
+  const renderAll = count <= fullListLimit;
+  const start = renderAll ? 0 : clamp(Math.floor((viewport.top - overscan - filesTop) / rowHeight));
+  const end = renderAll ? count : clamp(Math.ceil((viewport.top + viewport.height + overscan - filesTop) / rowHeight));
+  const indexes = Array.from({ length: end - start }, (_, index) => start + index);
+  // Keep a focused row mounted when a snapshot inserts files above it or the user scrolls away.
+  if (focusedIndex >= 0 && focusedIndex < start) indexes.unshift(focusedIndex);
+  if (focusedIndex >= end && focusedIndex < count) indexes.push(focusedIndex);
+  return indexes;
+}
+
+export function StagingFileSections({
   visibleStaged,
   visibleUnstaged,
   visibleUntracked,
   fileOps,
   onSelectFileInspect,
   selectedFile,
-}) => {
+}: StagingFileSectionsProps) {
   const { t, tr } = useI18n();
-  const allLabel = fileOps.isFiltering ? tr('Alle Treffer', 'All matches') : t('generated.components.layout.sidebar.githubconnectedcontent.all_2ba206ff');
+  const id = useId();
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const pendingFocus = useRef<(FocusedFile & { index: number }) | null>(null);
+  const [viewport, setViewport] = useState<Viewport>({ top: 0, height: rowHeight });
+  const [collapsed, setCollapsed] = useState<Partial<Record<FileSection, boolean>>>({});
+  const [collapsedMatches, setCollapsedMatches] = useState<Partial<Record<FileSection, boolean>>>({});
+  const [focusedFile, setFocusedFile] = useState<FocusedFile | null>(null);
+  const { isFiltering, status } = fileOps;
+  const query = fileOps.searchQuery.trim().toLowerCase();
+  const allLabel = isFiltering ? tr('Alle Treffer', 'All matches') : t('generated.components.layout.sidebar.githubconnectedcontent.all_2ba206ff');
 
-  // Render markup directly: defining a component type here would remount every
-  // visible row on each progress tick, losing hover, focus and pending clicks.
-  const renderFileRow = (entry: FileEntry, section: FileSection) => {
-    const statusCode = section === 'staged' ? entry.x : entry.y;
-    const info = getStatusInfo(statusCode);
-    const inspectSource = section === 'staged' ? 'staged' : 'unstaged';
-    const isSelected = selectedFile?.path === entry.path && selectedFile.source === inspectSource;
-    const lfsState = fileOps.lfs?.stateFor(entry.path, section);
-    return (
-      <div
-        className={`staging-file-row${isSelected ? ' is-selected' : ''}`}
-        tabIndex={0}
-        role="group"
-        aria-label={entry.path}
-        aria-current={isSelected ? 'true' : undefined}
-        onKeyDown={(event) => {
-          if (event.target !== event.currentTarget) return;
-          if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) fileOps.openFileContextMenu(event, entry, section);
-          else if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            if (onSelectFileInspect) onSelectFileInspect(entry.path, inspectSource);
-            else fileOps.showDiff(entry.path, section === 'staged');
-          }
-        }}
-        onClick={() => {
-          if (onSelectFileInspect) onSelectFileInspect(entry.path, inspectSource);
-          else fileOps.showDiff(entry.path, section === 'staged');
-        }}
-        onContextMenu={(event) => fileOps.openFileContextMenu(event, entry, section)}
-      >
-        <span className="staging-status" style={{ color: info.color }}>
-          {statusCode}
-        </span>
-        <span className="staging-path" title={entry.path}>
-          <span className="staging-file-name">{basename(entry.path)}</span>
-          {lfsState?.recommendation && (
-            <span
-              className="staging-lfs-recommendation"
-              tabIndex={0}
-              role="img"
-              title={fileOps.lfs.recommendationTitle(lfsState)}
-              aria-label={fileOps.lfs.recommendationTitle(lfsState)}
-            >
-              <AlertCircle size={13} aria-hidden="true" />
-            </span>
-          )}
-        </span>
-        <div className="staging-actions">
-          {section === 'staged' && (
-            <button
-              data-tutorial="unstage-file"
-              className="staging-btn"
-              disabled={fileOps.isMutating}
-              onClick={(event) => {
-                event.stopPropagation();
-                fileOps.unstageFile(entry);
-              }}
-              title={t('generated.components.staging_area.stagingfilesections.unstage_6b603f75')}
-            >
-              -
-            </button>
-          )}
-          {section === 'unstaged' && (
-            <>
-              <button
-                data-tutorial="stage-file"
-                className="staging-btn"
-                disabled={fileOps.isMutating}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  fileOps.stageFile(entry.path);
-                }}
-                title={t('generated.components.staging_area.stagingfilesections.stage_9f9f36bd')}
-              >
-                +
-              </button>
-              <button
-                className="staging-btn danger"
-                disabled={fileOps.isMutating}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  fileOps.discardFile(entry.path);
-                }}
-                title={t('generated.components.diff_viewer.diffcontentpane.discard_23504c1c')}
-                data-tutorial="discard-file"
-              >
-                x
-              </button>
-            </>
-          )}
-          {section === 'untracked' && (
-            <>
-              <button
-                data-tutorial="stage-file"
-                className="staging-btn"
-                disabled={fileOps.isMutating}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  fileOps.stageFile(entry.path);
-                }}
-                title={t('generated.components.staging_area.stagingfilesections.stage_9f9f36bd')}
-              >
-                +
-              </button>
-              <button
-                className="staging-btn danger"
-                disabled={fileOps.isMutating}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  fileOps.deleteUntracked(entry.path);
-                }}
-                title={t('generated.components.staging_area.stagingfilesections.delete_e5186a63')}
-                data-tutorial="delete-untracked-file"
-              >
-                x
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    );
+  const measureViewport = useCallback((element: HTMLDivElement) => {
+    const { scrollTop, clientHeight } = element;
+    setViewport((previous) => {
+      const height = clientHeight || previous.height;
+      return previous.top === scrollTop && previous.height === height ? previous : { top: scrollTop, height };
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    const element = viewportRef.current;
+    if (!element) return;
+    const measure = () => measureViewport(element);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [measureViewport]);
+
+  useLayoutEffect(() => {
+    const element = viewportRef.current;
+    if (element) {
+      element.scrollTop = 0;
+      measureViewport(element);
+    }
+    setCollapsedMatches((previous) => (Object.keys(previous).length ? {} : previous));
+  }, [measureViewport, query]);
+
+  const groups: Group[] = [
+    {
+      section: 'staged',
+      label: tr('Gestagt', 'Staged'),
+      color: 'var(--status-success)',
+      files: visibleStaged,
+      stats: fileOps.stagedStats,
+      actions: [
+        {
+          tutorial: 'unstage-section',
+          text: `− ${allLabel}`,
+          title: isFiltering
+            ? tr('Angezeigte Dateien aus dem Staging entfernen', 'Unstage displayed files')
+            : t('generated.components.staging_area.stagingfilesections.unstage_all_13421edd'),
+          run: fileOps.unstageAll,
+        },
+      ],
+    },
+    {
+      section: 'unstaged',
+      label: tr('Ungestagt', 'Unstaged'),
+      color: 'var(--status-warning)',
+      files: visibleUnstaged,
+      stats: fileOps.unstagedStats,
+      actions: [
+        {
+          tutorial: 'stage-modified-section',
+          text: `+ ${allLabel}`,
+          title: tr('Alle angezeigten Änderungen dieses Bereichs hinzufügen', 'Stage all displayed changes in this section'),
+          run: fileOps.stageAllUnstaged,
+        },
+        {
+          tutorial: 'discard-modified-section',
+          text: '×',
+          title: tr('Alle angezeigten ungestagten Änderungen verwerfen', 'Discard all displayed unstaged changes'),
+          run: fileOps.discardAll,
+          destructive: true,
+        },
+      ],
+    },
+    {
+      section: 'untracked',
+      label: tr('Neu', 'Untracked'),
+      color: 'var(--status-untracked)',
+      files: visibleUntracked,
+      actions: [
+        {
+          tutorial: 'stage-untracked-section',
+          text: `+ ${allLabel}`,
+          title: tr('Alle angezeigten neuen Dateien hinzufügen', 'Stage all displayed untracked files'),
+          run: fileOps.stageAllUntracked,
+        },
+      ],
+    },
+  ];
+  const focusedFiles = groups.find((group) => group.section === focusedFile?.section)?.files;
+  const focusedPath = focusedFile?.path;
+  const focusedIndex = useMemo(() => focusedFiles?.findIndex((file) => file.path === focusedPath) ?? -1, [focusedFiles, focusedPath]);
+
+  let nextHeaderTop = 0;
+  const layout: GroupLayout[] = groups
+    .filter((group) => group.files.length > 0)
+    .map((group) => {
+      const expanded = !(isFiltering ? collapsedMatches : collapsed)[group.section];
+      const filesTop = nextHeaderTop + headerHeight;
+      nextHeaderTop = filesTop + (expanded ? group.files.length * rowHeight : 0);
+      return { ...group, expanded, filesTop };
+    });
+
+  const applyPendingFocus = () => {
+    const target = pendingFocus.current;
+    if (!target) return;
+    const row = viewportRef.current?.querySelector<HTMLElement>(`[data-tutorial="${target.section}-files"] [data-staging-row="${target.index}"]`);
+    if (row?.getAttribute('aria-label') !== target.path) return;
+    pendingFocus.current = null;
+    row.focus({ preventScroll: true });
+  };
+  useLayoutEffect(applyPendingFocus);
+
+  const focusRow = (group: GroupLayout, index: number) => {
+    const element = viewportRef.current;
+    if (!element) return;
+    pendingFocus.current = { section: group.section, path: group.files[index].path, index };
+    const top = group.filesTop + index * rowHeight;
+    if (top < element.scrollTop + headerHeight) {
+      element.scrollTop = top - headerHeight;
+    } else if (top + rowHeight > element.scrollTop + (element.clientHeight || viewport.height)) {
+      element.scrollTop = top + rowHeight - (element.clientHeight || viewport.height);
+    }
+    measureViewport(element);
+    applyPendingFocus();
   };
 
-  const getSectionFlex = (itemCount: number) => `${Math.min(itemCount, 8)} 1 0`;
+  const moveFocus = (groupIndex: number, index: number, direction: -1 | 1) => {
+    const group = layout[groupIndex];
+    const next = index + direction;
+    if (next >= 0 && next < group.files.length) {
+      focusRow(group, next);
+      return;
+    }
+    for (let candidate = groupIndex + direction; candidate >= 0 && candidate < layout.length; candidate += direction) {
+      const adjacent = layout[candidate];
+      if (!adjacent.expanded) continue;
+      focusRow(adjacent, direction > 0 ? 0 : adjacent.files.length - 1);
+      return;
+    }
+  };
+
+  const toggleGroup = ({ section, expanded, filesTop, files }: GroupLayout) => {
+    const element = viewportRef.current;
+    const headerTop = filesTop - headerHeight;
+    if (expanded && element && element.scrollTop > headerTop && element.scrollTop < filesTop + files.length * rowHeight) {
+      element.scrollTop = headerTop;
+      measureViewport(element);
+    }
+    const setGroups = isFiltering ? setCollapsedMatches : setCollapsed;
+    setGroups((previous) => ({ ...previous, [section]: expanded }));
+  };
 
   return (
-    <>
-      {visibleStaged.length > 0 && (
-        <div className="staging-section" data-tutorial="staged-files" style={{ flex: getSectionFlex(visibleStaged.length) }}>
-          <SectionHeader
-            title={t('generated.components.staging_area.stagingfilesections.staged_changes_12b1a849')}
-            count={visibleStaged.length}
-            color="var(--status-success)"
-            statsText={formatDiffStats(fileOps.stagedStats)}
-            actions={
+    <div
+      className="staging-change-list"
+      role="region"
+      aria-label={tr('Geänderte Dateien', 'Changed files')}
+      ref={viewportRef}
+      style={{ ...listStyle, flexGrow: Math.max(1, Math.min(8, Math.ceil(nextHeaderTop / rowHeight))) }}
+      onScroll={(event) => measureViewport(event.currentTarget)}
+    >
+      {layout.map((group, groupIndex) => {
+        const { section, expanded, files } = group;
+        const listId = `${id}-${section}`;
+        const total = status?.[section].length ?? files.length;
+        const count = isFiltering && files.length !== total ? `${files.length}/${total}` : files.length;
+        const Chevron = expanded ? ChevronDown : ChevronRight;
+        const source = section === 'staged' ? 'staged' : 'unstaged';
+        return (
+          <section className="staging-section" data-tutorial={`${section}-files`} key={section} aria-labelledby={`${listId}-heading`}>
+            <div className="staging-section-header staging-change-header">
               <button
-                className="staging-btn-sm"
-                disabled={fileOps.isMutating}
-                onClick={fileOps.unstageAll}
-                data-tutorial="unstage-section"
-                title={
-                  fileOps.isFiltering
-                    ? tr('Angezeigte Dateien aus dem Staging entfernen', 'Unstage displayed files')
-                    : t('generated.components.staging_area.stagingfilesections.unstage_all_13421edd')
-                }
+                id={`${listId}-heading`}
+                type="button"
+                className="staging-section-toggle"
+                aria-expanded={expanded}
+                aria-controls={listId}
+                onClick={() => toggleGroup(group)}
               >
-                - {allLabel}
-              </button>
-            }
-          />
-          <VirtualList
-            className="staging-section-list"
-            items={visibleStaged}
-            rowHeight={28}
-            fillAvailableHeight
-            getKey={(file) => `s-${file.path}`}
-            renderItem={(file) => renderFileRow(file, 'staged')}
-          />
-        </div>
-      )}
-
-      {visibleUnstaged.length > 0 && (
-        <div className="staging-section" data-tutorial="unstaged-files" style={{ flex: getSectionFlex(visibleUnstaged.length) }}>
-          <SectionHeader
-            title={t('generated.components.staging_area.stagingfilesections.changes_69ca4922')}
-            count={visibleUnstaged.length}
-            color="var(--status-warning)"
-            statsText={formatDiffStats(fileOps.unstagedStats)}
-            actions={
-              <>
-                <button
-                  data-tutorial="stage-modified-section"
-                  className="staging-btn-sm"
-                  disabled={fileOps.isMutating}
-                  onClick={fileOps.stageAllUnstaged}
-                  title={tr('Alle angezeigten Änderungen dieses Bereichs hinzufügen', 'Stage all displayed changes in this section')}
+                <Chevron size={14} aria-hidden="true" />
+                <span style={{ color: group.color }}>{group.label}</span>
+                <span
+                  className="staging-count"
+                  title={isFiltering ? tr(`${files.length} von ${total} Dateien`, `${files.length} of ${total} files`) : undefined}
                 >
-                  + {allLabel}
-                </button>
-                <button
-                  data-tutorial="discard-modified-section"
-                  className="staging-btn-sm danger"
-                  disabled={fileOps.isMutating}
-                  onClick={fileOps.discardAll}
-                  title={tr('Alle angezeigten ungestagten Änderungen verwerfen', 'Discard all displayed unstaged changes')}
-                >
-                  x {allLabel}
-                </button>
-              </>
-            }
-          />
-          <VirtualList
-            className="staging-section-list"
-            items={visibleUnstaged}
-            rowHeight={28}
-            fillAvailableHeight
-            getKey={(file) => `u-${file.path}`}
-            renderItem={(file) => renderFileRow(file, 'unstaged')}
-          />
-        </div>
-      )}
-
-      {visibleUntracked.length > 0 && (
-        <div className="staging-section" data-tutorial="untracked-files" style={{ flex: getSectionFlex(visibleUntracked.length) }}>
-          <SectionHeader
-            title={t('generated.components.staging_area.stagingfilesections.untracked_d2518623')}
-            count={visibleUntracked.length}
-            color="var(--status-untracked)"
-            actions={
-              <button
-                data-tutorial="stage-untracked-section"
-                className="staging-btn-sm"
-                disabled={fileOps.isMutating}
-                onClick={fileOps.stageAllUntracked}
-                title={tr('Alle angezeigten neuen Dateien hinzufügen', 'Stage all displayed untracked files')}
-              >
-                + {allLabel}
+                  {count}
+                </span>
               </button>
-            }
-          />
-          <VirtualList
-            className="staging-section-list"
-            items={visibleUntracked}
-            rowHeight={28}
-            fillAvailableHeight
-            getKey={(file) => `t-${file.path}`}
-            renderItem={(file) => renderFileRow(file, 'untracked')}
-          />
-        </div>
-      )}
-    </>
+              {!isFiltering && expanded && !!group.stats?.files && <span className="staging-stats-inline">{formatDiffStats(group.stats)}</span>}
+              {expanded && (
+                <div className="staging-section-actions">
+                  {group.actions.map((action) => (
+                    <button
+                      key={action.tutorial}
+                      type="button"
+                      data-tutorial={action.tutorial}
+                      className={`staging-btn-sm${action.destructive ? ' danger' : ''}`}
+                      disabled={fileOps.isMutating}
+                      title={action.title}
+                      aria-label={action.title}
+                      onClick={action.run}
+                    >
+                      {action.text}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="staging-section-list" id={listId} hidden={!expanded} style={{ height: files.length * rowHeight }}>
+              {expanded &&
+                mountedRowIndexes(files.length, group.filesTop, viewport, focusedFile?.section === section ? focusedIndex : -1).map((index) => {
+                  const file = files[index];
+                  return (
+                    <StagingFileRow
+                      key={file.path}
+                      entry={file}
+                      section={section}
+                      index={index}
+                      style={{ top: index * rowHeight }}
+                      fileOps={fileOps}
+                      isSelected={selectedFile?.path === file.path && selectedFile.source === source}
+                      onInspect={() => {
+                        if (onSelectFileInspect) onSelectFileInspect(file.path, source);
+                        else fileOps.showDiff(file.path, section === 'staged');
+                      }}
+                      onMoveFocus={(direction) => moveFocus(groupIndex, index, direction)}
+                      onFocusChange={(focused) =>
+                        setFocusedFile((previous) => {
+                          const sameFile = previous?.section === section && previous.path === file.path;
+                          if (focused) return sameFile ? previous : { section, path: file.path };
+                          return sameFile ? null : previous;
+                        })
+                      }
+                    />
+                  );
+                })}
+            </div>
+          </section>
+        );
+      })}
+    </div>
   );
-};
+}

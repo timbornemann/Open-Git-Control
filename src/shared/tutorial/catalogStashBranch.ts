@@ -215,7 +215,7 @@ export const TUTORIAL_STASH_BRANCH: TutorialChapter = {
       'open-index',
       ['Öffne den wiederhergestellten Index-Diff', 'Open the restored index diff'],
       [
-        'Öffne README unter Vorgemerkt. Dieser Vergleich liest den älteren gespeicherten Ausgangspunkt gegen die gesicherte Indexfassung.',
+        'Öffne README unter „Gestagt“. Dieser Vergleich liest den älteren gespeicherten Ausgangspunkt gegen die gesicherte Indexfassung.',
         'Open README under Staged. This compares the older saved base against the restored index version.',
       ],
       stagingRow('staged', 'README.md'),
@@ -245,8 +245,8 @@ export const TUTORIAL_STASH_BRANCH: TutorialChapter = {
       'work',
       ['Die zusätzliche Bearbeitung bleibt ungestagt', 'The additional edit remains unstaged'],
       [
-        'README steht auch unter Änderungen. Das bedeutet hier einen Unterschied zwischen der wiederhergestellten Indexfassung und der zurückgebrachten Arbeitsdatei.',
-        'README also appears under Changes. This represents a difference between the restored index version and the working file brought back.',
+        'README steht auch unter „Ungestagt“. Das bedeutet hier einen Unterschied zwischen der wiederhergestellten Indexfassung und der zurückgebrachten Arbeitsdatei.',
+        'README also appears under Unstaged. This represents a difference between the restored index version and the working file brought back.',
       ],
       c('unstaged-files'),
       { prepare: seed('result') },
@@ -255,8 +255,8 @@ export const TUTORIAL_STASH_BRANCH: TutorialChapter = {
       'open-work',
       ['Öffne den ungestagten Vergleich', 'Open the unstaged comparison'],
       [
-        'Öffne README unter Änderungen. Nun soll die Staging-Begrüßung gegen die weitere Team-Begrüßung verglichen werden.',
-        'Open README under Changes. This should now compare the staging greeting against the further team greeting.',
+        'Öffne README unter „Ungestagt“. Nun soll die Staging-Begrüßung gegen die weitere Team-Begrüßung verglichen werden.',
+        'Open README under Unstaged. This should now compare the staging greeting against the further team greeting.',
       ],
       stagingRow('unstaged', 'README.md'),
       { prepare: seed('result'), completion: element(viewer('unstaged')) },

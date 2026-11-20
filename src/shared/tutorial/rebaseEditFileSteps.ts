@@ -63,8 +63,8 @@ export function rebaseEditFileSteps(kind: RebasePauseKind): TutorialStep[] {
       'edit-save',
       ['Speichere die Arbeitsdatei', 'Save the working file'],
       [
-        'Klicke Speichern. Die gespeicherte Ergänzung erscheint anschließend unter Änderungen und ist noch nicht im Index.',
-        'Click Save. The saved addition appears under Changes and is not staged yet.',
+        'Klicke Speichern. Die gespeicherte Ergänzung erscheint anschließend unter „Ungestagt“ und ist noch nicht im Index.',
+        'Click Save. The saved addition appears under Unstaged and is not staged yet.',
       ],
       c('save-file'),
       {
@@ -93,8 +93,8 @@ export function rebaseEditFileSteps(kind: RebasePauseKind): TutorialStep[] {
       'edit-staging',
       ['Kehre zur Staging Area zurück', 'Return to the staging area'],
       [
-        'Wähle Staging Area. LICENSE steht unter Änderungen; die Rebase-Aktionsgruppe ist weiterhin sichtbar.',
-        'Choose Staging Area. LICENSE appears under Changes; the Rebase action group is still visible.',
+        'Wähle Staging Area. LICENSE steht unter „Ungestagt“; die Rebase-Aktionsgruppe ist weiterhin sichtbar.',
+        'Choose Staging Area. LICENSE appears under Unstaged; the Rebase action group is still visible.',
       ],
       c('open-staging'),
       {

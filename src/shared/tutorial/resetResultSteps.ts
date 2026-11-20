@@ -24,8 +24,8 @@ const workText: Record<ResetMode, TutorialText> = {
     'The working README still contains Hello team. This later draft remains outside the index as before and is visible as an additional working change.',
   ],
   mixed: [
-    'README.md mit Hallo Team und die aktuelle App-Datei sind unverändert im Arbeitsordner vorhanden. Ihre Unterschiede zum neuen Index erscheinen jetzt vollständig unter Änderungen.',
-    'README.md with Hello team and the current app file remain unchanged in the working directory. Their differences from the new index now appear entirely under Changes.',
+    'README.md mit Hallo Team und die aktuelle App-Datei sind unverändert im Arbeitsordner vorhanden. Ihre Unterschiede zum neuen Index erscheinen jetzt vollständig unter „Ungestagt“.',
+    'README.md with Hello team and the current app file remain unchanged in the working directory. Their differences from the new index now appear entirely under Unstaged.',
   ],
   hard: [
     'Die erfassten Arbeitsdateien entsprechen jetzt dem dritten Commit. Der spätere Team-Entwurf ist verworfen. Die unabhängige neue Notiz bleibt als unversionierte Datei erhalten.',

@@ -28,8 +28,8 @@ export const TUTORIAL_DIFF_HUNKS: TutorialChapter = {
       'open-diff',
       ['Öffne die geänderte README.md', 'Open modified README.md'],
       [
-        'Klicke README.md unter Änderungen. Der Diff zeigt beide Blöcke; noch ist keiner vorgemerkt.',
-        'Click README.md under Changes. The diff shows both blocks; neither is staged yet.',
+        'Klicke README.md unter „Ungestagt“. Der Diff zeigt beide Blöcke; noch ist keiner vorgemerkt.',
+        'Click README.md under Unstaged. The diff shows both blocks; neither is staged yet.',
       ],
       row('unstaged'),
       { openView: undefined, completion: element(`${viewer}[data-source="unstaged"] ${block(2)}`) },
@@ -125,7 +125,7 @@ export const TUTORIAL_DIFF_HUNKS: TutorialChapter = {
       'open-index',
       ['Öffne die vorgemerkte Fassung', 'Open the staged version'],
       [
-        'Klicke README.md im Bereich Vorgemerkt. Jetzt vergleichst du den Index mit dem letzten Commit.',
+        'Klicke README.md im Bereich „Gestagt“. Jetzt vergleichst du den Index mit dem letzten Commit.',
         'Click README.md in Staged. You are now comparing the index with the last commit.',
       ],
       row('staged'),
@@ -165,8 +165,8 @@ export const TUTORIAL_DIFF_HUNKS: TutorialChapter = {
       'close-index',
       ['Schließe die Indexansicht', 'Close the index view'],
       [
-        'Schließe den Datei-Viewer. README.md soll wieder nur unter Änderungen stehen.',
-        'Close the file viewer. README.md should appear only under Changes again.',
+        'Schließe den Datei-Viewer. README.md soll wieder nur unter „Ungestagt“ stehen.',
+        'Close the file viewer. README.md should appear only under Unstaged again.',
       ],
       c('close-file'),
       { prepare: emptyIndex, completion: { kind: 'absent', selector: viewer } },

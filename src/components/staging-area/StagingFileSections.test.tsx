@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, createElement } from 'react';
+import { act, createElement, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '@/i18n';
@@ -23,9 +23,11 @@ describe('StagingFileSections file previews', () => {
     host.remove();
   });
 
-  const render = (lfs?: ReturnType<typeof useFileOperations>['lfs'], withInspector = true, selectedFile?: { path: string; source: 'staged' | 'unstaged' }) => {
+  type ListOverrides = Partial<Omit<ComponentProps<typeof StagingFileSections>, 'fileOps' | 'onSelectFileInspect'>>;
+  const render = (lfs?: ReturnType<typeof useFileOperations>['lfs'], withInspector = true, overrides: ListOverrides = {}) => {
     const actions = {
       isMutating: false,
+      searchQuery: '',
       showDiff: vi.fn(),
       stageFile: vi.fn(),
       unstageFile: vi.fn(),
@@ -46,7 +48,7 @@ describe('StagingFileSections file previews', () => {
             visibleUntracked: [{ path: 'new/file.txt', x: '?', y: '?' }],
             fileOps: actions as unknown as ReturnType<typeof useFileOperations>,
             onSelectFileInspect: withInspector ? inspect : undefined,
-            selectedFile,
+            ...overrides,
           }),
         }),
       );
@@ -105,7 +107,7 @@ describe('StagingFileSections file previews', () => {
   });
 
   it('marks the selected file in its original category', () => {
-    render(undefined, true, { path: 'modified.txt', source: 'unstaged' });
+    render(undefined, true, { selectedFile: { path: 'modified.txt', source: 'unstaged' } });
     expect(host.querySelector('[aria-current="true"]')?.getAttribute('aria-label')).toBe('modified.txt');
     expect(host.querySelectorAll('.is-selected')).toHaveLength(1);
   });
@@ -124,8 +126,8 @@ describe('StagingFileSections file previews', () => {
     render();
     const row = host.querySelector<HTMLElement>('[aria-label="modified.txt"]')!;
     const button = row.querySelector('button')!;
-    const list = row.closest<HTMLElement>('.staging-section-list')!;
-    row.focus();
+    const list = row.closest<HTMLElement>('.staging-change-list')!;
+    act(() => row.focus());
     list.scrollTop = 8;
     for (let tick = 0; tick < 8; tick++) {
       render();
@@ -134,5 +136,66 @@ describe('StagingFileSections file previews', () => {
       expect(document.activeElement).toBe(row);
       expect(list.scrollTop).toBe(8);
     }
+  });
+
+  it('shows repository-relative parents and distinguishes the two diffs of a partially staged rename', () => {
+    const rename = { path: 'src/settings/index.ts', originalPath: 'src/legacy/config.ts', x: 'R', y: 'M' };
+    const homonym = { path: 'tests/settings/index.ts', x: ' ', y: 'M' };
+    const { inspect } = render(undefined, true, {
+      visibleStaged: [rename],
+      visibleUnstaged: [rename, homonym],
+      selectedFile: { path: rename.path, source: 'staged' },
+    });
+    const [staged, unstaged] = host.querySelectorAll<HTMLElement>('[aria-label="src/settings/index.ts"]');
+    const other = host.querySelector('[aria-label="tests/settings/index.ts"]')!;
+    expect(staged.querySelector('.staging-file-name')?.textContent).toBe('index.ts');
+    expect(staged.querySelector('.staging-directory')?.textContent).toBe('src/settings/');
+    expect(other.querySelector('.staging-directory')?.textContent).toBe('tests/settings/');
+    expect(staged.querySelector<HTMLElement>('.staging-path')?.title).toBe('src/settings/index.ts\nPreviously src/legacy/config.ts');
+    expect(staged.querySelector('.staging-partial')?.getAttribute('title')).toBe('Also has unstaged changes');
+    const description = document.getElementById(unstaged.getAttribute('aria-describedby')!);
+    expect(description?.textContent).toContain('Modified · Also has staged changes');
+    expect(staged.getAttribute('aria-current')).toBe('true');
+    expect(unstaged.hasAttribute('aria-current')).toBe(false);
+
+    act(() => staged.click());
+    act(() => unstaged.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })));
+    expect(inspect.mock.calls).toEqual([
+      [rename.path, 'staged'],
+      [rename.path, 'unstaged'],
+    ]);
+  });
+
+  it('scrolls between virtualized rows and keeps focus across snapshots and group boundaries', () => {
+    const visibleUnstaged = Array.from({ length: 100 }, (_, index) => ({ path: `src/file-${index}.ts`, x: ' ', y: 'M' }));
+    render(undefined, true, { visibleUnstaged });
+    const list = host.querySelector<HTMLDivElement>('.staging-change-list')!;
+    Object.defineProperty(list, 'clientHeight', { value: 160 });
+    const scroll = (top: number) =>
+      act(() => {
+        list.scrollTop = top;
+        list.dispatchEvent(new Event('scroll'));
+      });
+    const row = (path: string) => list.querySelector<HTMLElement>(`.staging-file-row[aria-label="${path}"]`);
+    const move = (key: string) => act(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })));
+
+    expect(row('src/file-99.ts')).toBeNull();
+    act(() => row('staged.txt')!.focus());
+    move('ArrowDown');
+    expect(document.activeElement).toBe(row('src/file-0.ts'));
+    const focused = document.activeElement;
+    scroll(4_000);
+    render(undefined, true, { visibleUnstaged: visibleUnstaged.map((file) => ({ ...file })) });
+    expect(list.scrollTop).toBe(4_000);
+    expect(document.activeElement).toBe(focused);
+    expect(row('src/file-0.ts')).toBe(focused);
+    expect(row('src/file-50.ts')).toBeNull();
+
+    act(() => row('src/file-99.ts')!.focus());
+    move('ArrowDown');
+    expect(document.activeElement).toBe(row('new/file.txt'));
+    expect(list.scrollTop).toBeGreaterThan(4_000);
+    move('ArrowUp');
+    expect(document.activeElement).toBe(row('src/file-99.ts'));
   });
 });

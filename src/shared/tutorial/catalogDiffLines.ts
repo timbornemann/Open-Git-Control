@@ -42,8 +42,8 @@ export const TUTORIAL_DIFF_LINES: TutorialChapter = {
       'open-diff',
       ['Öffne die README-Änderung', 'Open the README change'],
       [
-        'Klicke README.md unter Änderungen. Links an den geänderten Zeilen erscheinen kleine Plus-Schaltflächen; oberhalb des Diffs steht die Zeilenauswahl.',
-        'Click README.md under Changes. Small plus buttons appear beside changed lines, with the line selection bar above the diff.',
+        'Klicke README.md unter „Ungestagt“. Links an den geänderten Zeilen erscheinen kleine Plus-Schaltflächen; oberhalb des Diffs steht die Zeilenauswahl.',
+        'Click README.md under Unstaged. Small plus buttons appear beside changed lines, with the line selection bar above the diff.',
       ],
       row('unstaged'),
       { openView: undefined, completion: element(`${viewer} ${unit()}`) },
@@ -181,7 +181,7 @@ export const TUTORIAL_DIFF_LINES: TutorialChapter = {
       'close-working',
       ['Kehre zur Dateiauswahl zurück', 'Return to the file list'],
       [
-        'Schließe den Viewer. README.md steht jetzt sowohl unter Vorgemerkt als auch unter Änderungen.',
+        'Schließe den Viewer. README.md steht jetzt sowohl unter „Gestagt“ als auch unter „Ungestagt“.',
         'Close the viewer. README.md now appears under both Staged and Changes.',
       ],
       c('close-file'),
@@ -191,7 +191,7 @@ export const TUTORIAL_DIFF_LINES: TutorialChapter = {
       'open-index',
       ['Untersuche die kleine Vormerkung', 'Inspect the small staged change'],
       [
-        'Öffne README.md unter Vorgemerkt. Hier darf nur das ausgewählte Begrüßungspaar erscheinen.',
+        'Öffne README.md unter „Gestagt“. Hier darf nur das ausgewählte Begrüßungspaar erscheinen.',
         'Open README.md under Staged. Only the selected greeting pair should appear here.',
       ],
       row('staged'),
@@ -240,7 +240,7 @@ export const TUTORIAL_DIFF_LINES: TutorialChapter = {
     s(
       'close-index',
       ['Schließe den leeren Index-Diff', 'Close the empty index diff'],
-      ['Schließe den Viewer. Die README steht wieder ausschließlich unter Änderungen.', 'Close the viewer. README appears only under Changes again.'],
+      ['Schließe den Viewer. Die README steht wieder ausschließlich unter „Ungestagt“.', 'Close the viewer. README appears only under Unstaged again.'],
       c('close-file'),
       { prepare: emptyIndex, completion: { kind: 'absent', selector: viewer } },
     ),

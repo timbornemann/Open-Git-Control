@@ -59,6 +59,36 @@ const sharedDetailInputs = (shared: boolean, snapshot: StagingAreaProps['working
   externalSnapshotId: shared ? (snapshot?.snapshotId ?? null) : undefined,
 });
 
+function StagingEmptyState({
+  status,
+  visibleFiles,
+  isConflictOnly,
+  isFiltering,
+}: {
+  status: GitStatusWithConflicts;
+  visibleFiles: GitStatusWithConflicts;
+  isConflictOnly: boolean;
+  isFiltering: boolean;
+}) {
+  const { t, tr } = useI18n();
+  if (isFiltering && !isConflictOnly) {
+    if (Object.values(visibleFiles).some((entries) => entries.length > 0)) return null;
+    return (
+      <p className="staging-empty-search" role="status">
+        {tr('Keine passenden Dateien', 'No matching files')}
+      </p>
+    );
+  }
+  if (Object.values(status).some((entries) => entries.length > 0)) return null;
+  return (
+    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+      {isConflictOnly
+        ? t('generated.components.staging_area.stagingarea.no_open_conflicts_a3f846f5')
+        : t('generated.components.staging_area.stagingarea.working_tree_is_clean_7d0c725c')}
+    </div>
+  );
+}
+
 export const StagingArea: React.FC<StagingAreaProps> = ({
   repoPath,
   onRepoChanged,
@@ -182,7 +212,6 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
 
   const status = fileOps.status;
   const isBareRepository = Boolean(sharedSnapshot?.isBare);
-  const totalChanges = status.staged.length + status.unstaged.length + status.untracked.length + status.conflicts.length;
   const hasOpenConflicts = status.conflicts.length > 0;
   // Generating text from notes does not change the Git index. Only the commit
   // fields need to wait for that result; staging can continue independently.
@@ -243,6 +272,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
 
       {!isConflictOnly && (
         <StagingFileSections
+          key={normalizeRepoPathKey(repoPath)}
           visibleStaged={visibleStaged}
           visibleUnstaged={visibleUnstaged}
           visibleUntracked={visibleUntracked}
@@ -273,14 +303,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
           </div>
         ) : (
           <>
-            {totalChanges === 0 ? (
-              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                {isConflictOnly
-                  ? t('generated.components.staging_area.stagingarea.no_open_conflicts_a3f846f5')
-                  : t('generated.components.staging_area.stagingarea.working_tree_is_clean_7d0c725c')}
-              </div>
-            ) : null}
-
+            <StagingEmptyState status={status} visibleFiles={visibleFiles} isConflictOnly={isConflictOnly} isFiltering={fileOps.isFiltering} />
             {isConflictOnly ? stagingSections : <div className="staging-file-sections">{stagingSections}</div>}
           </>
         )}

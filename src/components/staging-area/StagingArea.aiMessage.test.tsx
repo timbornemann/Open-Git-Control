@@ -89,6 +89,7 @@ beforeEach(async () => {
   vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
   vi.spyOn(gitClient, 'getStashes').mockResolvedValue({ success: true, data: [] });
   vi.spyOn(gitClient, 'getSequencerState').mockResolvedValue({ success: true, data: { operation: null } });
+  vi.spyOn(gitClient, 'getRepositoryHead').mockResolvedValue({ success: true, data: { kind: 'ready', oid: 'a'.repeat(40) } });
   vi.spyOn(gitClient, 'stagePaths').mockImplementation(async (selected) => {
     await writeBarrier;
     selected.forEach((path) => index.add(path));

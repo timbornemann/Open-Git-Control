@@ -231,7 +231,7 @@ export const TUTORIAL_BRANCHES_PARK_RESTORE: TutorialChapter = {
       'index',
       ['README ist wieder teilweise vorgemerkt', 'README is partially staged again'],
       [
-        'README steht wieder unter Vorgemerkt. Ihre vorgemerkte Fassung enthält weiterhin die Staging-Begrüßung; die zusätzliche Team-Begrüßung bleibt im Arbeitsordner.',
+        'README steht wieder unter „Gestagt“. Ihre vorgemerkte Fassung enthält weiterhin die Staging-Begrüßung; die zusätzliche Team-Begrüßung bleibt im Arbeitsordner.',
         'README appears in Staged again. Its staged version still contains the staging greeting; the additional team greeting remains in the working directory.',
       ],
       c('staged-files'),
@@ -241,8 +241,8 @@ export const TUTORIAL_BRANCHES_PARK_RESTORE: TutorialChapter = {
       'work',
       ['Der weitere Unterschied bleibt ungestagt', 'The further difference remains unstaged'],
       [
-        'Dieselbe Datei steht auch unter Änderungen. Die Wiederherstellung hat nicht alle offenen Inhalte pauschal gestagt. Die Trennung von Index und Arbeitsdatei besteht weiter.',
-        'The same file also appears in Changes. Restoration did not stage all uncommitted contents indiscriminately. The distinction between index and working file remains.',
+        'Dieselbe Datei steht auch unter „Ungestagt“. Die Wiederherstellung hat nicht alle offenen Inhalte pauschal gestagt. Die Trennung von Index und Arbeitsdatei besteht weiter.',
+        'The same file also appears in Unstaged. Restoration did not stage all uncommitted contents indiscriminately. The distinction between index and working file remains.',
       ],
       c('unstaged-files'),
       { prepare: seed('restored') },

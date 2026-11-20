@@ -24,6 +24,11 @@ try {
     git(['config', '--local', key, value]);
   fs.writeFileSync(path.join(repo, '.git/info/attributes'), '* -filter -text\n');
   for (let i = 0; i < 400; i++) fs.writeFileSync(path.join(repo, `file-${i}.txt`), 'initial\n');
+  for (const relative of ['src/settings/index.ts', 'tests/settings/index.ts', 'src/settings/legacy.ts']) {
+    const file = path.join(repo, relative);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, 'export const value = 1;\n');
+  }
   git(['add', '-A']);
   git(['commit', '-m', 'UI baseline']);
   for (let i = 0; i < 400; i++) fs.writeFileSync(path.join(repo, `file-${i}.txt`), 'modified\n');

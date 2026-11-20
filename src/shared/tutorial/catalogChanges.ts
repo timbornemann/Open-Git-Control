@@ -58,8 +58,8 @@ export const TUTORIAL_CHANGES_LESSON: TutorialChapter = {
       'open-diff',
       ['Öffne genau README.md', 'Open README.md specifically'],
       [
-        'Klicke im Bereich Änderungen auf den Namen README.md. Klicke auf den Dateinamen, damit du zuerst prüfen kannst, was du später vormerkst. Plus oder X sind für diesen Schritt noch nicht nötig.',
-        'Click the README.md name in Changes. Click the name so you can inspect what you will stage later. Plus and X are not needed for this step.',
+        'Klicke im Bereich „Ungestagt“ auf den Namen README.md. Klicke auf den Dateinamen, damit du zuerst prüfen kannst, was du später vormerkst. Plus oder X sind für diesen Schritt noch nicht nötig.',
+        'Click the README.md name in Unstaged. Click the name so you can inspect what you will stage later. Plus and X are not needed for this step.',
       ],
       readme('unstaged'),
       { action: 'inspect:diff' },
@@ -132,8 +132,8 @@ export const TUTORIAL_CHANGES_LESSON: TutorialChapter = {
       'stage',
       ['Merke nur README.md vor', 'Stage only README.md'],
       [
-        'Klicke auf das kleine Plus in der Zeile README.md im Bereich Änderungen. Dadurch wird genau diese Dateiversion in den Index übernommen. notes.txt bleibt neu und unvorgemerkt; src/app.ts bleibt wie vorher vorgemerkt.',
-        'Click the small plus in the README.md row in Changes. This copies that file version into the index. notes.txt remains untracked and unstaged; src/app.ts remains staged as before.',
+        'Klicke auf das kleine Plus in der Zeile README.md im Bereich „Ungestagt“. Dadurch wird genau diese Dateiversion in den Index übernommen. notes.txt bleibt neu und unvorgemerkt; src/app.ts bleibt wie vorher vorgemerkt.',
+        'Click the small plus in the README.md row in Unstaged. This copies that file version into the index. notes.txt remains untracked and unstaged; src/app.ts remains staged as before.',
       ],
       readme('unstaged'),
       { completion: element(readme('staged')) },
@@ -142,7 +142,7 @@ export const TUTORIAL_CHANGES_LESSON: TutorialChapter = {
       'staged',
       ['Die Datei ist in den Index gewandert', 'The file has moved into the index'],
       [
-        'README.md steht jetzt gemeinsam mit src/app.ts im Bereich Vorgemerkt. Ein Commit würde diese Auswahl speichern. Wenn du nach dem Vormerken weiter editierst, können Arbeitsordner und Index wieder voneinander abweichen. Prüfe deine Auswahl deshalb vor jedem Commit.',
+        'README.md steht jetzt gemeinsam mit src/app.ts im Bereich „Gestagt“. Ein Commit würde diese Auswahl speichern. Wenn du nach dem Vormerken weiter editierst, können Arbeitsordner und Index wieder voneinander abweichen. Prüfe deine Auswahl deshalb vor jedem Commit.',
         'README.md is now staged alongside src/app.ts. A commit would save this selection. Editing again after staging can make the working directory differ from the index. Check your selection before each commit.',
       ],
       '[data-tutorial="staged-files"]',
@@ -152,7 +152,7 @@ export const TUTORIAL_CHANGES_LESSON: TutorialChapter = {
       'unstage',
       ['Nimm README.md wieder aus der Auswahl', 'Remove README.md from the selection'],
       [
-        'Klicke in der vorgemerkten README-Zeile auf Minus. Die Änderung bleibt im Arbeitsordner erhalten und erscheint wieder unter Änderungen. Die andere vorgemerkte Datei src/app.ts soll im Index bleiben.',
+        'Klicke in der vorgemerkten README-Zeile auf Minus. Die Änderung bleibt im Arbeitsordner erhalten und erscheint wieder unter „Ungestagt“. Die andere vorgemerkte Datei src/app.ts soll im Index bleiben.',
         'Click minus in the staged README row. The change stays in the working directory and returns to Changes. The other staged file, src/app.ts, should remain in the index.',
       ],
       readme('staged'),

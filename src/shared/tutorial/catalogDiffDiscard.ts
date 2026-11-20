@@ -29,10 +29,10 @@ export const TUTORIAL_DIFF_DISCARD: TutorialChapter = {
     ),
     s(
       'open-diff',
-      ['Öffne README.md unter Änderungen', 'Open README.md under Changes'],
+      ['Öffne README.md unter „Ungestagt“', 'Open README.md under Unstaged'],
       [
-        'Klicke die Datei unter Änderungen, nicht unter Vorgemerkt. Hier siehst du den Unterschied zwischen Index und Arbeitsordner.',
-        'Click the file under Changes, rather than Staged. This shows the difference between index and worktree.',
+        'Klicke die Datei unter „Ungestagt“, nicht unter „Gestagt“. Hier siehst du den Unterschied zwischen Index und Arbeitsordner.',
+        'Click the file under Unstaged, rather than Staged. This shows the difference between index and worktree.',
       ],
       row('unstaged'),
       { openView: undefined, prepare: before, completion: element(`${viewer}[data-source="unstaged"] ${block()}`) },
@@ -127,7 +127,7 @@ export const TUTORIAL_DIFF_DISCARD: TutorialChapter = {
     s(
       'close-diff',
       ['Kehre zur Dateiliste zurück', 'Return to the file list'],
-      ['Schließe den Viewer. Die README soll ausschließlich unter Vorgemerkt stehen.', 'Close the viewer. README should appear only under Staged.'],
+      ['Schließe den Viewer. Die README soll ausschließlich unter „Gestagt“ stehen.', 'Close the viewer. README should appear only under Staged.'],
       c('close-file'),
       { prepare: after, completion: { kind: 'absent', selector: viewer } },
     ),
@@ -135,8 +135,8 @@ export const TUTORIAL_DIFF_DISCARD: TutorialChapter = {
       'staged-result',
       ['Die Vormerkung wurde erhalten', 'The staged change was preserved'],
       [
-        'README.md steht weiterhin unter Vorgemerkt. Im Bereich Änderungen gibt es für sie keinen Eintrag mehr. Unstage würde jetzt die Vormerkung zurücknehmen, während die Arbeitsdatei erhalten bliebe.',
-        'README.md remains under Staged. It no longer has an entry under Changes. Unstage would now remove its staged change while preserving the working file.',
+        'README.md steht weiterhin unter „Gestagt“. Im Bereich „Ungestagt“ gibt es für sie keinen Eintrag mehr. Unstage würde jetzt die Vormerkung zurücknehmen, während die Arbeitsdatei erhalten bliebe.',
+        'README.md remains under Staged. It no longer has an entry under Unstaged. Unstage would now remove its staged change while preserving the working file.',
       ],
       row('staged'),
       { openView: undefined, prepare: closed },

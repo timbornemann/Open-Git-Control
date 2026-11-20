@@ -47,7 +47,7 @@ export const TUTORIAL_STAGING_DELETE: TutorialChapter = {
       'open-delete',
       ['Öffne den Löschdialog', 'Open deletion confirmation'],
       [
-        'Klicke das rote x bei notes.txt unter Unversioniert. Bis zur Bestätigung bleibt die Datei erhalten.',
+        'Klicke das rote x bei notes.txt unter „Neu“. Bis zur Bestätigung bleibt die Datei erhalten.',
         'Click the red x beside notes.txt under Untracked. The file is preserved until confirmation.',
       ],
       remove,
@@ -66,7 +66,7 @@ export const TUTORIAL_STAGING_DELETE: TutorialChapter = {
     s(
       'cancel-delete',
       ['Brich das Löschen ab', 'Cancel deletion'],
-      ['Klicke Abbrechen. notes.txt soll im Bereich Unversioniert bleiben.', 'Click Cancel. notes.txt should remain in Untracked.'],
+      ['Klicke Abbrechen. notes.txt soll im Bereich „Neu“ bleiben.', 'Click Cancel. notes.txt should remain in Untracked.'],
       cancelDialog,
       { prepare: seed({ submit: remove }), completion: { kind: 'absent', selector: dialog } },
     ),
@@ -103,7 +103,7 @@ export const TUTORIAL_STAGING_DELETE: TutorialChapter = {
       'result',
       ['Die Auswahl war auf eine Datei begrenzt', 'The selection affected one file'],
       [
-        'Im Bereich Unversioniert bleibt docs/ideas.md. Das Löschen hat keine anderen Dateien entfernt. Ein erneuter Start dieser Lektion stellt das feste Beispiel wieder her; bei echten unversionierten Dateien ist das keine Git-Wiederherstellung.',
+        'Im Bereich „Neu“ bleibt docs/ideas.md. Das Löschen hat keine anderen Dateien entfernt. Ein erneuter Start dieser Lektion stellt das feste Beispiel wieder her; bei echten unversionierten Dateien ist das keine Git-Wiederherstellung.',
         'docs/ideas.md remains in Untracked. Deletion removed no other files. Restarting this lesson restores its fixed sample; that is not a Git recovery mechanism for real untracked files.',
       ],
       row('untracked', 'docs/ideas.md'),

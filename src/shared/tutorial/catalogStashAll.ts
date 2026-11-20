@@ -239,8 +239,8 @@ export const TUTORIAL_STASH_ALL: TutorialChapter = {
       'returned',
       ['Die vorhandene README kehrt als Arbeitsänderung zurück', 'The existing README returns as a working edit'],
       [
-        'README steht unter Änderungen; ihr Index entspricht wieder dem gespeicherten Commit. Gewöhnliches Pop rekonstruiert hier nicht automatisch die frühere teilweise Vormerkung.',
-        'README appears under Changes; its index again matches the saved commit. Ordinary Pop does not automatically reconstruct its former partial staging here.',
+        'README steht unter „Ungestagt“; ihr Index entspricht wieder dem gespeicherten Commit. Gewöhnliches Pop rekonstruiert hier nicht automatisch die frühere teilweise Vormerkung.',
+        'README appears under Unstaged; its index again matches the saved commit. Ordinary Pop does not automatically reconstruct its former partial staging here.',
       ],
       c('staging'),
       { prepare: seed('popped') },
@@ -259,8 +259,8 @@ export const TUTORIAL_STASH_ALL: TutorialChapter = {
       'open-diff',
       ['Prüfe die zurückgekehrte README', 'Inspect the restored README'],
       [
-        'Öffne README unter Änderungen. Wir vergleichen den tatsächlich zurückgebrachten Inhalt mit dem gespeicherten Ausgangsstand.',
-        'Open README under Changes. We will compare the contents actually restored against the saved starting revision.',
+        'Öffne README unter „Ungestagt“. Wir vergleichen den tatsächlich zurückgebrachten Inhalt mit dem gespeicherten Ausgangsstand.',
+        'Open README under Unstaged. We will compare the contents actually restored against the saved starting revision.',
       ],
       stagingRow('unstaged', 'README.md'),
       { prepare: seed('popped'), completion: element(viewer('unstaged')) },

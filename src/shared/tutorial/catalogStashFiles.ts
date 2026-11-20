@@ -84,7 +84,7 @@ export const TUTORIAL_STASH_FILES: TutorialChapter = {
       'tracked-result',
       ['README ist vollständig vorgemerkt', 'README is staged in full'],
       [
-        'README steht unter Vorgemerkt und hat keine weitere ungestagte Fassung. notes.txt fehlt noch im Arbeitsordner. Die Dateiliste wird nach der Aktion geschlossen und bei erneutem Öffnen frisch gelesen.',
+        'README steht unter „Gestagt“ und hat keine weitere ungestagte Fassung. notes.txt fehlt noch im Arbeitsordner. Die Dateiliste wird nach der Aktion geschlossen und bei erneutem Öffnen frisch gelesen.',
         'README appears under Staged with no further unstaged version. notes.txt is still absent from the working directory. The file list closes after the operation and is read afresh when reopened.',
       ],
       c('staged-files'),
@@ -94,7 +94,7 @@ export const TUTORIAL_STASH_FILES: TutorialChapter = {
       'open-diff',
       ['Prüfe den neu befüllten Index', 'Inspect the newly filled index'],
       [
-        'Öffne README unter Vorgemerkt. Der Diff soll den gespeicherten Commit gegen den jetzt vollständig übernommenen Inhalt vergleichen.',
+        'Öffne README unter „Gestagt“. Der Diff soll den gespeicherten Commit gegen den jetzt vollständig übernommenen Inhalt vergleichen.',
         'Open README under Staged. The diff should compare the saved commit against the contents just restored in full.',
       ],
       stagingRow('staged', 'README.md'),

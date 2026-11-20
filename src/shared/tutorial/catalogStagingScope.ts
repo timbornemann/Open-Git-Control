@@ -64,7 +64,7 @@ export const TUTORIAL_STAGING_SCOPE: TutorialChapter = {
       'filtered-result',
       ['„Alle Treffer“ meint die sichtbare Auswahl', '“All matches” means the visible selection'],
       [
-        'Im Bereich Änderungen gibt es jetzt einen Treffer. Seine Plus-Aktion heißt mit aktivem Filter Alle Treffer. Sie betrifft die angezeigten geänderten Dateien dieses Bereichs; neue Dateien und ausgeblendete Änderungen gehören nicht dazu.',
+        'Im Bereich „Ungestagt“ gibt es jetzt einen Treffer. Seine Plus-Aktion heißt mit aktivem Filter Alle Treffer. Sie betrifft die angezeigten geänderten Dateien dieses Bereichs; neue Dateien und ausgeblendete Änderungen gehören nicht dazu.',
         'Changes now contains one match. With a filter, its plus action says All matches. It applies to displayed modified files in this section; untracked files and hidden changes are outside its scope.',
       ],
       control('stage-modified-section'),
@@ -74,8 +74,8 @@ export const TUTORIAL_STAGING_SCOPE: TutorialChapter = {
       'stage-filtered',
       ['Füge nur den gefilterten Bereich hinzu', 'Stage the filtered section only'],
       [
-        'Klicke im Bereich Änderungen auf Plus Alle Treffer. Damit kommt nur README.md in den Index. package.json und die beiden neuen Dateien sollen unverändert außerhalb des Index bleiben.',
-        'Click plus All matches in Changes. Only README.md should enter the index. package.json and both untracked files must stay outside it.',
+        'Klicke im Bereich „Ungestagt“ auf Plus Alle Treffer. Damit kommt nur README.md in den Index. package.json und die beiden neuen Dateien sollen unverändert außerhalb des Index bleiben.',
+        'Click plus All matches in Unstaged. Only README.md should enter the index. package.json and both untracked files must stay outside it.',
       ],
       control('stage-modified-section'),
       { prepare: seed([], 'README'), completion: files(['src/app.ts', ...readme], ['package.json'], newFiles) },
@@ -84,7 +84,7 @@ export const TUTORIAL_STAGING_SCOPE: TutorialChapter = {
       'hidden',
       ['Prüfe auch ausgeblendete Änderungen', 'Remember hidden changes'],
       [
-        'Die README steht nun unter Vorgemerkte Änderungen. Der Filter ist weiterhin aktiv: Er versteckt auch die bereits vorgemerkte src/app.ts. Ein kurzer Blick auf eine gefilterte Liste reicht deshalb nicht aus, um den gesamten Commit-Inhalt zu prüfen.',
+        'Die README steht nun unter „Gestagt“. Der Filter ist weiterhin aktiv: Er versteckt auch die bereits vorgemerkte src/app.ts. Ein kurzer Blick auf eine gefilterte Liste reicht deshalb nicht aus, um den gesamten Commit-Inhalt zu prüfen.',
         'README now appears under Staged changes. The filter is still active and also hides the already staged src/app.ts. A filtered list alone is therefore insufficient to review the whole commit contents.',
       ],
       control('staged-files'),
@@ -104,8 +104,8 @@ export const TUTORIAL_STAGING_SCOPE: TutorialChapter = {
       'modified-section',
       ['Ein Bereich ist keine Repository-Auswahl', 'A section is not the whole repository'],
       [
-        'Plus Alle im Bereich Änderungen betrifft jetzt die verbliebene package.json. Es fügt nicht automatisch die Dateien aus Unversioniert hinzu. Diese Trennung hilft, bestehende Änderungen und neu angelegte Dateien bewusst auszuwählen.',
-        'Plus All in Changes now applies to the remaining package.json. It does not automatically include Untracked files. This separation helps you select modifications and new files deliberately.',
+        'Plus Alle im Bereich „Ungestagt“ betrifft jetzt die verbliebene package.json. Es fügt nicht automatisch die Dateien aus „Neu“ hinzu. Diese Trennung hilft, bestehende Änderungen und neu angelegte Dateien bewusst auszuwählen.',
+        'Plus All in Unstaged now applies to the remaining package.json. It does not automatically include Untracked files. This separation helps you select modifications and new files deliberately.',
       ],
       control('stage-modified-section'),
       { prepare: seed(readme) },
@@ -114,8 +114,8 @@ export const TUTORIAL_STAGING_SCOPE: TutorialChapter = {
       'stage-modified',
       ['Füge die übrigen geänderten Dateien hinzu', 'Stage the remaining modified files'],
       [
-        'Klicke Plus Alle im Bereich Änderungen. Danach sollen README.md, src/app.ts und package.json vorgemerkt sein. Die zwei neuen Dateien bleiben in ihrem eigenen Bereich.',
-        'Click plus All in Changes. README.md, src/app.ts and package.json should then be staged. The two new files remain in their own section.',
+        'Klicke Plus Alle im Bereich „Ungestagt“. Danach sollen README.md, src/app.ts und package.json vorgemerkt sein. Die zwei neuen Dateien bleiben in ihrem eigenen Bereich.',
+        'Click plus All in Unstaged. README.md, src/app.ts and package.json should then be staged. The two new files remain in their own section.',
       ],
       control('stage-modified-section'),
       { prepare: seed(readme), completion: files(['src/app.ts', 'README.md', 'package.json'], [], newFiles) },
@@ -144,7 +144,7 @@ export const TUTORIAL_STAGING_SCOPE: TutorialChapter = {
       'stage-new',
       ['Füge den neuen Treffer hinzu', 'Stage the new match'],
       [
-        'Klicke Plus Alle Treffer im Bereich Unversioniert. notes.txt wechselt in den Index; docs/ideas.md bleibt neu und unversioniert.',
+        'Klicke Plus Alle Treffer im Bereich „Neu“. notes.txt wechselt in den Index; docs/ideas.md bleibt neu und unversioniert.',
         'Click plus All matches in Untracked. notes.txt enters the index; docs/ideas.md remains untracked.',
       ],
       control('stage-untracked-section'),
@@ -164,7 +164,7 @@ export const TUTORIAL_STAGING_SCOPE: TutorialChapter = {
       'unstage-explained',
       ['Aus dem Index nehmen löscht keine Änderungen', 'Unstaging does not delete changes'],
       [
-        'Minus Alle im Bereich Vorgemerkte Änderungen nimmt die angezeigten Dateien aus der Commit-Auswahl. Ihre Inhalte bleiben im Arbeitsordner. Bei neuen Dateien wird der Zustand wieder unversioniert; bei bekannten Dateien wieder geändert.',
+        'Minus Alle im Bereich „Gestagt“ nimmt die angezeigten Dateien aus der Commit-Auswahl. Ihre Inhalte bleiben im Arbeitsordner. Bei neuen Dateien wird der Zustand wieder unversioniert; bei bekannten Dateien wieder geändert.',
         'Minus All in Staged changes removes displayed files from the commit selection. Their contents stay in the working directory. New files become untracked again; known files become modified again.',
       ],
       control('unstage-section'),
@@ -184,7 +184,7 @@ export const TUTORIAL_STAGING_SCOPE: TutorialChapter = {
       'unstage-selected',
       ['Nimm nur den Treffer aus dem Index', 'Unstage the match only'],
       [
-        'Klicke Minus Alle Treffer unter Vorgemerkte Änderungen. README.md erscheint wieder als geändert. src/app.ts, package.json und notes.txt sollen weiterhin vorgemerkt bleiben.',
+        'Klicke Minus Alle Treffer unter „Gestagt“. README.md erscheint wieder als geändert. src/app.ts, package.json und notes.txt sollen weiterhin vorgemerkt bleiben.',
         'Click minus All matches under Staged changes. README.md becomes modified again. src/app.ts, package.json and notes.txt must remain staged.',
       ],
       control('unstage-section'),

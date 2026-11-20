@@ -32,7 +32,7 @@ export const TUTORIAL_FILES_INDEX: TutorialChapter = {
       'overview',
       ['Das Beispiel enthält drei verschiedene Fassungen', 'The example contains three different versions'],
       [
-        'Der letzte Commit hat Status: Entwurf. Im Index steht Nur im Index, im Arbeitsordner Lokale Bearbeitung. Die README erscheint deshalb unter Vorgemerkt und Änderungen. Wir bearbeiten nur den Index.',
+        'Der letzte Commit hat Status: Entwurf. Im Index steht Nur im Index, im Arbeitsordner Lokale Bearbeitung. Die README erscheint deshalb unter „Gestagt“ und „Ungestagt“. Wir bearbeiten nur den Index.',
         'The last commit has Status: Draft. The index says Index only, and the worktree says Local edit. README therefore appears under both Staged and Changes. We will edit only the index.',
       ],
       staged,
@@ -40,9 +40,9 @@ export const TUTORIAL_FILES_INDEX: TutorialChapter = {
     ),
     s(
       'open-index',
-      ['Öffne README.md unter Vorgemerkt', 'Open README.md under Staged'],
+      ['Öffne README.md unter „Gestagt“', 'Open README.md under Staged'],
       [
-        'Klicke die Datei im Bereich Vorgemerkt. Der Viewer startet mit dem Index-Diff gegen den letzten Commit.',
+        'Klicke die Datei im Bereich „Gestagt“. Der Viewer startet mit dem Index-Diff gegen den letzten Commit.',
         'Click the file in Staged. The viewer starts with the index diff against the last commit.',
       ],
       staged,
@@ -137,10 +137,10 @@ export const TUTORIAL_FILES_INDEX: TutorialChapter = {
     ),
     s(
       'open-working',
-      ['Öffne die README unter Änderungen', 'Open README under Changes'],
+      ['Öffne die README unter „Ungestagt“', 'Open README under Unstaged'],
       [
-        'Klicke jetzt README.md unter Änderungen. Dieser Diff vergleicht die Arbeitsdatei mit der eben gespeicherten Indexfassung.',
-        'Now click README.md under Changes. This diff compares the working file with the index version you just saved.',
+        'Klicke jetzt README.md unter „Ungestagt“. Dieser Diff vergleicht die Arbeitsdatei mit der eben gespeicherten Indexfassung.',
+        'Now click README.md under Unstaged. This diff compares the working file with the index version you just saved.',
       ],
       working,
       { openView: undefined, inspector: 'staging', prepare: indexed, completion: element(`${fileViewer}[data-source="unstaged"][data-tab="diff"]`) },

@@ -165,8 +165,8 @@ export const TUTORIAL_SEARCH_ONE: TutorialChapter = {
       'open-staging',
       ['Prüfe den Git-Status', 'Check the Git status'],
       [
-        'Wechsle zur Staging Area. Nur guides/Planet.md soll unter Änderungen stehen. Es wurde noch nichts vorgemerkt.',
-        'Switch to Staging Area. Only guides/Planet.md should appear under Changes. Nothing has been staged.',
+        'Wechsle zur Staging Area. Nur guides/Planet.md soll unter „Ungestagt“ stehen. Es wurde noch nichts vorgemerkt.',
+        'Switch to Staging Area. Only guides/Planet.md should appear under Unstaged. Nothing has been staged.',
       ],
       c('open-staging'),
       { prepare: p('one'), completion: element(`${c('open-staging')}[aria-pressed="true"]`) },

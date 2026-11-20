@@ -10,17 +10,20 @@ type StagingToolbarProps = {
 };
 
 export const StagingToolbar: React.FC<StagingToolbarProps> = ({ searchQuery, setSearchQuery, onStageAll, canStageAll, hasConflicts }) => {
-  const { t, tr } = useI18n();
+  const { tr } = useI18n();
+  const searchLabel = tr('Datei oder Ordner suchen', 'Search files or folders');
 
   return (
     <div className="staging-toolbar">
       <div className="staging-search-row">
         <input
+          type="search"
           data-tutorial="staging-search"
           className="staging-search-input"
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder={t('generated.components.staging_area.stagingtoolbar.search_file_be8954bd')}
+          placeholder={searchLabel}
+          aria-label={searchLabel}
         />
         <button
           data-tutorial="stage-repository"

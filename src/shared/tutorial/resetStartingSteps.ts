@@ -10,7 +10,7 @@ export const resetStartingSteps = (mode: ResetMode): TutorialStep[] => [
     'planes',
     ['Drei getrennte Zustände derselben Datei', 'Three separate states of the same file'],
     [
-      'HEAD enthält Hallo Welt, der Index Hallo Staging und die spätere Arbeitsdatei Hallo Team. Die README steht deshalb sowohl unter Vorgemerkt als auch unter Änderungen.',
+      'HEAD enthält Hallo Welt, der Index Hallo Staging und die spätere Arbeitsdatei Hallo Team. Die README steht deshalb sowohl unter „Gestagt“ als auch unter „Ungestagt“.',
       'HEAD contains Hello world, the index Hello Staging and the later working file Hello team. The README therefore appears under both Staged and Changes.',
     ],
     '[data-tutorial="staging"]',
@@ -20,7 +20,7 @@ export const resetStartingSteps = (mode: ResetMode): TutorialStep[] => [
     'open-index',
     ['Öffne zuerst den vorgemerkten Unterschied', 'First open the staged difference'],
     [
-      'Klicke README.md unter Vorgemerkt. Dieser Diff vergleicht HEAD mit dem Index, nicht mit dem späteren Arbeitsentwurf.',
+      'Klicke README.md unter „Gestagt“. Dieser Diff vergleicht HEAD mit dem Index, nicht mit dem späteren Arbeitsentwurf.',
       'Click README.md under Staged. This diff compares HEAD with the index rather than the later working draft.',
     ],
     stagingRow('staged', 'README.md'),
@@ -54,8 +54,8 @@ export const resetStartingSteps = (mode: ResetMode): TutorialStep[] => [
     'open-work',
     ['Öffne die nicht vorgemerkte README', 'Open the unstaged README'],
     [
-      'Klicke README.md unter Änderungen. Dieser Diff vergleicht den Index mit der aktuellen Arbeitsdatei.',
-      'Click README.md under Changes. This diff compares the index with the current working file.',
+      'Klicke README.md unter „Ungestagt“. Dieser Diff vergleicht den Index mit der aktuellen Arbeitsdatei.',
+      'Click README.md under Unstaged. This diff compares the index with the current working file.',
     ],
     stagingRow('unstaged', 'README.md'),
     { prepare: recipe(mode), completion: element(historyViewer()) },

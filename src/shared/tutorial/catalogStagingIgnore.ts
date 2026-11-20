@@ -32,7 +32,7 @@ export const TUTORIAL_STAGING_IGNORE: TutorialChapter = {
       'open-file-menu',
       ['Öffne das Dateikontextmenü', 'Open the file context menu'],
       [
-        'Klicke mit der rechten Maustaste auf notes.txt unter Unversioniert. Mit der Tastatur kannst du die Zeile fokussieren und Umschalt+F10 drücken.',
+        'Klicke mit der rechten Maustaste auf notes.txt unter „Neu“. Mit der Tastatur kannst du die Zeile fokussieren und Umschalt+F10 drücken.',
         'Right-click notes.txt under Untracked. With the keyboard, focus its row and press Shift+F10.',
       ],
       notes,
@@ -52,7 +52,7 @@ export const TUTORIAL_STAGING_IGNORE: TutorialChapter = {
       'ignore-file',
       ['Ignoriere notes.txt', 'Ignore notes.txt'],
       [
-        'Wähle „Datei zu .gitignore hinzufügen“. notes.txt soll aus Unversioniert verschwinden. docs/ideas.md bleibt sichtbar; .gitignore erscheint als neue Datei.',
+        'Wähle „Datei zu .gitignore hinzufügen“. notes.txt soll aus „Neu“ verschwinden. docs/ideas.md bleibt sichtbar; .gitignore erscheint als neue Datei.',
         'Choose “Add file to .gitignore”. notes.txt should disappear from Untracked. docs/ideas.md remains visible, and .gitignore appears as a new file.',
       ],
       c('ignore-file'),
@@ -112,7 +112,7 @@ export const TUTORIAL_STAGING_IGNORE: TutorialChapter = {
       'staged-case',
       ['Frisches Beispiel: neue Datei bereits vorgemerkt', 'Fresh example: a new file already staged'],
       [
-        'Das Beispiel wird erneut zurückgesetzt und notes.txt ist jetzt im Bereich Vorgemerkt. Sie ist neu und wurde noch nie committet. Die App kann sie beim Hinzufügen einer Ignore-Regel aus dieser Vormerkung zurücknehmen.',
+        'Das Beispiel wird erneut zurückgesetzt und notes.txt ist jetzt im Bereich „Gestagt“. Sie ist neu und wurde noch nie committet. Die App kann sie beim Hinzufügen einer Ignore-Regel aus dieser Vormerkung zurücknehmen.',
         'The example resets again, and notes.txt is now in Staged. It is new and has never been committed. The app can unstage it when adding an ignore rule.',
       ],
       row('staged', 'notes.txt'),
@@ -122,7 +122,7 @@ export const TUTORIAL_STAGING_IGNORE: TutorialChapter = {
       'open-staged-menu',
       ['Öffne das Menü der vorgemerkten neuen Datei', 'Open the staged new file’s menu'],
       [
-        'Öffne das Kontextmenü von notes.txt im Bereich Vorgemerkt. Achte auf den Bereich: Dieselbe Regel wird hier zusätzlich ihre neue Vormerkung zurücknehmen.',
+        'Öffne das Kontextmenü von notes.txt im Bereich „Gestagt“. Achte auf den Bereich: Dieselbe Regel wird hier zusätzlich ihre neue Vormerkung zurücknehmen.',
         'Open notes.txt’s context menu in Staged. Notice the section: applying the same rule here will also unstage this new file.',
       ],
       row('staged', 'notes.txt'),

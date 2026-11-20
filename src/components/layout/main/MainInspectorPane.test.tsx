@@ -44,6 +44,7 @@ vi.mock('@/components/staging-area', () => ({
               fileOps={
                 {
                   isMutating: false,
+                  searchQuery: filter,
                   stageFile: state.stage,
                   unstageFile: state.unstage,
                   discardFile: state.discard,
@@ -147,10 +148,10 @@ describe('working-tree inspector split', () => {
   it('keeps the categorized staging list, filters, draft and scroll while showing the common file details above it', async () => {
     await render();
     const staging = host.querySelector('.staging-container');
-    const list = row('staged.ts').closest<HTMLElement>('.staging-section-list')!;
-    list.scrollTop = 7;
+    const list = row('staged.ts').closest<HTMLElement>('.staging-change-list')!;
     input('[aria-label="Commit draft"]', 'Keep this commit message');
     input('[aria-label="Filter changes"]', 'Keep this filter');
+    list.scrollTop = 7;
     await click(row('src/renamed.ts'));
     expect(host.querySelector('.staging-container')).toBe(staging);
     expect(list.scrollTop).toBe(7);

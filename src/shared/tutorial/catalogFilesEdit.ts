@@ -108,8 +108,8 @@ export const TUTORIAL_FILES_EDIT: TutorialChapter = {
       'saved',
       ['Gespeichert, aber noch nicht vorgemerkt', 'Saved, but not yet staged'],
       [
-        'Der Stern ist weg. Der Arbeitsordner enthält jetzt die Bearbeitung; Git wird sie unter Änderungen anzeigen. Im nächsten Commit erscheint sie erst nach dem Vormerken.',
-        'The asterisk is gone. The worktree now contains the edit, and Git will show it under Changes. It enters the next commit only after staging.',
+        'Der Stern ist weg. Der Arbeitsordner enthält jetzt die Bearbeitung; Git wird sie unter „Ungestagt“ anzeigen. Im nächsten Commit erscheint sie erst nach dem Vormerken.',
+        'The asterisk is gone. The worktree now contains the edit, and Git will show it under Unstaged. It enters the next commit only after staging.',
       ],
       `${fileViewer}[data-dirty="false"]`,
       { prepare: seed('edited') },
@@ -178,8 +178,8 @@ export const TUTORIAL_FILES_EDIT: TutorialChapter = {
       'open-staging',
       ['Prüfe den Git-Status', 'Check the Git status'],
       [
-        'Wechsle über Staging Area zurück zur Änderungsliste. README.md soll unter Änderungen stehen und noch nicht vorgemerkt sein.',
-        'Switch back to the change list with Staging Area. README.md should be under Changes and remain unstaged.',
+        'Wechsle über Staging Area zurück zur Änderungsliste. README.md soll unter „Ungestagt“ stehen und noch nicht vorgemerkt sein.',
+        'Switch back to the change list with Staging Area. README.md should be under Unstaged and remain unstaged.',
       ],
       c('open-staging'),
       { prepare: seed('draft', 'head', { click: [] }), completion: element(`${c('open-staging')}[aria-pressed="true"]`) },

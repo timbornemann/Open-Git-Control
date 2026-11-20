@@ -105,9 +105,9 @@ export const TUTORIAL_HISTORY_SOURCES: TutorialChapter = {
     ),
     s(
       'open-index',
-      ['Wähle README ausdrücklich unter Staged', 'Select README specifically under Staged'],
+      ['Wähle README ausdrücklich unter „Gestagt“', 'Select README specifically under Staged'],
       [
-        'Klicke README.md im Bereich Staged. Damit öffnest du den vorgemerkten Inhalt, nicht die gleichnamige Unstaged-Zeile.',
+        'Klicke README.md im Bereich „Gestagt“. Damit öffnest du den vorgemerkten Inhalt, nicht die gleichnamige Unstaged-Zeile.',
         'Click README.md under Staged. This opens the indexed content, not the identically named Unstaged row.',
       ],
       stagedFile,

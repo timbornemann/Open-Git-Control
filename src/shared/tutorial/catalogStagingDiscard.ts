@@ -53,8 +53,8 @@ export const TUTORIAL_STAGING_DISCARD: TutorialChapter = {
       'open-confirm',
       ['Öffne die Bestätigung für README', 'Open confirmation for README'],
       [
-        'Klicke das rote x bei README.md im Bereich Änderungen. Es erscheint zuerst eine Bestätigung; bis dahin sind die Dateiinhalte unverändert.',
-        'Click the red x beside README.md in Changes. A confirmation appears first; the file contents have not changed yet.',
+        'Klicke das rote x bei README.md im Bereich „Ungestagt“. Es erscheint zuerst eine Bestätigung; bis dahin sind die Dateiinhalte unverändert.',
+        'Click the red x beside README.md in Unstaged. A confirmation appears first; the file contents have not changed yet.',
       ],
       discard,
       { completion: element(dialog) },
@@ -83,8 +83,8 @@ export const TUTORIAL_STAGING_DISCARD: TutorialChapter = {
       'cancelled',
       ['Die Änderung ist weiterhin da', 'The edit is still present'],
       [
-        'README.md und package.json stehen weiterhin unter Änderungen. src/app.ts bleibt vorgemerkt; notes.txt und docs/ideas.md bleiben neu. Jetzt probieren wir die bestätigte Aktion aus.',
-        'README.md and package.json remain in Changes. src/app.ts stays staged; notes.txt and docs/ideas.md remain new. Next we try confirming the operation.',
+        'README.md und package.json stehen weiterhin unter „Ungestagt“. src/app.ts bleibt vorgemerkt; notes.txt und docs/ideas.md bleiben neu. Jetzt probieren wir die bestätigte Aktion aus.',
+        'README.md and package.json remain in Unstaged. src/app.ts stays staged; notes.txt and docs/ideas.md remain new. Next we try confirming the operation.',
       ],
       row('unstaged', 'README.md'),
     ),
@@ -112,8 +112,8 @@ export const TUTORIAL_STAGING_DISCARD: TutorialChapter = {
       'result',
       ['Warum die Datei aus der Liste verschwindet', 'Why the file leaves the list'],
       [
-        'Die README entspricht jetzt wieder der Indexversion. Sie ist noch im Projektordner vorhanden, hat aber keine ungestagte Abweichung mehr. Im Bereich Änderungen bleibt package.json.',
-        'README matches the index again. It still exists in the project folder, but has no unstaged difference. package.json remains in Changes.',
+        'Die README entspricht jetzt wieder der Indexversion. Sie ist noch im Projektordner vorhanden, hat aber keine ungestagte Abweichung mehr. Im Bereich „Ungestagt“ bleibt package.json.',
+        'README matches the index again. It still exists in the project folder, but has no unstaged difference. package.json remains in Unstaged.',
       ],
       c('unstaged-files'),
       { prepare: seed({ restored: ['README.md'] }) },
@@ -132,7 +132,7 @@ export const TUTORIAL_STAGING_DISCARD: TutorialChapter = {
       'open-staged',
       ['Wähle die ungestagte README-Zeile', 'Choose the unstaged README row'],
       [
-        'Klicke das rote x in der README-Zeile unter Änderungen. Die vorgemerkte Zeile darüber bleibt Teil der Commit-Auswahl.',
+        'Klicke das rote x in der README-Zeile unter „Ungestagt“. Die vorgemerkte Zeile darüber bleibt Teil der Commit-Auswahl.',
         'Click the red x in README’s Changes row. The staged row above remains part of the commit selection.',
       ],
       discard,
@@ -171,7 +171,7 @@ export const TUTORIAL_STAGING_DISCARD: TutorialChapter = {
       'index-result',
       ['Die Commit-Auswahl ist erhalten', 'The commit selection is preserved'],
       [
-        'Die README steht jetzt nur noch unter Vorgemerkte Änderungen. Du hast die spätere Zeile verworfen, ohne die ausgewählte Begrüßung aus dem Index zu nehmen.',
+        'Die README steht jetzt nur noch unter „Gestagt“. Du hast die spätere Zeile verworfen, ohne die ausgewählte Begrüßung aus dem Index zu nehmen.',
         'README now appears only under Staged changes. You discarded the later line while keeping the selected welcome text in the index.',
       ],
       row('staged', 'README.md'),
@@ -181,8 +181,8 @@ export const TUTORIAL_STAGING_DISCARD: TutorialChapter = {
       'filtered',
       ['Ein gefilterter Bereich begrenzt das Verwerfen', 'A filtered section limits discarding'],
       [
-        'Wir beginnen wieder mit zwei geänderten Dateien und suchen nach README. Das rote x Alle Treffer im Bereich Änderungen betrifft nur die angezeigte Auswahl. Die ausgeblendete package.json soll unverändert bleiben.',
-        'We start again with two modified files and search for README. The red x All matches in Changes affects only displayed matches. Hidden package.json must remain unchanged.',
+        'Wir beginnen wieder mit zwei geänderten Dateien und suchen nach README. Das × in der Überschrift „Ungestagt“ betrifft nur die angezeigte Auswahl. Die ausgeblendete package.json soll unverändert bleiben.',
+        'We start again with two modified files and search for README. The × in the Unstaged header affects only displayed matches. Hidden package.json must remain unchanged.',
       ],
       section,
       { continue: false, prepare: seed({}, 'README') },
@@ -191,8 +191,8 @@ export const TUTORIAL_STAGING_DISCARD: TutorialChapter = {
       'open-filtered',
       ['Öffne die Bereichsbestätigung', 'Open section confirmation'],
       [
-        'Klicke x Alle Treffer im Bereich Änderungen. Der Dialog zeigt die Auswahl und den aktiven Suchfilter. Prüfe den Umfang vor dem Bestätigen.',
-        'Click x All matches in Changes. The dialog shows the selection and active search filter. Review the scope before confirming.',
+        'Klicke × in der Überschrift „Ungestagt“. Der Dialog zeigt die Auswahl und den aktiven Suchfilter. Prüfe den Umfang vor dem Bestätigen.',
+        'Click × in the Unstaged header. The dialog shows the selection and active search filter. Review the scope before confirming.',
       ],
       section,
       { prepare: seed({}, 'README'), completion: element(dialog) },
@@ -211,8 +211,8 @@ export const TUTORIAL_STAGING_DISCARD: TutorialChapter = {
       'all',
       ['Ohne Filter betrifft der Bereich alle seine Dateien', 'Without a filter, the section affects all its files'],
       [
-        'Im letzten Beispiel sind wieder beide geänderten Dateien sichtbar. x Alle im Bereich Änderungen betrifft deren ungestagte Inhalte. Bereits vorgemerkte und unversionierte Dateien gehören weiterhin nicht zu diesem Vorgang.',
-        'In the last sample, both modified files are visible again. x All in Changes affects their unstaged contents. Already staged and untracked files are still outside this operation.',
+        'Im letzten Beispiel sind wieder beide geänderten Dateien sichtbar. × in der Überschrift „Ungestagt“ betrifft deren ungestagte Inhalte. Bereits vorgemerkte und unversionierte Dateien gehören weiterhin nicht zu diesem Vorgang.',
+        'In the last sample, both modified files are visible again. × in the Unstaged header affects their unstaged contents. Already staged and untracked files are still outside this operation.',
       ],
       section,
       { continue: false, prepare: seed() },
@@ -221,8 +221,8 @@ export const TUTORIAL_STAGING_DISCARD: TutorialChapter = {
       'open-all',
       ['Prüfe die vollständige Bereichsauswahl', 'Review the full section selection'],
       [
-        'Klicke x Alle im Bereich Änderungen. Die Bestätigung nennt die zwei geänderten Dateien als Umfang. Das ist kein Löschen des Repositories.',
-        'Click x All in Changes. Confirmation identifies the two modified files as its scope. This does not delete the repository.',
+        'Klicke × in der Überschrift „Ungestagt“. Die Bestätigung nennt die zwei geänderten Dateien als Umfang. Das ist kein Löschen des Repositories.',
+        'Click × in the Unstaged header. Confirmation identifies the two modified files as its scope. This does not delete the repository.',
       ],
       section,
       { completion: element(dialog) },
@@ -245,7 +245,7 @@ export const TUTORIAL_STAGING_DISCARD: TutorialChapter = {
       ['Auswahl zurücknehmen, Inhalte verwerfen, Dateien löschen', 'Unstage, discard contents, delete files'],
       [
         'Du hast Abbrechen, einzelne Dateien, einen gefilterten Bereich und den vollständigen Änderungsbereich geübt. Minus nimmt eine Commit-Auswahl zurück; Verwerfen stellt den Indexinhalt wieder her. Neue Dateien brauchen eine eigene Löschaktion, die wir als Nächstes ansehen.',
-        'You practiced Cancel, individual files, a filtered section and the full Changes section. Minus removes a commit selection; Discard restores index contents. Untracked files have a separate delete action, which we explore next.',
+        'You practiced Cancel, individual files, a filtered section and the full Unstaged section. Minus removes a commit selection; Discard restores index contents. Untracked files have a separate delete action, which we explore next.',
       ],
       undefined,
       { prepare: seed({ restored: ['.'] }) },

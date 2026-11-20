@@ -60,7 +60,7 @@ describe('staging bulk actions and search scope', () => {
     await act(async () => fileOps.setSearchQuery(query));
   };
   const clickSection = async (section: number, action = 0) => {
-    const button = host.querySelectorAll('.staging-section')[section].querySelectorAll<HTMLButtonElement>('.staging-section-header button')[action];
+    const button = host.querySelectorAll('.staging-section')[section].querySelectorAll<HTMLButtonElement>('.staging-section-actions button')[action];
     await act(async () => button.click());
   };
   const confirmation = () => vi.mocked(params.setConfirmDialog).mock.calls.at(-1)![0]!;
@@ -192,13 +192,33 @@ describe('staging bulk actions and search scope', () => {
     expect(gitClient.stagePaths).toHaveBeenCalledOnce();
   });
 
-  it('unstages only the filtered entries and includes both sides of a rename', async () => {
+  it.each(['feature', '  OLD/RENAMED.ts  '])('unstages both paths of a rename matched by %j', async (query) => {
     params = { ...params, externalStatus: { ...status, staged: [{ ...status.staged[0], originalPath: 'old/renamed.ts' }, status.staged[1]] } };
     await render();
-    await search('feature');
+    await search(query);
     await clickSection(0);
     expect(gitClient.runGitCommandForRepo).toHaveBeenCalledWith(repo, 'reset', '--', 'old/renamed.ts', 'feature/renamed.ts');
     expect(gitClient.runGitCommandForRepo).not.toHaveBeenCalledWith(repo, 'reset', 'HEAD');
+  });
+
+  it('temporarily opens a collapsed group for matching files and restores its previous state', async () => {
+    const group = host.querySelector('[data-tutorial="staged-files"]')!;
+    const toggle = group.querySelector<HTMLButtonElement>('.staging-section-toggle')!;
+    await act(async () => toggle.click());
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(group.querySelector('.staging-count')?.textContent).toBe('2');
+    expect(group.querySelector('[data-tutorial="unstage-section"]')).toBeNull();
+    expect(group.querySelector('.staging-file-row')).toBeNull();
+
+    await search('feature');
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(group.querySelector('.staging-count')?.textContent).toBe('1/2');
+    expect(group.querySelector('[data-tutorial="unstage-section"]')?.textContent).toContain('All matches');
+    expect(group.querySelector('.staging-file-row')?.getAttribute('aria-label')).toBe('feature/renamed.ts');
+
+    await search('');
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(group.querySelector('.staging-count')?.textContent).toBe('2');
   });
 
   it.each(['feature', '  FEATURE  ', 'src/feature/'])('discards only the displayed tracked files after confirmation for search %j', async (query) => {
