@@ -35,6 +35,11 @@ export function createDemoGitApi(repo: DemoRepository): Partial<ElectronGitAPI> 
     runGitCommand: async (name, ...args) => command(name, args),
     runGitCommandForRepo: async (path, name, ...args) => (path === repo.activeRepo ? command(name, args) : unavailable()),
     createCommit: async (input) => repo.commit(input.title, input),
+    getRepositoryHead: async (path) => {
+      if (path !== repo.activeRepo) return unavailable();
+      const head = repo.commits[0];
+      return head ? ok({ kind: 'ready', oid: head.hash }) : ok({ kind: 'unborn', ref: `refs/heads/${repo.branch || 'main'}` });
+    },
     getWorkingTreeStatus: async () =>
       ok({
         repoPath: repo.activeRepo,

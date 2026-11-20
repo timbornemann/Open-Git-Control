@@ -5,7 +5,6 @@ import { CommitStatsService } from './CommitStatsService';
 import { gitService } from './GitService';
 import { githubService } from './GitHubService';
 import { SecretScanService } from './SecretScanService';
-import { WorkingTreeService } from './WorkingTreeService';
 import { buildDiagnosticsReportFactory } from './main-process/diagnostics';
 import { setupIPC } from './main-process/ipc/setupIPC';
 import { getGeminiApiKeyFromSecureStore, getOpenAiApiKeyFromSecureStore, readSettingsWithMigration } from './main-process/settingsStore';
@@ -60,14 +59,13 @@ if (isPrimaryInstance) {
   let planningApiError: string | null = null;
   let repositoryRunService: { dispose: () => void } | null = null;
   let stopSystemTools: (() => void) | undefined;
-  let disposeStorageMaintenance: (() => void) | undefined;
+  let disposeStorageMaintenance: (() => Promise<void>) | undefined;
   let disposeSecretScans: (() => void) | undefined;
   const preferredPlanningApiPort = (() => {
     const parsed = Number(process.env.OPEN_GIT_CONTROL_API_PORT || '2990');
     return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 2990;
   })();
   const secretScanService = new SecretScanService(gitService);
-  const workingTreeService = new WorkingTreeService(gitService);
   const commitStatsService = new CommitStatsService(gitService, () => path.join(app.getPath('userData'), 'commit-stats-v1.jsonl'));
 
   const buildDiagnosticsReport = buildDiagnosticsReportFactory({
@@ -160,7 +158,6 @@ if (isPrimaryInstance) {
       aiService,
       secretScanService,
       commitStatsService,
-      workingTreeService,
       updaterManager,
       userNotesManager,
       readSettingsWithMigration,
@@ -207,7 +204,7 @@ if (isPrimaryInstance) {
     recordStartup('shutdown-cleanup-start');
     stopStartupDiagnostics();
     disposeSecretScans?.();
-    disposeStorageMaintenance?.();
+    await disposeStorageMaintenance?.();
     stopSystemTools?.();
     await systemToolsService.dispose();
     repositoryRunService?.dispose();

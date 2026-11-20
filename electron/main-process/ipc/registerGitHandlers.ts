@@ -6,6 +6,7 @@ import type { SecretScanService } from '../../SecretScanService';
 import type { WorkingTreeService } from '../../WorkingTreeService';
 import type { AppSettings } from '../../settings';
 import { redactGitSensitiveText } from '../../git/GitErrorFormatter';
+import { branchGitFailure, type RepositoryHeadService } from '../../git/RepositoryHeadService';
 import { IpcChannel } from '../../../src/types/ipcContract';
 import { createJobId, normalizeCommandArgs } from '../gitCommandPolicy';
 import { registerGitDiffPreviewHandler } from './git/registerGitDiffPreviewHandler';
@@ -35,6 +36,7 @@ type RegisterGitHandlersDeps = {
   secretScanService: SecretScanService;
   commitStatsService: CommitStatsService;
   workingTreeService: WorkingTreeService;
+  heads?: RepositoryHeadService;
   readSettingsWithMigration: () => AppSettings;
   repoJobRegistry?: RepoJobRegistry;
   readStoredRepoPaths?: () => string[];
@@ -45,6 +47,7 @@ export function registerGitHandlers({
   secretScanService,
   commitStatsService,
   workingTreeService,
+  heads,
   readSettingsWithMigration,
   repoJobRegistry = defaultRepoJobRegistry,
   readStoredRepoPaths = () => readStoreData().repos.map((repo) => repo.path),
@@ -69,12 +72,12 @@ export function registerGitHandlers({
     repoJobRegistry,
   });
 
-  const resetWorkingTreeWatches = registerGitHistoryHandlers({ gitService, commitStatsService, workingTreeService });
-  registerGitFileHandlers({ gitService, readStoredRepoPaths, ensureWriteAllowed: ensureCommitProtectionIsIdle });
+  const resetWorkingTreeWatches = registerGitHistoryHandlers({ gitService, commitStatsService, workingTreeService, heads });
+  registerGitFileHandlers({ gitService, readStoredRepoPaths, ensureWriteAllowed: ensureCommitProtectionIsIdle, heads });
   registerGitOperationStateHandler({ gitService });
   registerDiffLineSelectionHandler(gitService);
   registerUntrackFilesHandlers(gitService, repoJobRegistry);
-  registerRepositoryActivityHandler({ gitService, readStoredRepoPaths });
+  registerRepositoryActivityHandler({ gitService, readStoredRepoPaths, heads });
   const commitMessageEdits = registerCommitMessageEditHandlers({ gitService, repoJobRegistry, beginCommitProtection, ensureCommitProtectionIsIdle });
 
   ipcMain.handle(IpcChannel.GitResolveRepoPath, async (_event: any, repoPath: string) => {
@@ -172,6 +175,8 @@ export function registerGitHandlers({
             });
             return scanBlock;
           }
+          await heads?.read(repoPath, { requestedKind: 'interactive' });
+          requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), IpcChannel.GitCreateCommit);
           const data = await gitService.commits.commitWithMessageAtPath(repoPath, {
             title: String(params.title || ''),
             description: String(params.description || ''),
@@ -198,7 +203,7 @@ export function registerGitHandlers({
           message: safeError,
           timestamp: Date.now(),
         });
-        return { success: false, error: safeError };
+        return { ...branchGitFailure(error), error: safeError };
       }
     },
   );
@@ -215,7 +220,7 @@ export function registerGitHandlers({
     return secretScanCommitGuard.approveSecretScanCommit(event, requestedRepoPath);
   });
 
-  registerGitStagingHandler(gitService, commitStatsService);
+  registerGitStagingHandler(gitService, commitStatsService, heads);
 
   registerGitDiffPreviewHandler({ gitService, commitStatsService });
 
@@ -246,7 +251,7 @@ export function registerGitHandlers({
       } catch (error: unknown) {
         return { success: false, error: error instanceof Error ? error.message : COMMIT_PROTECTION_BUSY_ERROR };
       }
-      return handleGitCommand(event, gitService, commandName, rawArgs, repoPath);
+      return handleGitCommand(event, gitService, commandName, rawArgs, repoPath, heads);
     }
     const releaseCommitProtection = beginCommitProtection(repoPath);
     if (!releaseCommitProtection) return { success: false, error: COMMIT_PROTECTION_BUSY_ERROR };
@@ -254,7 +259,7 @@ export function registerGitHandlers({
       const scanBlock = await secretScanCommitGuard.requireCommitSecretScanApproval(event, repoPath);
       if (scanBlock) return scanBlock;
       requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), gitCommandAction(IpcChannel.GitCommand, commandName));
-      return await handleGitCommand(event, gitService, commandName, rawArgs, repoPath);
+      return await handleGitCommand(event, gitService, commandName, rawArgs, repoPath, heads);
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? redactGitSensitiveText(error.message) : 'Commit failed.' };
     } finally {
@@ -289,7 +294,7 @@ export function registerGitHandlers({
       } catch (error: unknown) {
         return { success: false, error: error instanceof Error ? error.message : COMMIT_PROTECTION_BUSY_ERROR };
       }
-      return handleGitCommand(event, gitService, commandName, rawArgs, repoPath);
+      return handleGitCommand(event, gitService, commandName, rawArgs, repoPath, heads);
     }
     const releaseCommitProtection = beginCommitProtection(repoPath);
     if (!releaseCommitProtection) return { success: false, error: COMMIT_PROTECTION_BUSY_ERROR };
@@ -297,7 +302,7 @@ export function registerGitHandlers({
       const scanBlock = await secretScanCommitGuard.requireCommitSecretScanApproval(event, repoPath);
       if (scanBlock) return scanBlock;
       requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), gitCommandAction(IpcChannel.GitCommandForRepo, commandName));
-      return await handleGitCommand(event, gitService, commandName, rawArgs, repoPath);
+      return await handleGitCommand(event, gitService, commandName, rawArgs, repoPath, heads);
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? redactGitSensitiveText(error.message) : 'Commit failed.' };
     } finally {

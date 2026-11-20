@@ -183,7 +183,7 @@ export class GitRunner {
     const env = options.envOverrides ? { ...process.env, ...options.envOverrides } : process.env;
     const execOptions: GitExecFileOptions = {
       cwd: repoPath,
-      maxBuffer: 20 * 1024 * 1024,
+      maxBuffer: options.maxBuffer ?? 20 * 1024 * 1024,
       env,
       signal: options.signal,
     };
@@ -213,7 +213,7 @@ export class GitRunner {
           ? this.spawnOperations.streamResult(repoPath, args, options.onOutput, signal, options.envOverrides)
           : this.processExecutor.runResult(repoPath, args, {
               cwd: repoPath,
-              maxBuffer: 8 * 1024 * 1024,
+              maxBuffer: options.maxBuffer ?? 8 * 1024 * 1024,
               env: { ...process.env, ...options.envOverrides },
               signal,
             }),

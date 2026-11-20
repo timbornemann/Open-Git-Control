@@ -91,6 +91,7 @@ export const SettingsSwitch = ({
   onChange,
   compact = false,
   description,
+  disabled,
 }: {
   variant: SettingsLayoutVariant;
   checked: boolean;
@@ -98,6 +99,7 @@ export const SettingsSwitch = ({
   onChange: (checked: boolean) => void;
   compact?: boolean;
   description?: string;
+  disabled?: boolean;
 }) => {
   return (
     <label className={`settings-switch-row${variant === 'sidebar' || compact ? ' settings-switch-row--compact' : ''}`}>
@@ -106,7 +108,7 @@ export const SettingsSwitch = ({
         {description && <small>{description}</small>}
       </span>
       <span className="settings-switch-control">
-        <input className="settings-switch-input" type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+        <input className="settings-switch-input" type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
         <span className="settings-switch-track" aria-hidden="true">
           <span className="settings-switch-thumb" />
         </span>

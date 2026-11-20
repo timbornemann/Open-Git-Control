@@ -1,4 +1,5 @@
 import type { ElectronRepositorySecretScanAllowlistAPI } from './repositorySecretScanAllowlist';
+import type { ElectronBranchRecoveryAPI } from '../branchRecovery';
 import type { RepositoryAnalyticsApi } from '../repositoryAnalytics';
 import type { WorkingTreeWatchApi } from '../workingTreeWatch';
 import type { ReadRequest } from '../../cache/resource';
@@ -240,6 +241,7 @@ export type OpenRepositoryPathResultDto = {
 
 export interface ElectronGitAPI
   extends
+    ElectronBranchRecoveryAPI,
     UntrackFilesApi,
     BranchChangeApi,
     BranchCleanupApi,

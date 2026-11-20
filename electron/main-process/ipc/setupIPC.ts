@@ -6,7 +6,7 @@ import type { GitService } from '../../GitService';
 import type { GitHubService } from '../../GitHubService';
 import type { SecretScanService } from '../../SecretScanService';
 import type { CommitStatsService } from '../../CommitStatsService';
-import type { WorkingTreeService } from '../../WorkingTreeService';
+import { WorkingTreeService } from '../../WorkingTreeService';
 import type { AppSettings } from '../../settings';
 import type { UpdaterManager } from '../updaterManager';
 import type { UserNotesManager } from '../UserNotesManager';
@@ -39,6 +39,7 @@ import { registerRepositoryLocationHandlers } from './registerRepositoryLocation
 import { registerStorageMaintenanceHandlers } from './registerStorageMaintenanceHandlers';
 import { RepositoryLocationService } from '../RepositoryLocationService';
 import { registerJsonSchemaValidationHandler } from './registerJsonSchemaValidationHandler';
+import { registerBranchRecoveryHandlers } from './git/registerBranchRecoveryHandlers';
 
 type SetupIpcDeps = {
   gitService: GitService;
@@ -46,7 +47,6 @@ type SetupIpcDeps = {
   aiService: AiService;
   secretScanService: SecretScanService;
   commitStatsService: CommitStatsService;
-  workingTreeService: WorkingTreeService;
   updaterManager: UpdaterManager;
   userNotesManager: UserNotesManager;
   readSettingsWithMigration: () => AppSettings;
@@ -67,25 +67,26 @@ export function setupIPC({
   aiService,
   secretScanService,
   commitStatsService,
-  workingTreeService,
   updaterManager,
   userNotesManager,
   readSettingsWithMigration,
   getGeminiApiKeyFromSecureStore,
   getOpenAiApiKeyFromSecureStore,
   buildDiagnosticsReport,
-}: SetupIpcDeps): { repositoryRunService: RepositoryRunService; disposeStorageMaintenance: () => void; disposeSecretScans: () => void } {
+}: SetupIpcDeps): { repositoryRunService: RepositoryRunService; disposeStorageMaintenance: () => Promise<void>; disposeSecretScans: () => void } {
   const repositoryRunConfigService = new RepositoryRunConfigService();
   const repositoryRunService = new RepositoryRunService(repositoryRunConfigService);
   registerReadCancellation();
   registerBootstrapHandlers();
   registerJsonSchemaValidationHandler();
   registerDialogHandlers({ gitService });
+  const branchRecovery = registerBranchRecoveryHandlers(gitService);
   const pushGuard = registerGitHandlers({
     gitService,
     secretScanService,
     commitStatsService,
-    workingTreeService,
+    workingTreeService: new WorkingTreeService(gitService, branchRecovery.heads),
+    heads: branchRecovery.heads,
     readSettingsWithMigration,
     repoJobRegistry,
   });
@@ -103,7 +104,14 @@ export function setupIPC({
   const iconService = registerRepositoryIconHandlers();
   registerGitIdentityHandlers(gitService);
   const analyticsService = registerRepositoryAnalyticsHandlers(gitService);
-  const maintenance = registerStorageMaintenanceHandlers({ gitService, commitStatsService, runService: repositoryRunService, iconService, analyticsService });
+  const maintenance = registerStorageMaintenanceHandlers({
+    gitService,
+    commitStatsService,
+    runService: repositoryRunService,
+    iconService,
+    analyticsService,
+    branchRepairSnapshots: branchRecovery.snapshots,
+  });
   registerRepositoryLocationHandlers(gitService, locationService, (oldPath) => maintenance.service.repositoryRelocated(oldPath));
   registerRepositorySecretScanAllowlistHandlers({ gitService, repoJobRegistry, readSettingsWithMigration });
   registerProjectPlannerHandlers({ gitService });
@@ -158,5 +166,12 @@ export function setupIPC({
     runService: repositoryRunService,
     readStoredRepoPaths: () => readStoreData().repos.map((repo) => repo.path),
   });
-  return { repositoryRunService, disposeStorageMaintenance: maintenance.dispose, disposeSecretScans: () => pushGuard.abortActiveScan() };
+  return {
+    repositoryRunService,
+    disposeStorageMaintenance: async () => {
+      maintenance.dispose();
+      await branchRecovery.dispose();
+    },
+    disposeSecretScans: () => pushGuard.abortActiveScan(),
+  };
 }

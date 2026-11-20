@@ -5,8 +5,7 @@ import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
 import type { CommitStatsPriority, CommitStatsService } from '../../../CommitStatsService';
 import type { GitService } from '../../../GitService';
 import type { WorkingTreeService } from '../../../WorkingTreeService';
-import { EXPECTED_NON_FATAL_GIT_ERROR_NAME } from '../../../git/GitErrorFormatter';
-import { isRepoUnavailableError } from '../../../../src/shared/git/errors';
+import { branchGitFailure, RepositoryHeadService } from '../../../git/RepositoryHeadService';
 import { IpcChannel } from '../../../../src/types/ipcContract';
 import { parseFileBlame, parseFileHistory, parseStashList } from '../../parsing';
 import { requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
@@ -16,17 +15,15 @@ type RegisterGitHistoryHandlersDeps = {
   gitService: GitService;
   commitStatsService: CommitStatsService;
   workingTreeService: WorkingTreeService;
+  heads?: Pick<RepositoryHeadService, 'read'>;
 };
 
-const isUnbornHeadError = (error: unknown): boolean => {
-  if (error instanceof Error && error.name === EXPECTED_NON_FATAL_GIT_ERROR_NAME) return true;
-  const message = error instanceof Error ? error.message : String(error);
-  return /needed a single revision|does not have any commits yet|unknown revision or path not in the working tree|ambiguous argument ['"]?HEAD['"]?: unknown revision/i.test(
-    message,
-  );
-};
-
-export function registerGitHistoryHandlers({ gitService, commitStatsService, workingTreeService }: RegisterGitHistoryHandlersDeps): () => void {
+export function registerGitHistoryHandlers({
+  gitService,
+  commitStatsService,
+  workingTreeService,
+  heads = new RepositoryHeadService(gitService.runner),
+}: RegisterGitHistoryHandlersDeps): () => void {
   const resetWatches = registerWorkingTreeWatchHandlers(gitService);
   const commitStatsSubscribers = new Set<WebContents>();
   commitStatsService.onUpdate((update) => {
@@ -53,18 +50,9 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
         const readKind = !params.readRequest || params.readRequest.priority === 'visible' ? 'interactive' : 'background';
         request.signal.throwIfAborted();
 
-        let headHash: string;
-        try {
-          headHash = await gitService.runCommandAtPathWithSignal(repoPath, ['rev-parse', '--verify', '--quiet', 'HEAD'], request.signal, readKind);
-        } catch (error: unknown) {
-          request.signal.throwIfAborted();
-          const message = error instanceof Error ? error.message : String(error);
-          if (isRepoUnavailableError(message)) {
-            throw error;
-          }
-          if (!isUnbornHeadError(error)) {
-            throw error;
-          }
+        const head = await heads.read(repoPath, { signal: request.signal, requestedKind: readKind });
+        request.signal.throwIfAborted();
+        if (head.kind === 'unborn') {
           return {
             success: true,
             data: {
@@ -84,7 +72,7 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
         const visibleHashes = hashes.slice(0, limit);
         const [stats, refs] = await Promise.all([
           commitStatsService.getCachedStats(visibleHashes, repoPath),
-          gitService.history.getGraphRefs(repoPath, request.signal, readKind, headHash),
+          gitService.history.getGraphRefs(repoPath, request.signal, readKind, head.oid),
         ]);
         request.signal.throwIfAborted();
         return {
@@ -98,7 +86,7 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
           },
         };
       } catch (error: unknown) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
+        return branchGitFailure(error);
       } finally {
         request.finish();
       }
@@ -135,7 +123,7 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
         ),
       };
     } catch (error: unknown) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
+      return branchGitFailure(error);
     } finally {
       request.finish();
     }
@@ -147,7 +135,7 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
       const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitWorkingTreeSnapshot);
       return { success: true, data: await workingTreeService.getSnapshot(repoPath, request.signal) };
     } catch (error: unknown) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
+      return branchGitFailure(error);
     } finally {
       request.finish();
     }
@@ -163,7 +151,7 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
         const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitWorkingTreeStats);
         return { success: true, data: await workingTreeService.getStats(normalizedId, repoPath, request.signal) };
       } catch (error: unknown) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
+        return branchGitFailure(error);
       } finally {
         request.finish();
       }

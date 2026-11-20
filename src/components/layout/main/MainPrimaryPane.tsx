@@ -3,6 +3,7 @@ import { viewModules } from '@/data/viewModules';
 /* eslint-disable complexity -- this component is the intentionally central primary-pane route switch. */
 import React from 'react';
 import { RecoveryCenter } from '@/components/RecoveryCenter';
+import { BranchHeadNotice } from '@/components/recovery-center/BranchHeadNotice';
 import { StagingArea } from '@/components/staging-area';
 import { useRepositoryContext, useSettingsContext, useUIContext, useWorkflowContext } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
@@ -250,6 +251,8 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
               onOpenWorkingDirectoryFile(path, { line: line ?? 1, column });
             }}
           />
+        ) : activeConflictPath && workingTree.headProblem ? (
+          <BranchHeadNotice problem={workingTree.headProblem} onOpen={handleToggleRecoveryCenter} />
         ) : activeConflictPath ? (
           <StagingArea
             repoPath={repository.activeRepo}
@@ -278,28 +281,32 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
                 overflowAnchor: 'none',
               }}
             >
-              <CommitGraph
-                repoPath={repository.activeRepo}
-                selectedHash={repository.selectedCommit}
-                navigationRequest={repository.commitNavigationRequest}
-                onNavigationRequestHandled={repository.onCommitNavigationRequestHandled}
-                onSelectCommit={handleSelectCommitDirect}
-                onEditCommitMessage={commitEditor.open}
-                refreshTrigger={repository.refreshTrigger}
-                commitRefreshTrigger={repository.commitRefreshTrigger}
-                showSecondaryHistory={repository.showSecondaryHistory}
-                onOpenDiff={handleOpenDiff}
-                showRecoveryCenter={showRecoveryCenter}
-                onToggleRecoveryCenter={handleToggleRecoveryCenter}
-                currentBranch={repository.currentBranch}
-                branches={repository.branches}
-                conflictingTags={repository.tagConflicts}
-                onMergeBranch={repository.onMergeBranch}
-                onRunGitCommand={workflow.runGitCommand}
-                onOpenConflictResolverForPath={workflow.onOpenConflictResolverForPath}
-                workingTreeStatus={workingTree.status}
-                onRefreshWorkingTree={workingTree.refresh}
-              />
+              {workingTree.headProblem ? (
+                <BranchHeadNotice problem={workingTree.headProblem} onOpen={handleToggleRecoveryCenter} />
+              ) : (
+                <CommitGraph
+                  repoPath={repository.activeRepo}
+                  selectedHash={repository.selectedCommit}
+                  navigationRequest={repository.commitNavigationRequest}
+                  onNavigationRequestHandled={repository.onCommitNavigationRequestHandled}
+                  onSelectCommit={handleSelectCommitDirect}
+                  onEditCommitMessage={commitEditor.open}
+                  refreshTrigger={repository.refreshTrigger}
+                  commitRefreshTrigger={repository.commitRefreshTrigger}
+                  showSecondaryHistory={repository.showSecondaryHistory}
+                  onOpenDiff={handleOpenDiff}
+                  showRecoveryCenter={showRecoveryCenter}
+                  onToggleRecoveryCenter={handleToggleRecoveryCenter}
+                  currentBranch={repository.currentBranch}
+                  branches={repository.branches}
+                  conflictingTags={repository.tagConflicts}
+                  onMergeBranch={repository.onMergeBranch}
+                  onRunGitCommand={workflow.runGitCommand}
+                  onOpenConflictResolverForPath={workflow.onOpenConflictResolverForPath}
+                  workingTreeStatus={workingTree.status}
+                  onRefreshWorkingTree={workingTree.refresh}
+                />
+              )}
             </div>
             {fileViewerRequest && (
               <FileViewer
@@ -320,6 +327,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
         ) : showRecoveryCenter ? (
           <RecoveryCenter
             repoPath={repository.activeRepo}
+            headProblem={workingTree.headProblem}
             refreshTrigger={repository.refreshTrigger}
             onRepoChanged={repository.triggerRefresh}
             settings={settingsState.settings}

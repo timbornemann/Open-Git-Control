@@ -171,6 +171,22 @@ describe('commit graph loading lifecycle', () => {
     expect(host.textContent).toContain('Saved commit');
   });
 
+  it('clears the cached graph when the active branch is damaged and reloads after repair', async () => {
+    storeGraphCache(getGraphCacheKey(repoPath, false), commits, false, computeGraphLayout(commits));
+    const headProblem = { repoPath, ref: 'refs/heads/main', reason: 'broken-ref' as const, repairable: true };
+    vi.spyOn(gitClient, 'getCommitLogPage')
+      .mockResolvedValueOnce({ success: false, error: 'Branch reference is damaged.', headProblem })
+      .mockResolvedValue(page);
+    await render();
+    expect(graph.headProblem).toEqual(headProblem);
+    expect(graph.layout).toBeNull();
+    await act(async () => {
+      await graph.refreshCommits('reset');
+    });
+    expect(graph.headProblem).toBeNull();
+    expect(host.textContent).toContain('Saved commit');
+  });
+
   it('can leave and reopen the graph while the original request is pending', async () => {
     const pending = deferred<typeof page>();
     vi.spyOn(gitClient, 'getCommitLogPage').mockReturnValueOnce(pending.promise).mockResolvedValueOnce(page);

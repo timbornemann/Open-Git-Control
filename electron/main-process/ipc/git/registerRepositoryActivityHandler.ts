@@ -6,10 +6,11 @@ import type { ReadRequest } from '../../../../src/shared/cache/resource';
 import { countPorcelainChanges } from '../../../../src/shared/git/porcelainStatus';
 import { repositoryPathKey } from '../../activeRepositoryAuthorization';
 import { beginReadRequest } from '../../readRequests';
+import { branchGitFailure, type RepositoryHeadService } from '../../../git/RepositoryHeadService';
 
-type Dependencies = { gitService: Pick<GitService, 'getRepoPath' | 'runner'>; readStoredRepoPaths: () => string[] };
+type Dependencies = { gitService: Pick<GitService, 'getRepoPath' | 'runner'>; readStoredRepoPaths: () => string[]; heads?: RepositoryHeadService };
 
-export function registerRepositoryActivityHandler({ gitService, readStoredRepoPaths }: Dependencies) {
+export function registerRepositoryActivityHandler({ gitService, readStoredRepoPaths, heads }: Dependencies) {
   ipcMain.handle(IpcChannel.GitRepositoryChangeSummary, async (event: IpcMainInvokeEvent, requestedPath: unknown, readRequest?: ReadRequest) => {
     const request = beginReadRequest(event, readRequest);
     const deadline = new AbortController();
@@ -24,14 +25,20 @@ export function registerRepositoryActivityHandler({ gitService, readStoredRepoPa
       const run = (args: string[]) => gitService.runner.run(repoPath, ['--no-optional-locks', ...args], { signal, requestedKind: 'background' });
       // Async even on a cold repository; never select it or run full snapshot/stat work.
       const bare = (await run(['rev-parse', '--is-bare-repository'])).trim() === 'true';
-      const raw = bare ? '' : await run(['status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignore-submodules=none']);
+      const options = { signal, requestedKind: 'background' as const };
+      if (bare) await heads?.read(repoPath, options);
+      const raw = bare
+        ? ''
+        : heads
+          ? (await heads.status(repoPath, options)).status
+          : await run(['status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignore-submodules=none']);
       signal.throwIfAborted();
       return {
         success: true,
         data: { repoPath, changeCount: countPorcelainChanges(raw), checkedAt: Date.now(), statusFingerprint: createHash('sha256').update(raw).digest('hex') },
       };
     } catch (error) {
-      return { success: false, error: deadline.signal.aborted ? 'Repository status check timed out.' : error instanceof Error ? error.message : String(error) };
+      return deadline.signal.aborted ? { success: false, error: 'Repository status check timed out.' } : branchGitFailure(error);
     } finally {
       clearTimeout(timeout);
       request.finish();

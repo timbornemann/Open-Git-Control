@@ -18,11 +18,13 @@ import { windowsSystemExecutable } from '../../../system-tools/windowsSystemExec
 import { createRepositoryPathResolver } from '../../../git/RepositoryPathSafetyAsync';
 import { pathExists } from './workingDirectoryAsyncFs';
 import { withWorkingDirectoryWrite } from './workingDirectoryWrite';
+import { branchGitFailure, type RepositoryHeadService } from '../../../git/RepositoryHeadService';
 
 type RegisterGitFileHandlersDeps = {
   gitService: GitService;
   readStoredRepoPaths?: () => string[];
   ensureWriteAllowed?: (repoPath: string) => void;
+  heads?: RepositoryHeadService;
 };
 
 const REPOSITORY_FILE_SOURCES = new Set<RepositoryFileSource>(['unstaged', 'staged', 'commit']);
@@ -153,7 +155,12 @@ const openWithSystemChooser = async (targetPath: string): Promise<void> => {
   });
 };
 
-export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () => [], ensureWriteAllowed = () => {} }: RegisterGitFileHandlersDeps): void {
+export function registerGitFileHandlers({
+  gitService,
+  readStoredRepoPaths = () => [],
+  ensureWriteAllowed = () => {},
+  heads,
+}: RegisterGitFileHandlersDeps): void {
   const workingDirectoryPathAsync = async (repoPath: string, value: unknown, label: string, allowMissing = false) => {
     const resolver = await createRepositoryPathResolver(repoPath);
     return allowMissing ? resolver.forCreateWithoutSymlinks(value, label) : resolver.existingWithoutSymlinks(value, label);
@@ -468,6 +475,7 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
       const selectedRepo = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitAddIgnoreRule);
 
       const repoRoot = await gitService.runCommandAtPath(selectedRepo, ['rev-parse', '--show-toplevel']);
+      await heads?.read(selectedRepo, { requestedKind: 'interactive' });
       // The Git command crossed an asynchronous boundary. Authorize again
       // before any filesystem read or write so a repository switch cannot
       // apply this operation to a repository the user has left.
@@ -485,7 +493,7 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
       replaceIgnoreFileAtomically(gitignorePath, nextContent, mode);
       return { success: true, added: true, pattern: normalizedPattern };
     } catch (error: unknown) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
+      return branchGitFailure(error);
     }
   });
 }

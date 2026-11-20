@@ -8,6 +8,12 @@ import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 
 type Toast = { msg: string; isError: boolean };
 
+async function isInitialBranch(repoPath: string): Promise<boolean> {
+  const head = await gitClient.getRepositoryHead(repoPath);
+  if (!head.success) throw new Error(head.error);
+  return head.data.kind === 'unborn';
+}
+
 type Params = {
   getActiveRepo: () => string | null;
   recoverBareRepoForPush: () => Promise<boolean>;
@@ -32,6 +38,7 @@ export const useInitialCommitRecoveryWorkflow = ({
       const repoPath = options.expectedRepoPath || getActiveRepo();
       if (!repoPath || getActiveRepo() !== repoPath) return false;
       try {
+        if (!(await isInitialBranch(repoPath))) return getActiveRepo() === repoPath;
         if (!(await gitClient.ensureCommitIdentity(repoPath)) || getActiveRepo() !== repoPath) return false;
       } catch (error: unknown) {
         setGitActionToast({
@@ -132,6 +139,8 @@ export const useInitialCommitRecoveryWorkflow = ({
       if (!repoPath || getActiveRepo() !== repoPath) return false;
 
       let changedFiles: number | null = null;
+      const initial = await isInitialBranch(repoPath).catch(() => false);
+      if (!initial || getActiveRepo() !== repoPath) return false;
       try {
         const statusResult = await freshRead(() => gitClient.runGitCommandForRepo(repoPath, 'statusPorcelain'));
         if (statusResult.success) {

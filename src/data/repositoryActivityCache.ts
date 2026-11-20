@@ -1,5 +1,5 @@
 import type { RepositoryChangeSummaryDto } from '@/types/gitDtos';
-import type { IpcResult } from '@/types/ipc';
+import type { IpcErrorResult, IpcResult } from '@/types/ipc';
 import type { ResourceKey } from '@/shared/cache/resource';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { parseGitStatusDetailed } from '@/utils/gitParsing';
@@ -24,4 +24,8 @@ export function countStatusFiles(statusRaw: string): number {
 export function markRepositoryActivityError(repoPath: string, message: string) {
   const query = queryClient.getQueryCache().build(queryClient, { queryKey: repositoryActivityKey(repoPath) });
   query.setState({ status: 'error', error: new Error(message), errorUpdatedAt: Date.now() });
+}
+
+export function publishRepositoryHeadProblem(repoPath: string, response: IpcErrorResult) {
+  updateResource<RepositoryActivityResult>(repositoryActivityKey(repoPath), response);
 }

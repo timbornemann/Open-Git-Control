@@ -1,0 +1,52 @@
+.branch-head-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.8rem;
+  margin: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  background: var(--bg-secondary);
+}
+
+.branch-head-notice > svg {
+  flex: none;
+  color: var(--warning-color, #e2a43e);
+}
+
+.branch-head-notice > div,
+.branch-repair-candidate > span {
+  display: grid;
+  justify-items: start;
+  gap: 0.3rem;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.branch-repair-panel {
+  display: grid;
+  gap: 0.65rem;
+  justify-items: start;
+  padding: 0.75rem 1rem;
+  max-height: 60%;
+  overflow: auto;
+}
+
+.branch-repair-panel .branch-head-notice {
+  margin: 0;
+}
+
+.branch-repair-panel fieldset {
+  display: grid;
+  gap: 0.45rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.4rem;
+  min-width: 0;
+}
+
+.branch-repair-candidate {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.25rem 0.4rem;
+}

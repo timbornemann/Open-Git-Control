@@ -1,6 +1,7 @@
 import type { StoredRepoEntryDto, StoredRepoData, RepoSortByDto } from '../../types/appDtos';
 import type { IpcResult } from '../../types/ipc';
 import type { RepositoryUiPreferences } from './repositoryUiPreferences';
+import type { ElectronBranchBackupAPI } from './branchRecovery';
 
 export const STORAGE_BUDGETS = {
   previews: 128 * 1024 ** 2,
@@ -65,8 +66,9 @@ export interface CompletedRecoveryBackup {
   createdAt: number;
   reference: string;
   objectId: string;
+  kind?: 'branch-repair';
 }
-export interface ElectronStorageAPI {
+export interface ElectronStorageAPI extends ElectronBranchBackupAPI {
   getRepositoryUiPreferences: (legacy?: Record<string, RepositoryUiPreferences>) => Promise<IpcResult<Record<string, RepositoryUiPreferences>>>;
   updateRepositoryUiPreferences: (request: { repoPath: string; patch: RepositoryUiPreferences }) => Promise<IpcResult<Record<string, RepositoryUiPreferences>>>;
   inspectStorage: () => Promise<IpcResult<StorageOverview>>;

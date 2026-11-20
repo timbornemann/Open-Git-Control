@@ -69,7 +69,8 @@ describe('staging bulk actions and search scope', () => {
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
     vi.spyOn(gitClient, 'getGitLfsStatus').mockResolvedValue({ success: true, data: { available: false, files: [] } });
     vi.spyOn(gitClient, 'stagePaths').mockResolvedValue({ success: true, data: '' });
-    vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: `# branch.oid ${'a'.repeat(40)}\n# branch.head main` });
+    vi.spyOn(gitClient, 'getRepositoryHead').mockResolvedValue({ success: true, data: { kind: 'ready', oid: 'a'.repeat(40) } });
+    vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: '' });
     params = {
       repoPath: repo,
       externalRepoPath: repo,

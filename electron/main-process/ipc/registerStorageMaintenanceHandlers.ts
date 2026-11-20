@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import * as path from 'node:path';
 import type { GitService } from '../../GitService';
+import { branchRepairId, type BranchRepairSnapshots } from '../../git/BranchRepairSnapshots';
 import type { CommitStatsService } from '../../CommitStatsService';
 import type { RepositoryRunService } from '../RepositoryRunService';
 import type { RepositoryIconService } from '../RepositoryIconService';
@@ -27,6 +28,7 @@ import { readRepositoryUiPreferences, updateRepositoryUiPreferences } from '../r
 import { validateMaintenanceRequest } from '../storageMaintenanceRequests';
 export function registerStorageMaintenanceHandlers(deps: {
   gitService: GitService;
+  branchRepairSnapshots?: BranchRepairSnapshots;
   commitStatsService: CommitStatsService;
   runService: RepositoryRunService;
   iconService: RepositoryIconService;
@@ -119,7 +121,7 @@ export function registerStorageMaintenanceHandlers(deps: {
   const recovery = new CommitMessageEditService(deps.gitService.runner);
   ipcMain.handle(IpcChannel.StorageRecoveryList, () =>
     response(async () => {
-      const result: CompletedRecoveryBackup[] = [];
+      const result: CompletedRecoveryBackup[] = (await deps.branchRepairSnapshots?.list()) ?? [];
       const scanned = new Set<string>();
       for (const repo of [...readStoreData().repos.map((entry) => entry.path), ...service.recoveryDirectories()]) {
         if (busy(repo) || (await probeRepositoryHealth(repo)) !== 'available') continue;
@@ -139,25 +141,28 @@ export function registerStorageMaintenanceHandlers(deps: {
         !Array.isArray(request.ids) ||
         !request.ids.length ||
         request.ids.length > 100 ||
-        request.ids.some((id) => typeof id !== 'string' || !EDIT_ID.test(id))
+        request.ids.some((id) => typeof id !== 'string' || (!EDIT_ID.test(id) && !branchRepairId.test(id)))
       )
         throw new Error('Choose completed recovery operations.');
       const resolveOwner = () =>
         readStoreData().repos.find((entry) => repositoryPathKey(entry.path) === repositoryPathKey(request.repoPath))?.path ||
         service.recoveryDirectories().find((common) => repositoryPathKey(common) === repositoryPathKey(request.repoPath));
-      const repo = resolveOwner();
-      if (!repo || busy(repo) || (await probeRepositoryHealth(repo)) !== 'available') throw new Error('Repository is unavailable or in use.');
-      const common = probedCommonDirectory(repo);
-      const release = beginCommitProtection(repo);
-      if (!release) throw new Error('A protected operation is running.');
+      const editIds = request.ids.filter((id) => EDIT_ID.test(id));
+      const snapshotIds = request.ids.filter((id) => branchRepairId.test(id));
+      const repo = editIds.length ? resolveOwner() : null;
+      if (editIds.length && (!repo || busy(repo) || (await probeRepositoryHealth(repo)) !== 'available'))
+        throw new Error('Repository is unavailable or in use.');
+      const common = repo ? probedCommonDirectory(repo) : null;
+      const release = repo ? beginCommitProtection(repo) : null;
+      if (repo && !release) throw new Error('A protected operation is running.');
       try {
         const german = readSettings().language === 'de';
         const result = await dialog.showMessageBox(BrowserWindow.fromWebContents(event.sender)!, {
           type: 'warning',
           title: german ? 'Wiederherstellungssicherungen entfernen' : 'Remove recovery backups',
           message: german
-            ? `${request.ids.length} abgeschlossene Vorgänge und ihre Git-Sicherungsreferenzen entfernen?`
-            : `Remove ${request.ids.length} completed operations and their Git backup references?`,
+            ? `${request.ids.length} ausgewählte Wiederherstellungssicherungen entfernen?`
+            : `Remove ${request.ids.length} selected recovery backups?`,
           detail: german
             ? 'Diese Rückkehrmöglichkeit entfällt. Git-Objekte werden nicht durch git gc gelöscht.'
             : 'This recovery option will be lost. Git objects are not removed with git gc.',
@@ -166,11 +171,13 @@ export function registerStorageMaintenanceHandlers(deps: {
           cancelId: 0,
         });
         if (result.response !== 1) return 0;
-        if (!resolveOwner() || (await probeRepositoryHealth(repo)) !== 'available' || probedCommonDirectory(repo) !== common)
+        if (repo && (!resolveOwner() || (await probeRepositoryHealth(repo)) !== 'available' || probedCommonDirectory(repo) !== common))
           throw new Error('Repository ownership changed.');
-        return await recovery.removeCompletedBackups(repo, request.ids);
+        const removedEdits = repo ? await recovery.removeCompletedBackups(repo, editIds) : 0;
+        const removedSnapshots = snapshotIds.length ? ((await deps.branchRepairSnapshots?.remove(request.repoPath, snapshotIds)) ?? 0) : 0;
+        return removedEdits + removedSnapshots;
       } finally {
-        release();
+        release?.();
       }
     }),
   );

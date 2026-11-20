@@ -11,6 +11,8 @@ import { ForensicSearchPanel, type ForensicSearchType } from './ForensicSearchPa
 import { GRAPH_PADDING, LANE_WIDTH, ROW_HEIGHT } from './commitGraphConstants';
 import { EmptyState } from '@/components/EmptyState';
 import { CommitGraphLoadError } from './CommitGraphLoadError';
+import { BranchHeadNotice } from '@/components/recovery-center/BranchHeadNotice';
+import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { buildGraphHighlightData } from './commitGraphRefs';
 import { useCommitGraphDialogs } from './useCommitGraphDialogs';
 import { useCommitGraphSearch } from './useCommitGraphSearch';
@@ -105,6 +107,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     loading,
     loadingMore,
     loadError,
+    headProblem,
     hasMoreCommits,
     refreshCommits,
     loadMoreCommits,
@@ -309,6 +312,9 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         {t('generated.components.commit_graph.commitgraph.please_select_a_repository_to_view_the_graph_3653ac88')}
       </div>
     );
+  }
+  if (headProblem && normalizeRepoPathKey(headProblem.repoPath) === normalizeRepoPathKey(repoPath)) {
+    return <BranchHeadNotice problem={headProblem} onOpen={onToggleRecoveryCenter} />;
   }
   if (loading) {
     return (

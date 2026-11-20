@@ -6,8 +6,9 @@ import { createJobId } from '../../gitCommandPolicy';
 import { ensureCommitProtectionIsIdle } from '../../RepositoryCommitProtection';
 import { requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
 import { emitJobEvent } from '../jobEvents';
+import { branchGitFailure, type RepositoryHeadService } from '../../../git/RepositoryHeadService';
 
-export function registerGitStagingHandler(gitService: GitService, commitStatsService: CommitStatsService) {
+export function registerGitStagingHandler(gitService: GitService, commitStatsService: CommitStatsService, heads?: RepositoryHeadService) {
   ipcMain.handle(IpcChannel.GitStagePaths, async (event, paths: unknown, requestedRepoPath?: unknown) => {
     const jobId = createJobId('git-stage-paths');
     emitJobEvent(event.sender, { id: jobId, operation: 'git:add', status: 'start', timestamp: Date.now() });
@@ -19,13 +20,14 @@ export function registerGitStagingHandler(gitService: GitService, commitStatsSer
         ensureCommitProtectionIsIdle(repoPath);
       };
       assertReady();
+      await heads?.read(repoPath, { requestedKind: 'interactive' });
       commitStatsService.interruptBackgroundWork();
       const data = await gitService.staging.stagePathsAtPath(repoPath, normalizedPaths, assertReady);
       emitJobEvent(event.sender, { id: jobId, operation: 'git:add', status: 'done', details: { pathCount: normalizedPaths.length }, timestamp: Date.now() });
       return { success: true, data };
     } catch (error: any) {
       emitJobEvent(event.sender, { id: jobId, operation: 'git:add', status: 'failed', message: error.message, timestamp: Date.now() });
-      return { success: false, error: error.message };
+      return branchGitFailure(error);
     }
   });
 }

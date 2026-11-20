@@ -5,6 +5,7 @@ import { storageClient } from '@/services/storageClient';
 import type { CompletedRecoveryBackup, MaintenanceRequest, StorageOverview } from '@/shared/ipc/storageMaintenance';
 import { SettingsDisclosure, SettingsSection, SettingsSwitch, type SettingsSectionProps } from './SettingsSectionPrimitives';
 import { formatStorageBytes, storageCategoryLabel, storageReasonLabel } from './storageLabels';
+import { BranchBackupSettings } from './BranchBackupSettings';
 import './settingsStorage.css';
 
 export function SettingsStorageSection({ settings, onUpdateSettings, variant }: SettingsSectionProps) {
@@ -215,6 +216,7 @@ export function SettingsStorageSection({ settings, onUpdateSettings, variant }: 
           </SettingsDisclosure>
         </>
       )}
+      <BranchBackupSettings variant={variant} />
       <SettingsDisclosure title={tr('Wiederherstellungssicherungen bewusst bereinigen', 'Explicitly clean recovery backups')}>
         <p className="storage-hint">
           {tr(
@@ -252,6 +254,7 @@ export function SettingsStorageSection({ settings, onUpdateSettings, variant }: 
                         ? entry.reference
                         : tr('Abgeschlossenes Journal ohne Git-Sicherungsreferenz', 'Completed journal without Git backup reference')}
                     </code>
+                    {entry.kind === 'branch-repair' && <small>{tr('Git-Metadaten vor Branch-Reparatur', 'Git metadata before branch repair')}</small>}
                   </span>
                 </label>
               ))}

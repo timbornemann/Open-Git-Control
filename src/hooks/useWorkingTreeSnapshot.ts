@@ -2,9 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useCachedResult } from '@/data/resourceHooks';
 import { resourceKey, peekResource, invalidateResources, freshRead, withReadPriority } from '@/data/clientCache';
 import { queryClient } from '@/data/queryClient';
-import { publishRepositoryActivity, markRepositoryActivityError } from '@/data/repositoryActivityCache';
-import type { IpcResult } from '@/types/ipc';
-import type { WorkingTreeSnapshotDto, WorkingTreeStatsDto, WorkingTreeStatusDto } from '@/types/gitDtos';
+import { publishRepositoryActivity, markRepositoryActivityError, publishRepositoryHeadProblem } from '@/data/repositoryActivityCache';
+import type { IpcErrorResult, IpcResult } from '@/types/ipc';
+import type { RepositoryChangeSummaryDto, WorkingTreeSnapshotDto, WorkingTreeStatsDto, WorkingTreeStatusDto } from '@/types/gitDtos';
+import type { BranchHeadProblem } from '@/shared/ipc/branchRecovery';
 import { gitClient } from '@/services/gitClient';
 import { getElectronApi } from '@/services/electronApi';
 import { parseGitStatusDetailed, type GitStatusDetailed } from '@/utils/gitParsing';
@@ -31,6 +32,7 @@ export type WorkingTreeState = {
   statusRaw: string;
   stats: WorkingTreeStatsDto | null;
   loading: boolean;
+  headProblem?: BranchHeadProblem | null;
   /** Resolves after a fresh status, independently of optional detail reads. */
   refresh: () => Promise<void>;
 };
@@ -44,6 +46,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
   const [stats, setStats] = useState<WorkingTreeStatsDto | null>(null);
   const [dataRepoPath, setDataRepoPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [headProblem, setHeadProblem] = useState<BranchHeadProblem | null>(null);
   const generationRef = useRef(0);
   const detailedRef = useRef(detailed);
   const largeRef = useRef(false);
@@ -69,10 +72,12 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
   }, []);
   const applyStatus = useCallback((next: WorkingTreeStatusDto | WorkingTreeSnapshotDto) => {
     const changed = rawRef.current !== next.statusRaw;
+    if (versionRef.current?.startsWith('head:')) invalidateResources('git', normalizeRepoPathKey(next.repoPath), ['getCommitLogPage', 'graph']);
     if (changed && rawRef.current !== null) invalidateResources('git', normalizeRepoPathKey(next.repoPath), contentReads);
     rawRef.current = next.statusRaw;
     largeRef.current = next.changeCount >= 250;
     failedRef.current = false;
+    setHeadProblem(null);
     setDataRepoPath(next.repoPath);
     setStatusRaw(next.statusRaw);
     setStatus((current) => (current && !changed ? current : parseGitStatusDetailed(next.statusRaw)));
@@ -84,6 +89,30 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
     if (changed) versionRef.current = `status:${next.statusRaw}`;
     publishRepositoryActivity(next.repoPath, next.changeCount, 'checkedAt' in next ? next.checkedAt : Date.now());
   }, []);
+
+  const applyHeadProblem = useCallback(
+    (response: IpcErrorResult) => {
+      const problem = response.headProblem;
+      if (!problem || !repoPath || normalizeRepoPathKey(problem.repoPath) !== normalizeRepoPathKey(repoPath)) return false;
+      cancelDetails();
+      rawRef.current = null;
+      snapshotRef.current = null;
+      statsRef.current = null;
+      failedRef.current = true;
+      const version = `head:${problem.reason}:${problem.ref}`;
+      if (versionRef.current !== version) invalidateResources('git', normalizeRepoPathKey(repoPath), ['getCommitLogPage', 'graph', 'getWorkingTreeSnapshot']);
+      versionRef.current = version;
+      setHeadProblem(problem);
+      setDataRepoPath(null);
+      setStatusRaw('');
+      setStatus(null);
+      setSnapshot(null);
+      setStats(null);
+      publishRepositoryHeadProblem(repoPath, response);
+      return true;
+    },
+    [cancelDetails, repoPath],
+  );
 
   const scheduleDetails = useCallback(
     (generation: number) => {
@@ -105,6 +134,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
             );
             if (!current()) return;
             if (!result.success) {
+              if (applyHeadProblem(result)) return;
               if (isReadCancellation(result.error)) throw new Error(result.error);
               return;
             }
@@ -143,7 +173,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
       };
       detailRef.current = { timer: setTimeout(run, 300), controller };
     },
-    [applyStatus, cancelDetails, repoPath],
+    [applyHeadProblem, applyStatus, cancelDetails, repoPath],
   );
 
   const refresh = useCallback(async () => {
@@ -165,15 +195,19 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
         failed = false;
         try {
           if (!detailedRef.current) {
-            const result = await freshRead(() => gitClient.getRepositoryChangeSummary(repoPath)).catch((error: unknown) => ({
-              success: false as const,
-              error: String(error),
-            }));
+            const result: IpcResult<RepositoryChangeSummaryDto> = await freshRead(() => gitClient.getRepositoryChangeSummary(repoPath)).catch(
+              (error: unknown) => ({
+                success: false as const,
+                error: String(error),
+              }),
+            );
             if (generation !== generationRef.current) return;
             if (result.success && normalizeRepoPathKey(result.data.repoPath) === normalizeRepoPathKey(repoPath)) {
+              if (versionRef.current?.startsWith('head:')) invalidateResources('git', normalizeRepoPathKey(repoPath), ['getCommitLogPage', 'graph']);
+              setHeadProblem(null);
               versionRef.current = result.data.statusFingerprint || `summary:${result.data.changeCount}`;
               publishRepositoryActivity(repoPath, result.data.changeCount, result.data.checkedAt);
-            } else {
+            } else if (result.success || !applyHeadProblem(result)) {
               versionRef.current = undefined;
               markRepositoryActivityError(repoPath, result.success ? 'Repository status belongs to another repository.' : result.error);
             }
@@ -182,6 +216,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
               freshRead(() => (readRequest ? gitClient.getWorkingTreeStatus(repoPath, readRequest) : gitClient.getWorkingTreeStatus(repoPath))),
             );
             if (generation !== generationRef.current) return;
+            if (!result.success && applyHeadProblem(result)) return;
             if (!result.success || normalizeRepoPathKey(result.data.repoPath) !== normalizeRepoPathKey(repoPath))
               throw new Error(result.success ? 'Repository status belongs to another repository.' : result.error);
             applyStatus(result.data);
@@ -212,7 +247,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
       });
     inFlightRef.current = { generation, promise: request, controller };
     return request;
-  }, [applyStatus, cancelDetails, repoPath, scheduleDetails]);
+  }, [applyHeadProblem, applyStatus, cancelDetails, repoPath, scheduleDetails]);
 
   useLayoutEffect(() => {
     generationRef.current += 1;
@@ -233,6 +268,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
     setStats(null);
     setDataRepoPath(null);
     setLoading(false);
+    setHeadProblem(null);
     return () => {
       generationRef.current += 1;
       inFlightRef.current?.controller.abort();
@@ -326,7 +362,8 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
     status: local ? status : preview ? parseGitStatusDetailed(preview.statusRaw) : null,
     statusRaw: local ? statusRaw : preview?.statusRaw || '',
     stats: currentSnapshot && stats?.snapshotId === currentSnapshot.snapshotId ? stats : null,
-    loading: detailed && (loading || Boolean(repoPath && !local && !preview)),
+    headProblem: headProblem && repoPath && normalizeRepoPathKey(headProblem.repoPath) === normalizeRepoPathKey(repoPath) ? headProblem : null,
+    loading: detailed && !headProblem && (loading || Boolean(repoPath && !local && !preview)),
     refresh,
   };
 };

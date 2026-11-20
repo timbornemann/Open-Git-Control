@@ -8,6 +8,7 @@ import type { DiffRequest } from '@/types/diff';
 import type { WorkingTreeState } from '@/hooks/useWorkingTreeSnapshot';
 import { INSPECTOR_PANE_MIN_WIDTH } from '@/components/layout/hooks/useMainViewPaneResizer';
 import { WorkingDirectoryTree } from '@/components/working-directory/WorkingDirectoryTree';
+import { BranchHeadNotice } from '@/components/recovery-center/BranchHeadNotice';
 import type { CommitHistoryEntry } from '../hooks/useMainViewInspector';
 import './workingTreeInspector.css';
 
@@ -27,6 +28,7 @@ type MainInspectorPaneProps = {
   isContentResizing: boolean;
   onContentResizeStart: (event: React.PointerEvent<HTMLDivElement>) => void;
   workingTree: WorkingTreeState;
+  onOpenRecovery?: () => void;
   commitHistoryStack: CommitHistoryEntry[];
   activeDiffRequest: DiffRequest | null;
   workingTreeSelection: WorkingTreeSelection | null;
@@ -52,6 +54,7 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
   isContentResizing,
   onContentResizeStart,
   workingTree,
+  onOpenRecovery,
   commitHistoryStack,
   activeDiffRequest,
   workingTreeSelection,
@@ -179,22 +182,26 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
                   role="region"
                   aria-label="Staging Area"
                 >
-                  <StagingArea
-                    repoPath={repository.activeRepo}
-                    onRepoChanged={repository.triggerRefresh}
-                    onCommitsCreated={repository.triggerCommitRefresh}
-                    onOpenDiff={handleOpenDiff}
-                    onSelectFileInspect={handleSelectWorkingTreeFile}
-                    selectedFile={workingTreeSelection}
-                    onOpenConflictResolver={handleOpenConflictResolver}
-                    settings={settingsState.settings}
-                    workingTreeRepoPath={workingTree.dataRepoPath}
-                    workingTreeSnapshot={workingTree.snapshot}
-                    workingTreeStatusRaw={workingTree.statusRaw}
-                    workingTreeStatus={workingTree.status}
-                    workingTreeStats={workingTree.stats}
-                    onRefreshWorkingTree={workingTree.refresh}
-                  />
+                  {workingTree.headProblem ? (
+                    <BranchHeadNotice problem={workingTree.headProblem} onOpen={onOpenRecovery} />
+                  ) : (
+                    <StagingArea
+                      repoPath={repository.activeRepo}
+                      onRepoChanged={repository.triggerRefresh}
+                      onCommitsCreated={repository.triggerCommitRefresh}
+                      onOpenDiff={handleOpenDiff}
+                      onSelectFileInspect={handleSelectWorkingTreeFile}
+                      selectedFile={workingTreeSelection}
+                      onOpenConflictResolver={handleOpenConflictResolver}
+                      settings={settingsState.settings}
+                      workingTreeRepoPath={workingTree.dataRepoPath}
+                      workingTreeSnapshot={workingTree.snapshot}
+                      workingTreeStatusRaw={workingTree.statusRaw}
+                      workingTreeStatus={workingTree.status}
+                      workingTreeStats={workingTree.stats}
+                      onRefreshWorkingTree={workingTree.refresh}
+                    />
+                  )}
                 </div>
               </div>
             </div>

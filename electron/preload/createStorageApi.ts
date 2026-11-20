@@ -11,6 +11,9 @@ export function createStorageApi(ipc: Pick<IpcRenderer, 'invoke' | 'on' | 'remov
     restoreRemovedRepository: (repoPath) => ipc.invoke(IpcChannel.StorageRestore, repoPath),
     getCompletedRecoveryBackups: () => ipc.invoke(IpcChannel.StorageRecoveryList),
     removeCompletedRecoveryBackups: (request) => ipc.invoke(IpcChannel.StorageRecoveryRemove, request),
+    getBranchBackupOverview: () => ipc.invoke(IpcChannel.StorageBranchBackups),
+    chooseBranchBackupDirectory: () => ipc.invoke(IpcChannel.StorageBranchBackupDirectory),
+    setBranchBackupEnabled: (enabled) => ipc.invoke(IpcChannel.StorageBranchBackupEnabled, enabled),
     onStorageMaintenance: (callback) => {
       const handler = (_event: unknown, value: StorageOverview) => callback(value);
       ipc.on(IpcChannel.StorageEvent, handler);

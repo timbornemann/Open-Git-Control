@@ -4,6 +4,7 @@ import { createRepositoryAnalyticsApi } from './createRepositoryAnalyticsApi';
 import { createBranchCleanupApi } from './createBranchCleanupApi';
 import { createTutorialApi } from './createTutorialApi';
 import { createBranchChangeApi } from './createBranchChangeApi';
+import { createBranchRecoveryApi } from './createBranchRecoveryApi';
 import { createUntrackFilesApi } from './createUntrackFilesApi';
 import type { ApplyDiffLineSelectionRequest } from '../../src/shared/ipc/diffLineSelection';
 import { createRepositoryLocationApi } from './createRepositoryLocationApi';
@@ -96,6 +97,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     ...createTutorialApi(ipcRenderer),
     ...createBranchCleanupApi(ipcRenderer),
     ...createBranchChangeApi(ipcRenderer),
+    ...createBranchRecoveryApi(ipcRenderer),
     ...createUntrackFilesApi(ipcRenderer),
     ...createSystemToolsApi(ipcRenderer),
     ...createRepositorySecretScanAllowlistApi(ipcRenderer),
@@ -381,6 +383,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     hosting: { hostingRequest: flatApi.hostingRequest },
     transfers: { remoteTransferRequest: flatApi.remoteTransferRequest },
     git: {
+      ...createBranchRecoveryApi(ipcRenderer),
       ...createBranchCleanupApi(ipcRenderer),
       ...createBranchChangeApi(ipcRenderer),
       ...createUntrackFilesApi(ipcRenderer),

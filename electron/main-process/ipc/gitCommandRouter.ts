@@ -1,4 +1,6 @@
 import type { GitService } from '../../GitService';
+import type { IpcResult } from '../../../src/types/ipc';
+import { branchGitFailure, type RepositoryHeadService } from '../../git/RepositoryHeadService';
 import { assertAllowedGitCommand, createJobId, normalizeCommandArgs, type GitCommandName } from '../gitCommandPolicy';
 import { emitJobEvent } from './jobEvents';
 import { normalizeRepositoryRelativePath, toLiteralPathspec } from '../../git/RepositoryPathSafety';
@@ -292,12 +294,24 @@ const executeGitCommand = async (context: GitCommandExecutionContext): Promise<s
   return runInContext(context, [context.commandName, ...context.args]);
 };
 
-export const handleGitCommand = async (event: GitCommandRouterEvent, gitService: GitService, commandName: unknown, rawArgs: unknown[], repoPath?: string) => {
+export const handleGitCommand = async (
+  event: GitCommandRouterEvent,
+  gitService: GitService,
+  commandName: unknown,
+  rawArgs: unknown[],
+  repoPath?: string,
+  heads?: RepositoryHeadService,
+): Promise<IpcResult<string>> => {
   let jobId: string | null = null;
 
   try {
     assertAllowedGitCommand(commandName);
     const args = normalizeCommandArgs(commandName, rawArgs);
+    if (heads && repoPath && (['commit', 'add', 'rm'].includes(commandName) || (commandName === 'reset' && (args[0] === '--' || args[0] === 'HEAD')))) {
+      const head = await heads.read(repoPath, { requestedKind: 'interactive' });
+      if (commandName === 'rm' && head.kind !== 'unborn') throw new Error('The branch now has a commit. Refresh staging and try again.');
+      requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), `git:${commandName}`);
+    }
 
     jobId = LONG_RUNNING_COMMANDS.has(commandName) ? createJobId(`git-${commandName}`) : null;
     if (jobId) {
@@ -338,6 +352,6 @@ export const handleGitCommand = async (event: GitCommandRouterEvent, gitService:
         timestamp: Date.now(),
       });
     }
-    return { success: false, error: error.message };
+    return branchGitFailure(error);
   }
 };

@@ -2,7 +2,7 @@ import { gitClient } from '@/services/gitClient';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { queryClient, readResource } from './queryClient';
 import { cancellableRead } from './ipcRead';
-import { REPOSITORY_ACTIVITY_METHOD, repositoryActivityKey, type RepositoryActivityResult } from './repositoryActivityCache';
+import { REPOSITORY_ACTIVITY_METHOD, repositoryActivityKey, publishRepositoryHeadProblem, type RepositoryActivityResult } from './repositoryActivityCache';
 import { repositoryActivityDemand, type RepositoryActivityDemand } from './repositoryActivityDemand';
 
 const POLL_MS = 15_000;
@@ -141,7 +141,7 @@ export class RepositoryActivityCoordinator {
     this.preferredRuns = this.preferred(key) ? Math.min(3, this.preferredRuns + 1) : 0;
     this.running = key;
     try {
-      await readResource<RepositoryActivityResult>(
+      const response = await readResource<RepositoryActivityResult>(
         repositoryActivityKey(path),
         async (signal) => {
           const result = await cancellableRead(signal, 'speculative', (request) => gitClient.getRepositoryChangeSummary(path, request));
@@ -154,6 +154,7 @@ export class RepositoryActivityCoordinator {
         },
         { staleTime: POLL_MS, force: true, priority: 'speculative', automaticRefresh: false },
       );
+      if (!response.success && response.headProblem) publishRepositoryHeadProblem(path, response);
     } catch {
       if (queryClient.getQueryState(repositoryActivityKey(path))?.status === 'error') this.stability.delete(key);
       // Cancellation belongs to selection/visibility changes. Other errors are

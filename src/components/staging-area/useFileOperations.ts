@@ -301,13 +301,13 @@ export const useFileOperations = ({
       mutationInFlightRef.current = true;
       setMutationStartedAt(Date.now());
       try {
-        const statusResult = await gitClient.runGitCommandForRepo(repoAtStart, 'status', '--porcelain=v2', '--branch');
+        const statusResult = await gitClient.getRepositoryHead(repoAtStart);
         if (!isCurrentRepoGeneration(generation, repoAtStart)) return false;
         if (!statusResult.success) {
           setToast({ msg: statusResult.error || t('generated.components.layout.cloneprogressmodal.error_7d62310f'), isError: true });
           return false;
         }
-        const isUnbornBranch = /^# branch\.oid \(initial\)$/m.test(statusResult.data || '');
+        const isUnbornBranch = statusResult.data.kind === 'unborn';
         if (preferWholeIndexReset && !isUnbornBranch) {
           const resetResult = await gitClient.runGitCommandForRepo(repoAtStart, 'reset', 'HEAD');
           if (!isCurrentRepoGeneration(generation, repoAtStart)) return false;

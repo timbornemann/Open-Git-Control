@@ -193,6 +193,7 @@ const MainViewComponent: React.FC = () => {
             isContentResizing={isContentResizing}
             onContentResizeStart={handleContentResizeStart}
             workingTree={workingTree}
+            onOpenRecovery={handleToggleRecoveryCenter}
             commitHistoryStack={commitHistoryStack}
             activeDiffRequest={activeDiffRequest}
             workingTreeSelection={workingTreeSelection}

@@ -1,4 +1,4 @@
-const { app } = require('electron');
+const { app, dialog } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -6,6 +6,9 @@ const { execFileSync } = require('node:child_process');
 const profile = process.env.OGC_STAGING_UI_PROFILE;
 const repo = process.env.OGC_STAGING_UI_REPOSITORY;
 if (!profile || !repo) throw new Error('An isolated staging fixture is required.');
+const showMessageBox = dialog.showMessageBox.bind(dialog);
+dialog.showMessageBox = (...args) =>
+  args.at(-1)?.message === 'Restore branch reference?' ? Promise.resolve({ response: 1, checkboxChecked: false }) : showMessageBox(...args);
 app.disableHardwareAcceleration();
 app.setPath('userData', profile);
 app.setPath('sessionData', path.join(profile, 'session'));
@@ -118,11 +121,32 @@ app
       .filter(Boolean);
     assert.equal(staged.length, 400);
     release();
+    const ref = path.join(repo, '.git', 'refs', 'heads', 'main');
+    const originalRef = fs.readFileSync(ref);
+    fs.writeFileSync(ref, Buffer.alloc(41));
+    await until(
+      () =>
+        parent.webContents.executeJavaScript('document.querySelectorAll(".branch-head-notice").length >= 2 && !document.querySelector(".staging-stage-all")'),
+      'Branch damage in history and staging',
+    );
+    await parent.webContents.executeJavaScript('document.querySelector(".branch-head-notice button").click()');
+    await until(
+      () => parent.webContents.executeJavaScript('Boolean(document.querySelector(".branch-repair-panel input:checked"))'),
+      'Verified reflog candidate',
+    );
+    await parent.webContents.executeJavaScript('document.querySelector(".branch-repair-panel > button").click()');
+    await until(
+      () =>
+        parent.webContents.executeJavaScript('document.querySelector(".branch-repair-panel [role=status]")?.textContent.includes("Branch reference restored")'),
+      'Confirmed repair',
+    );
+    assert.deepEqual(fs.readFileSync(ref), originalRef);
+    assert.equal(execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: repo, encoding: 'utf8', windowsHide: true }).trim().split('\n').length, 400);
     assert.deepEqual(errors, [], 'No unhandled renderer failures.');
     fs.writeFileSync(path.resolve(__dirname, '../build/staging-ui.json'), JSON.stringify(results, null, 2) + '\n');
     fs.writeFileSync(path.join(profile, 'verified'), 'yes');
     clearTimeout(timeout);
-    console.log('Native staging status-first and filter safety checks passed.');
+    console.log('Native staging and branch recovery checks passed.');
     app.quit();
   })
   .catch(fail);

@@ -7,29 +7,45 @@ import { useRecoveryCenter } from './recovery-center/useRecoveryCenter';
 import { RecoveryHistory } from './recovery-center/RecoveryHistory';
 import { RecoveryActions } from './recovery-center/RecoveryActions';
 import { RecoveryNotice } from './recovery-center/RecoveryNotice';
+import { BranchRepairPanel } from './recovery-center/BranchRepairPanel';
+import { branchRecoveryClient } from '@/services/branchRecoveryClient';
+import type { BranchHeadProblem } from '@/shared/ipc/branchRecovery';
 
-export function RecoveryCenter(props: RecoveryCenterProps) {
+export function RecoveryCenter(props: RecoveryCenterProps & { headProblem?: BranchHeadProblem | null }) {
   const { tr } = useI18n();
-  const state = useRecoveryCenter(props);
+  const canRepair = branchRecoveryClient.isAvailable();
+  const showBranchRepair = Boolean(props.headProblem && canRepair);
+  const state = useRecoveryCenter({ ...props, repoPath: showBranchRepair ? null : props.repoPath });
   const { entries, selected, isLoading, isBusy, isAvailable, loadReflog, loadIssue, dangerAction, setDangerAction } = state;
   return (
     <section className="recovery-center" data-tutorial="recovery" data-loading={isLoading} aria-label={tr('Recovery Center', 'Recovery Center')}>
-      <header className="recovery-center__intro">
-        <p>{tr('Frühere Commits wiederfinden und auf einem neuen Branch weiterarbeiten.', 'Find earlier commits and continue working on a new branch.')}</p>
-        <div className="recovery-center__intro-actions">
-          <Button
-            data-tutorial="recovery-refresh"
-            size="xs"
-            variant="ghost"
-            icon={isLoading ? <Loader2 size={13} className="spin" /> : <RefreshCw size={13} />}
-            disabled={isLoading || isBusy || !props.repoPath || !isAvailable}
-            onClick={() => void loadReflog()}
-          >
-            {tr('Aktualisieren', 'Refresh')}
-          </Button>
-        </div>
-      </header>
-      {!props.repoPath || !isAvailable ? (
+      {!showBranchRepair && (
+        <header className="recovery-center__intro">
+          <p>{tr('Frühere Commits wiederfinden und auf einem neuen Branch weiterarbeiten.', 'Find earlier commits and continue working on a new branch.')}</p>
+          <div className="recovery-center__intro-actions">
+            <Button
+              data-tutorial="recovery-refresh"
+              size="xs"
+              variant="ghost"
+              icon={isLoading ? <Loader2 size={13} className="spin" /> : <RefreshCw size={13} />}
+              disabled={isLoading || isBusy || !props.repoPath || !isAvailable}
+              onClick={() => void loadReflog()}
+            >
+              {tr('Aktualisieren', 'Refresh')}
+            </Button>
+          </div>
+        </header>
+      )}
+      {props.repoPath && isAvailable && canRepair && (
+        <BranchRepairPanel
+          key={props.repoPath}
+          repoPath={props.repoPath}
+          refreshTrigger={props.refreshTrigger}
+          observedProblem={props.headProblem}
+          onRepaired={props.onRepoChanged}
+        />
+      )}
+      {showBranchRepair ? null : !props.repoPath || !isAvailable ? (
         <div className="recovery-center__empty">
           <FolderGit2 size={28} aria-hidden="true" />
           <h2>{!props.repoPath ? tr('Repository öffnen', 'Open a repository') : tr('Git ist nicht verfügbar', 'Git is unavailable')}</h2>

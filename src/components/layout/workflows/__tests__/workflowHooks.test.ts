@@ -447,6 +447,7 @@ remote: https://github.com/acme/repo/security/secret-scanning/unblock-secret/tok
 
   it('fragt vor automatischem Initial-Commit nach, wenn lokale Aenderungen vorhanden sind', async () => {
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'getRepositoryHead').mockResolvedValue({ success: true, data: { kind: 'unborn', ref: 'refs/heads/main' } });
     vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: '?? README.md\n M src/app.ts' });
     const setActiveTab = vi.fn();
     const setConfirmDialog = vi.fn();

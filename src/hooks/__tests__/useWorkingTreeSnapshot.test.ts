@@ -66,6 +66,18 @@ afterEach(() => {
 });
 
 describe('status-first working tree refresh', () => {
+  it('suppresses a previous staging snapshot when a branch reference is damaged', async () => {
+    await render();
+    await advance();
+    expect(current.snapshot?.snapshotId).toBe('first');
+    const headProblem = { repoPath: repo!, ref: 'refs/heads/main', reason: 'broken-ref' as const, repairable: true };
+    vi.mocked(gitClient.getWorkingTreeStatus).mockResolvedValueOnce({ success: false, error: 'Branch reference is damaged.', headProblem });
+    await act(async () => current.refresh());
+    expect(current).toMatchObject({ headProblem, snapshot: null, status: null, statusRaw: '', loading: false });
+    await act(async () => current.refresh());
+    expect(current.headProblem).toBeNull();
+    expect(current.status?.unstaged).toHaveLength(1);
+  });
   it('retries preempted background details without redoing a confirmed snapshot for cancelled counts', async () => {
     vi.mocked(gitClient.getWorkingTreeSnapshot).mockResolvedValueOnce({ success: false, error: 'Git operation was aborted.' });
     vi.mocked(gitClient.getWorkingTreeStats).mockResolvedValueOnce({ success: false, error: 'Git operation was aborted.' });

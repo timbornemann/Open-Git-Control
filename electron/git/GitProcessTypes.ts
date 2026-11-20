@@ -17,6 +17,7 @@ export const defaultExecFileAsyncRunner: ExecFileAsyncRunner = runGitExecFile;
 
 export type GitRunOptions = {
   envOverrides?: NodeJS.ProcessEnv;
+  maxBuffer?: number;
   signal?: AbortSignal;
   requestedKind?: GitJobKind;
   coalesceKey?: string;

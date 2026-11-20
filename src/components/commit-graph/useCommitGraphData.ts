@@ -1,5 +1,6 @@
 import { errorMessage, isGitOperationAborted, requestDeferredFrame, cancelDeferredFrame, cancelDeferredRetry } from './commitGraphRequestUtils';
 import { useCachedResult } from '@/data/resourceHooks';
+import type { BranchHeadProblem } from '@/shared/ipc/branchRecovery';
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { historyRevision, subscribeHistoryRevision } from '@/data/historyRevision';
 import { gitHistoryVersion, subscribeGitHistoryRefresh } from '@/data/gitHistoryRefresh';
@@ -60,6 +61,7 @@ export const useCommitGraphData = ({
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [headProblem, setHeadProblem] = useState<BranchHeadProblem | null>(null);
   const [hasMoreCommits, setHasMoreCommits] = useState(cachedAtMount?.hasMore ?? true);
   // A restored/worker layout can arrive while the live request is still pending.
   // Once it is usable, no request's loading flag may hide it.
@@ -188,6 +190,7 @@ export const useCommitGraphData = ({
         });
         if (!isCurrent()) return;
         if (result.success) {
+          setHeadProblem(null);
           const data = result.data;
           const parsedChunk = parseGitLog(data.raw || '').slice(0, requestedLimit);
           const visibleChunk = applyCachedStats(parsedChunk, data.stats || {});
@@ -218,6 +221,13 @@ export const useCommitGraphData = ({
             storeGraphCache(cacheKey, normalized, hasMore);
             await updateLayout(normalized);
           }
+        } else if (result.headProblem) {
+          setHeadProblem(result.headProblem);
+          setLayout(null);
+          layoutRef.current = null;
+          setCommitCount(0);
+          commitCountRef.current = 0;
+          setHasMoreCommits(false);
         } else {
           handleFailure(result.error);
         }
@@ -259,6 +269,7 @@ export const useCommitGraphData = ({
       setLoading(false);
       setLoadingMore(false);
       setLoadError(null);
+      setHeadProblem(null);
       commitCountRef.current = 0;
       setHasMoreCommits(true);
       clearWorkingTreeStatus();
@@ -462,6 +473,7 @@ export const useCommitGraphData = ({
     loading: isInitialLoading,
     loadingMore,
     loadError,
+    headProblem,
     hasMoreCommits,
     refreshCommits,
     loadMoreCommits,

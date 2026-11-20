@@ -7,6 +7,7 @@ import { createRepositoryPathResolver } from './git/RepositoryPathSafetyAsync';
 import { fingerprintWorkingTreeIndex } from './WorkingTreeIndexFingerprint';
 import { WorkingTreeStatsRead, SharedWorkingTreeRead } from './WorkingTreeStatsRead';
 import type { WorkingTreeStatusDto } from '../src/types/gitDtos';
+import type { RepositoryHeadService } from './git/RepositoryHeadService';
 
 export type WorkingTreeSnapshot = {
   snapshotId: string;
@@ -55,7 +56,10 @@ export class WorkingTreeService {
   private volatileFingerprintGeneration = 0;
   private repoGeneration = 0;
 
-  constructor(private readonly gitService: GitService) {}
+  constructor(
+    private readonly gitService: GitService,
+    private readonly heads?: RepositoryHeadService,
+  ) {}
 
   setActiveRepo(): void {
     for (const controller of this.statsControllers.values()) controller.abort();
@@ -84,7 +88,9 @@ export class WorkingTreeService {
     signal?.throwIfAborted();
     const repoPath = requestedRepoPath || this.gitService.getRepoPath();
     if (!repoPath) throw new Error('No repository path set.');
-    const sample = (await this.isBare(repoPath)) ? { statusRaw: '', changeCount: 0 } : await this.getStatusSample(repoPath, signal, priority);
+    const sample = (await this.isBare(repoPath))
+      ? await this.getBareStatus(repoPath, signal, priority)
+      : await this.getStatusSample(repoPath, signal, priority);
     signal?.throwIfAborted();
     this.gitService.recordWorkingTreeRead?.(repoPath, 'status', performance.now() - started);
     return { repoPath, statusRaw: sample.statusRaw, changeCount: sample.changeCount, checkedAt: Date.now() };
@@ -107,7 +113,7 @@ export class WorkingTreeService {
       const isBare = await this.isBare(repoPath);
       controller.signal.throwIfAborted();
       const state = isBare
-        ? { statusRaw: '', statusIdentity: '', changeCount: 0, contentFingerprint: 'bare' }
+        ? { ...(await this.getBareStatus(repoPath, controller.signal, 'background')), statusIdentity: '', contentFingerprint: 'bare' }
         : await this.captureStableState(repoPath, controller.signal);
       controller.signal.throwIfAborted();
       const { statusRaw, statusIdentity, changeCount, contentFingerprint } = state;
@@ -249,6 +255,12 @@ export class WorkingTreeService {
 
   private async getStatusSample(repoPath: string, signal?: AbortSignal, priority: 'interactive' | 'background' = 'background'): Promise<StatusSample> {
     signal?.throwIfAborted();
+    if (this.heads) {
+      const { status, head } = await this.heads.status(repoPath, { signal, requestedKind: priority });
+      const parsed = parseNulStatus(status);
+      const baseline = head.kind === 'ready' ? head.oid : head.ref;
+      return { ...parsed, identity: `${baseline}\0${parsed.identity}` };
+    }
     const gitCapabilities = this.gitService as GitService & {
       getStatusPorcelainZAtPath?: (path: string, signal?: AbortSignal, kind?: 'background' | 'interactive') => Promise<string>;
     };
@@ -279,6 +291,11 @@ export class WorkingTreeService {
       hasStagedChanges: hasStagedChanges(statusRaw),
       changeCount: paths.length,
     };
+  }
+
+  private async getBareStatus(repoPath: string, signal: AbortSignal | undefined, priority: 'interactive' | 'background') {
+    await this.heads?.read(repoPath, { signal, requestedKind: priority });
+    return { statusRaw: '', changeCount: 0 };
   }
 
   private async getContentFingerprint(repoPath: string, status: StatusSample, signal?: AbortSignal): Promise<string> {

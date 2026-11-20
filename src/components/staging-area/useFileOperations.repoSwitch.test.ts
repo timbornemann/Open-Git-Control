@@ -100,11 +100,8 @@ describe('useFileOperations repository switch isolation', () => {
     };
     let current: ReturnType<typeof useFileOperations> | null = null;
     const root: Root = createRoot(document.getElementById('root')!);
-    const runGitCommandForRepo = vi
-      .spyOn(gitClient, 'runGitCommandForRepo')
-      .mockImplementation(async (_repo, command) =>
-        command === 'status' ? { success: true, data: '# branch.oid (initial)\n# branch.head main' } : { success: true, data: '' },
-      );
+    const readHead = vi.spyOn(gitClient, 'getRepositoryHead').mockResolvedValue({ success: true, data: { kind: 'unborn', ref: 'refs/heads/main' } });
+    const runGitCommandForRepo = vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: '' });
     const Harness = () => {
       current = useFileOperations(params);
       return null;
@@ -130,9 +127,7 @@ describe('useFileOperations repository switch isolation', () => {
     };
     act(() => root.render(createElement(Harness)));
     runGitCommandForRepo.mockClear();
-    runGitCommandForRepo.mockImplementation(async (_repo, command) =>
-      command === 'status' ? { success: true, data: `# branch.oid ${'a'.repeat(40)}\n# branch.head main` } : { success: true, data: '' },
-    );
+    readHead.mockResolvedValue({ success: true, data: { kind: 'ready', oid: 'a'.repeat(40) } });
     await act(async () => {
       await current!.unstageFile(renamed);
     });
