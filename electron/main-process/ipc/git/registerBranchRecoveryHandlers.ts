@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, type WebContents } from 'electron';
 import type { GitService } from '../../../GitService';
 import { BranchBackupService } from '../../../git/BranchBackupService';
 import { BranchRecoveryService, type BranchRepairPlan } from '../../../git/BranchRecoveryService';
@@ -14,6 +14,7 @@ import { beginCommitProtection, COMMIT_PROTECTION_BUSY_ERROR } from '../../Repos
 import { repoJobRegistry } from '../../repoJobRegistry';
 import { onRepoStoreChanged, readStoreData } from '../../repoStore';
 import { readSettings } from '../../settingsStore';
+import { registerBranchBackupHandlers } from './registerBranchBackupHandlers';
 
 export function registerBranchRecoveryHandlers(gitService: GitService) {
   const profile = app.getPath('userData');
@@ -25,6 +26,7 @@ export function registerBranchRecoveryHandlers(gitService: GitService) {
     observeTip: (tip) => journal.observe(tip),
   });
   const backups: BranchBackupService = new BranchBackupService(profile, gitService.runner, heads, journal, () => readStoreData().repos.map(({ path }) => path));
+  registerBranchBackupHandlers(backups);
   const service = new BranchRecoveryService(gitService.runner, heads, journal, backups, snapshots);
   const stop = onRepoStoreChanged(() => backups.repositoriesChanged());
   const confirmations = new WeakMap<WebContents, { id: string; generation: number; plan: BranchRepairPlan }>();
@@ -108,25 +110,6 @@ export function registerBranchRecoveryHandlers(gitService: GitService) {
       } finally {
         job.complete();
       }
-    }),
-  );
-  ipcMain.handle(IpcChannel.StorageBranchBackups, () => respond(() => backups.overview()));
-  ipcMain.handle(IpcChannel.StorageBranchBackupDirectory, (event: IpcMainInvokeEvent) =>
-    respond(async () => {
-      const german = readSettings().language === 'de';
-      const options = {
-        title: german ? 'Verzeichnis für Git-Sicherungen auswählen' : 'Choose Git backup directory',
-        properties: ['openDirectory', 'createDirectory'] as ('openDirectory' | 'createDirectory')[],
-      };
-      const window = BrowserWindow.fromWebContents(event.sender);
-      const result = await (window ? dialog.showOpenDialog(window, options) : dialog.showOpenDialog(options));
-      return result.canceled || !result.filePaths[0] ? backups.overview() : backups.chooseDirectory(result.filePaths[0]);
-    }),
-  );
-  ipcMain.handle(IpcChannel.StorageBranchBackupEnabled, (_event, enabled: unknown) =>
-    respond(() => {
-      if (typeof enabled !== 'boolean') throw new Error('Invalid backup setting.');
-      return backups.enable(enabled);
     }),
   );
   return {

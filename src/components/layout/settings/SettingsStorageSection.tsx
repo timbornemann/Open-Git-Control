@@ -5,7 +5,8 @@ import { storageClient } from '@/services/storageClient';
 import type { CompletedRecoveryBackup, MaintenanceRequest, StorageOverview } from '@/shared/ipc/storageMaintenance';
 import { SettingsDisclosure, SettingsSection, SettingsSwitch, type SettingsSectionProps } from './SettingsSectionPrimitives';
 import { formatStorageBytes, storageCategoryLabel, storageReasonLabel } from './storageLabels';
-import { BranchBackupSettings } from './BranchBackupSettings';
+import { requestSettingsDestination } from '@/app/state/settingsNavigationStore';
+import { branchBackupClient } from '@/services/branchRecoveryClient';
 import './settingsStorage.css';
 
 export function SettingsStorageSection({ settings, onUpdateSettings, variant }: SettingsSectionProps) {
@@ -216,7 +217,13 @@ export function SettingsStorageSection({ settings, onUpdateSettings, variant }: 
           </SettingsDisclosure>
         </>
       )}
-      <BranchBackupSettings variant={variant} />
+      {variant === 'main' && branchBackupClient.isAvailable() && (
+        <div className="settings-inline-actions">
+          <Button onClick={() => requestSettingsDestination({ id: 'branch-backups', tab: 'backups' })}>
+            {tr('Repository-Sicherungen öffnen', 'Open repository backups')}
+          </Button>
+        </div>
+      )}
       <SettingsDisclosure title={tr('Wiederherstellungssicherungen bewusst bereinigen', 'Explicitly clean recovery backups')}>
         <p className="storage-hint">
           {tr(

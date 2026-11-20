@@ -1,9 +1,18 @@
-import { BookOpen, Bot, ChevronRight, Keyboard, Monitor, Server, ShieldCheck, Wrench } from 'lucide-react';
+import { Archive, BookOpen, Bot, ChevronRight, Keyboard, Monitor, Server, ShieldCheck, Wrench } from 'lucide-react';
 import type { SettingsTabId } from '@/app/state/contracts';
 import { useI18n } from '@/i18n';
 import { getSettingsCategories } from './settingsNavigation';
 
-const categoryIcons = { general: Monitor, shortcuts: Keyboard, integrations: Server, api: Bot, security: ShieldCheck, system: Wrench, help: BookOpen };
+const categoryIcons = {
+  general: Monitor,
+  shortcuts: Keyboard,
+  integrations: Server,
+  api: Bot,
+  security: ShieldCheck,
+  backups: Archive,
+  system: Wrench,
+  help: BookOpen,
+};
 
 export function SettingsCategoryNavigation({ activeTab, onSelectTab }: { activeTab: SettingsTabId; onSelectTab: (tab: SettingsTabId) => void }) {
   const { tr } = useI18n();

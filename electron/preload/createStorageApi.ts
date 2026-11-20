@@ -13,7 +13,11 @@ export function createStorageApi(ipc: Pick<IpcRenderer, 'invoke' | 'on' | 'remov
     removeCompletedRecoveryBackups: (request) => ipc.invoke(IpcChannel.StorageRecoveryRemove, request),
     getBranchBackupOverview: () => ipc.invoke(IpcChannel.StorageBranchBackups),
     chooseBranchBackupDirectory: () => ipc.invoke(IpcChannel.StorageBranchBackupDirectory),
+    resetBranchBackupDirectory: () => ipc.invoke(IpcChannel.StorageBranchBackupDefaultDirectory),
     setBranchBackupEnabled: (enabled) => ipc.invoke(IpcChannel.StorageBranchBackupEnabled, enabled),
+    setBranchBackupSelection: (selection) => ipc.invoke(IpcChannel.StorageBranchBackupSelection, selection),
+    backupBranchesNow: (repoPath) => ipc.invoke(IpcChannel.StorageBranchBackupNow, repoPath),
+    removeBranchBackups: (selection) => ipc.invoke(IpcChannel.StorageBranchBackupRemove, selection),
     onStorageMaintenance: (callback) => {
       const handler = (_event: unknown, value: StorageOverview) => callback(value);
       ipc.on(IpcChannel.StorageEvent, handler);

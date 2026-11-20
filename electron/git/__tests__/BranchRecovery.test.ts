@@ -220,7 +220,7 @@ describe('global branch bundles', () => {
     expect(await bundles.versions(backupDir, layout)).toHaveLength(3);
   }, 55_000);
 
-  it('starts for all open repositories after opt-in and reports an unavailable destination', async () => {
+  it('backs up the selected repositories and preserves the selection across restart', async () => {
     fs.writeFileSync(path.join(repo, 'file.txt'), 'first');
     commit('Initial');
     const second = path.join(root, 'second');
@@ -228,22 +228,106 @@ describe('global branch bundles', () => {
     const start = () => new BranchBackupService(path.join(root, 'profile'), runner, heads, tips, () => [repo, second]);
     let service = start();
     try {
-      expect(await service.overview()).toMatchObject({ enabled: false, directory: null });
+      expect(await service.overview()).toMatchObject({ enabled: false, directory: path.join(root, 'profile', 'Repository-Backups'), versionCount: 0 });
       await expect(service.chooseDirectory(repo)).rejects.toThrow('outside');
       await service.chooseDirectory(backupDir);
+      await service.setSelection({ automatic: true, repoPath: repo });
       await service.enable(true);
+      await vi.waitFor(async () => expect((await service.overview()).repositories[0].verifiedAt).toBeTruthy(), { timeout: 20_000 });
+      expect((await service.overview()).repositories.map(({ automatic, versions }) => [automatic, versions.length])).toEqual([
+        [true, 1],
+        [false, 0],
+      ]);
+      await service.setSelection({ automatic: true });
       await vi.waitFor(async () => expect((await service.overview()).repositories.every((record) => record.verifiedAt)).toBe(true), { timeout: 20_000 });
+      const cleared = await service.setSelection({ automatic: false });
+      expect(cleared.repositories.every((record) => !record.automatic)).toBe(true);
+      expect(cleared.versionCount).toBe(2);
+      await service.setSelection({ automatic: true });
       await service.enable(false);
       await service.dispose();
       const disconnected = path.join(root, 'removed destination');
       fs.renameSync(backupDir, disconnected);
       service = start();
       await service.enable(true);
-      await vi.waitFor(async () => expect((await service.overview()).repositories.every((record) => record.verifiedAt && record.lastError)).toBe(true), {
-        timeout: 20_000,
-      });
+      await vi.waitFor(
+        async () => expect((await service.overview()).repositories.every((record) => record.automatic && record.verifiedAt && record.lastError)).toBe(true),
+        {
+          timeout: 20_000,
+        },
+      );
     } finally {
       await service.dispose();
     }
   }, 50_000);
+
+  it('creates a manual backup at the default destination and manages saved versions after the repository is removed', async () => {
+    const profile = path.join(root, 'profile');
+    const registered = [repo];
+    const service = new BranchBackupService(profile, runner, heads, tips, () => registered);
+    try {
+      fs.writeFileSync(path.join(repo, 'file.txt'), 'first');
+      commit('Initial');
+      await expect(service.backupNow(backupDir)).rejects.toThrow('registered');
+      await expect(service.backupNow(repo)).resolves.toBe('created');
+      await expect(service.backupNow(repo)).resolves.toBe('up-to-date');
+      const first = await service.overview();
+      expect(first).toMatchObject({ enabled: false, versionCount: 1, directory: path.join(profile, 'Repository-Backups') });
+      expect(first.totalBytes).toBe(first.repositories[0].versions[0].bytes);
+      expect(first.totalBytes).toBeGreaterThan(0);
+      expect(first.repositories[0]).toMatchObject({ repoPath: repo, automatic: false, registered: true });
+      const repositoryKey = first.repositories[0].repositoryKey!;
+      for (const version of ['second', 'third']) {
+        fs.writeFileSync(path.join(repo, 'file.txt'), version);
+        commit(version);
+        await expect(service.backupNow(repo)).resolves.toBe('created');
+      }
+      const records = await service.bundles.versionsByKey(first.directory, repositoryKey);
+      expect(records).toHaveLength(3);
+      const older = await service.previewRemoval({ repositoryKey });
+      const keptBytes = fs.readFileSync(records[0].file);
+      fs.appendFileSync(records[0].file, 'damaged');
+      await expect(service.remove(older)).rejects.toThrow('changed');
+      await expect(service.remove(await service.previewRemoval({ repositoryKey }))).rejects.toThrow('integrity');
+      expect((await service.overview()).versionCount).toBe(3);
+      fs.writeFileSync(records[0].file, keptBytes);
+      const unknownFile = path.join(records[2].directory, 'keep.txt');
+      fs.writeFileSync(unknownFile, 'Unrelated file');
+      await expect(service.remove(await service.previewRemoval({ repositoryKey }))).rejects.toThrow('unfamiliar');
+      expect((await service.overview()).versionCount).toBe(3);
+      fs.unlinkSync(unknownFile);
+      registered.length = 0;
+      service.repositoriesChanged();
+      expect((await service.overview()).repositories).toMatchObject([{ repoPath: repo, registered: false, repositoryKey }]);
+      await expect(service.remove(await service.previewRemoval({ repositoryKey, versionId: records[1].id }))).resolves.toBe(1);
+      await expect(service.remove(await service.previewRemoval({ repositoryKey }))).resolves.toBe(1);
+      expect((await service.overview()).repositories[0].versions.map(({ id }) => id)).toEqual([records[0].id]);
+      const last = await service.previewRemoval({ repositoryKey, versionId: records[0].id });
+      expect(last.lastVersion).toBe(true);
+      await service.chooseDirectory(backupDir);
+      await expect(service.remove(last)).rejects.toThrow();
+      await service.resetDirectory();
+      await expect(service.remove(last)).resolves.toBe(1);
+      expect(await service.overview()).toMatchObject({ versionCount: 0, totalBytes: 0, repositories: [] });
+    } finally {
+      await service.dispose();
+    }
+  }, 55_000);
+
+  it('migrates an enabled global configuration once and leaves newly registered repositories unselected', async () => {
+    const profile = path.join(root, 'profile');
+    fs.mkdirSync(profile);
+    fs.writeFileSync(path.join(profile, 'branch-backups.json'), JSON.stringify({ enabled: true, directory: backupDir }));
+    const registered = [repo];
+    const service = new BranchBackupService(profile, runner, heads, tips, () => registered);
+    try {
+      expect((await service.overview()).repositories[0].automatic).toBe(true);
+      await service.enable(false);
+      registered.push(path.join(root, 'another-repository'));
+      expect((await service.overview()).repositories.map(({ automatic }) => automatic)).toEqual([true, false]);
+      expect(JSON.parse(fs.readFileSync(path.join(profile, 'branch-backups.json'), 'utf8'))).toMatchObject({ directory: backupDir, automatic: [repo] });
+    } finally {
+      await service.dispose();
+    }
+  }, 20_000);
 });

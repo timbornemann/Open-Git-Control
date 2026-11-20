@@ -17,6 +17,11 @@ export const getSettingsCategories = (tr: Translate) => [
   { id: 'api' as const, label: tr('KI & API', 'AI & API'), description: tr('Modelle und lokale Schnittstellen', 'Models and local interfaces') },
   { id: 'security' as const, label: tr('Sicherheit', 'Security'), description: tr('Bestätigungen und Secret-Scans', 'Confirmations and secret scans') },
   {
+    id: 'backups' as const,
+    label: tr('Repository-Sicherungen', 'Repository backups'),
+    description: tr('Lokale Commits sichern und vorhandene Versionen verwalten', 'Back up local commits and manage saved versions'),
+  },
+  {
     id: 'system' as const,
     label: tr('App & Diagnose', 'App & diagnostics'),
     description: tr('Updates, Feedback und Vorgänge', 'Updates, feedback and operations'),
@@ -180,6 +185,13 @@ export const getSettingsGroups = (tr: Translate) =>
       title: tr('Diagnose', 'Diagnostics'),
       description: tr('Einen bereinigten Diagnosebericht für die Fehlersuche kopieren.', 'Copy a redacted diagnostic report for troubleshooting.'),
       keywords: 'diagnostics report copy diagnose bericht kopieren troubleshooting',
+    },
+    {
+      id: 'branch-backups',
+      tab: 'backups',
+      title: tr('Sicherungen verwalten', 'Manage backups'),
+      description: tr('Zielordner, automatische Auswahl und Speicherverbrauch.', 'Destination, automatic selection and storage usage.'),
+      keywords: 'git bundle commit backup restore recovery repository sicherung wiederherstellung manuell auswählen speicher größe löschen bereinigung',
     },
     {
       id: 'storage',

@@ -7,8 +7,17 @@ const profile = process.env.OGC_STAGING_UI_PROFILE;
 const repo = process.env.OGC_STAGING_UI_REPOSITORY;
 if (!profile || !repo) throw new Error('An isolated staging fixture is required.');
 const showMessageBox = dialog.showMessageBox.bind(dialog);
-dialog.showMessageBox = (...args) =>
-  args.at(-1)?.message === 'Restore branch reference?' ? Promise.resolve({ response: 1, checkboxChecked: false }) : showMessageBox(...args);
+let backupDeletionPrompts = 0;
+dialog.showMessageBox = (...args) => {
+  switch (args.at(-1)?.message) {
+    case 'Restore branch reference?':
+      return Promise.resolve({ response: 1, checkboxChecked: false });
+    case 'Permanently delete backup?':
+      return Promise.resolve({ response: backupDeletionPrompts++ === 0 ? 0 : 1, checkboxChecked: false });
+    default:
+      return showMessageBox(...args);
+  }
+};
 app.disableHardwareAcceleration();
 app.setPath('userData', profile);
 app.setPath('sessionData', path.join(profile, 'session'));
@@ -80,6 +89,38 @@ async function measure(mode, selector, count) {
   assert.ok(elapsed < 10000, 'The full snapshot must not block the file list.');
   return { mode, clickToFrameMs: elapsed };
 }
+async function clickButton(scope, text) {
+  await parent.webContents.executeJavaScript(`(() => {
+    const button = [...document.querySelectorAll(${JSON.stringify(`${scope} button`)})].find(item => item.textContent.trim() === ${JSON.stringify(text)});
+    if (!button || button.disabled) throw new Error('Missing enabled button: ' + ${JSON.stringify(text)});
+    button.click();
+  })()`);
+}
+
+async function verifyBackupSettings() {
+  const view = '#settings-branch-backups';
+  await clickButton('.recovery-center', 'Repository backups');
+  const read = (source) => parent.webContents.executeJavaScript(source);
+  await until(() => read('Boolean(document.querySelector(".backup-repository input"))'), 'Backup settings page');
+  await clickButton(view, 'Select all');
+  await until(() => read('Boolean(document.querySelector(".backup-repository input:checked"))'), 'Select repository for automatic backup');
+  await clickButton(view, 'Deselect all');
+  await until(() => read('Boolean(document.querySelector(".backup-repository input:not(:checked)"))'), 'Clear automatic backup selection');
+  await clickButton(view, 'Back up now');
+  await until(
+    () => read('document.querySelector(".backup-total")?.textContent.includes("1 version at this destination")'),
+    'Manual backup at default location',
+  );
+  await read('document.querySelector(".backup-repository details").open = true');
+  await clickButton('.backup-versions', 'Delete …');
+  await until(
+    async () => backupDeletionPrompts === 1 && (await read('Boolean(document.querySelector(".backup-versions button:not(:disabled)"))')),
+    'Cancelled backup deletion',
+  );
+  await clickButton('.backup-versions', 'Delete …');
+  await until(() => read('document.querySelector(".backup-total")?.textContent.includes("0 versions at this destination")'), 'Confirmed backup deletion');
+  assert.equal(backupDeletionPrompts, 2);
+}
 require('../dist-electron/electron/main.js');
 app
   .whenReady()
@@ -141,12 +182,13 @@ app
       'Confirmed repair',
     );
     assert.deepEqual(fs.readFileSync(ref), originalRef);
+    await verifyBackupSettings();
     assert.equal(execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: repo, encoding: 'utf8', windowsHide: true }).trim().split('\n').length, 400);
     assert.deepEqual(errors, [], 'No unhandled renderer failures.');
     fs.writeFileSync(path.resolve(__dirname, '../build/staging-ui.json'), JSON.stringify(results, null, 2) + '\n');
     fs.writeFileSync(path.join(profile, 'verified'), 'yes');
     clearTimeout(timeout);
-    console.log('Native staging and branch recovery checks passed.');
+    console.log('Native staging, branch recovery and backup settings checks passed.');
     app.quit();
   })
   .catch(fail);

@@ -8,31 +8,43 @@ import { RecoveryHistory } from './recovery-center/RecoveryHistory';
 import { RecoveryActions } from './recovery-center/RecoveryActions';
 import { RecoveryNotice } from './recovery-center/RecoveryNotice';
 import { BranchRepairPanel } from './recovery-center/BranchRepairPanel';
-import { branchRecoveryClient } from '@/services/branchRecoveryClient';
+import { branchBackupClient, branchRecoveryClient } from '@/services/branchRecoveryClient';
 import type { BranchHeadProblem } from '@/shared/ipc/branchRecovery';
+import { useOpenSettingsGroup } from '@/hooks/useOpenSettingsGroup';
 
 export function RecoveryCenter(props: RecoveryCenterProps & { headProblem?: BranchHeadProblem | null }) {
   const { tr } = useI18n();
   const canRepair = branchRecoveryClient.isAvailable();
+  const openSettings = useOpenSettingsGroup();
+  const canManageBackups = openSettings && branchBackupClient.isAvailable();
   const showBranchRepair = Boolean(props.headProblem && canRepair);
   const state = useRecoveryCenter({ ...props, repoPath: showBranchRepair ? null : props.repoPath });
   const { entries, selected, isLoading, isBusy, isAvailable, loadReflog, loadIssue, dangerAction, setDangerAction } = state;
   return (
     <section className="recovery-center" data-tutorial="recovery" data-loading={isLoading} aria-label={tr('Recovery Center', 'Recovery Center')}>
-      {!showBranchRepair && (
+      {(!showBranchRepair || canManageBackups) && (
         <header className="recovery-center__intro">
-          <p>{tr('Frühere Commits wiederfinden und auf einem neuen Branch weiterarbeiten.', 'Find earlier commits and continue working on a new branch.')}</p>
+          {!showBranchRepair && (
+            <p>{tr('Frühere Commits wiederfinden und auf einem neuen Branch weiterarbeiten.', 'Find earlier commits and continue working on a new branch.')}</p>
+          )}
           <div className="recovery-center__intro-actions">
-            <Button
-              data-tutorial="recovery-refresh"
-              size="xs"
-              variant="ghost"
-              icon={isLoading ? <Loader2 size={13} className="spin" /> : <RefreshCw size={13} />}
-              disabled={isLoading || isBusy || !props.repoPath || !isAvailable}
-              onClick={() => void loadReflog()}
-            >
-              {tr('Aktualisieren', 'Refresh')}
-            </Button>
+            {canManageBackups && (
+              <Button size="xs" variant="ghost" onClick={() => openSettings({ id: 'branch-backups', tab: 'backups' })}>
+                {tr('Repository-Sicherungen', 'Repository backups')}
+              </Button>
+            )}
+            {!showBranchRepair && (
+              <Button
+                data-tutorial="recovery-refresh"
+                size="xs"
+                variant="ghost"
+                icon={isLoading ? <Loader2 size={13} className="spin" /> : <RefreshCw size={13} />}
+                disabled={isLoading || isBusy || !props.repoPath || !isAvailable}
+                onClick={() => void loadReflog()}
+              >
+                {tr('Aktualisieren', 'Refresh')}
+              </Button>
+            )}
           </div>
         </header>
       )}

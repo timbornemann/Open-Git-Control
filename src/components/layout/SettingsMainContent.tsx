@@ -22,6 +22,7 @@ import {
 import { useSettingsPanelModel } from './settings/useSettingsPanelModel';
 import { SettingsDiagnosticsSection } from './settings/SettingsDiagnosticsSection';
 import { SettingsStorageSection } from './settings/SettingsStorageSection';
+import { BranchBackupSettings } from './settings/BranchBackupSettings';
 import { SettingsUserNotesSection } from './settings/SettingsUserNotesSection';
 import { SettingsKeyboardShortcutsSection } from './settings/SettingsKeyboardShortcutsSection';
 import { getSettingsCategories, searchSettingsGroups } from './settings/settingsNavigation';
@@ -220,6 +221,8 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
           )}
 
           {activeTab === 'security' && <SettingsSecuritySection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" />}
+
+          {activeTab === 'backups' && <BranchBackupSettings />}
 
           {activeTab === 'system' && (
             <div className="settings-grid">

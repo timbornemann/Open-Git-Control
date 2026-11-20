@@ -1,4 +1,4 @@
-import type { RepairBranchRequest } from '@/shared/ipc/branchRecovery';
+import type { BranchBackupRemoval, BranchBackupSelection, RepairBranchRequest } from '@/shared/ipc/branchRecovery';
 import { invalidateResources } from '@/data/clientCache';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { getElectronApi, requireElectronAppApi, requireElectronGitApi } from './electronApi';
@@ -19,5 +19,9 @@ export const branchBackupClient = {
   isAvailable: () => typeof getElectronApi()?.app?.getBranchBackupOverview === 'function',
   overview: () => requireElectronAppApi().getBranchBackupOverview(),
   chooseDirectory: () => requireElectronAppApi().chooseBranchBackupDirectory(),
+  resetDirectory: () => requireElectronAppApi().resetBranchBackupDirectory(),
   enable: (enabled: boolean) => requireElectronAppApi().setBranchBackupEnabled(enabled),
+  select: (selection: BranchBackupSelection) => requireElectronAppApi().setBranchBackupSelection(selection),
+  backupNow: (repoPath: string) => requireElectronAppApi().backupBranchesNow(repoPath),
+  remove: (selection: BranchBackupRemoval) => requireElectronAppApi().removeBranchBackups(selection),
 };

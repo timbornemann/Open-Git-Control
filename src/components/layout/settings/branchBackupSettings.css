@@ -1,0 +1,102 @@
+.backup-settings,
+.backup-repositories,
+.backup-versions {
+  display: grid;
+  gap: 12px;
+}
+
+.backup-destination,
+.backup-repository-header,
+.backup-repository-controls,
+.backup-list-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  flex-wrap: wrap;
+}
+
+.backup-destination-path,
+.backup-repository-path {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.backup-destination-path span,
+.backup-total {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.backup-destination-path code,
+.backup-repository-path code {
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.backup-total {
+  padding: 9px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.backup-total span,
+.backup-settings small {
+  color: var(--text-secondary);
+}
+
+.backup-list-tools input {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.backup-repositories,
+.backup-versions {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.backup-repository {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.backup-repository-summary {
+  display: grid;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.backup-repository-controls .settings-switch-row {
+  flex: 1;
+}
+
+.backup-versions {
+  gap: 4px;
+}
+
+.backup-versions li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.backup-versions li > span:first-child {
+  flex: 1 1 170px;
+}
+
+.backup-notice {
+  color: var(--text-primary);
+}

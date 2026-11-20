@@ -34,17 +34,36 @@ export interface RepairBranchRequest {
 }
 
 export interface BranchBackupStatus {
-  repoPath: string;
+  repoPath: string | null;
+  repositoryKey: string | null;
+  registered: boolean;
+  automatic: boolean;
+  busy: boolean;
   checkedAt: number | null;
   verifiedAt: number | null;
   lastError: string | null;
+  versions: BranchBackupVersion[];
+}
+
+export interface BranchBackupVersion {
+  id: string;
+  verifiedAt: number;
+  bytes: number;
 }
 
 export interface BranchBackupOverview {
   enabled: boolean;
-  directory: string | null;
+  directory: string;
+  defaultDirectory: string;
+  directoryError: string | null;
+  versionCount: number;
+  totalBytes: number;
   repositories: BranchBackupStatus[];
 }
+
+export type BranchBackupSelection = { automatic: boolean; repoPath?: string };
+export type BranchBackupRemoval = { repositoryKey: string; versionId?: string };
+export type BranchBackupOutcome = 'created' | 'up-to-date' | 'empty';
 
 export interface ElectronBranchRecoveryAPI {
   getRepositoryHead: (repoPath: string) => Promise<IpcResult<RepositoryHead>>;
@@ -55,5 +74,9 @@ export interface ElectronBranchRecoveryAPI {
 export interface ElectronBranchBackupAPI {
   getBranchBackupOverview: () => Promise<IpcResult<BranchBackupOverview>>;
   chooseBranchBackupDirectory: () => Promise<IpcResult<BranchBackupOverview>>;
+  resetBranchBackupDirectory: () => Promise<IpcResult<BranchBackupOverview>>;
   setBranchBackupEnabled: (enabled: boolean) => Promise<IpcResult<BranchBackupOverview>>;
+  setBranchBackupSelection: (selection: BranchBackupSelection) => Promise<IpcResult<BranchBackupOverview>>;
+  backupBranchesNow: (repoPath: string) => Promise<IpcResult<BranchBackupOutcome>>;
+  removeBranchBackups: (selection: BranchBackupRemoval) => Promise<IpcResult<number>>;
 }
