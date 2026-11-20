@@ -5,7 +5,6 @@ import { formatDate, formatTime } from '@/utils/dateTime';
 import {
   formatRecoveryDate,
   getRecoveryActionLabel,
-  getRecoveryEntryKey,
   getRecoveryEntryKind,
   getRecoveryLoadViewState,
   getRecoveryDescription,
@@ -122,7 +121,7 @@ export function RecoveryHistory({ state }: { state: RecoveryCenterState }) {
           </div>
         ) : (
           filtered.map((entry, index) => {
-            const key = getRecoveryEntryKey(entry);
+            const key = entry.id;
             const kind = getRecoveryEntryKind(entry);
             const label = getRecoveryActionLabel(entry, tr);
             const description = getRecoveryDescription(entry, tr);

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { peekResource } from '@/data/clientCache';
 import type { IpcResult } from '@/types/ipc';
-import type { GitReflogEntryDto } from '@/types/git';
 import type { GitCommandNameDto } from '@/types/gitDtos';
 import { useAppToastSetter } from '@/hooks/useAppToast';
 import { useI18n } from '@/i18n';
@@ -11,12 +10,12 @@ import { validateBranchName } from '@/utils/gitRefValidation';
 import { confirmWorkingDirectoryNavigation } from '@/components/working-directory/workingDirectoryNavigationGuard';
 import {
   filterRecoveryEntries,
-  getRecoveryEntryKey,
-  selectLoadedRecoveryKey,
+  identifyRecoveryEntries,
   sortRecoveryEntries,
   type RecoveryActionId,
   type RecoveryCenterProps,
   type RecoveryDangerAction,
+  type RecoveryEntry,
   type RecoveryEntryFilter,
   type RecoveryIssue,
 } from './recoveryCenterUtils';
@@ -28,9 +27,9 @@ export function useRecoveryCenter({ repoPath, refreshTrigger, onRepoChanged, set
   const loadSequence = useRef(0);
   const context = useRef({ repoPath, mounted: true });
   const activeAction = useRef<object | null>(null);
-  const [loaded, setLoaded] = useState<{ repoPath: string | null; entries: GitReflogEntryDto[] }>(() => {
+  const [loaded, setLoaded] = useState<{ repoPath: string | null; entries: RecoveryEntry[] }>(() => {
     const cached = peekResource<IpcResult<string>>('git', 'runGitCommandForRepo', [repoPath, 'reflog', '300']);
-    return { repoPath, entries: cached?.success ? parseGitReflog(cached.data) : [] };
+    return { repoPath, entries: cached?.success ? identifyRecoveryEntries(parseGitReflog(cached.data)) : [] };
   });
   const loadedRef = useRef(loaded);
   useLayoutEffect(() => {
@@ -89,7 +88,7 @@ export function useRecoveryCenter({ repoPath, refreshTrigger, onRepoChanged, set
         );
         const nextEntries = sortRecoveryEntries([...result.entries, ...retained]);
         setLoaded({ repoPath, entries: nextEntries });
-        setSelectedKey((current) => selectLoadedRecoveryKey(current, nextEntries, previousEntries));
+        setSelectedKey((current) => (nextEntries.some((entry) => entry.id === current) ? current : (nextEntries[0]?.id ?? null)));
       }
     } catch (error: unknown) {
       if (requestId !== loadSequence.current || !context.current.mounted || context.current.repoPath !== repoPath) return;
@@ -110,16 +109,15 @@ export function useRecoveryCenter({ repoPath, refreshTrigger, onRepoChanged, set
   }, [loadReflog, refreshTrigger]);
 
   const filtered = useMemo(() => filterRecoveryEntries(entries, filter, source), [entries, filter, source]);
-  const selected = filtered.find((entry) => getRecoveryEntryKey(entry) === selectedKey) ?? filtered[0] ?? null;
-  const entryKey = selected ? getRecoveryEntryKey(selected) : null;
-  const draftKey = selected ? `${selected.hash}\u0000${selected.date}\u0000${selected.subject}` : null;
+  const selected = filtered.find((entry) => entry.id === selectedKey) ?? filtered[0] ?? null;
+  const entryKey = selected?.id ?? null;
   const abbrevHash = selected?.abbrevHash ?? '';
   useEffect(() => {
     setBranchName(abbrevHash ? `recovery-${abbrevHash}` : '');
     setBranchNameTouched(false);
     setActionIssue(null);
     setSuccessMessage(null);
-  }, [abbrevHash, draftKey, repoPath]);
+  }, [abbrevHash, entryKey, repoPath]);
 
   const runAction = useCallback(
     async (actionId: RecoveryActionId, args: string[], message: string) => {

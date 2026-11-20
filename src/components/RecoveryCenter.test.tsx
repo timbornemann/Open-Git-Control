@@ -102,6 +102,36 @@ describe('RecoveryCenter', () => {
     expect(historyItems[1]?.getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('keeps same-second reflog events distinct across refreshes', async () => {
+    const repeated = {
+      hash: 'a'.repeat(40),
+      abbrevHash: 'aaaaaaa',
+      selector: 'HEAD@{2026-10-18 19:09:26 +0200}',
+      subject: 'reset: moving to HEAD',
+      date: '2026-07-30T12:00:00.000Z',
+    };
+    const checkout = { ...repeated, subject: 'checkout: moving from feature to main' };
+    const log = vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: buildReflog([checkout, repeated, repeated]) });
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const historyItems = () => [...host.querySelectorAll<HTMLButtonElement>('.recovery-center__history-item')];
+    const selection = () => historyItems().map((item) => item.getAttribute('aria-pressed'));
+    await renderCenter();
+
+    expect(historyItems()).toHaveLength(3);
+    expect(host.querySelector('.recovery-center__selection h2')?.textContent).toBe('From feature to main');
+    act(() => historyItems()[2].click());
+    expect(host.querySelector('.recovery-center__selection h2')?.textContent).toBe('Reset to HEAD');
+    expect(selection()).toEqual(['false', 'false', 'true']);
+    enterText(host.querySelector<HTMLInputElement>('#recovery-branch-name')!, 'keep/same-second');
+
+    log.mockResolvedValue({ success: true, data: buildReflog([repeated, checkout, repeated, repeated]) });
+    await renderCenter({ refreshTrigger: 1 });
+
+    expect(selection()).toEqual(['false', 'false', 'false', 'true']);
+    expect(host.querySelector<HTMLInputElement>('#recovery-branch-name')?.value).toBe('keep/same-second');
+    expect(errors.mock.calls.flat().join(' ')).not.toContain('Encountered two children with the same key');
+  });
+
   it('shows durable message backups even when their reflog position has expired', async () => {
     vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: '' });
     vi.mocked(gitClient.getCommitMessageEditBackups).mockResolvedValue({

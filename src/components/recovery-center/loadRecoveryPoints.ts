@@ -2,7 +2,7 @@ import { gitClient } from '@/services/gitClient';
 import { parseGitReflog } from '@/utils/gitParsing';
 import type { TranslateFn } from '@/i18n';
 import type { IpcResult } from '@/types/ipc';
-import { messageBackupEntries, sortRecoveryEntries, type RecoveryIssue } from './recoveryCenterUtils';
+import { identifyRecoveryEntries, messageBackupEntries, sortRecoveryEntries, type RecoveryIssue } from './recoveryCenterUtils';
 
 function failureDetail(result: PromiseSettledResult<IpcResult<unknown>>): string {
   if (result.status === 'rejected') return result.reason instanceof Error ? result.reason.message : String(result.reason);
@@ -33,9 +33,11 @@ export async function loadRecoveryPoints(repoPath: string, tr: TranslateFn) {
       );
     issue = { message, details: [failureDetail(history), failureDetail(backups)].filter(Boolean).join('\n') };
   }
-  const entries = sortRecoveryEntries([
-    ...messageBackupEntries(backupResult?.success ? backupResult.data : [], tr('Nachrichten-Sicherung', 'Message backup')),
-    ...parseGitReflog(historyResult?.success ? String(historyResult.data || '') : ''),
-  ]);
+  const entries = sortRecoveryEntries(
+    identifyRecoveryEntries([
+      ...messageBackupEntries(backupResult?.success ? backupResult.data : [], tr('Nachrichten-Sicherung', 'Message backup')),
+      ...parseGitReflog(historyResult?.success ? String(historyResult.data || '') : ''),
+    ]),
+  );
   return { entries, issue, historyAvailable, backupsAvailable };
 }

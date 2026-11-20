@@ -162,6 +162,8 @@ app
       .filter(Boolean);
     assert.equal(staged.length, 400);
     release();
+    const sameSecond = { ...process.env, GIT_COMMITTER_DATE: '2026-10-18T19:09:26+02:00' };
+    for (let repeat = 0; repeat < 2; repeat++) execFileSync('git', ['reset', '--soft', 'HEAD'], { cwd: repo, windowsHide: true, env: sameSecond });
     const ref = path.join(repo, '.git', 'refs', 'heads', 'main');
     const originalRef = fs.readFileSync(ref);
     fs.writeFileSync(ref, Buffer.alloc(41));
@@ -180,6 +182,10 @@ app
       () =>
         parent.webContents.executeJavaScript('document.querySelector(".branch-repair-panel [role=status]")?.textContent.includes("Branch reference restored")'),
       'Confirmed repair',
+    );
+    await until(
+      () => parent.webContents.executeJavaScript('document.querySelectorAll("[data-recovery-kind=reset]").length === 2'),
+      'Both same-second reflog entries are visible',
     );
     assert.deepEqual(fs.readFileSync(ref), originalRef);
     await verifyBackupSettings();

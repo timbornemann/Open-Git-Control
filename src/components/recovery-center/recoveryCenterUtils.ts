@@ -23,6 +23,7 @@ export type RecoveryCenterProps = {
 export type RecoveryActionId = 'branch' | 'checkout' | 'reset';
 export type RecoveryEntryKind = 'backup' | 'commit' | 'checkout' | 'reset' | 'merge' | 'rebase' | 'other';
 export type RecoveryEntryFilter = 'all' | 'backup' | 'history';
+export type RecoveryEntry = GitReflogEntryDto & { id: string };
 export type RecoveryIssue = { message: string; details: string };
 
 export type RecoveryDangerAction = {
@@ -35,17 +36,23 @@ export type RecoveryDangerAction = {
   run: () => Promise<void>;
 } | null;
 
-export const getRecoveryEntryKey = (entry: GitReflogEntryDto): string => `${entry.selector}\u0000${entry.hash}`;
+export function identifyRecoveryEntries(entries: GitReflogEntryDto[]): RecoveryEntry[] {
+  const occurrences = new Map<string, number>();
+  const identified = new Array<RecoveryEntry>(entries.length);
+  // Git reports newest first. Start with the oldest so a newer identical event keeps existing IDs stable.
+  for (let index = entries.length - 1; index >= 0; index--) {
+    const entry = entries[index];
+    const selector = entry.selector.replace(/@\{\d+\}$/, '@{}');
+    const subject = getRecoveryEntryKind(entry) === 'backup' ? '' : entry.subject;
+    const signature = JSON.stringify([selector, entry.hash, entry.date, subject]);
+    const occurrence = (occurrences.get(signature) ?? 0) + 1;
+    occurrences.set(signature, occurrence);
+    identified[index] = { ...entry, id: `${signature}:${occurrence}` };
+  }
+  return identified;
+}
 
-export const selectLoadedRecoveryKey = (current: string | null, entries: GitReflogEntryDto[], previousEntries: GitReflogEntryDto[] = []): string | null => {
-  const previous = previousEntries.find((entry) => getRecoveryEntryKey(entry) === current);
-  const moved = previous && entries.find((entry) => entry.hash === previous.hash && entry.date === previous.date && entry.subject === previous.subject);
-  if (moved) return getRecoveryEntryKey(moved);
-  if (!previous && current && entries.some((entry) => getRecoveryEntryKey(entry) === current)) return current;
-  return entries[0] ? getRecoveryEntryKey(entries[0]) : null;
-};
-
-export const filterRecoveryEntries = (entries: GitReflogEntryDto[], filter: string, source: RecoveryEntryFilter = 'all'): GitReflogEntryDto[] => {
+export const filterRecoveryEntries = (entries: RecoveryEntry[], filter: string, source: RecoveryEntryFilter = 'all'): RecoveryEntry[] => {
   const query = filter.trim().toLowerCase();
   return entries.filter((entry) => {
     const backup = getRecoveryEntryKind(entry) === 'backup';
@@ -54,7 +61,7 @@ export const filterRecoveryEntries = (entries: GitReflogEntryDto[], filter: stri
   });
 };
 
-export const sortRecoveryEntries = (entries: GitReflogEntryDto[]): GitReflogEntryDto[] =>
+export const sortRecoveryEntries = (entries: RecoveryEntry[]): RecoveryEntry[] =>
   [...entries].sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
 
 export const getRecoveryEntryKind = (entry: GitReflogEntryDto): RecoveryEntryKind => {
