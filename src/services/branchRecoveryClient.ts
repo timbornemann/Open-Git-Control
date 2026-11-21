@@ -3,8 +3,13 @@ import { invalidateResources } from '@/data/clientCache';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { getElectronApi, requireElectronAppApi, requireElectronGitApi } from './electronApi';
 
+// The tutorial bridge also returns callable failure stubs for unimplemented methods.
+function hasDeclaredMethod<T extends object>(api: T | undefined, method: keyof T): boolean {
+  return Boolean(api && Object.prototype.hasOwnProperty.call(api, method) && typeof api[method] === 'function');
+}
+
 export const branchRecoveryClient = {
-  isAvailable: () => typeof getElectronApi()?.git?.inspectBranchRecovery === 'function',
+  isAvailable: () => hasDeclaredMethod(getElectronApi()?.git, 'inspectBranchRecovery'),
   inspect: (repoPath: string) => requireElectronGitApi().inspectBranchRecovery(repoPath),
   repair: async (request: RepairBranchRequest) => {
     const result = await requireElectronGitApi().repairBranch(request);
@@ -16,7 +21,7 @@ export const branchRecoveryClient = {
 };
 
 export const branchBackupClient = {
-  isAvailable: () => typeof getElectronApi()?.app?.getBranchBackupOverview === 'function',
+  isAvailable: () => hasDeclaredMethod(getElectronApi()?.app, 'getBranchBackupOverview'),
   overview: () => requireElectronAppApi().getBranchBackupOverview(),
   chooseDirectory: () => requireElectronAppApi().chooseBranchBackupDirectory(),
   resetDirectory: () => requireElectronAppApi().resetBranchBackupDirectory(),

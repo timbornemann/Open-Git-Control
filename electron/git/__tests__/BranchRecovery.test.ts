@@ -13,6 +13,7 @@ import { BranchTipJournal } from '../BranchTipJournal';
 import { RepositoryHeadService } from '../RepositoryHeadService';
 import { configureFixtureRepository } from './gitFixtureHistory';
 
+const tempDirectory = fs.realpathSync.native(os.tmpdir());
 let root: string;
 let repo: string;
 let backupDir: string;
@@ -36,7 +37,8 @@ function commit(subject: string, cwd = repo) {
 }
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-branch-repair-test-'));
+  // Bundle storage expects the same canonical path that the destination picker supplies.
+  root = fs.mkdtempSync(path.join(tempDirectory, 'ogc-branch-repair-test-'));
   repo = path.join(root, 'repo');
   backupDir = path.join(root, 'backup-disk');
   fs.mkdirSync(repo);
@@ -59,7 +61,7 @@ afterEach(async () => {
   await runner?.close();
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
-  if (path.dirname(path.resolve(root)) !== path.resolve(os.tmpdir()) || !path.basename(root).startsWith('ogc-branch-repair-test-'))
+  if (path.dirname(path.resolve(root)) !== tempDirectory || !path.basename(root).startsWith('ogc-branch-repair-test-'))
     throw new Error('Invalid fixture directory.');
   fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
